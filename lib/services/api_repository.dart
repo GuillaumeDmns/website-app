@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import '../models/lines_response.dart';
 import '../models/stops_by_line_dto.dart';
+import '../models/unit_idfm_dto.dart';
 import 'api_interceptor.dart';
 
 class ApiRepository {
@@ -61,4 +62,18 @@ class ApiRepository {
       throw Exception('Failed to load stops and shape');
     }
   }
+
+  Future<UnitIDFMDTO> fetchNextDepartures(String stopId, String lineId) async {
+    final response = await client.get(
+      Uri.parse('https://guillaumedamiens.com/api/get-stop-next-passages?stopId=$stopId&lineId=$lineId'),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return UnitIDFMDTO.fromJson(json);
+    } else {
+      throw Exception('Failed to fetch next departures');
+    }
+  }
+
 }

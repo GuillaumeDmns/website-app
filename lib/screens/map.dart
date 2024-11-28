@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geojson_vi/geojson_vi.dart';
 
+import '../app_settings.dart';
+import '../models/call_unit.dart';
 import '../models/line_dto.dart';
 import '../models/stops_by_line_dto.dart';
 import '../services/api_repository.dart';
@@ -43,22 +45,26 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (response.stops.isNotEmpty) {
-      _addStopsMarkers(response.stops, lineColor);
+      _addStopsMarkers(response.stops, lineId, lineColor);
     }
   }
 
-  void _addStopsMarkers(List<IDFMStopArea> stops, Color lineColor) {
+  void _addStopsMarkers(List<IDFMStopArea> stops, String lineId, Color lineColor) {
     setState(() {
       markers.clear();
       for (final stop in stops) {
         if (stop.latitude != null && stop.longitude != null) {
           markers.add(Marker(
             point: LatLng(stop.latitude!, stop.longitude!),
-            alignment: const Alignment(0, -0.5),
-            child: Icon(
-              Icons.location_on,
-              color: lineColor,
-              size: 20.0,
+            width: 30.0,
+            height: 30.0,
+            child: GestureDetector(
+              onTap: () => _onMarkerTap(stop.id!, lineId),
+              child: Icon(
+                Icons.location_on,
+                color: lineColor,
+                size: 20.0,
+              ),
             ),
           ));
         }
@@ -79,6 +85,121 @@ class _MapScreenState extends State<MapScreen> {
         );
       }).toList();
     });
+  }
+
+  void _onMarkerTap(String stopId, String lineId) async {
+    try {
+      final nextDepartures = await api.fetchNextDepartures(stopId, lineId);
+
+      if (nextDepartures.nextPassages != null &&
+          nextDepartures.nextPassages!.isNotEmpty) {
+        final groupedDepartures = <String, List<CallUnit>>{};
+
+        for (var passage in nextDepartures.nextPassages!) {
+          final destination = passage.destinationName ?? 'Unknown Destination';
+          groupedDepartures.putIfAbsent(destination, () => []).add(passage);
+        }
+
+        _showNextDeparturesDialog(groupedDepartures);
+      } else {
+        _showNoDeparturesDialog();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching departures: $e')),
+      );
+    }
+  }
+
+  void _showNextDeparturesDialog(Map<String, List<CallUnit>> groupedDepartures) {
+    showDialog(
+      context: AppSettings.navigatorState.currentContext!,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Next Departures'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: groupedDepartures.entries.map((entry) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.key,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.0,
+                      ),
+                    ),
+                    ...entry.value.map((callUnit) {
+                      return ListTile(
+                        title: Text(
+                          'Departure: ${_formatTimeRelativeToNow(callUnit.expectedDepartureTime)}',
+                        ),
+                        subtitle: callUnit.arrivalPlatformName != null ? Text(
+                          'Platform: ${callUnit.arrivalPlatformName}',
+                        ) : null,
+                        trailing: Text(
+                          callUnit.departureStatus ?? '',
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showNoDeparturesDialog() {
+    showDialog(
+      context: AppSettings.navigatorState.currentContext!,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Next Departures'),
+          content: const Text('No departures available.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatTimeRelativeToNow(String? timestamp) {
+    if (timestamp == null) return 'N/A';
+
+    final departureTime = DateTime.tryParse(timestamp);
+    if (departureTime == null) return 'N/A';
+
+    final now = DateTime.now();
+    final difference = departureTime.difference(now);
+
+    if (difference.inMinutes < 1) {
+      return 'Now';
+    } else if (difference.inMinutes < 60) {
+      return 'in ${difference.inMinutes} min';
+    } else {
+      return 'in ${difference.inHours} h ${difference.inMinutes % 60} min';
+    }
   }
 
   @override
