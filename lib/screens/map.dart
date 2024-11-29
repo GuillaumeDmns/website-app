@@ -24,6 +24,7 @@ class _MapScreenState extends State<MapScreen> {
   List<Polyline> polylines = [];
   List<Marker> markers = [];
   Map<String, int> transportModeCount = {};
+  final MapController _mapController = MapController();
 
   final api = ApiRepository();
 
@@ -50,27 +51,46 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _addStopsMarkers(List<IDFMStopArea> stops, String lineId, Color lineColor) {
+    if (stops.isEmpty) return;
+
+    final validStops = stops.where((stop) => stop.latitude != null && stop.longitude != null).toList();
+    if (validStops.isEmpty) return;
+
+    final minLat = validStops.reduce((prev, curr) => curr.latitude! < prev.latitude! ? curr : prev).latitude!;
+    final maxLat = validStops.reduce((prev, curr) => curr.latitude! > prev.latitude! ? curr : prev).latitude!;
+    final minLong = validStops.reduce((prev, curr) => curr.longitude! < prev.longitude! ? curr : prev).longitude!;
+    final maxLong = validStops.reduce((prev, curr) => curr.longitude! > prev.longitude! ? curr : prev).longitude!;
+
     setState(() {
       markers.clear();
-      for (final stop in stops) {
-        if (stop.latitude != null && stop.longitude != null) {
-          markers.add(Marker(
-            point: LatLng(stop.latitude!, stop.longitude!),
-            width: 30.0,
-            height: 30.0,
-            child: GestureDetector(
-              onTap: () => _onMarkerTap(stop.id!, lineId),
-              child: Icon(
-                Icons.location_on,
-                color: lineColor,
-                size: 20.0,
-              ),
+      for (final stop in validStops) {
+        markers.add(Marker(
+          point: LatLng(stop.latitude!, stop.longitude!),
+          width: 8.0,
+          height: 8.0,
+          child: GestureDetector(
+            onTap: () => _onMarkerTap(stop.id!, stop.name!, lineId),
+            child: Icon(
+              Icons.circle,
+              color: lineColor,
+              size: 8.0,
             ),
-          ));
-        }
+          ),
+        ));
       }
     });
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds(
+          LatLng(minLat, minLong),
+          LatLng(maxLat, maxLong),
+        ),
+        padding: const EdgeInsets.all(40.0)
+      )
+    );
   }
+
 
   void _parseShapeGeoJson(StopsByLineDTO stopsByLine, Color lineColor) {
     final geoJsonMultilineString = GeoJSONMultiLineString.fromJSON(stopsByLine.shape);
@@ -87,7 +107,7 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _onMarkerTap(String stopId, String lineId) async {
+  void _onMarkerTap(String stopId, String lineName, String lineId) async {
     try {
       final nextDepartures = await api.fetchNextDepartures(stopId, lineId);
 
@@ -100,7 +120,7 @@ class _MapScreenState extends State<MapScreen> {
           groupedDepartures.putIfAbsent(destination, () => []).add(passage);
         }
 
-        _showNextDeparturesDialog(groupedDepartures);
+        _showNextDeparturesDialog(lineName, groupedDepartures);
       } else {
         _showNoDeparturesDialog();
       }
@@ -111,12 +131,12 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _showNextDeparturesDialog(Map<String, List<CallUnit>> groupedDepartures) {
+  void _showNextDeparturesDialog(String lineName, Map<String, List<CallUnit>> groupedDepartures) {
     showDialog(
       context: AppSettings.navigatorState.currentContext!,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Next Departures'),
+          title: Text(lineName),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -218,6 +238,7 @@ class _MapScreenState extends State<MapScreen> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: _mapController,
             options: const MapOptions(
               initialCenter: LatLng(48.864716, 2.349014),
               initialZoom: 11,
