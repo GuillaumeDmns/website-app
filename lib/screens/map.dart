@@ -29,7 +29,6 @@ class _MapScreenState extends State<MapScreen> {
   Map<String, int> transportModeCount = {};
   bool isLoadingDepartures = false;
   final MapController _mapController = MapController();
-  StreamSubscription<Position>? _positionStreamSubscription;
   Marker? _userMarker;
 
   final api = ApiRepository();
@@ -244,27 +243,6 @@ class _MapScreenState extends State<MapScreen> {
         );
         return;
       }
-
-      _positionStreamSubscription =
-          Geolocator.getPositionStream().listen((Position position) {
-            final userLatLng = LatLng(position.latitude, position.longitude);
-
-            setState(() {
-              _userMarker = Marker(
-                point: userLatLng,
-                width: 20.0,
-                height: 20.0,
-                child: const Icon(
-                  Icons.person_pin_circle,
-                  size: 40.0,
-                  color: Colors.blue,
-                ),
-              );
-            });
-
-            // Centrer la carte automatiquement sur la position
-            _mapController.move(userLatLng, _mapController.camera.zoom);
-          });
     });
   }
 
@@ -277,15 +255,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   @override
-  void dispose() {
-    _positionStreamSubscription?.cancel();
-    super.dispose();
-  }
-
-
-  @override
   Widget build(BuildContext context) {
-    return Stack(
+    return PopScope(canPop: false, child: Stack(
       children: [
         Scaffold(
           appBar: AppBar(
@@ -333,29 +304,7 @@ class _MapScreenState extends State<MapScreen> {
                     FloatingActionButton(
                       onPressed: () => _openTransportModeSelector(context),
                       child: const Icon(Icons.directions_transit),
-                    ),
-                    const SizedBox(height: 16),
-                    FloatingActionButton(
-                      onPressed: () {
-                        if (_positionStreamSubscription != null) {
-                          _positionStreamSubscription?.cancel();
-                          setState(() {
-                            _positionStreamSubscription = null;
-                            _userMarker = null;
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Location tracking stopped.')),
-                          );
-                        } else {
-                          _startLocationTracking();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Location tracking started.')),
-                          );
-                        }
-                      },
-                      child: Icon(_positionStreamSubscription == null ? Icons.play_arrow : Icons.stop),
-                    ),
-
+                    )
                   ],
                 ),
               ),
@@ -368,9 +317,9 @@ class _MapScreenState extends State<MapScreen> {
             child: const Center(
               child: CircularProgressIndicator(),
             ),
-          ),
+          )
       ],
-    );
+    ));
   }
 
   Future<void> _centerOnUserLocation() async {
@@ -403,11 +352,29 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       Position position = await Geolocator.getCurrentPosition();
+      LatLng userLatLng = LatLng(position.latitude, position.longitude);
 
       _mapController.move(
-        LatLng(position.latitude, position.longitude),
-        16.0, // Niveau de zoom
+        userLatLng,
+        16.0,
       );
+
+      setState(() {
+        _userMarker = Marker(
+          alignment: Alignment.topCenter,
+          point: userLatLng,
+          width: 40.0,
+          height: 40.0,
+          child: const Icon(
+            Icons.person_pin_circle,
+            size: 40.0,
+            color: Colors.blue,
+          ),
+        );
+
+        _mapController.move(userLatLng, _mapController.camera.zoom);
+      });
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to get location: $e')),
