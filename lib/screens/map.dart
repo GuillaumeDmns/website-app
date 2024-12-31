@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geojson_vi/geojson_vi.dart';
 
@@ -24,7 +27,9 @@ class _MapScreenState extends State<MapScreen> {
   List<Polyline> polylines = [];
   List<Marker> markers = [];
   Map<String, int> transportModeCount = {};
+  bool isLoadingDepartures = false;
   final MapController _mapController = MapController();
+  Marker? _userMarker;
 
   final api = ApiRepository();
 
@@ -66,14 +71,14 @@ class _MapScreenState extends State<MapScreen> {
       for (final stop in validStops) {
         markers.add(Marker(
           point: LatLng(stop.latitude!, stop.longitude!),
-          width: 8.0,
-          height: 8.0,
+          width: 10.0,
+          height: 10.0,
           child: GestureDetector(
             onTap: () => _onMarkerTap(stop.id!, stop.name!, lineId),
             child: Icon(
               Icons.circle,
               color: lineColor,
-              size: 8.0,
+              size: 10.0,
             ),
           ),
         ));
@@ -91,7 +96,6 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-
   void _parseShapeGeoJson(StopsByLineDTO stopsByLine, Color lineColor) {
     final geoJsonMultilineString = GeoJSONMultiLineString.fromJSON(stopsByLine.shape);
 
@@ -108,6 +112,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onMarkerTap(String stopId, String lineName, String lineId) async {
+    setState(() {
+      isLoadingDepartures = true;
+    });
+
     try {
       final nextDepartures = await api.fetchNextDepartures(stopId, lineId);
 
@@ -128,6 +136,10 @@ class _MapScreenState extends State<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching departures: $e')),
       );
+    } finally {
+      setState(() {
+        isLoadingDepartures = false;
+      });
     }
   }
 
@@ -222,55 +234,154 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _startLocationTracking() {
+    Geolocator.requestPermission().then((permission) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permissions are required.')),
+        );
+        return;
+      }
+    });
+  }
+
+
   @override
   void initState() {
     super.initState();
     fetchLines();
+    _startLocationTracking();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Map'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: const MapOptions(
-              initialCenter: LatLng(48.864716, 2.349014),
-              initialZoom: 11,
-              interactionOptions: InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-            ),
+    return PopScope(canPop: false, child: Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: const Text('Map'),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+          body: Stack(
             children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.guillaumedamiens',
+              FlutterMap(
+                mapController: _mapController,
+                options: const MapOptions(
+                  initialCenter: LatLng(48.864716, 2.349014),
+                  initialZoom: 11,
+                  interactionOptions: InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.guillaumedamiens',
+                  ),
+                  PolylineLayer(
+                    polylines: polylines,
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      ...markers,
+                      if (_userMarker != null) _userMarker!,
+                    ],
+                  ),
+                ],
               ),
-              PolylineLayer(
-                polylines: polylines,
-              ),
-              MarkerLayer(
-                markers: markers
+              Positioned(
+                bottom: 20,
+                right: 20,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FloatingActionButton(
+                      onPressed: _centerOnUserLocation,
+                      child: const Icon(Icons.my_location),
+                    ),
+                    const SizedBox(height: 16),
+                    FloatingActionButton(
+                      onPressed: () => _openTransportModeSelector(context),
+                      child: const Icon(Icons.directions_transit),
+                    )
+                  ],
+                ),
               ),
             ],
           ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () => _openTransportModeSelector(context),
-              child: const Icon(Icons.directions_transit),
+        ),
+        if (isLoadingDepartures)
+          Container(
+            color: Colors.black54,
+            child: const Center(
+              child: CircularProgressIndicator(),
             ),
-          ),
-        ],
-      ),
-    );
+          )
+      ],
+    ));
   }
+
+  Future<void> _centerOnUserLocation() async {
+    try {
+      // Vérifier les permissions
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location services are disabled.')),
+        );
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied.')),
+          );
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permissions are permanently denied.')),
+        );
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      LatLng userLatLng = LatLng(position.latitude, position.longitude);
+
+      _mapController.move(
+        userLatLng,
+        16.0,
+      );
+
+      setState(() {
+        _userMarker = Marker(
+          alignment: Alignment.topCenter,
+          point: userLatLng,
+          width: 40.0,
+          height: 40.0,
+          child: const Icon(
+            Icons.person_pin_circle,
+            size: 40.0,
+            color: Colors.blue,
+          ),
+        );
+
+        _mapController.move(userLatLng, _mapController.camera.zoom);
+      });
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to get location: $e')),
+      );
+    }
+  }
+
 
   void _openTransportModeSelector(BuildContext context) {
     showModalBottomSheet(
