@@ -256,7 +256,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(canPop: false, child: Stack(
+    return Stack(
       children: [
         Scaffold(
           appBar: AppBar(
@@ -297,11 +297,13 @@ class _MapScreenState extends State<MapScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     FloatingActionButton(
+                      heroTag: null,
                       onPressed: _centerOnUserLocation,
                       child: const Icon(Icons.my_location),
                     ),
                     const SizedBox(height: 16),
                     FloatingActionButton(
+                      heroTag: null,
                       onPressed: () => _openTransportModeSelector(context),
                       child: const Icon(Icons.directions_transit),
                     )
@@ -319,7 +321,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
           )
       ],
-    ));
+    );
   }
 
   Future<void> _centerOnUserLocation() async {
