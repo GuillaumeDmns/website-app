@@ -30,8 +30,84 @@ class _MapScreenState extends State<MapScreen> {
   bool isLoadingDepartures = false;
   final MapController _mapController = MapController();
   Marker? _userMarker;
-
   final api = ApiRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    fetchLines();
+    _startLocationTracking();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: const Text("Map"),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+          body: Stack(
+            children: [
+              FlutterMap(
+                mapController: _mapController,
+                options: const MapOptions(
+                  initialCenter: LatLng(48.864716, 2.349014),
+                  initialZoom: 11,
+                  interactionOptions: InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.guillaumedamiens',
+                  ),
+                  PolylineLayer(
+                    polylines: polylines,
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      ...markers,
+                      if (_userMarker != null) _userMarker!,
+                    ],
+                  ),
+                ],
+              ),
+              Positioned(
+                bottom: 20,
+                right: 20,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FloatingActionButton(
+                      heroTag: null,
+                      onPressed: _centerOnUserLocation,
+                      child: const Icon(Icons.my_location),
+                    ),
+                    const SizedBox(height: 16),
+                    FloatingActionButton(
+                      heroTag: null,
+                      onPressed: () => _openTransportModeSelector(context),
+                      child: const Icon(Icons.directions_transit),
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (isLoadingDepartures)
+          Container(
+            color: Colors.black54,
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          )
+      ],
+    );
+  }
 
   Future<void> fetchLines() async {
     final response = await api.fetchLines();
@@ -246,83 +322,6 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-
-  @override
-  void initState() {
-    super.initState();
-    fetchLines();
-    _startLocationTracking();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            title: const Text('Map'),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          ),
-          body: Stack(
-            children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: const MapOptions(
-                  initialCenter: LatLng(48.864716, 2.349014),
-                  initialZoom: 11,
-                  interactionOptions: InteractionOptions(
-                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                  ),
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.guillaumedamiens',
-                  ),
-                  PolylineLayer(
-                    polylines: polylines,
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      ...markers,
-                      if (_userMarker != null) _userMarker!,
-                    ],
-                  ),
-                ],
-              ),
-              Positioned(
-                bottom: 20,
-                right: 20,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FloatingActionButton(
-                      heroTag: null,
-                      onPressed: _centerOnUserLocation,
-                      child: const Icon(Icons.my_location),
-                    ),
-                    const SizedBox(height: 16),
-                    FloatingActionButton(
-                      heroTag: null,
-                      onPressed: () => _openTransportModeSelector(context),
-                      child: const Icon(Icons.directions_transit),
-                    )
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (isLoadingDepartures)
-          Container(
-            color: Colors.black54,
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          )
-      ],
-    );
-  }
 
   Future<void> _centerOnUserLocation() async {
     try {
