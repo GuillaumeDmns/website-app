@@ -29,9 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Map',
           ),
           NavigationDestination(
-            selectedIcon: Icon(Icons.map),
-            icon: Icon(Icons.map_outlined),
-            label: 'Map',
+            selectedIcon: Icon(Icons.calendar_month),
+            icon: Icon(Icons.calendar_month_outlined),
+            label: 'Lines',
           ),
         ],
       ),
@@ -44,6 +44,4 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentPageIndex = index;
     });
   }
-
-
 }
