@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:website_app/screens/lines.dart';
 
 import 'map.dart';
 
@@ -13,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPageIndex = 0;
   final List<Widget> _screens = [
     MapScreen(),
-    MapScreen()
+    LinesScreen()
   ];
 
   @override
