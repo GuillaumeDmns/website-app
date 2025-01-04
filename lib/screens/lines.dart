@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:website_app/screens/stops.dart';
 
 import '../app_settings.dart';
 import '../models/call_unit.dart';
@@ -68,8 +69,10 @@ class _LinesScreenState extends State<LinesScreen> {
                 selectedMode: mode,
                 lines: lines,
                 onLineSelected: (line) {
-                  fetchStopsAndShape(line.id!,
-                      lineIdBackgroundColor: line.lineIdBackgroundColor!);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => StopsScreen(line: line)),
+                  );
                 },
               ),
             );
@@ -77,15 +80,6 @@ class _LinesScreenState extends State<LinesScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> fetchStopsAndShape(String lineId,
-      {required String lineIdBackgroundColor}) async {
-    final response = await api.fetchStopsAndShape(lineId);
-    final lineColor =
-        Color(int.parse("FF${lineIdBackgroundColor.toUpperCase()}", radix: 16));
-
-    // handle stops
   }
 
   void _onMarkerTap(String stopId, String lineName, String lineId) async {
