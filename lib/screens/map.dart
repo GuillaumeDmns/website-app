@@ -16,10 +16,8 @@ class _MapScreenState extends State<MapScreen> {
   List<Polyline> polylines = [];
   List<Marker> markers = [];
 
-  bool isLoadingDepartures = false;
   final MapController _mapController = MapController();
   Marker? _userMarker;
-
 
   @override
   Widget build(BuildContext context) {
@@ -55,13 +53,6 @@ class _MapScreenState extends State<MapScreen> {
           alignment: Alignment.bottomCenter,
           child: _buildDraggableScrollableSheet(),
         ),
-        if (isLoadingDepartures)
-          Container(
-            color: Colors.black54,
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
       ],
     );
   }

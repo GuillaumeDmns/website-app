@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/models/stops_by_line_dto.dart';
+import 'package:website_app/screens/next_departures.dart';
 import 'package:website_app/widgets/line_icon.dart';
 
 import '../models/line_dto.dart';
@@ -62,6 +63,17 @@ class _StopsScreenState extends State<StopsScreen> {
                     title: Text(stop.name!),
                     subtitle: Text('${stop.latitude} / ${stop.longitude}'),
                     trailing: Icon(Icons.favorite_outline_rounded),
+                    onTap: () => {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => NextDeparturesScreen(
+                                lineId: widget.line.id!,
+                                stop: stop
+                            )
+                        ),
+                      )
+                    },
                   ),
                   if (stop != stops.last) Divider(height: 0),
                 ],

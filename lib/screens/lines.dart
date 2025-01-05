@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/screens/stops.dart';
+import 'package:website_app/utils/time_utils.dart';
 
 import '../app_settings.dart';
 import '../models/call_unit.dart';
@@ -90,8 +91,7 @@ class _LinesScreenState extends State<LinesScreen> {
     try {
       final nextDepartures = await api.fetchNextDepartures(stopId, lineId);
 
-      if (nextDepartures.nextPassages != null &&
-          nextDepartures.nextPassages!.isNotEmpty) {
+      if (nextDepartures.nextPassages.isNotEmpty) {
         final groupedDepartures = <String, List<CallUnit>>{};
 
         for (var passage in nextDepartures.nextPassages!) {
@@ -100,8 +100,6 @@ class _LinesScreenState extends State<LinesScreen> {
         }
 
         _showNextDeparturesDialog(lineName, groupedDepartures);
-      } else {
-        _showNoDeparturesDialog();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +137,7 @@ class _LinesScreenState extends State<LinesScreen> {
                     ...entry.value.map((callUnit) {
                       return ListTile(
                         title: Text(
-                          'Departure: ${_formatTimeRelativeToNow(callUnit.expectedDepartureTime)}',
+                          'Departure: ${TimeUtils.formatTimeRelativeToNow(callUnit.expectedDepartureTime)}',
                         ),
                         subtitle: callUnit.arrivalPlatformName != null
                             ? Text(
@@ -168,43 +166,5 @@ class _LinesScreenState extends State<LinesScreen> {
         );
       },
     );
-  }
-
-  void _showNoDeparturesDialog() {
-    showDialog(
-      context: AppSettings.navigatorState.currentContext!,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Next Departures'),
-          content: const Text('No departures available.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  String _formatTimeRelativeToNow(String? timestamp) {
-    if (timestamp == null) return 'N/A';
-
-    final departureTime = DateTime.tryParse(timestamp);
-    if (departureTime == null) return 'N/A';
-
-    final now = DateTime.now();
-    final difference = departureTime.difference(now);
-
-    if (difference.inMinutes < 1) {
-      return 'Now';
-    } else if (difference.inMinutes < 60) {
-      return 'in ${difference.inMinutes} min';
-    } else {
-      return 'in ${difference.inHours} h ${difference.inMinutes % 60} min';
-    }
   }
 }
