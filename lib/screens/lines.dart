@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/screens/stops.dart';
-import 'package:website_app/utils/time_utils.dart';
 
-import '../app_settings.dart';
-import '../models/call_unit.dart';
 import '../models/line_dto.dart';
 import '../services/api_repository.dart';
 import '../widgets/line_list.dart';
@@ -80,91 +77,6 @@ class _LinesScreenState extends State<LinesScreen> {
           }).toList(),
         ),
       ),
-    );
-  }
-
-  void _onMarkerTap(String stopId, String lineName, String lineId) async {
-    setState(() {
-      isLoadingDepartures = true;
-    });
-
-    try {
-      final nextDepartures = await api.fetchNextDepartures(stopId, lineId);
-
-      if (nextDepartures.nextPassages.isNotEmpty) {
-        final groupedDepartures = <String, List<CallUnit>>{};
-
-        for (var passage in nextDepartures.nextPassages!) {
-          final destination = passage.destinationName ?? 'Unknown Destination';
-          groupedDepartures.putIfAbsent(destination, () => []).add(passage);
-        }
-
-        _showNextDeparturesDialog(lineName, groupedDepartures);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching departures: $e')),
-      );
-    } finally {
-      setState(() {
-        isLoadingDepartures = false;
-      });
-    }
-  }
-
-  void _showNextDeparturesDialog(
-      String lineName, Map<String, List<CallUnit>> groupedDepartures) {
-    showDialog(
-      context: AppSettings.navigatorState.currentContext!,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(lineName),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: groupedDepartures.entries.map((entry) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
-                      ),
-                    ),
-                    ...entry.value.map((callUnit) {
-                      return ListTile(
-                        title: Text(
-                          'Departure: ${TimeUtils.formatTimeRelativeToNow(callUnit.expectedDepartureTime)}',
-                        ),
-                        subtitle: callUnit.arrivalPlatformName != null
-                            ? Text(
-                                'Platform: ${callUnit.arrivalPlatformName}',
-                              )
-                            : null,
-                        trailing: Text(
-                          callUnit.departureStatus ?? '',
-                          style: const TextStyle(color: Colors.green),
-                        ),
-                      );
-                    }),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

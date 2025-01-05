@@ -61,26 +61,54 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
       appBar: AppBar(
         title: Text(widget.stop.name!),
       ),
-      body: Column(
-        children: [
-          if (isLoading) const LinearProgressIndicator(),
-          Expanded(
-            child: ListView(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(8.0),
               children: [
-                for (var departure in nextDepartures) ...[
-                  ListTile(
-                    leading: Text(TimeUtils.getTimeFromIso8601(
-                        departure.expectedDepartureTime)),
-                    title: Text(departure.destinationName ?? ''),
-                    subtitle: Text(departure.arrivalPlatformName ?? ''),
+                for (var destination in nextDeparturesDestinations)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(destination),
+                          const SizedBox(height: 8.0),
+                          ...nextDepartures
+                              .where((departure) =>
+                                  departure.destinationName == destination)
+                              .map(
+                                (departure) => Column(
+                                  children: [
+                                    ListTile(
+                                      leading: Text(
+                                        TimeUtils.getTimeFromIso8601(
+                                            departure.expectedDepartureTime),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      title:
+                                          Text(departure.destinationName ?? ''),
+                                      subtitle: Text(
+                                        departure.arrivalPlatformName != null
+                                            ? "Platform ${departure.arrivalPlatformName}"
+                                            : '',
+                                      ),
+                                    ),
+                                    if (departure !=
+                                        nextDepartures.lastWhere((d) =>
+                                            d.destinationName == destination))
+                                      const Divider(height: 0),
+                                  ],
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
                   ),
-                  if (departure != nextDepartures.last) Divider(height: 0),
-                ],
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
