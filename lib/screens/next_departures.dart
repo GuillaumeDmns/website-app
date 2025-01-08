@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/models/call_unit.dart';
 import 'package:website_app/models/stops_by_line_dto.dart';
-import 'package:website_app/utils/time_utils.dart';
 
 import '../services/api_repository.dart';
+import '../widgets/next_departures_card.dart';
 
 class NextDeparturesScreen extends StatefulWidget {
   const NextDeparturesScreen(
@@ -23,17 +23,15 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   bool isLoading = false;
 
   Future<void> fetchNextDepartures() async {
-    setState(() {
-      isLoading = true;
-    });
+
 
     try {
       final response =
           await api.fetchNextDepartures(widget.stop.id!, widget.lineId);
       nextDepartures = response.nextPassages;
       nextDepartures.sort((a, b) {
-        return DateTime.parse(a.expectedDepartureTime!)
-                .isBefore(DateTime.parse((b.expectedDepartureTime!)))
+        return DateTime.parse(a.expectedDepartureTime ?? a.expectedArrivalTime!)
+                .isBefore(DateTime.parse((b.expectedDepartureTime ?? b.expectedArrivalTime!)))
             ? -1
             : 1;
       });
@@ -52,6 +50,9 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   @override
   void initState() {
     super.initState();
+    setState(() {
+      isLoading = true;
+    });
     fetchNextDepartures();
   }
 
@@ -63,52 +64,25 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(8.0),
-              children: [
-                for (var destination in nextDeparturesDestinations)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(destination),
-                          const SizedBox(height: 8.0),
-                          ...nextDepartures
-                              .where((departure) =>
-                                  departure.destinationName == destination)
-                              .map(
-                                (departure) => Column(
-                                  children: [
-                                    ListTile(
-                                      leading: Text(
-                                        TimeUtils.getTimeFromIso8601(
-                                            departure.expectedDepartureTime),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      title:
-                                          Text(departure.destinationName ?? ''),
-                                      subtitle: Text(
-                                        departure.arrivalPlatformName != null
-                                            ? "Platform ${departure.arrivalPlatformName}"
-                                            : '',
-                                      ),
-                                    ),
-                                    if (departure !=
-                                        nextDepartures.lastWhere((d) =>
-                                            d.destinationName == destination))
-                                      const Divider(height: 0),
-                                  ],
-                                ),
-                              ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          : RefreshIndicator(
+        onRefresh: fetchNextDepartures,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ListView(
+            children: [
+              for (var destination in nextDeparturesDestinations)
+                NextDepartureCard(
+                  destination: destination,
+                  nextDepartures: List.from(nextDepartures
+                      .where((departure) =>
+                  departure.destinationName == destination)
+                      .toList()),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
+
 }
