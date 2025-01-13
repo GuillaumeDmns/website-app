@@ -26,14 +26,24 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
     required List<CallUnit> newItems,
   }) {
     for (var i = 0; i < oldItems.length; i++) {
-      final _oldItem = oldItems[i];
+      final oldItem = oldItems[i];
 
-      if (!newItems.contains(_oldItem)) {
+      if (!newItems.any((newItem) {
+        final oldTime = DateTime.parse(
+            oldItem.expectedDepartureTime ?? oldItem.expectedArrivalTime!);
+        final newTime = DateTime.parse(
+            newItem.expectedDepartureTime ?? newItem.expectedArrivalTime!);
+
+        return oldTime.difference(newTime).inMinutes == 0;
+      })) {
         _listKey.currentState?.removeItem(
           i,
-              (context, animation) => SizeTransition(
+          (context, animation) => SizeTransition(
             sizeFactor: animation,
-            child: Text("test"),
+            child: DepartureItem(
+                widget: widget,
+                departure: widget.nextDepartures[i],
+                isLastItem: false),
           ),
         );
       }
@@ -45,7 +55,16 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
     required List<CallUnit> newItems,
   }) {
     for (var i = 0; i < newItems.length; i++) {
-      if (!oldItems.contains(newItems[i])) {
+      final newItem = newItems[i];
+
+      if (!oldItems.any((oldItem) {
+        final oldTime = DateTime.parse(
+            oldItem.expectedDepartureTime ?? oldItem.expectedArrivalTime!);
+        final newTime = DateTime.parse(
+            newItem.expectedDepartureTime ?? newItem.expectedArrivalTime!);
+
+        return oldTime.difference(newTime).inMinutes == 0;
+      })) {
         _listKey.currentState?.insertItem(i);
       }
     }
@@ -54,8 +73,10 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
   @override
   void didUpdateWidget(covariant NextDepartureCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _handleAddedItems(oldItems: oldWidget.nextDepartures, newItems: widget.nextDepartures);
-    _handleRemovedItems(oldItems: oldWidget.nextDepartures, newItems: widget.nextDepartures);
+    _handleAddedItems(
+        oldItems: oldWidget.nextDepartures, newItems: widget.nextDepartures);
+    _handleRemovedItems(
+        oldItems: oldWidget.nextDepartures, newItems: widget.nextDepartures);
   }
 
   @override
@@ -80,7 +101,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
                   departure: widget.nextDepartures[index],
                   isLastItem: widget.nextDepartures[index] ==
                       widget.nextDepartures.lastWhere(
-                              (d) => d.destinationName == widget.destination),
+                          (d) => d.destinationName == widget.destination),
                 ),
               ),
             ),
@@ -109,8 +130,8 @@ class DepartureItem extends StatelessWidget {
       children: [
         ListTile(
           leading: Text(
-            TimeUtils.getTimeFromIso8601(
-                departure.expectedDepartureTime ?? departure.expectedArrivalTime!),
+            TimeUtils.getTimeFromIso8601(departure.expectedDepartureTime ??
+                departure.expectedArrivalTime!),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           title: Text(departure.destinationName ?? ''),
