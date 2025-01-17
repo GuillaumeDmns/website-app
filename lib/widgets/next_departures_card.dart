@@ -19,7 +19,7 @@ class NextDepartureCard extends StatefulWidget {
 
 class _NextDepartureCardState extends State<NextDepartureCard> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
-  late int _initialItemCount = widget.nextDepartures.length;
+  late final int _initialItemCount = widget.nextDepartures.length;
 
   _handleRemovedItems({
     required List<CallUnit> oldItems,
@@ -29,12 +29,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
       final oldItem = oldItems[i];
 
       if (!newItems.any((newItem) {
-        final oldTime = DateTime.parse(
-            oldItem.expectedDepartureTime ?? oldItem.expectedArrivalTime!);
-        final newTime = DateTime.parse(
-            newItem.expectedDepartureTime ?? newItem.expectedArrivalTime!);
-
-        return oldTime.difference(newTime).inMinutes == 0;
+        return newItem.id == oldItem.id;
       })) {
         _listKey.currentState?.removeItem(
           i,
@@ -58,12 +53,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
       final newItem = newItems[i];
 
       if (!oldItems.any((oldItem) {
-        final oldTime = DateTime.parse(
-            oldItem.expectedDepartureTime ?? oldItem.expectedArrivalTime!);
-        final newTime = DateTime.parse(
-            newItem.expectedDepartureTime ?? newItem.expectedArrivalTime!);
-
-        return oldTime.difference(newTime).inMinutes == 0;
+        return newItem.id == oldItem.id;
       })) {
         _listKey.currentState?.insertItem(i);
       }
@@ -135,10 +125,9 @@ class DepartureItem extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           title: Text(departure.destinationName ?? ''),
-          subtitle: Text(
-            departure.arrivalPlatformName != null
-                ? "Platform ${departure.arrivalPlatformName}"
-                : '',
+          subtitle: Text([departure.journeyNote, departure.arrivalPlatformName != null ? "Platform ${departure.arrivalPlatformName}" : null]
+              .where((item) => item != null)
+              .join(" - "),
           ),
         ),
         if (!isLastItem) const Divider(height: 0),

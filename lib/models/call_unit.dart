@@ -1,4 +1,5 @@
 class CallUnit {
+  final String? id;
   final String? expectedDepartureTime;
   final String? expectedArrivalTime;
   final String? aimedDepartureTime;
@@ -10,8 +11,10 @@ class CallUnit {
   final bool? vehicleAtStop;
   final String? directionName;
   final String? destinationName;
+  final String? journeyNote;
 
   CallUnit({
+    this.id,
     this.expectedDepartureTime,
     this.expectedArrivalTime,
     this.aimedDepartureTime,
@@ -23,10 +26,12 @@ class CallUnit {
     this.vehicleAtStop,
     this.directionName,
     this.destinationName,
+    this.journeyNote
   });
 
   factory CallUnit.fromJson(Map<String, dynamic> json) {
     return CallUnit(
+      id: json['id'] as String?,
       expectedDepartureTime: json['expectedDepartureTime'] as String?,
       expectedArrivalTime: json['expectedArrivalTime'] as String?,
       aimedDepartureTime: json['aimedDepartureTime'] as String?,
@@ -38,6 +43,7 @@ class CallUnit {
       vehicleAtStop: json['vehicleAtStop'] as bool?,
       directionName: json['directionName'] as String?,
       destinationName: json['destinationName'] as String?,
+      journeyNote: json['journeyNote'] as String?,
     );
   }
 }
