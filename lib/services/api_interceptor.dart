@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart';
-import 'package:http_interceptor/extensions/base_response_none.dart';
+import 'package:http_interceptor/extensions/base_response_io.dart';
 import 'package:http_interceptor/models/interceptor_contract.dart';
 
 import '../app_settings.dart';
@@ -55,7 +55,13 @@ class APIInterceptor extends InterceptorContract {
       if (response.statusCode == 401) {
         _redirectToLogin();
       }
-      return response.copyWith(body: utf8.decode(response.bodyBytes));
+      return response.copyWith(
+        body: utf8.decode(response.bodyBytes),
+        headers: {
+          ...response.headers,
+          HttpHeaders.contentTypeHeader: 'application/json; charset=utf-8'
+        },
+      );
     }
     return response;
   }
