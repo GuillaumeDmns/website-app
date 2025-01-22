@@ -36,11 +36,23 @@ class Place {
       id: json['id'] as String?,
       name: json['name'] as String?,
       quality: json['quality'] as int?,
-      stopArea: json['stopArea'] != null ? StopArea.fromJson(json['stopArea']) : null,
-      stopPoint: json['stopPoint'] != null ? StopPoint.fromJson(json['stop_Point']) : null,
-      administrativeRegion: json['administrativeRegion'] != null ? Admin.fromJson(json['administrativeRegion']) : null,
-      embeddedType: json['embeddedType'] as EmbeddedTypeEnum?,
-      address: json['address'] != null ? Address.fromJson(json['address']) : null,
+      stopArea:
+          json['stopArea'] != null ? StopArea.fromJson(json['stopArea']) : null,
+      stopPoint: json['stopPoint'] != null
+          ? StopPoint.fromJson(json['stopPoint'])
+          : null,
+      administrativeRegion: json['administrativeRegion'] != null
+          ? Admin.fromJson(json['administrativeRegion'])
+          : null,
+      embeddedType: json['embeddedType'] != null
+          ? EmbeddedTypeEnum.values.firstWhere(
+              (e) => e.value == json['embeddedType'],
+              orElse: () => throw Exception(
+                  "Invalid embeddedType value: ${json['embeddedType']}"),
+            )
+          : null,
+      address:
+          json['address'] != null ? Address.fromJson(json['address']) : null,
       poi: json['poi'] != null ? Poi.fromJson(json['poi']) : null,
       distance: json['distance'] as String?,
     );

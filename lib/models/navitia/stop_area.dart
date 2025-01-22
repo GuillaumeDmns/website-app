@@ -44,51 +44,53 @@ class StopArea {
     return StopArea(
       id: json['id'] as String?,
       name: json['name'] as String?,
-      comments: (json['comments'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((comment) => Comment.fromJson(comment)))
-          .toList(),
+      comments: json['comments'] != null
+          ? (json['comments'] as List<dynamic>)
+              .map((comment) =>
+                  Comment.fromJson(comment as Map<String, dynamic>))
+              .toList()
+          : null,
       comment: json['comment'] as String?,
-      codes: (json['codes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((code) => Code.fromJson(code)))
-          .toList(),
+      codes: json['codes'] != null
+          ? (json['codes'] as List<dynamic>)
+              .map((code) => Code.fromJson(code as Map<String, dynamic>))
+              .toList()
+          : null,
       timezone: json['timezone'] as String?,
       label: json['label'] as String?,
-      coord: Coord.fromJson(json['coord']),
-      links: (json['links'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((link) => LinkSchema.fromJson(link)))
-          .toList(),
-      commercialModes: (json['commercialModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List)
-              .map((mode) => CommercialMode.fromJson(mode)))
-          .toList(),
-      physicalModes: (json['physicalModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((mode) => PhysicalMode.fromJson(mode)))
-          .toList(),
-      administrativeRegions:
-          (json['administrativeRegions'] as Map<String, dynamic>)
-              .entries
-              .expand((entry) =>
-                  (entry.value as List).map((admin) => Admin.fromJson(admin)))
-              .toList(),
-      stopPoints: (json['stopPoints'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((stop) => StopPoint.fromJson(stop)))
-          .toList(),
-      lines: (json['lines'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((line) => Line.fromJson(line)))
-          .toList(),
+      coord: json['coord'] != null ? Coord.fromJson(json['coord']) : null,
+      links: json['links'] != null
+          ? (json['links'] as List<dynamic>)
+              .map((link) => LinkSchema.fromJson(link as Map<String, dynamic>))
+              .toList()
+          : null,
+      commercialModes: json['commercialModes'] != null
+          ? (json['commercialModes'] as List<dynamic>)
+              .map((mode) =>
+                  CommercialMode.fromJson(mode as Map<String, dynamic>))
+              .toList()
+          : null,
+      physicalModes: json['physicalModes'] != null
+          ? (json['physicalModes'] as List<dynamic>)
+              .map(
+                  (mode) => PhysicalMode.fromJson(mode as Map<String, dynamic>))
+              .toList()
+          : null,
+      administrativeRegions: json['administrativeRegions'] != null
+          ? (json['administrativeRegions'] as List<dynamic>)
+              .map((admin) => Admin.fromJson(admin as Map<String, dynamic>))
+              .toList()
+          : null,
+      stopPoints: json['stopPoints'] != null
+          ? (json['stopPoints'] as List<dynamic>)
+              .map((stop) => StopPoint.fromJson(stop as Map<String, dynamic>))
+              .toList()
+          : null,
+      lines: json['lines'] != null
+          ? (json['lines'] as List<dynamic>)
+              .map((line) => Line.fromJson(line as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 }

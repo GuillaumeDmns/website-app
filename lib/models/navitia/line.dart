@@ -56,47 +56,56 @@ class Line {
       code: json['code'] as String?,
       color: json['color'] as String?,
       textColor: json['textColor'] as String?,
-      comments: (json['comments'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((comment) => Comment.fromJson(comment)))
-          .toList(),
+      comments: json['comments'] != null
+          ? (json['comments'] as List<dynamic>)
+              .map((comment) =>
+                  Comment.fromJson(comment as Map<String, dynamic>))
+              .toList()
+          : null,
       comment: json['comment'] as String?,
-      codes: (json['code'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((code) => Code.fromJson(code)))
-          .toList(),
-      commercialMode: CommercialMode.fromJson(json['commercialMode']),
-      physicalModes: (json['physicalModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List)
-              .map((physicalMode) => PhysicalMode.fromJson(physicalMode)))
-          .toList(),
-      routes: (json['routes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((route) => Route.fromJson(route)))
-          .toList(),
-      network: Network.fromJson(json['network']),
+      codes: json['codes'] != null
+          ? (json['codes'] as List<dynamic>)
+              .map((code) => Code.fromJson(code as Map<String, dynamic>))
+              .toList()
+          : null,
+      commercialMode: json['commercialMode'] != null
+          ? CommercialMode.fromJson(json['commercialMode'])
+          : null,
+      physicalModes: json['physicalModes'] != null
+          ? (json['physicalModes'] as List<dynamic>)
+              .map((physicalMode) =>
+                  PhysicalMode.fromJson(physicalMode as Map<String, dynamic>))
+              .toList()
+          : null,
+      routes: json['routes'] != null
+          ? (json['routes'] as List<dynamic>)
+              .map((route) => Route.fromJson(route as Map<String, dynamic>))
+              .toList()
+          : null,
+      network:
+          json['network'] != null ? Network.fromJson(json['network']) : null,
       closingTime: json['closingTime'] as String?,
       openingTime: json['openingTime'] as String?,
-      properties: (json['properties'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List)
-              .map((property) => Property.fromJson(property)))
-          .toList(),
-      geojson: MultiLineStringSchema.fromJson(json['geojson']),
-      links: (json['links'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((link) => LinkSchema.fromJson(link)))
-          .toList(),
-      lineGroups: (json['lineGroups'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List)
-              .map((lineGroup) => LineGroup.fromJson(lineGroup)))
-          .toList(),
+      properties: json['properties'] != null
+          ? (json['properties'] as List<dynamic>)
+              .map((property) =>
+                  Property.fromJson(property as Map<String, dynamic>))
+              .toList()
+          : null,
+      geojson: json['geojson'] != null
+          ? MultiLineStringSchema.fromJson(json['geojson'])
+          : null,
+      links: json['links'] != null
+          ? (json['links'] as List<dynamic>)
+              .map((link) => LinkSchema.fromJson(link as Map<String, dynamic>))
+              .toList()
+          : null,
+      lineGroups: json['lineGroups'] != null
+          ? (json['lineGroups'] as List<dynamic>)
+              .map((lineGroup) =>
+                  LineGroup.fromJson(lineGroup as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 }
