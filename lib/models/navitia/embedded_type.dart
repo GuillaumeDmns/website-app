@@ -15,6 +15,7 @@ enum EmbeddedTypeEnum {
   contributor("contributor"),
   address("address"),
   poitype("poitype"),
+  administrativeRegion("administrative_region"),
   calendar("calendar"),
   lineGroup("line_group"),
   impact("impact"),

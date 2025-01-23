@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/models/navitia/place.dart';
 
 import '../services/api_repository.dart';
 
@@ -29,22 +30,51 @@ class _MapScreenState extends State<MapScreen> {
   List<String?> suggestions = [];
   Timer? debounceTimer;
 
-  Future<List<String?>> fetchSuggestions(String query) async {
+  Future<List<Place>> fetchSuggestions(String query) async {
     if (query.isEmpty) return [];
 
     final response = await api.autocompletePlaces(query);
 
-    return response.places?.map((place) => place.name).toList() ?? [];
+    return response.places ?? [];
   }
 
-  void onTextChanged(String query, TextEditingController controller) {
+  void onDebouncedTextChange(String query, ValueChanged<List<Place>> onSuggestionsReady) {
     if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
     debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       final results = await fetchSuggestions(query);
-      setState(() {
-        suggestions = results;
-      });
+      onSuggestionsReady(results);
     });
+  }
+
+  Widget buildAutocomplete({
+    required String labelText,
+    required TextEditingController controller,
+  }) {
+    return Autocomplete<Place>(
+      displayStringForOption: (option) => option.name ?? '',
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        return Future.delayed(Duration.zero, () async {
+          if (textEditingValue.text == '') {
+            return const Iterable<Place>.empty();
+          }
+          final completer = Completer<List<Place>>();
+          onDebouncedTextChange(textEditingValue.text, completer.complete);
+          final results = await completer.future;
+          return results.whereType<Place>();
+        });
+      },
+      fieldViewBuilder: (context, textController, focusNode, onEditingComplete) {
+        return TextField(
+          controller: textController,
+          focusNode: focusNode,
+          onEditingComplete: onEditingComplete,
+          decoration: InputDecoration(
+            labelText: labelText,
+            border: const OutlineInputBorder(),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -95,43 +125,15 @@ class _MapScreenState extends State<MapScreen> {
                 controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 children: [
-                  TextField(
+                  buildAutocomplete(
+                    labelText: 'Start',
                     controller: startController,
-                    decoration: const InputDecoration(
-                      labelText: 'Start Point',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) => onTextChanged(value, startController),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  buildAutocomplete(
+                    labelText: 'Destination',
                     controller: destinationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Destination',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) => onTextChanged(value, destinationController),
                   ),
-                  const SizedBox(height: 16),
-                  if (suggestions.isNotEmpty) ...[
-                    const Text(
-                      'Suggestions:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    ...suggestions.map((suggestion) => ListTile(
-                      title: Text(suggestion ?? ''),
-                      onTap: () {
-                        if (startController.text.isEmpty) {
-                          startController.text = suggestion ?? '';
-                        } else {
-                          destinationController.text = suggestion ?? '';
-                        }
-                        setState(() {
-                          suggestions.clear();
-                        });
-                      },
-                    )),
-                  ],
                 ],
               ),
             );
