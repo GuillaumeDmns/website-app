@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:website_app/models/navitia/place.dart';
+import 'package:website_app/models/navitia/embedded_type.dart';
 
+import '../models/navitia/journey.dart';
+import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
 
 class MapScreen extends StatefulWidget {
@@ -30,6 +32,9 @@ class _MapScreenState extends State<MapScreen> {
   List<String?> suggestions = [];
   Timer? debounceTimer;
 
+  Place? selectedStartPlace;
+  Place? selectedDestinationPlace;
+
   Future<List<Place>> fetchSuggestions(String query) async {
     if (query.isEmpty) return [];
 
@@ -37,6 +42,15 @@ class _MapScreenState extends State<MapScreen> {
 
     return response.places ?? [];
   }
+
+  Future<List<Journey>> getJourneys(String startPoint, String endPoint) async {
+    if (startPoint.isEmpty || endPoint.isEmpty) return [];
+
+    final response = await api.getJourneys(startPoint, endPoint);
+
+    return response.journeys ?? [];
+  }
+
 
   void onDebouncedTextChange(String query, ValueChanged<List<Place>> onSuggestionsReady) {
     if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
@@ -46,9 +60,30 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  void fetchJourneysIfBothPlacesSelected() async {
+    if (selectedStartPlace != null && selectedDestinationPlace != null) {
+      final startPoint = switch (selectedStartPlace?.embeddedType) {
+        EmbeddedTypeEnum.address => '${selectedStartPlace?.address?.coord?.lon};${selectedStartPlace?.address?.coord?.lat}',
+        EmbeddedTypeEnum.stopArea => '${selectedStartPlace?.stopArea?.id}',
+        _ => ''
+      };
+
+      final endPoint = switch (selectedDestinationPlace?.embeddedType) {
+        EmbeddedTypeEnum.address => '${selectedDestinationPlace?.address?.coord?.lon};${selectedDestinationPlace?.address?.coord?.lat}',
+        EmbeddedTypeEnum.stopArea => '${selectedDestinationPlace?.stopArea?.id}',
+        _ => ''
+      };
+
+      final journeys = await getJourneys(startPoint, endPoint);
+      print("object");
+    }
+  }
+
+
   Widget buildAutocomplete({
     required String labelText,
     required TextEditingController controller,
+    required ValueChanged<Place> onSelected,
   }) {
     return Autocomplete<Place>(
       displayStringForOption: (option) => option.name ?? '',
@@ -63,6 +98,7 @@ class _MapScreenState extends State<MapScreen> {
           return results.whereType<Place>();
         });
       },
+      onSelected: onSelected,
       fieldViewBuilder: (context, textController, focusNode, onEditingComplete) {
         return TextField(
           controller: textController,
@@ -74,6 +110,32 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
       },
+        optionsViewBuilder: (context, onSelected, options) {
+          final RenderBox renderBox = context.findRenderObject() as RenderBox;
+          final double fieldWidth = renderBox.size.width;
+
+          return Material(
+            elevation: 4.0,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: fieldWidth, // Match dropdown width to input field width
+              ),
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final place = options.elementAt(index);
+                  return ListTile(
+                    onTap: () => onSelected(place),
+                    title: Text(place.name ?? 'Unknown Place'),
+                    subtitle: place.address?.name != null ? Text(place.address?.name ?? 'No address available') : null,
+                    trailing: const Icon(Icons.location_pin),
+                  );
+                },
+              ),
+            ),
+          );
+        }
     );
   }
 
@@ -128,11 +190,23 @@ class _MapScreenState extends State<MapScreen> {
                   buildAutocomplete(
                     labelText: 'Start',
                     controller: startController,
+                    onSelected: (place) {
+                      setState(() {
+                        selectedStartPlace = place;
+                      });
+                      fetchJourneysIfBothPlacesSelected();
+                    },
                   ),
                   const SizedBox(height: 16),
                   buildAutocomplete(
                     labelText: 'Destination',
                     controller: destinationController,
+                    onSelected: (place) {
+                      setState(() {
+                        selectedDestinationPlace = place;
+                      });
+                      fetchJourneysIfBothPlacesSelected();
+                    },
                   ),
                 ],
               ),
