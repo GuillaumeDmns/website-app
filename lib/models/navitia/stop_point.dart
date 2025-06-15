@@ -57,59 +57,43 @@ class StopPoint {
     return StopPoint(
       id: json['id'] as String?,
       name: json['name'] as String?,
-      comments: (json['comments'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((comment) => Comment.fromJson(comment)))
-          .toList(),
+      comments: json['comments'] != null ? (json['comments'] as List<dynamic>)
+          .map((place) => Comment.fromJson(place))
+          .toList() : null,
       comment: json['comment'] as String?,
-      codes: (json['codes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((code) => Code.fromJson(code)))
-          .toList(),
+      codes: json['codes'] != null ? (json['codes'] as List<dynamic>)
+          .map((place) => Code.fromJson(place))
+          .toList() : null,
       label: json['label'] as String?,
-      coord: Coord.fromJson(json['coord']),
-      links: (json['links'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((link) => LinkSchema.fromJson(link)))
-          .toList(),
-      commercialModes: (json['commercialModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List)
-              .map((mode) => CommercialMode.fromJson(mode)))
-          .toList(),
-      physicalModes: (json['physicalModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((mode) => PhysicalMode.fromJson(mode)))
-          .toList(),
-      administrativeRegions:
-          (json['administrativeRegions'] as Map<String, dynamic>)
-              .entries
-              .expand((entry) =>
-                  (entry.value as List).map((region) => Admin.fromJson(region)))
-              .toList(),
-      stopArea: StopArea.fromJson(json['stopArea']),
-      equipments: (json['equipments'] as List<dynamic>?)
-          ?.map((equipment) => EquipmentsEnum.values.firstWhere(
-                (e) => e.toString() == 'EquipmentsEnum.$equipment',
-              ))
-          .cast<EquipmentsEnum>()
-          .toList(),
-      address: Address.fromJson(json['address']),
-      fareZone: FareZone.fromJson(json['fare_zone']),
-      equipmentDetails: (json['equipmentDetails'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) => (entry.value as List).map(
-              (equipmentDetail) => EquipmentDetails.fromJson(equipmentDetail)))
-          .toList(),
-      lines: (json['comments'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((line) => Line.fromJson(line)))
-          .toList(),
+      coord: json['coord'] != null ? Coord.fromJson(json['coord']) : null,
+      links: json['links'] != null ? (json['links'] as List<dynamic>)
+          .map((place) => LinkSchema.fromJson(place))
+          .toList() : null,
+      commercialModes: json['commercialModes'] != null ? (json['commercialModes'] as List<dynamic>)
+          .map((place) => CommercialMode.fromJson(place))
+          .toList() : null,
+      physicalModes: json['physicalModes'] != null ? (json['physicalModes'] as List<dynamic>)
+          .map((place) => PhysicalMode.fromJson(place))
+          .toList() : null,
+      administrativeRegions: json['administrativeRegions'] != null ?
+      (json['administrativeRegions'] as List<dynamic>)
+          .map((place) => Admin.fromJson(place))
+          .toList() : null,
+      stopArea: json['stopArea'] != null ? StopArea.fromJson(json['stopArea']) : null,
+      // equipments: json['equipments'] != null ? (json['equipments'] as List<dynamic>?)
+      //     ?.map((equipment) => EquipmentsEnum.values.firstWhere(
+      //           (e) => e.toString() == 'EquipmentsEnum.$equipment',
+      //         ))
+      //     .cast<EquipmentsEnum>()
+      //     .toList() : null,
+      address: json['address'] != null ? Address.fromJson(json['address']) : null,
+      fareZone: json['fareZone'] != null ? FareZone.fromJson(json['fareZone']) : null,
+      equipmentDetails: json['equipmentDetails'] != null ? (json['equipmentDetails'] as List<dynamic>)
+          .map((place) => EquipmentDetails.fromJson(place))
+          .toList() : null,
+      lines: json['lines'] != null ? (json['lines'] as List<dynamic>)
+          .map((place) => Line.fromJson(place))
+          .toList() : null,
     );
   }
 }

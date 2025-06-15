@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_interceptor/http/intercepted_client.dart';
+import 'package:website_app/models/navitia/journeys.dart';
 import 'dart:convert';
 
 import '../models/lines_response.dart';
@@ -87,6 +88,19 @@ class ApiRepository {
       return Places.fromJson(json);
     } else {
       throw Exception('Failed to autocomplete places');
+    }
+  }
+
+  Future<Journeys> getJourneys(String startPoint, String endPoint) async {
+    final response = await client.get(
+      Uri.parse('https://guillaumedamiens.com/api/journeys?startPoint=$startPoint&endPoint=$endPoint'),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return Journeys.fromJson(json);
+    } else {
+      throw Exception('Failed to get journeys');
     }
   }
 
