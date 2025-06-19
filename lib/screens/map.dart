@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
 import '../utils/debounce_utils.dart';
+import '../widgets/journey_card.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -31,6 +33,10 @@ class _MapScreenState extends State<MapScreen> {
   Place? selectedStartPlace;
   Place? selectedDestinationPlace;
 
+  Journeys? _journeys;
+
+  bool _isLoadingJourneys = false;
+
   bool _showRoutes = false;
 
 
@@ -39,6 +45,32 @@ class _MapScreenState extends State<MapScreen> {
     _startDebouncer.dispose();
     _destinationDebouncer.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchJourneys() async {
+    if (selectedStartPlace != null && selectedDestinationPlace != null) {
+      setState(() {
+        _isLoadingJourneys = true;
+        _showRoutes = true;
+        _journeys = null;
+        polylines.clear();
+      });
+
+      try {
+        final journeysResult = await api.getJourneys(selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
+
+        setState(() {
+          _journeys = journeysResult;
+          _isLoadingJourneys = false;
+        });
+
+      } catch (e) {
+        print('Erreur lors de la récupération des itinéraires: $e');
+        setState(() {
+          _isLoadingJourneys = false;
+        });
+      }
+    }
   }
 
   @override
@@ -125,6 +157,7 @@ class _MapScreenState extends State<MapScreen> {
                             setState(() {
                               selectedStartPlace = selection;
                             });
+                            _fetchJourneys();
                           },
                           displayStringForOption: (Place option) => option.name ?? '',
                           fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
@@ -178,8 +211,9 @@ class _MapScreenState extends State<MapScreen> {
                           },
                           onSelected: (Place selection) {
                             setState(() {
-                                selectedDestinationPlace = selection;
+                              selectedDestinationPlace = selection;
                             });
+                            _fetchJourneys();
                           },
                           displayStringForOption: (Place option) => option.name ?? '',
                           fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
@@ -189,7 +223,7 @@ class _MapScreenState extends State<MapScreen> {
                               decoration: const InputDecoration(
                                 labelText: 'Destination',
                                 border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.trip_origin),
+                                prefixIcon: Icon(Icons.fmd_good_outlined),
                               ),
                             );
                           },
@@ -224,16 +258,36 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                   const Divider(height: 21, thickness: 1),
-
                   if (_showRoutes)
-                    ...List.generate(20, (index) {
-                      return ListTile(
-                        title: Text('Suggestion ${index + 1}'),
-                        onTap: () {
-                          print('Suggestion ${index + 1} cliquée !');
+                    if (_isLoadingJourneys)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_journeys != null && _journeys!.journeys!.isNotEmpty)
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _journeys!.journeys!.length,
+                        itemBuilder: (context, index) {
+                          final journey = _journeys!.journeys![index];
+                          return GestureDetector(
+                            onTap: () {
+                              print('Itinéraire cliqué ! ID: ${journey.departureDateTime}');
+                            },
+                            child: JourneyCard(journey: journey),
+                          );
                         },
-                      );
-                    }),
+                      )
+                    else
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text("Aucun itinéraire trouvé."),
+                        ),
+                      ),
                 ],
               ),
             );

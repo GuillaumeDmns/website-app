@@ -1,3 +1,5 @@
+import 'package:website_app/models/navitia/section_display_information.dart';
+
 import 'path.dart';
 import 'place.dart';
 import 'section_geojson_schema.dart';
@@ -30,6 +32,8 @@ class Section {
 
   final String? mode;
 
+  final SectionDisplayInformation? displayInformations;
+
   Section(
       {this.from,
       this.transferType,
@@ -43,7 +47,8 @@ class Section {
       this.type,
       this.id,
       this.dataFreshness,
-      this.mode});
+      this.mode,
+      this.displayInformations});
 
   factory Section.fromJson(Map<String, dynamic> json) {
     return Section(
@@ -69,6 +74,9 @@ class Section {
         type: json['type'] as String?,
         id: json['id'] as String?,
         dataFreshness: json['dataFreshness'] as String?,
-        mode: json['mode'] as String?);
+        mode: json['mode'] as String?,
+        displayInformations: json['displayInformations'] != null
+        ? SectionDisplayInformation.fromJson(json['displayInformations'])
+        : null);
   }
 }
