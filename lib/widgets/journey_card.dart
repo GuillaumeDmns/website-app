@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../models/navitia/journey.dart';
 import '../models/navitia/section.dart';
+import '../utils/style_utils.dart';
 
 class JourneyCard extends StatelessWidget {
   final Journey journey;
+  final Function(Journey) onJourneySelected;
 
-  const JourneyCard({super.key, required this.journey});
+  const JourneyCard({
+    super.key,
+    required this.journey,
+    required this.onJourneySelected
+  });
 
   String _formatTime(String? dateTimeString) {
     if (dateTimeString == null || dateTimeString.length < 13) {
@@ -27,20 +33,22 @@ class JourneyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalDurationInMinutes = (journey.duration ?? 0) ~/ 60;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      elevation: 3.0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildJourneyHeader(totalDurationInMinutes),
-            const SizedBox(height: 16),
-            _buildJourneySections(),
-          ],
+    return GestureDetector(
+      onTap: () => onJourneySelected(journey),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        elevation: 3.0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildJourneyHeader(totalDurationInMinutes),
+              const SizedBox(height: 16),
+              _buildJourneySections(),
+            ],
+          ),
         ),
       ),
     );
@@ -109,7 +117,7 @@ class JourneyCard extends StatelessWidget {
         children: [
           Icon(
             _getTransportIcon(displayInfo.physicalMode),
-            color: _hexToColor(displayInfo.color),
+            color: hexToColor(displayInfo.color),
             size: 24,
           ),
           const SizedBox(width: 6),
@@ -117,13 +125,13 @@ class JourneyCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _hexToColor(displayInfo.color),
+                color: hexToColor(displayInfo.color),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 displayInfo.code!,
                 style: TextStyle(
-                  color: _hexToColor(displayInfo.textColor),
+                  color: hexToColor(displayInfo.textColor),
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -155,13 +163,5 @@ class JourneyCard extends StatelessWidget {
       default:
         return Icons.place_outlined;
     }
-  }
-
-  Color _hexToColor(String? hexColor) {
-    hexColor = (hexColor ?? '808080').replaceAll('#', '');
-    if (hexColor.length == 6) {
-      return Color(int.parse('FF$hexColor', radix: 16));
-    }
-    return Colors.grey;
   }
 }

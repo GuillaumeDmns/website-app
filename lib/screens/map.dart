@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
 import '../utils/debounce_utils.dart';
+import '../utils/style_utils.dart';
 import '../widgets/journey_card.dart';
 
 class MapScreen extends StatefulWidget {
@@ -71,6 +73,60 @@ class _MapScreenState extends State<MapScreen> {
         });
       }
     }
+  }
+
+  void _displayJourneyOnMap(Journey journey) {
+    if (journey.sections == null) return;
+
+    final List<Polyline> newJourneyPolylines = [];
+    final List<LatLng> allJourneyPoints = [];
+
+    for (var section in journey.sections!) {
+
+      if (section.geojson != null && section.geojson!.coordinates!.isNotEmpty) {
+        final List<LatLng> sectionPoints = [];
+        for (var coord in section.geojson!.coordinates!) {
+          if (coord.length >= 2) {
+            final point = LatLng(coord[1], coord[0]);
+            sectionPoints.add(point);
+            allJourneyPoints.add(point);
+          }
+        }
+
+        if (sectionPoints.isNotEmpty) {
+          final color = hexToColor(section.displayInformations?.color);
+
+          newJourneyPolylines.add(
+            Polyline(
+              points: sectionPoints,
+              strokeWidth: 5.0,
+              color: color,
+            ),
+          );
+        }
+      }
+    }
+
+    if (newJourneyPolylines.isEmpty) return;
+
+    setState(() {
+      polylines.clear();
+      polylines.addAll(newJourneyPolylines);
+
+      _scrollableController.animateTo(
+        0.25,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+
+    final bounds = LatLngBounds.fromPoints(allJourneyPoints);
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: bounds,
+        padding: const EdgeInsets.all(50.0),
+      ),
+    );
   }
 
   @override
@@ -277,7 +333,10 @@ class _MapScreenState extends State<MapScreen> {
                             onTap: () {
                               print('Itinéraire cliqué ! ID: ${journey.departureDateTime}');
                             },
-                            child: JourneyCard(journey: journey),
+                            child: JourneyCard(
+                                journey: journey,
+                              onJourneySelected: _displayJourneyOnMap,
+                            ),
                           );
                         },
                       )
