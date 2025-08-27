@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/screens/search_places.dart';
 
 import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
-import '../utils/debounce_utils.dart';
 import '../utils/style_utils.dart';
 import '../widgets/journey_card.dart';
 
@@ -29,9 +29,6 @@ class _MapScreenState extends State<MapScreen> {
   final DraggableScrollableController _scrollableController = DraggableScrollableController();
   Marker? _userMarker;
 
-  final _startDebouncer = AsyncDebouncer(delay: const Duration(milliseconds: 300));
-  final _destinationDebouncer = AsyncDebouncer(delay: const Duration(milliseconds: 300));
-
   Place? selectedStartPlace;
   Place? selectedDestinationPlace;
 
@@ -41,12 +38,38 @@ class _MapScreenState extends State<MapScreen> {
 
   bool _showRoutes = false;
 
+  final TextEditingController _startController = TextEditingController();
+  final TextEditingController _destinationController = TextEditingController();
+
 
   @override
   void dispose() {
-    _startDebouncer.dispose();
-    _destinationDebouncer.dispose();
+    _startController.dispose();
+    _destinationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _navigateToSearchScreen({required bool isStart}) async {
+    final Place? result = await Navigator.of(context).push<Place>(
+      MaterialPageRoute(
+        builder: (context) => SearchPlaceScreen(
+          hintText: isStart ? 'Enter a starting point' : 'Enter a destination',
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        if (isStart) {
+          selectedStartPlace = result;
+          _startController.text = result.name ?? '';
+        } else {
+          selectedDestinationPlace = result;
+          _destinationController.text = result.name ?? '';
+        }
+      });
+      _fetchJourneys();
+    }
   }
 
   Future<void> _fetchJourneys() async {
@@ -199,116 +222,26 @@ class _MapScreenState extends State<MapScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Column(
                       children: [
-                        Autocomplete<Place>(
-                          optionsBuilder: (TextEditingValue textEditingValue) {
-                            if (textEditingValue.text.isEmpty) {
-                              return const Iterable<Place>.empty();
-                            }
-                            return _startDebouncer.debounce<Iterable<Place>>(() async {
-                              final response = await api.autocompletePlaces(textEditingValue.text);
-                              return response.places ?? [];
-                            });
-                          },
-                          onSelected: (Place selection) {
-                            setState(() {
-                              selectedStartPlace = selection;
-                            });
-                            _fetchJourneys();
-                          },
-                          displayStringForOption: (Place option) => option.name ?? '',
-                          fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
-                            return TextField(
-                              controller: fieldController,
-                              focusNode: fieldFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'Start',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.trip_origin),
-                              ),
-                            );
-                          },
-                          optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<Place> onSelected, Iterable<Place> options) {
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                elevation: 4.0,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxHeight: 200),
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    itemBuilder: (BuildContext context, int index) {
-                                      final Place option = options.elementAt(index);
-                                      return ListTile(
-                                        leading: const Icon(Icons.location_on_outlined),
-                                        title: Text(option.name ?? ''),
-                                        onTap: () {
-                                          onSelected(option);
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                        TextFormField(
+                          controller: _startController,
+                          readOnly: true,
+                          onTap: () => _navigateToSearchScreen(isStart: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Start',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.trip_origin),
+                          ),
                         ),
                         const SizedBox(height: 10),
-                        Autocomplete<Place>(
-                          optionsBuilder: (TextEditingValue textEditingValue) {
-                            if (textEditingValue.text.isEmpty) {
-                              return const Iterable<Place>.empty();
-                            }
-                            return _destinationDebouncer.debounce<Iterable<Place>>(() async {
-                              final response = await api.autocompletePlaces(textEditingValue.text);
-                              return response.places ?? [];
-                            });
-                          },
-                          onSelected: (Place selection) {
-                            setState(() {
-                              selectedDestinationPlace = selection;
-                            });
-                            _fetchJourneys();
-                          },
-                          displayStringForOption: (Place option) => option.name ?? '',
-                          fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
-                            return TextField(
-                              controller: fieldController,
-                              focusNode: fieldFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'Destination',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.fmd_good_outlined),
-                              ),
-                            );
-                          },
-                          optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<Place> onSelected, Iterable<Place> options) {
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                elevation: 4.0,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxHeight: 200),
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    itemBuilder: (BuildContext context, int index) {
-                                      final Place option = options.elementAt(index);
-                                      return ListTile(
-                                        leading: const Icon(Icons.location_on_outlined),
-                                        title: Text(option.name ?? ''),
-                                        onTap: () {
-                                          onSelected(option);
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                        TextFormField(
+                          controller: _destinationController,
+                          readOnly: true,
+                          onTap: () => _navigateToSearchScreen(isStart: false),
+                          decoration: const InputDecoration(
+                            labelText: 'Destination',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.fmd_good_outlined),
+                          ),
                         ),
                       ],
                     ),
@@ -334,7 +267,7 @@ class _MapScreenState extends State<MapScreen> {
                               print('Itinéraire cliqué ! ID: ${journey.departureDateTime}');
                             },
                             child: JourneyCard(
-                                journey: journey,
+                              journey: journey,
                               onJourneySelected: _displayJourneyOnMap,
                             ),
                           );
