@@ -23,8 +23,6 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   bool isLoading = false;
 
   Future<void> fetchNextDepartures() async {
-
-
     try {
       final response =
           await api.fetchNextDepartures(widget.stop.id!, widget.lineId);

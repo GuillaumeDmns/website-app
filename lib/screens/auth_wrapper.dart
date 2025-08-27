@@ -6,7 +6,6 @@ import '../app_settings.dart';
 import '../services/api_repository.dart';
 import '../utils/auth_utils.dart';
 import 'login.dart';
-import 'map.dart';
 
 class AuthWrapperScreen extends StatefulWidget {
   const AuthWrapperScreen({super.key});
