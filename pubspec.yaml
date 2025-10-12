@@ -44,6 +44,8 @@ dependencies:
   http_interceptor: ^2.0.0
   geolocator: ^14.0.2
   intl: ^0.20.2
+  flutter_local_notifications: ^19.4.2
+  turf: ^0.0.10
 
 dev_dependencies:
   flutter_test:

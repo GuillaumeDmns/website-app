@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  _onDestinationTap(int index) {
+  void _onDestinationTap(int index) {
     setState(() {
       _currentPageIndex = index;
     });

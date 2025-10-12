@@ -21,7 +21,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   late final int _initialItemCount = widget.nextDepartures.length;
 
-  _handleRemovedItems({
+  void _handleRemovedItems({
     required List<CallUnit> oldItems,
     required List<CallUnit> newItems,
   }) {
@@ -45,7 +45,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
     }
   }
 
-  _handleAddedItems({
+  void _handleAddedItems({
     required List<CallUnit> oldItems,
     required List<CallUnit> newItems,
   }) {

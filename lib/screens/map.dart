@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:turf/turf.dart' as turf;
 import 'package:website_app/screens/search_places.dart';
 
 import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
+import '../services/notification_service.dart';
 import '../utils/style_utils.dart';
 import '../widgets/journey_card.dart';
 
@@ -27,7 +32,6 @@ class _MapScreenState extends State<MapScreen> {
 
   final MapController _mapController = MapController();
   final DraggableScrollableController _scrollableController = DraggableScrollableController();
-  Marker? _userMarker;
 
   Place? selectedStartPlace;
   Place? selectedDestinationPlace;
@@ -35,15 +39,33 @@ class _MapScreenState extends State<MapScreen> {
   Journeys? _journeys;
 
   bool _isLoadingJourneys = false;
-
   bool _showRoutes = false;
+
+  Timer? _journeySimulator;
+
+  StreamSubscription<Position>? _positionStreamSubscription;
+  Marker? _userLocationMarker;
+  Journey? _activeJourney;
+  int _currentSectionIndex = -1;
+
+  List<LatLng> _fullJourneyPolyline = [];
+  List<double> _cumulativeDistances = [];
 
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
 
+  final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationService.init();
+  }
 
   @override
   void dispose() {
+    _journeySimulator?.cancel();
+    _positionStreamSubscription?.cancel();
     _startController.dispose();
     _destinationController.dispose();
     super.dispose();
@@ -83,12 +105,10 @@ class _MapScreenState extends State<MapScreen> {
 
       try {
         final journeysResult = await api.getJourneys(selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
-
         setState(() {
           _journeys = journeysResult;
           _isLoadingJourneys = false;
         });
-
       } catch (e) {
         print('Erreur lors de la récupération des itinéraires: $e');
         setState(() {
@@ -99,26 +119,33 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _displayJourneyOnMap(Journey journey) {
-    if (journey.sections == null) return;
+    _stopGpsTracking();
 
     final List<Polyline> newJourneyPolylines = [];
     final List<LatLng> allJourneyPoints = [];
 
-    for (var section in journey.sections!) {
+    setState(() {
+      _activeJourney = journey;
+      _currentSectionIndex = -1;
+    });
 
-      if (section.geojson != null && section.geojson!.coordinates!.isNotEmpty) {
+    _fullJourneyPolyline.clear();
+    _cumulativeDistances.clear();
+    double totalDistance = 0;
+
+    for (var section in journey.sections!) {
+      if (section.geojson != null && section.geojson!.coordinates != null && section.geojson!.coordinates!.isNotEmpty) {
         final List<LatLng> sectionPoints = [];
         for (var coord in section.geojson!.coordinates!) {
           if (coord.length >= 2) {
             final point = LatLng(coord[1], coord[0]);
             sectionPoints.add(point);
             allJourneyPoints.add(point);
+            _fullJourneyPolyline.add(point);
           }
         }
-
         if (sectionPoints.isNotEmpty) {
           final color = hexToColor(section.displayInformations?.color);
-
           newJourneyPolylines.add(
             Polyline(
               points: sectionPoints,
@@ -128,14 +155,15 @@ class _MapScreenState extends State<MapScreen> {
           );
         }
       }
+      totalDistance += section.geojson?.properties?[0].length ?? 0;
+      _cumulativeDistances.add(totalDistance);
     }
 
-    if (newJourneyPolylines.isEmpty) return;
+    _startGpsTracking();
 
     setState(() {
       polylines.clear();
       polylines.addAll(newJourneyPolylines);
-
       _scrollableController.animateTo(
         0.25,
         duration: const Duration(milliseconds: 300),
@@ -143,13 +171,221 @@ class _MapScreenState extends State<MapScreen> {
       );
     });
 
-    final bounds = LatLngBounds.fromPoints(allJourneyPoints);
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: bounds,
-        padding: const EdgeInsets.all(50.0),
+    if (allJourneyPoints.isNotEmpty) {
+      final bounds = LatLngBounds.fromPoints(allJourneyPoints);
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(50.0),
+        ),
+      );
+    }
+  }
+
+  Future<void> _startGpsTracking() async {
+    if (!mounted) return;
+
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Location Services Disabled'),
+          content: const Text('Please enable location services to use live tracking.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Open Settings'),
+              onPressed: () {
+                Geolocator.openLocationSettings();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is required to track your journey.')),
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Location Permission Denied'),
+          content: const Text('Location permission has been permanently denied. Please enable it from the app settings to use this feature.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Open Settings'),
+              onPressed: () {
+                Geolocator.openAppSettings();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (_activeJourney != null) {
+      _notificationService.showJourneyProgressNotification(_activeJourney!);
+    }
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
+    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(_onLocationUpdate);
+  }
+
+  void _onLocationUpdate(Position position) {
+    if (_fullJourneyPolyline.isEmpty || _activeJourney == null || _activeJourney!.sections == null) return;
+
+    final userPosition = turf.Position(position.longitude, position.latitude);
+
+    final userMarker = Marker(
+      point: LatLng(position.latitude, position.longitude),
+      width: 80,
+      height: 80,
+      child: Center(
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.0),
+              ),
+            ),
+          ),
+        ),
       ),
     );
+
+    int newSectionIndex = -1;
+    double minDistanceToSection = double.infinity;
+
+    for (int i = 0; i < _activeJourney!.sections!.length; i++) {
+      final section = _activeJourney!.sections![i];
+      if (section.geojson?.coordinates == null || section.geojson!.coordinates!.isEmpty) continue;
+
+      final sectionPoints = section.geojson!.coordinates!
+          .where((c) => c.length >= 2)
+          .map((c) => turf.Position(c[0], c[1]))
+          .toList();
+
+      if (sectionPoints.isEmpty) continue;
+
+      final sectionLine = turf.LineString(coordinates: sectionPoints);
+      final pointOnThisSection = turf.nearestPointOnLine(sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
+      final distance = pointOnThisSection.properties!['dist'] as num;
+
+      if (distance < minDistanceToSection) {
+        minDistanceToSection = distance.toDouble();
+        newSectionIndex = i;
+      }
+    }
+
+    if (newSectionIndex == -1) {
+      newSectionIndex = _activeJourney!.sections!.length - 1;
+    }
+
+    final newPolylines = <Polyline>[];
+    for (int i = 0; i < _activeJourney!.sections!.length; i++) {
+      final section = _activeJourney!.sections![i];
+      if (section.geojson?.coordinates == null || section.geojson!.coordinates!.isEmpty) continue;
+
+      final sectionPoints = section.geojson!.coordinates!
+          .where((c) => c.length >= 2)
+          .map((c) => LatLng(c[1], c[0]))
+          .toList();
+
+      if (sectionPoints.isEmpty) continue;
+
+      final originalColor = hexToColor(section.displayInformations?.color);
+      final traveledColor = originalColor.withValues(alpha: 0.2);
+
+      if (i < newSectionIndex) {
+        newPolylines.add(Polyline(points: sectionPoints, strokeWidth: 5.0, color: traveledColor));
+      } else if (i > newSectionIndex) {
+        newPolylines.add(Polyline(points: sectionPoints, strokeWidth: 5.0, color: originalColor));
+      } else {
+        final sectionLine = turf.LineString(coordinates: sectionPoints.map((p) => turf.Position(p.longitude, p.latitude)).toList());
+        final snappedOnSection = turf.nearestPointOnLine(sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
+        final snappedLatLngOnSection = LatLng(snappedOnSection.geometry!.coordinates.lat.toDouble(), snappedOnSection.geometry!.coordinates.lng.toDouble());
+        final splitIndex = snappedOnSection.properties!['index'] as int;
+
+        if (splitIndex >= 0 && sectionPoints.length > 1) {
+          final traveledPart = sectionPoints.sublist(0, splitIndex + 1)..add(snappedLatLngOnSection);
+          newPolylines.add(Polyline(points: traveledPart, strokeWidth: 5.0, color: traveledColor));
+        }
+
+        if (splitIndex < sectionPoints.length - 1) {
+          final remainingPart = [snappedLatLngOnSection, ...sectionPoints.sublist(splitIndex + 1)];
+          newPolylines.add(Polyline(points: remainingPart, strokeWidth: 5.0, color: originalColor));
+        } else if (newPolylines.where((p) => p.color == originalColor).isEmpty && sectionPoints.length <= 1) {
+          newPolylines.add(Polyline(points: [snappedLatLngOnSection, sectionPoints.last], strokeWidth: 5.0, color: originalColor));
+        }
+      }
+    }
+
+    setState(() {
+      _userLocationMarker = userMarker;
+      polylines = newPolylines;
+    });
+
+    if (newSectionIndex != _currentSectionIndex) {
+      setState(() {
+        _currentSectionIndex = newSectionIndex;
+      });
+      _notificationService.updateJourneyProgressNotification(_activeJourney!, _currentSectionIndex);
+    }
+
+    final endPoint = _fullJourneyPolyline.last;
+    final distanceToEnd = Geolocator.distanceBetween(position.latitude, position.longitude, endPoint.latitude, endPoint.longitude);
+    if (distanceToEnd < 50) {
+      _stopGpsTracking();
+    }
+  }
+
+  void _stopGpsTracking() {
+    _positionStreamSubscription?.cancel();
+    if (_activeJourney != null) {
+      _notificationService.cancelJourneyNotification(_activeJourney!);
+    }
+    setState(() {
+      _userLocationMarker = null;
+      _activeJourney = null;
+    });
   }
 
   @override
@@ -176,7 +412,7 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(
               markers: [
                 ...markers,
-                if (_userMarker != null) _userMarker!,
+                if (_userLocationMarker != null) _userLocationMarker!,
               ],
             ),
           ],
@@ -196,7 +432,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                   ),
                 ],
@@ -255,21 +491,16 @@ class _MapScreenState extends State<MapScreen> {
                           child: CircularProgressIndicator(),
                         ),
                       )
-                    else if (_journeys != null && _journeys!.journeys!.isNotEmpty)
+                    else if (_journeys != null && _journeys!.journeys != null && _journeys!.journeys!.isNotEmpty)
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _journeys!.journeys!.length,
                         itemBuilder: (context, index) {
                           final journey = _journeys!.journeys![index];
-                          return GestureDetector(
-                            onTap: () {
-                              print('Itinéraire cliqué ! ID: ${journey.departureDateTime}');
-                            },
-                            child: JourneyCard(
-                              journey: journey,
-                              onJourneySelected: _displayJourneyOnMap,
-                            ),
+                          return JourneyCard(
+                            journey: journey,
+                            onJourneySelected: _displayJourneyOnMap,
                           );
                         },
                       )
