@@ -44,7 +44,7 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _journeySimulator;
 
   StreamSubscription<Position>? _positionStreamSubscription;
-  Marker? _userLocationMarker;
+  Position? _currentPosition;
   Journey? _activeJourney;
   int _currentSectionIndex = -1;
 
@@ -254,7 +254,7 @@ class _MapScreenState extends State<MapScreen> {
 
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
+      distanceFilter: 2,
     );
     _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(_onLocationUpdate);
   }
@@ -263,33 +263,6 @@ class _MapScreenState extends State<MapScreen> {
     if (_fullJourneyPolyline.isEmpty || _activeJourney == null || _activeJourney!.sections == null) return;
 
     final userPosition = turf.Position(position.longitude, position.latitude);
-
-    final userMarker = Marker(
-      point: LatLng(position.latitude, position.longitude),
-      width: 80,
-      height: 80,
-      child: Center(
-        child: Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.3),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.0),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
 
     int newSectionIndex = -1;
     double minDistanceToSection = double.infinity;
@@ -359,7 +332,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     setState(() {
-      _userLocationMarker = userMarker;
+      _currentPosition = position;
       polylines = newPolylines;
     });
 
@@ -383,7 +356,7 @@ class _MapScreenState extends State<MapScreen> {
       _notificationService.cancelJourneyNotification(_activeJourney!);
     }
     setState(() {
-      _userLocationMarker = null;
+      _currentPosition = null;
       _activeJourney = null;
     });
   }
@@ -409,11 +382,42 @@ class _MapScreenState extends State<MapScreen> {
             PolylineLayer(
               polylines: polylines,
             ),
+            if (_currentPosition != null) ...[
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                    radius: _currentPosition!.accuracy,
+                    useRadiusInMeter: true,
+                    color: Colors.blue.withValues(alpha: 0.2),
+                    borderColor: Colors.blue.withValues(alpha: 0.4),
+                    borderStrokeWidth: 1.5,
+                  ),
+                ],
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                    width: 80,
+                    height: 80,
+                    child: Center(
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.0),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             MarkerLayer(
-              markers: [
-                ...markers,
-                if (_userLocationMarker != null) _userLocationMarker!,
-              ],
+              markers: markers,
             ),
           ],
         ),
