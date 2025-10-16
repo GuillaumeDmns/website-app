@@ -37,21 +37,30 @@ class NotificationService {
 
   Future<void> showJourneyProgressNotification(Journey journey) async {
     if (journey.sections == null || journey.sections!.isEmpty) return;
-    await _updateJourneyProgress(journey, journey.sections!.first, 0);
+    await _updateJourneyProgress(journey, journey.sections!.first, 0, 500); // TODO 500 ?
   }
 
-  Future<void> updateJourneyProgressNotification(Journey journey, int currentSectionIndex) async {
+  Future<void> updateJourneyProgressNotification(
+      Journey journey,
+      int currentSectionIndex,
+      double traveledDistance,
+      double totalDistance) async {
     if (journey.sections == null || journey.sections!.length <= currentSectionIndex) return;
 
     final section = journey.sections![currentSectionIndex];
-    await _updateJourneyProgress(journey, section, currentSectionIndex);
+    await _updateJourneyProgress(journey, section, traveledDistance, totalDistance);
   }
 
-  Future<void> _updateJourneyProgress(Journey journey, Section currentSection, int currentStep) async {
-    final int totalSteps = journey.sections?.length ?? 1;
+  Future<void> _updateJourneyProgress(
+      Journey journey,
+      Section currentSection,
+      double traveledDistance,
+      double totalDistance) async {
     final String contentText = _formatSectionText(currentSection);
-
     final int notificationId = journey.hashCode;
+
+    final int maxProgress = totalDistance > 0 ? totalDistance.toInt() : 100;
+    final int currentProgress = traveledDistance.clamp(0, totalDistance).toInt();
 
     if (Platform.isAndroid) {
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -63,8 +72,8 @@ class NotificationService {
         ongoing: true,
         autoCancel: false,
         showProgress: true,
-        maxProgress: totalSteps,
-        progress: currentStep + 1,
+        maxProgress: maxProgress,
+        progress: currentProgress,
         onlyAlertOnce: true,
       );
 

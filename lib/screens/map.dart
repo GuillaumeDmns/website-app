@@ -48,8 +48,10 @@ class _MapScreenState extends State<MapScreen> {
   Journey? _activeJourney;
   int _currentSectionIndex = -1;
 
-  List<LatLng> _fullJourneyPolyline = [];
-  List<double> _cumulativeDistances = [];
+  double _totalJourneyDistanceInMeters = 0.0;
+
+  final List<LatLng> _fullJourneyPolyline = [];
+  final List<double> _cumulativeDistances = [];
 
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
@@ -127,10 +129,11 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       _activeJourney = journey;
       _currentSectionIndex = -1;
+      _totalJourneyDistanceInMeters = 0.0;
+      _cumulativeDistances.clear();
     });
 
     _fullJourneyPolyline.clear();
-    _cumulativeDistances.clear();
     double totalDistance = 0;
 
     for (var section in journey.sections!) {
@@ -159,6 +162,7 @@ class _MapScreenState extends State<MapScreen> {
       _cumulativeDistances.add(totalDistance);
     }
 
+    _totalJourneyDistanceInMeters = totalDistance;
     _startGpsTracking();
 
     setState(() {
@@ -331,16 +335,58 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
 
+    double traveledDistance = 0;
+
+    if (newSectionIndex > 0) {
+      traveledDistance += _cumulativeDistances[newSectionIndex - 1];
+    }
+
+    final currentSectionPoints = _activeJourney!.sections![newSectionIndex].geojson!.coordinates!
+        .where((c) => c.length >= 2)
+        .map((c) => LatLng(c[1], c[0]))
+        .toList();
+
+    final snappedOnSection = turf.nearestPointOnLine(
+        turf.LineString(coordinates: currentSectionPoints.map((p) => turf.Position(p.longitude, p.latitude)).toList()),
+        turf.Point(coordinates: turf.Position(position.longitude, position.latitude)),
+        turf.Unit.meters
+    );
+    final splitIndex = snappedOnSection.properties!['index'] as int;
+    final snappedLatLngOnSection = LatLng(snappedOnSection.geometry!.coordinates.lat.toDouble(), snappedOnSection.geometry!.coordinates.lng.toDouble());
+
+    double distanceInCurrentSection = 0.0;
+    for (int i = 0; i < splitIndex; i++) {
+      distanceInCurrentSection += Geolocator.distanceBetween(
+        currentSectionPoints[i].latitude, currentSectionPoints[i].longitude,
+        currentSectionPoints[i + 1].latitude, currentSectionPoints[i + 1].longitude,
+      );
+    }
+
+    if (splitIndex < currentSectionPoints.length) {
+      distanceInCurrentSection += Geolocator.distanceBetween(
+        currentSectionPoints[splitIndex].latitude, currentSectionPoints[splitIndex].longitude,
+        snappedLatLngOnSection.latitude, snappedLatLngOnSection.longitude,
+      );
+    }
+
+    traveledDistance += distanceInCurrentSection;
+
     setState(() {
       _currentPosition = position;
       polylines = newPolylines;
     });
 
+    _notificationService.updateJourneyProgressNotification(
+        _activeJourney!,
+        newSectionIndex,
+        traveledDistance,
+        _totalJourneyDistanceInMeters
+    );
+
     if (newSectionIndex != _currentSectionIndex) {
       setState(() {
         _currentSectionIndex = newSectionIndex;
       });
-      _notificationService.updateJourneyProgressNotification(_activeJourney!, _currentSectionIndex);
     }
 
     final endPoint = _fullJourneyPolyline.last;
