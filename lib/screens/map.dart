@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:website_app/screens/search_places.dart';
+import 'package:website_app/utils/map_utils.dart';
 
 import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
@@ -465,6 +466,11 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(
               markers: markers,
             ),
+            if (_activeJourney != null) ...[
+              MarkerLayer(
+                  markers: MapUtils.buildActiveJourneyMarkers(_activeJourney!)
+              ),
+            ]
           ],
         ),
         DraggableScrollableSheet(
