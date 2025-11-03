@@ -253,14 +253,23 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    if (_activeJourney != null) {
-      _notificationService.showJourneyProgressNotification(_activeJourney!);
-    }
-
-    const LocationSettings locationSettings = LocationSettings(
+    final LocationSettings locationSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 2,
+      forceLocationManager: true,
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: "Journey in Progress",
+        notificationText: "Tracking your location to guide you.",
+        setOngoing: true,
+        enableWakeLock: true,
+        notificationIcon: AndroidResource(name: 'launch_background'),
+      ),
     );
+
+    if (_activeJourney != null) {
+      await _notificationService.showJourneyProgressNotification(_activeJourney!);
+    }
+
     _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(_onLocationUpdate);
   }
 
@@ -400,7 +409,7 @@ class _MapScreenState extends State<MapScreen> {
   void _stopGpsTracking() {
     _positionStreamSubscription?.cancel();
     if (_activeJourney != null) {
-      _notificationService.cancelJourneyNotification(_activeJourney!);
+      _notificationService.cancelJourneyNotification();
     }
     setState(() {
       _currentPosition = null;

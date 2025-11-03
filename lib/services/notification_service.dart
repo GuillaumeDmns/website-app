@@ -4,6 +4,11 @@ import '../models/navitia/journey.dart';
 import '../models/navitia/section.dart';
 
 class NotificationService {
+  static const String _channelId = 'journey_progress_channel';
+  static const String _channelName = 'Journey Progress';
+  static const String _channelDescription = 'Live journey progress';
+  static const int _notificationId = 75415; // Same value as https://github.com/Baseflow/flutter-geolocator/blob/756b8d8015f06ecfcc64b438f71cb3b362b5e350/geolocator_android/android/src/main/java/com/baseflow/geolocator/GeolocatorLocationService.java#L31
+
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
@@ -20,24 +25,10 @@ class NotificationService {
     );
   }
 
-  Future<void> requestPermissions() async {
-    await _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    await _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-  }
-
   Future<void> showJourneyProgressNotification(Journey journey) async {
     if (journey.sections == null || journey.sections!.isEmpty) return;
-    await _updateJourneyProgress(journey, journey.sections!.first, 0, 500); // TODO 500 ?
+
+    await _updateJourneyProgress(journey, journey.sections!.first, 0);
   }
 
   Future<void> updateJourneyProgressNotification(
@@ -48,39 +39,34 @@ class NotificationService {
     if (journey.sections == null || journey.sections!.length <= currentSectionIndex) return;
 
     final section = journey.sections![currentSectionIndex];
-    await _updateJourneyProgress(journey, section, traveledDistance, totalDistance);
+    await _updateJourneyProgress(journey, section, (traveledDistance.clamp(0, totalDistance)*100/totalDistance).toInt());
   }
 
   Future<void> _updateJourneyProgress(
       Journey journey,
       Section currentSection,
-      double traveledDistance,
-      double totalDistance) async {
+      int traveledPercentage) async {
     final String contentText = _formatSectionText(currentSection);
-    final int notificationId = journey.hashCode;
-
-    final int maxProgress = totalDistance > 0 ? totalDistance.toInt() : 100;
-    final int currentProgress = traveledDistance.clamp(0, totalDistance).toInt();
 
     if (Platform.isAndroid) {
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'journey_progress_channel',
-        'Journey Progress',
-        channelDescription: 'Shows live journey progress',
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
         importance: Importance.low,
         priority: Priority.defaultPriority,
         ongoing: true,
         autoCancel: false,
         showProgress: true,
-        maxProgress: maxProgress,
-        progress: currentProgress,
+        progress: traveledPercentage,
+        maxProgress: 100,
         onlyAlertOnce: true,
       );
 
       final NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
 
       await _notificationsPlugin.show(
-        notificationId,
+        _notificationId,
         'Journey to ${journey.sections?.last.to?.name ?? 'Destination'}',
         contentText,
         notificationDetails,
@@ -89,8 +75,8 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelJourneyNotification(Journey journey) async {
-    await _notificationsPlugin.cancel(journey.hashCode);
+  Future<void> cancelJourneyNotification() async {
+    await _notificationsPlugin.cancel(_notificationId);
   }
 
   String _formatSectionText(Section section) {
