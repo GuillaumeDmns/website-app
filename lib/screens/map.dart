@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -253,24 +254,32 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    final LocationSettings locationSettings = AndroidSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 2,
-      forceLocationManager: true,
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: "Journey in Progress",
-        notificationText: "Tracking your location to guide you.",
-        setOngoing: true,
-        enableWakeLock: true,
-        notificationIcon: AndroidResource(name: 'launch_background'),
+    final LocationSettings locationSettings = switch(Platform.operatingSystem) {
+      "android" => AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 2,
+        forceLocationManager: true,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: "Journey in Progress",
+          notificationText: "Tracking your location to guide you.",
+          setOngoing: true,
+          enableWakeLock: true,
+        ),
       ),
-    );
+      _ => LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 2,
+      ),
+    };
 
     if (_activeJourney != null) {
       await _notificationService.showJourneyProgressNotification(_activeJourney!);
     }
 
     _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(_onLocationUpdate);
+
+    final Position position2 = await Geolocator.getCurrentPosition();
+    _onLocationUpdate(position2);
   }
 
   void _onLocationUpdate(Position position) {

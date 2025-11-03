@@ -15,8 +15,15 @@ class NotificationService {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
+    final LinuxInitializationSettings initializationSettingsLinux =
+    LinuxInitializationSettings(
+        defaultActionName: 'Open notification',
+        defaultIcon: AssetsLinuxIcon('launch_background')
+    );
+
     final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid
+      android: initializationSettingsAndroid,
+      linux: initializationSettingsLinux
     );
 
     await _notificationsPlugin.initialize(
@@ -48,31 +55,37 @@ class NotificationService {
       int traveledPercentage) async {
     final String contentText = _formatSectionText(currentSection);
 
-    if (Platform.isAndroid) {
-      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        _channelId,
-        _channelName,
-        channelDescription: _channelDescription,
-        importance: Importance.low,
-        priority: Priority.defaultPriority,
-        ongoing: true,
-        autoCancel: false,
-        showProgress: true,
-        progress: traveledPercentage,
-        maxProgress: 100,
-        onlyAlertOnce: true,
-      );
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.low,
+      priority: Priority.defaultPriority,
+      ongoing: true,
+      autoCancel: false,
+      showProgress: true,
+      progress: traveledPercentage,
+      maxProgress: 100,
+      onlyAlertOnce: true,
+    );
 
-      final NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+    final LinuxNotificationDetails linuxDetails = LinuxNotificationDetails(
+      urgency: LinuxNotificationUrgency.normal,
+      category: LinuxNotificationCategory.device,
+      resident: true,
+      suppressSound: true,
+      timeout: const LinuxNotificationTimeout.expiresNever(),
+    );
 
-      await _notificationsPlugin.show(
-        _notificationId,
-        'Journey to ${journey.sections?.last.to?.name ?? 'Destination'}',
-        contentText,
-        notificationDetails,
-      );
+    final NotificationDetails notificationDetails = NotificationDetails(android: androidDetails, linux: linuxDetails);
 
-    }
+    await _notificationsPlugin.show(
+      _notificationId,
+      'Journey to ${journey.sections?.last.to?.name ?? 'Destination'}',
+      contentText,
+      notificationDetails,
+    );
+
   }
 
   Future<void> cancelJourneyNotification() async {
