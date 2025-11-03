@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/navitia/journey.dart';
 import '../models/navitia/section.dart';

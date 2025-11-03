@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -254,8 +255,10 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    final LocationSettings locationSettings = switch(Platform.operatingSystem) {
-      "android" => AndroidSettings(
+    late LocationSettings locationSettings;
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 2,
         forceLocationManager: true,
@@ -265,12 +268,19 @@ class _MapScreenState extends State<MapScreen> {
           setOngoing: true,
           enableWakeLock: true,
         ),
-      ),
-      _ => LocationSettings(
+      );
+    } else if (kIsWeb) {
+      locationSettings = WebSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 100,
+        maximumAge: Duration(minutes: 1),
+      );
+    } else {
+      locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 2,
-      ),
-    };
+      );
+    }
 
     if (_activeJourney != null) {
       await _notificationService.showJourneyProgressNotification(_activeJourney!);
