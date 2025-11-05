@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:website_app/screens/search_places.dart';
 import 'package:website_app/utils/map_utils.dart';
@@ -26,7 +26,15 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  List<String> transportModes = ["BUS", "NOCTILIEN", "METRO", "TRAM", "TER", "TRANSILIEN", "RER"];
+  List<String> transportModes = [
+    "BUS",
+    "NOCTILIEN",
+    "METRO",
+    "TRAM",
+    "TER",
+    "TRANSILIEN",
+    "RER"
+  ];
   String? selectedMode;
 
   List<Polyline> polylines = [];
@@ -34,7 +42,7 @@ class _MapScreenState extends State<MapScreen> {
   final api = ApiRepository();
 
   final MapController _mapController = MapController();
-  final DraggableScrollableController _scrollableController = DraggableScrollableController();
+  final PanelController _panelController = PanelController();
 
   Place? selectedStartPlace;
   Place? selectedDestinationPlace;
@@ -109,7 +117,8 @@ class _MapScreenState extends State<MapScreen> {
       });
 
       try {
-        final journeysResult = await api.getJourneys(selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
+        final journeysResult = await api.getJourneys(
+            selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
         setState(() {
           _journeys = journeysResult;
           _isLoadingJourneys = false;
@@ -140,7 +149,9 @@ class _MapScreenState extends State<MapScreen> {
     double totalDistance = 0;
 
     for (var section in journey.sections!) {
-      if (section.geojson != null && section.geojson!.coordinates != null && section.geojson!.coordinates!.isNotEmpty) {
+      if (section.geojson != null &&
+          section.geojson!.coordinates != null &&
+          section.geojson!.coordinates!.isNotEmpty) {
         final List<LatLng> sectionPoints = [];
         for (var coord in section.geojson!.coordinates!) {
           if (coord.length >= 2) {
@@ -171,8 +182,9 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       polylines.clear();
       polylines.addAll(newJourneyPolylines);
-      _scrollableController.animateTo(
-        0.25,
+
+      _panelController.animatePanelToPosition(
+        0.0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -201,7 +213,8 @@ class _MapScreenState extends State<MapScreen> {
         context: context,
         builder: (BuildContext context) => AlertDialog(
           title: const Text('Location Services Disabled'),
-          content: const Text('Please enable location services to use live tracking.'),
+          content: const Text(
+              'Please enable location services to use live tracking.'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -225,7 +238,9 @@ class _MapScreenState extends State<MapScreen> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required to track your journey.')),
+          const SnackBar(
+              content: Text(
+                  'Location permission is required to track your journey.')),
         );
         return;
       }
@@ -236,7 +251,8 @@ class _MapScreenState extends State<MapScreen> {
         context: context,
         builder: (BuildContext context) => AlertDialog(
           title: const Text('Location Permission Denied'),
-          content: const Text('Location permission has been permanently denied. Please enable it from the app settings to use this feature.'),
+          content: const Text(
+              'Location permission has been permanently denied. Please enable it from the app settings to use this feature.'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -263,11 +279,11 @@ class _MapScreenState extends State<MapScreen> {
         distanceFilter: 2,
         forceLocationManager: true,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: "Journey in Progress",
-          notificationText: "Tracking your location to guide you.",
-          setOngoing: true,
-          enableWakeLock: true,
-        ),
+            notificationTitle: "Journey in Progress",
+            notificationText: "Tracking your location to guide you.",
+            setOngoing: true,
+            enableWakeLock: true,
+            color: Colors.green),
       );
     } else if (kIsWeb) {
       locationSettings = WebSettings(
@@ -283,17 +299,22 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (_activeJourney != null) {
-      await _notificationService.showJourneyProgressNotification(_activeJourney!);
+      await _notificationService
+          .showJourneyProgressNotification(_activeJourney!);
     }
 
-    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(_onLocationUpdate);
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen(_onLocationUpdate);
 
     final Position position2 = await Geolocator.getCurrentPosition();
     _onLocationUpdate(position2);
   }
 
   void _onLocationUpdate(Position position) {
-    if (_fullJourneyPolyline.isEmpty || _activeJourney == null || _activeJourney!.sections == null) return;
+    if (_fullJourneyPolyline.isEmpty ||
+        _activeJourney == null ||
+        _activeJourney!.sections == null) return;
 
     final userPosition = turf.Position(position.longitude, position.latitude);
 
@@ -302,7 +323,8 @@ class _MapScreenState extends State<MapScreen> {
 
     for (int i = 0; i < _activeJourney!.sections!.length; i++) {
       final section = _activeJourney!.sections![i];
-      if (section.geojson?.coordinates == null || section.geojson!.coordinates!.isEmpty) continue;
+      if (section.geojson?.coordinates == null ||
+          section.geojson!.coordinates!.isEmpty) continue;
 
       final sectionPoints = section.geojson!.coordinates!
           .where((c) => c.length >= 2)
@@ -312,7 +334,8 @@ class _MapScreenState extends State<MapScreen> {
       if (sectionPoints.isEmpty) continue;
 
       final sectionLine = turf.LineString(coordinates: sectionPoints);
-      final pointOnThisSection = turf.nearestPointOnLine(sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
+      final pointOnThisSection = turf.nearestPointOnLine(
+          sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
       final distance = pointOnThisSection.properties!['dist'] as num;
 
       if (distance < minDistanceToSection) {
@@ -328,7 +351,8 @@ class _MapScreenState extends State<MapScreen> {
     final newPolylines = <Polyline>[];
     for (int i = 0; i < _activeJourney!.sections!.length; i++) {
       final section = _activeJourney!.sections![i];
-      if (section.geojson?.coordinates == null || section.geojson!.coordinates!.isEmpty) continue;
+      if (section.geojson?.coordinates == null ||
+          section.geojson!.coordinates!.isEmpty) continue;
 
       final sectionPoints = section.geojson!.coordinates!
           .where((c) => c.length >= 2)
@@ -341,25 +365,45 @@ class _MapScreenState extends State<MapScreen> {
       final traveledColor = originalColor.withValues(alpha: 0.2);
 
       if (i < newSectionIndex) {
-        newPolylines.add(Polyline(points: sectionPoints, strokeWidth: 5.0, color: traveledColor));
+        newPolylines.add(Polyline(
+            points: sectionPoints, strokeWidth: 5.0, color: traveledColor));
       } else if (i > newSectionIndex) {
-        newPolylines.add(Polyline(points: sectionPoints, strokeWidth: 5.0, color: originalColor));
+        newPolylines.add(Polyline(
+            points: sectionPoints, strokeWidth: 5.0, color: originalColor));
       } else {
-        final sectionLine = turf.LineString(coordinates: sectionPoints.map((p) => turf.Position(p.longitude, p.latitude)).toList());
-        final snappedOnSection = turf.nearestPointOnLine(sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
-        final snappedLatLngOnSection = LatLng(snappedOnSection.geometry!.coordinates.lat.toDouble(), snappedOnSection.geometry!.coordinates.lng.toDouble());
+        final sectionLine = turf.LineString(
+            coordinates: sectionPoints
+                .map((p) => turf.Position(p.longitude, p.latitude))
+                .toList());
+        final snappedOnSection = turf.nearestPointOnLine(sectionLine,
+            turf.Point(coordinates: userPosition), turf.Unit.meters);
+        final snappedLatLngOnSection = LatLng(
+            snappedOnSection.geometry!.coordinates.lat.toDouble(),
+            snappedOnSection.geometry!.coordinates.lng.toDouble());
         final splitIndex = snappedOnSection.properties!['index'] as int;
 
         if (splitIndex >= 0 && sectionPoints.length > 1) {
-          final traveledPart = sectionPoints.sublist(0, splitIndex + 1)..add(snappedLatLngOnSection);
-          newPolylines.add(Polyline(points: traveledPart, strokeWidth: 5.0, color: traveledColor));
+          final traveledPart = sectionPoints.sublist(0, splitIndex + 1)
+            ..add(snappedLatLngOnSection);
+          newPolylines.add(Polyline(
+              points: traveledPart, strokeWidth: 5.0, color: traveledColor));
         }
 
         if (splitIndex < sectionPoints.length - 1) {
-          final remainingPart = [snappedLatLngOnSection, ...sectionPoints.sublist(splitIndex + 1)];
-          newPolylines.add(Polyline(points: remainingPart, strokeWidth: 5.0, color: originalColor));
-        } else if (newPolylines.where((p) => p.color == originalColor).isEmpty && sectionPoints.length <= 1) {
-          newPolylines.add(Polyline(points: [snappedLatLngOnSection, sectionPoints.last], strokeWidth: 5.0, color: originalColor));
+          final remainingPart = [
+            snappedLatLngOnSection,
+            ...sectionPoints.sublist(splitIndex + 1)
+          ];
+          newPolylines.add(Polyline(
+              points: remainingPart, strokeWidth: 5.0, color: originalColor));
+        } else if (newPolylines
+                .where((p) => p.color == originalColor)
+                .isEmpty &&
+            sectionPoints.length <= 1) {
+          newPolylines.add(Polyline(
+              points: [snappedLatLngOnSection, sectionPoints.last],
+              strokeWidth: 5.0,
+              color: originalColor));
         }
       }
     }
@@ -370,31 +414,41 @@ class _MapScreenState extends State<MapScreen> {
       traveledDistance += _cumulativeDistances[newSectionIndex - 1];
     }
 
-    final currentSectionPoints = _activeJourney!.sections![newSectionIndex].geojson!.coordinates!
+    final currentSectionPoints = _activeJourney!
+        .sections![newSectionIndex].geojson!.coordinates!
         .where((c) => c.length >= 2)
         .map((c) => LatLng(c[1], c[0]))
         .toList();
 
     final snappedOnSection = turf.nearestPointOnLine(
-        turf.LineString(coordinates: currentSectionPoints.map((p) => turf.Position(p.longitude, p.latitude)).toList()),
-        turf.Point(coordinates: turf.Position(position.longitude, position.latitude)),
-        turf.Unit.meters
-    );
+        turf.LineString(
+            coordinates: currentSectionPoints
+                .map((p) => turf.Position(p.longitude, p.latitude))
+                .toList()),
+        turf.Point(
+            coordinates: turf.Position(position.longitude, position.latitude)),
+        turf.Unit.meters);
     final splitIndex = snappedOnSection.properties!['index'] as int;
-    final snappedLatLngOnSection = LatLng(snappedOnSection.geometry!.coordinates.lat.toDouble(), snappedOnSection.geometry!.coordinates.lng.toDouble());
+    final snappedLatLngOnSection = LatLng(
+        snappedOnSection.geometry!.coordinates.lat.toDouble(),
+        snappedOnSection.geometry!.coordinates.lng.toDouble());
 
     double distanceInCurrentSection = 0.0;
     for (int i = 0; i < splitIndex; i++) {
       distanceInCurrentSection += Geolocator.distanceBetween(
-        currentSectionPoints[i].latitude, currentSectionPoints[i].longitude,
-        currentSectionPoints[i + 1].latitude, currentSectionPoints[i + 1].longitude,
+        currentSectionPoints[i].latitude,
+        currentSectionPoints[i].longitude,
+        currentSectionPoints[i + 1].latitude,
+        currentSectionPoints[i + 1].longitude,
       );
     }
 
     if (splitIndex < currentSectionPoints.length) {
       distanceInCurrentSection += Geolocator.distanceBetween(
-        currentSectionPoints[splitIndex].latitude, currentSectionPoints[splitIndex].longitude,
-        snappedLatLngOnSection.latitude, snappedLatLngOnSection.longitude,
+        currentSectionPoints[splitIndex].latitude,
+        currentSectionPoints[splitIndex].longitude,
+        snappedLatLngOnSection.latitude,
+        snappedLatLngOnSection.longitude,
       );
     }
 
@@ -405,12 +459,8 @@ class _MapScreenState extends State<MapScreen> {
       polylines = newPolylines;
     });
 
-    _notificationService.updateJourneyProgressNotification(
-        _activeJourney!,
-        newSectionIndex,
-        traveledDistance,
-        _totalJourneyDistanceInMeters
-    );
+    _notificationService.updateJourneyProgressNotification(_activeJourney!,
+        newSectionIndex, traveledDistance, _totalJourneyDistanceInMeters);
 
     if (newSectionIndex != _currentSectionIndex) {
       setState(() {
@@ -419,7 +469,8 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     final endPoint = _fullJourneyPolyline.last;
-    final distanceToEnd = Geolocator.distanceBetween(position.latitude, position.longitude, endPoint.latitude, endPoint.longitude);
+    final distanceToEnd = Geolocator.distanceBetween(position.latitude,
+        position.longitude, endPoint.latitude, endPoint.longitude);
     if (distanceToEnd < 50) {
       _stopGpsTracking();
     }
@@ -438,169 +489,159 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: const MapOptions(
-            initialCenter: LatLng(48.864716, 2.349014),
-            initialZoom: 11,
-            interactionOptions: InteractionOptions(
-              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+    BorderRadiusGeometry radius = BorderRadius.only(
+      topLeft: Radius.circular(24.0),
+      topRight: Radius.circular(24.0),
+    );
+
+    return SlidingUpPanel(
+      parallaxEnabled: true,
+      parallaxOffset: 0.5,
+      minHeight: 150,
+      controller: _panelController,
+      borderRadius: radius,
+      panelBuilder: (sc) => ListView(
+        controller: sc,
+        padding: EdgeInsets.zero,
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
             ),
           ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.guillaumedamiens',
-            ),
-            PolylineLayer(
-              polylines: polylines,
-            ),
-            if (_currentPosition != null) ...[
-              CircleLayer(
-                circles: [
-                  CircleMarker(
-                    point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                    radius: _currentPosition!.accuracy,
-                    useRadiusInMeter: true,
-                    color: Colors.blue.withValues(alpha: 0.2),
-                    borderColor: Colors.blue.withValues(alpha: 0.4),
-                    borderStrokeWidth: 1.5,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _startController,
+                  readOnly: true,
+                  onTap: () => _navigateToSearchScreen(isStart: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Start',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.trip_origin),
                   ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                    width: 80,
-                    height: 80,
-                    child: Center(
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2.0),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            MarkerLayer(
-              markers: markers,
-            ),
-            if (_activeJourney != null) ...[
-              MarkerLayer(
-                  markers: MapUtils.buildActiveJourneyMarkers(_activeJourney!)
-              ),
-            ]
-          ],
-        ),
-        DraggableScrollableSheet(
-          controller: _scrollableController,
-          initialChildSize: 0.25,
-          minChildSize: 0.25,
-          maxChildSize: 0.80,
-          builder: (BuildContext context, ScrollController scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _destinationController,
+                  readOnly: true,
+                  onTap: () => _navigateToSearchScreen(isStart: false),
+                  decoration: const InputDecoration(
+                    labelText: 'Destination',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.fmd_good_outlined),
                   ),
-                ],
-              ),
-              child: ListView(
-                controller: scrollController,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 21, thickness: 1),
+          if (_showRoutes)
+            if (_isLoadingJourneys)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_journeys != null &&
+                _journeys!.journeys != null &&
+                _journeys!.journeys!.isNotEmpty)
+              ListView.builder(
                 padding: EdgeInsets.zero,
-                children: [
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Container(
-                        width: 40,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _startController,
-                          readOnly: true,
-                          onTap: () => _navigateToSearchScreen(isStart: true),
-                          decoration: const InputDecoration(
-                            labelText: 'Start',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.trip_origin),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: _destinationController,
-                          readOnly: true,
-                          onTap: () => _navigateToSearchScreen(isStart: false),
-                          decoration: const InputDecoration(
-                            labelText: 'Destination',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.fmd_good_outlined),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 21, thickness: 1),
-                  if (_showRoutes)
-                    if (_isLoadingJourneys)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (_journeys != null && _journeys!.journeys != null && _journeys!.journeys!.isNotEmpty)
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _journeys!.journeys!.length,
-                        itemBuilder: (context, index) {
-                          final journey = _journeys!.journeys![index];
-                          return JourneyCard(
-                            journey: journey,
-                            onJourneySelected: _displayJourneyOnMap,
-                          );
-                        },
-                      )
-                    else
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text("Aucun itinéraire trouvé."),
-                        ),
-                      ),
-                ],
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _journeys!.journeys!.length,
+                itemBuilder: (context, index) {
+                  final journey = _journeys!.journeys![index];
+                  return JourneyCard(
+                    journey: journey,
+                    onJourneySelected: _displayJourneyOnMap,
+                  );
+                },
+              )
+            else
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text("Aucun itinéraire trouvé."),
+                ),
               ),
-            );
-          },
+        ],
+      ),
+      body: FlutterMap(
+        mapController: _mapController,
+        options: const MapOptions(
+          initialCenter: LatLng(48.864716, 2.349014),
+          initialZoom: 11,
+          interactionOptions: InteractionOptions(
+            flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+          ),
         ),
-      ],
+        children: [
+          TileLayer(
+            urlTemplate:
+                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.guillaumedamiens',
+          ),
+          PolylineLayer(
+            polylines: polylines,
+          ),
+          if (_currentPosition != null) ...[
+            CircleLayer(
+              circles: [
+                CircleMarker(
+                  point: LatLng(
+                      _currentPosition!.latitude, _currentPosition!.longitude),
+                  radius: _currentPosition!.accuracy,
+                  useRadiusInMeter: true,
+                  color: Colors.blue.withValues(alpha: 0.2),
+                  borderColor: Colors.blue.withValues(alpha: 0.4),
+                  borderStrokeWidth: 1.5,
+                ),
+              ],
+            ),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: LatLng(
+                      _currentPosition!.latitude, _currentPosition!.longitude),
+                  width: 80,
+                  height: 80,
+                  child: Center(
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2.0),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          MarkerLayer(
+            markers: markers,
+          ),
+          if (_activeJourney != null) ...[
+            MarkerLayer(
+                markers: MapUtils.buildActiveJourneyMarkers(_activeJourney!)),
+          ]
+        ],
+      ),
     );
   }
 }
