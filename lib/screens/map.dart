@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,19 @@ import '../services/notification_service.dart';
 import '../utils/style_utils.dart';
 import '../widgets/journey_card.dart';
 
+class LatLngTween extends Tween<LatLng> {
+  LatLngTween({required LatLng begin, required LatLng end})
+      : super(begin: begin, end: end);
+
+  @override
+  LatLng lerp(double t) {
+    return LatLng(
+      lerpDouble(begin!.latitude, end!.latitude, t)!,
+      lerpDouble(begin!.longitude, end!.longitude, t)!,
+    );
+  }
+}
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -25,18 +39,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
-  List<String> transportModes = [
-    "BUS",
-    "NOCTILIEN",
-    "METRO",
-    "TRAM",
-    "TER",
-    "TRANSILIEN",
-    "RER"
-  ];
-  String? selectedMode;
-
+class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<Polyline> polylines = [];
   List<Marker> markers = [];
   final api = ApiRepository();
@@ -51,8 +54,6 @@ class _MapScreenState extends State<MapScreen> {
 
   bool _isLoadingJourneys = false;
   bool _showRoutes = false;
-
-  Timer? _journeySimulator;
 
   StreamSubscription<Position>? _positionStreamSubscription;
   Position? _currentPosition;
@@ -69,18 +70,39 @@ class _MapScreenState extends State<MapScreen> {
 
   final NotificationService _notificationService = NotificationService();
 
+  late final AnimationController _animationController;
+
+  Animation<LatLng>? _positionAnimation;
+  Animation<double>? _radiusAnimation;
+
+  LatLng? _animatedLatLng;
+  double? _animatedRadius;
+
   @override
   void initState() {
     super.initState();
     _notificationService.init();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    )..addListener(() {
+      setState(() {
+        if (_positionAnimation != null) {
+          _animatedLatLng = _positionAnimation!.value;
+        }
+        if (_radiusAnimation != null) {
+          _animatedRadius = _radiusAnimation!.value;
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
-    _journeySimulator?.cancel();
     _positionStreamSubscription?.cancel();
     _startController.dispose();
     _destinationController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -454,6 +476,21 @@ class _MapScreenState extends State<MapScreen> {
 
     traveledDistance += distanceInCurrentSection;
 
+    final LatLng beginLatLng = _animatedLatLng ?? LatLng(position.latitude, position.longitude);
+    final double beginRadius = _animatedRadius ?? position.accuracy;
+
+    final LatLng endLatLng = LatLng(position.latitude, position.longitude);
+    final double endRadius = position.accuracy;
+
+    _positionAnimation = LatLngTween(begin: beginLatLng, end: endLatLng).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.linear),
+    );
+    _radiusAnimation = Tween<double>(begin: beginRadius, end: endRadius).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _animationController.forward(from: 0.0);
+
     setState(() {
       _currentPosition = position;
       polylines = newPolylines;
@@ -601,9 +638,8 @@ class _MapScreenState extends State<MapScreen> {
             CircleLayer(
               circles: [
                 CircleMarker(
-                  point: LatLng(
-                      _currentPosition!.latitude, _currentPosition!.longitude),
-                  radius: _currentPosition!.accuracy,
+                  point: _animatedLatLng ?? LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  radius: _animatedRadius ?? _currentPosition!.accuracy,
                   useRadiusInMeter: true,
                   color: Colors.blue.withValues(alpha: 0.2),
                   borderColor: Colors.blue.withValues(alpha: 0.4),
@@ -614,8 +650,7 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(
               markers: [
                 Marker(
-                  point: LatLng(
-                      _currentPosition!.latitude, _currentPosition!.longitude),
+                  point: _animatedLatLng ?? LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
                   width: 80,
                   height: 80,
                   child: Center(
