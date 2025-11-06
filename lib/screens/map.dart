@@ -41,7 +41,6 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<Polyline> polylines = [];
-  List<Marker> markers = [];
   final api = ApiRepository();
 
   final MapController _mapController = MapController();
@@ -668,9 +667,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ],
             ),
           ],
-          MarkerLayer(
-            markers: markers,
-          ),
           if (_activeJourney != null) ...[
             MarkerLayer(
                 markers: MapUtils.buildActiveJourneyMarkers(_activeJourney!)),

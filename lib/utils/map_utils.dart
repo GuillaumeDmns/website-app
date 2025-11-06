@@ -22,11 +22,12 @@ class MapUtils {
             height: 80,
             child: Center(
               child: Container(
-                width: 8,
-                height: 8,
+                width: 9,
+                height: 9,
                 decoration: BoxDecoration(
-                  color: hexToColor(section.displayInformations?.color),
+                  color: Colors.white,
                   shape: BoxShape.circle,
+                  border: Border.all(color: hexToColor(section.displayInformations?.color), width: 2.0),
                 ),
               ),
             ),
