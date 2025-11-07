@@ -85,15 +85,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 750),
     )..addListener(() {
-      setState(() {
-        if (_positionAnimation != null) {
-          _animatedLatLng = _positionAnimation!.value;
-        }
-        if (_radiusAnimation != null) {
-          _animatedRadius = _radiusAnimation!.value;
-        }
+        setState(() {
+          if (_positionAnimation != null) {
+            _animatedLatLng = _positionAnimation!.value;
+          }
+          if (_radiusAnimation != null) {
+            _animatedRadius = _radiusAnimation!.value;
+          }
+        });
       });
-    });
   }
 
   @override
@@ -475,16 +475,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     traveledDistance += distanceInCurrentSection;
 
-    final LatLng beginLatLng = _animatedLatLng ?? LatLng(position.latitude, position.longitude);
+    final LatLng beginLatLng =
+        _animatedLatLng ?? LatLng(position.latitude, position.longitude);
     final double beginRadius = _animatedRadius ?? position.accuracy;
 
     final LatLng endLatLng = LatLng(position.latitude, position.longitude);
     final double endRadius = position.accuracy;
 
-    _positionAnimation = LatLngTween(begin: beginLatLng, end: endLatLng).animate(
+    _positionAnimation =
+        LatLngTween(begin: beginLatLng, end: endLatLng).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.linear),
     );
-    _radiusAnimation = Tween<double>(begin: beginRadius, end: endRadius).animate(
+    _radiusAnimation =
+        Tween<double>(begin: beginRadius, end: endRadius).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
@@ -561,10 +564,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   controller: _startController,
                   readOnly: true,
                   onTap: () => _navigateToSearchScreen(isStart: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Start',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.trip_origin),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Start',
+                    prefixIcon:
+                        Icon(Icons.trip_origin, color: Colors.grey[700]),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -572,16 +587,27 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   controller: _destinationController,
                   readOnly: true,
                   onTap: () => _navigateToSearchScreen(isStart: false),
-                  decoration: const InputDecoration(
-                    labelText: 'Destination',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.fmd_good_outlined),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Destination',
+                    prefixIcon:
+                        Icon(Icons.fmd_good_outlined, color: Colors.grey[700]),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 21, thickness: 1),
           if (_showRoutes)
             if (_isLoadingJourneys)
               const Center(
@@ -593,18 +619,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             else if (_journeys != null &&
                 _journeys!.journeys != null &&
                 _journeys!.journeys!.isNotEmpty)
-              ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _journeys!.journeys!.length,
-                itemBuilder: (context, index) {
-                  final journey = _journeys!.journeys![index];
-                  return JourneyCard(
-                    journey: journey,
-                    onJourneySelected: _displayJourneyOnMap,
-                  );
-                },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _journeys!.journeys!.length,
+                  itemBuilder: (context, index) {
+                    final journey = _journeys!.journeys![index];
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10.0),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: JourneyCard(
+                          journey: journey,
+                          onJourneySelected: _displayJourneyOnMap,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               )
             else
               const Center(
@@ -637,7 +677,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             CircleLayer(
               circles: [
                 CircleMarker(
-                  point: _animatedLatLng ?? LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  point: _animatedLatLng ??
+                      LatLng(_currentPosition!.latitude,
+                          _currentPosition!.longitude),
                   radius: _animatedRadius ?? _currentPosition!.accuracy,
                   useRadiusInMeter: true,
                   color: Colors.blue.withValues(alpha: 0.2),
@@ -649,7 +691,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             MarkerLayer(
               markers: [
                 Marker(
-                  point: _animatedLatLng ?? LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  point: _animatedLatLng ??
+                      LatLng(_currentPosition!.latitude,
+                          _currentPosition!.longitude),
                   width: 80,
                   height: 80,
                   child: Center(

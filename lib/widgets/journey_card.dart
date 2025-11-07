@@ -8,11 +8,8 @@ class JourneyCard extends StatelessWidget {
   final Journey journey;
   final Function(Journey) onJourneySelected;
 
-  const JourneyCard({
-    super.key,
-    required this.journey,
-    required this.onJourneySelected
-  });
+  const JourneyCard(
+      {super.key, required this.journey, required this.onJourneySelected});
 
   String _formatTime(String? dateTimeString) {
     if (dateTimeString == null || dateTimeString.length < 13) {
@@ -35,20 +32,16 @@ class JourneyCard extends StatelessWidget {
     final totalDurationInMinutes = (journey.duration ?? 0) ~/ 60;
     return GestureDetector(
       onTap: () => onJourneySelected(journey),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        elevation: 3.0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildJourneyHeader(totalDurationInMinutes),
-              const SizedBox(height: 16),
-              _buildJourneySections(),
-            ],
-          ),
+      behavior: HitTestBehavior.translucent,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildJourneyHeader(totalDurationInMinutes),
+            const SizedBox(height: 16),
+            _buildJourneySections(),
+          ],
         ),
       ),
     );
@@ -88,8 +81,9 @@ class JourneyCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final sectionsToDisplay =
-        journey.sections!.where((s) => !["crow_fly", "waiting", "transfer"].contains(s.type)).toList();
+    final sectionsToDisplay = journey.sections!
+        .where((s) => !["crow_fly", "waiting", "transfer"].contains(s.type))
+        .toList();
 
     return SizedBox(
       height: 30,
@@ -139,11 +133,9 @@ class JourneyCard extends StatelessWidget {
             ),
         ],
       );
-    }
-    else if (section.mode == 'walking') {
+    } else if (section.mode == 'walking') {
       return const Icon(Icons.directions_walk, color: Colors.black54, size: 24);
-    }
-    else {
+    } else {
       return const SizedBox.shrink();
     }
   }
