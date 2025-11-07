@@ -27,7 +27,7 @@ class MapUtils {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(color: hexToColor(section.displayInformations?.color), width: 2.0),
+                  border: Border.all(color: StyleUtils.hexToColor(section.displayInformations?.color), width: 2.0),
                 ),
               ),
             ),

@@ -1,36 +1,22 @@
 import 'dart:async';
-import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
-import 'package:turf/turf.dart' as turf;
 import 'package:website_app/screens/search_places.dart';
-import 'package:website_app/utils/map_utils.dart';
 
 import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../services/api_repository.dart';
 import '../services/notification_service.dart';
-import '../utils/style_utils.dart';
-import '../widgets/journey_card.dart';
-
-class LatLngTween extends Tween<LatLng> {
-  LatLngTween({required LatLng begin, required LatLng end})
-      : super(begin: begin, end: end);
-
-  @override
-  LatLng lerp(double t) {
-    return LatLng(
-      lerpDouble(begin!.latitude, end!.latitude, t)!,
-      lerpDouble(begin!.longitude, end!.longitude, t)!,
-    );
-  }
-}
+import '../utils/journey_utils.dart';
+import '../utils/location_utils.dart';
+import '../widgets/main_map.dart';
+import '../widgets/panels/journey_details_panel.dart';
+import '../widgets/panels/search_panel.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -50,30 +36,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Place? selectedDestinationPlace;
 
   Journeys? _journeys;
+  Journey? _activeJourney;
 
   bool _isLoadingJourneys = false;
   bool _showRoutes = false;
 
   StreamSubscription<Position>? _positionStreamSubscription;
   Position? _currentPosition;
-  Journey? _activeJourney;
   int _currentSectionIndex = -1;
-
   double _totalJourneyDistanceInMeters = 0.0;
-
   final List<LatLng> _fullJourneyPolyline = [];
   final List<double> _cumulativeDistances = [];
 
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
-
   final NotificationService _notificationService = NotificationService();
-
   late final AnimationController _animationController;
-
   Animation<LatLng>? _positionAnimation;
   Animation<double>? _radiusAnimation;
-
   LatLng? _animatedLatLng;
   double? _animatedRadius;
 
@@ -156,63 +136,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void _displayJourneyOnMap(Journey journey) {
     _stopGpsTracking();
 
-    final List<Polyline> newJourneyPolylines = [];
-    final List<LatLng> allJourneyPoints = [];
+    final processedData = JourneyUtils.processJourneyForMap(journey);
 
     setState(() {
       _activeJourney = journey;
       _currentSectionIndex = -1;
-      _totalJourneyDistanceInMeters = 0.0;
+      _totalJourneyDistanceInMeters =
+          processedData.totalJourneyDistanceInMeters;
+
       _cumulativeDistances.clear();
-    });
+      _cumulativeDistances.addAll(processedData.cumulativeDistances);
 
-    _fullJourneyPolyline.clear();
-    double totalDistance = 0;
+      _fullJourneyPolyline.clear();
+      _fullJourneyPolyline.addAll(processedData.fullJourneyPolyline);
 
-    for (var section in journey.sections!) {
-      if (section.geojson != null &&
-          section.geojson!.coordinates != null &&
-          section.geojson!.coordinates!.isNotEmpty) {
-        final List<LatLng> sectionPoints = [];
-        for (var coord in section.geojson!.coordinates!) {
-          if (coord.length >= 2) {
-            final point = LatLng(coord[1], coord[0]);
-            sectionPoints.add(point);
-            allJourneyPoints.add(point);
-            _fullJourneyPolyline.add(point);
-          }
-        }
-        if (sectionPoints.isNotEmpty) {
-          final color = hexToColor(section.displayInformations?.color);
-          newJourneyPolylines.add(
-            Polyline(
-              points: sectionPoints,
-              strokeWidth: 5.0,
-              color: color,
-            ),
-          );
-        }
-      }
-      totalDistance += section.geojson?.properties?[0].length ?? 0;
-      _cumulativeDistances.add(totalDistance);
-    }
-
-    _totalJourneyDistanceInMeters = totalDistance;
-    _startGpsTracking();
-
-    setState(() {
       polylines.clear();
-      polylines.addAll(newJourneyPolylines);
-
-      _panelController.animatePanelToPosition(
-        0.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      polylines.addAll(processedData.polylines);
     });
 
-    if (allJourneyPoints.isNotEmpty) {
-      final bounds = LatLngBounds.fromPoints(allJourneyPoints);
+    _startGpsTracking();
+    _panelController.open();
+
+    if (processedData.allJourneyPoints.isNotEmpty) {
+      final bounds = LatLngBounds.fromPoints(processedData.allJourneyPoints);
       _mapController.fitCamera(
         CameraFit.bounds(
           bounds: bounds,
@@ -225,99 +171,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _startGpsTracking() async {
     if (!mounted) return;
 
-    bool serviceEnabled;
-    LocationPermission permission;
+    bool hasPermission =
+        await LocationUtils.checkAndRequestLocationPermissions(context);
+    if (!hasPermission) return;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Location Services Disabled'),
-          content: const Text(
-              'Please enable location services to use live tracking.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            TextButton(
-              child: const Text('Open Settings'),
-              onPressed: () {
-                Geolocator.openLocationSettings();
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Location permission is required to track your journey.')),
-        );
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Location Permission Denied'),
-          content: const Text(
-              'Location permission has been permanently denied. Please enable it from the app settings to use this feature.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            TextButton(
-              child: const Text('Open Settings'),
-              onPressed: () {
-                Geolocator.openAppSettings();
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    late LocationSettings locationSettings;
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      locationSettings = AndroidSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 2,
-        forceLocationManager: true,
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
-            notificationTitle: "Journey in Progress",
-            notificationText: "Tracking your location to guide you.",
-            setOngoing: true,
-            enableWakeLock: true,
-            color: Colors.green),
-      );
-    } else if (kIsWeb) {
-      locationSettings = WebSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 100,
-        maximumAge: Duration(minutes: 1),
-      );
-    } else {
-      locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 2,
-      );
-    }
+    final locationSettings = LocationUtils.getPlatformLocationSettings();
 
     if (_activeJourney != null) {
       await _notificationService
@@ -333,152 +191,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _onLocationUpdate(Position position) {
-    if (_fullJourneyPolyline.isEmpty ||
-        _activeJourney == null ||
-        _activeJourney!.sections == null) return;
+    if (_fullJourneyPolyline.isEmpty || _activeJourney == null) return;
 
-    final userPosition = turf.Position(position.longitude, position.latitude);
-
-    int newSectionIndex = -1;
-    double minDistanceToSection = double.infinity;
-
-    for (int i = 0; i < _activeJourney!.sections!.length; i++) {
-      final section = _activeJourney!.sections![i];
-      if (section.geojson?.coordinates == null ||
-          section.geojson!.coordinates!.isEmpty) continue;
-
-      final sectionPoints = section.geojson!.coordinates!
-          .where((c) => c.length >= 2)
-          .map((c) => turf.Position(c[0], c[1]))
-          .toList();
-
-      if (sectionPoints.isEmpty) continue;
-
-      final sectionLine = turf.LineString(coordinates: sectionPoints);
-      final pointOnThisSection = turf.nearestPointOnLine(
-          sectionLine, turf.Point(coordinates: userPosition), turf.Unit.meters);
-      final distance = pointOnThisSection.properties!['dist'] as num;
-
-      if (distance < minDistanceToSection) {
-        minDistanceToSection = distance.toDouble();
-        newSectionIndex = i;
-      }
-    }
-
-    if (newSectionIndex == -1) {
-      newSectionIndex = _activeJourney!.sections!.length - 1;
-    }
-
-    final newPolylines = <Polyline>[];
-    for (int i = 0; i < _activeJourney!.sections!.length; i++) {
-      final section = _activeJourney!.sections![i];
-      if (section.geojson?.coordinates == null ||
-          section.geojson!.coordinates!.isEmpty) continue;
-
-      final sectionPoints = section.geojson!.coordinates!
-          .where((c) => c.length >= 2)
-          .map((c) => LatLng(c[1], c[0]))
-          .toList();
-
-      if (sectionPoints.isEmpty) continue;
-
-      final originalColor = hexToColor(section.displayInformations?.color);
-      final traveledColor = originalColor.withValues(alpha: 0.2);
-
-      if (i < newSectionIndex) {
-        newPolylines.add(Polyline(
-            points: sectionPoints, strokeWidth: 5.0, color: traveledColor));
-      } else if (i > newSectionIndex) {
-        newPolylines.add(Polyline(
-            points: sectionPoints, strokeWidth: 5.0, color: originalColor));
-      } else {
-        final sectionLine = turf.LineString(
-            coordinates: sectionPoints
-                .map((p) => turf.Position(p.longitude, p.latitude))
-                .toList());
-        final snappedOnSection = turf.nearestPointOnLine(sectionLine,
-            turf.Point(coordinates: userPosition), turf.Unit.meters);
-        final snappedLatLngOnSection = LatLng(
-            snappedOnSection.geometry!.coordinates.lat.toDouble(),
-            snappedOnSection.geometry!.coordinates.lng.toDouble());
-        final splitIndex = snappedOnSection.properties!['index'] as int;
-
-        if (splitIndex >= 0 && sectionPoints.length > 1) {
-          final traveledPart = sectionPoints.sublist(0, splitIndex + 1)
-            ..add(snappedLatLngOnSection);
-          newPolylines.add(Polyline(
-              points: traveledPart, strokeWidth: 5.0, color: traveledColor));
-        }
-
-        if (splitIndex < sectionPoints.length - 1) {
-          final remainingPart = [
-            snappedLatLngOnSection,
-            ...sectionPoints.sublist(splitIndex + 1)
-          ];
-          newPolylines.add(Polyline(
-              points: remainingPart, strokeWidth: 5.0, color: originalColor));
-        } else if (newPolylines
-                .where((p) => p.color == originalColor)
-                .isEmpty &&
-            sectionPoints.length <= 1) {
-          newPolylines.add(Polyline(
-              points: [snappedLatLngOnSection, sectionPoints.last],
-              strokeWidth: 5.0,
-              color: originalColor));
-        }
-      }
-    }
-
-    double traveledDistance = 0;
-
-    if (newSectionIndex > 0) {
-      traveledDistance += _cumulativeDistances[newSectionIndex - 1];
-    }
-
-    final currentSectionPoints = _activeJourney!
-        .sections![newSectionIndex].geojson!.coordinates!
-        .where((c) => c.length >= 2)
-        .map((c) => LatLng(c[1], c[0]))
-        .toList();
-
-    final snappedOnSection = turf.nearestPointOnLine(
-        turf.LineString(
-            coordinates: currentSectionPoints
-                .map((p) => turf.Position(p.longitude, p.latitude))
-                .toList()),
-        turf.Point(
-            coordinates: turf.Position(position.longitude, position.latitude)),
-        turf.Unit.meters);
-    final splitIndex = snappedOnSection.properties!['index'] as int;
-    final snappedLatLngOnSection = LatLng(
-        snappedOnSection.geometry!.coordinates.lat.toDouble(),
-        snappedOnSection.geometry!.coordinates.lng.toDouble());
-
-    double distanceInCurrentSection = 0.0;
-    for (int i = 0; i < splitIndex; i++) {
-      distanceInCurrentSection += Geolocator.distanceBetween(
-        currentSectionPoints[i].latitude,
-        currentSectionPoints[i].longitude,
-        currentSectionPoints[i + 1].latitude,
-        currentSectionPoints[i + 1].longitude,
-      );
-    }
-
-    if (splitIndex < currentSectionPoints.length) {
-      distanceInCurrentSection += Geolocator.distanceBetween(
-        currentSectionPoints[splitIndex].latitude,
-        currentSectionPoints[splitIndex].longitude,
-        snappedLatLngOnSection.latitude,
-        snappedLatLngOnSection.longitude,
-      );
-    }
-
-    traveledDistance += distanceInCurrentSection;
+    final updateData = JourneyUtils.updateJourneyProgress(
+      position: position,
+      activeJourney: _activeJourney!,
+      fullJourneyPolyline: _fullJourneyPolyline,
+      cumulativeDistances: _cumulativeDistances,
+    );
 
     final LatLng beginLatLng =
         _animatedLatLng ?? LatLng(position.latitude, position.longitude);
     final double beginRadius = _animatedRadius ?? position.accuracy;
-
     final LatLng endLatLng = LatLng(position.latitude, position.longitude);
     final double endRadius = position.accuracy;
 
@@ -490,27 +214,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         Tween<double>(begin: beginRadius, end: endRadius).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-
     _animationController.forward(from: 0.0);
 
     setState(() {
       _currentPosition = position;
-      polylines = newPolylines;
+      polylines = updateData.newPolylines;
     });
 
-    _notificationService.updateJourneyProgressNotification(_activeJourney!,
-        newSectionIndex, traveledDistance, _totalJourneyDistanceInMeters);
+    _notificationService.updateJourneyProgressNotification(
+        _activeJourney!,
+        updateData.newSectionIndex,
+        updateData.traveledDistance,
+        _totalJourneyDistanceInMeters);
 
-    if (newSectionIndex != _currentSectionIndex) {
+    if (updateData.newSectionIndex != _currentSectionIndex) {
       setState(() {
-        _currentSectionIndex = newSectionIndex;
+        _currentSectionIndex = updateData.newSectionIndex;
       });
     }
 
-    final endPoint = _fullJourneyPolyline.last;
-    final distanceToEnd = Geolocator.distanceBetween(position.latitude,
-        position.longitude, endPoint.latitude, endPoint.longitude);
-    if (distanceToEnd < 50) {
+    if (updateData.isJourneyFinished) {
       _stopGpsTracking();
     }
   }
@@ -526,6 +249,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     });
   }
 
+  void _returnToSearch() {
+    _stopGpsTracking();
+    setState(() {
+      polylines.clear();
+      _currentSectionIndex = -1;
+      _fullJourneyPolyline.clear();
+      _cumulativeDistances.clear();
+      _currentPosition = null;
+      _animatedLatLng = null;
+    });
+    _panelController.animatePanelToPosition(
+      0.0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     BorderRadiusGeometry radius = BorderRadius.only(
@@ -539,183 +279,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       minHeight: 150,
       controller: _panelController,
       borderRadius: radius,
-      panelBuilder: (sc) => ListView(
-        controller: sc,
-        padding: EdgeInsets.zero,
-        children: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _startController,
-                  readOnly: true,
-                  onTap: () => _navigateToSearchScreen(isStart: true),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Start',
-                    prefixIcon:
-                        Icon(Icons.trip_origin, color: Colors.grey[700]),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _destinationController,
-                  readOnly: true,
-                  onTap: () => _navigateToSearchScreen(isStart: false),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Destination',
-                    prefixIcon:
-                        Icon(Icons.fmd_good_outlined, color: Colors.grey[700]),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_showRoutes)
-            if (_isLoadingJourneys)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_journeys != null &&
-                _journeys!.journeys != null &&
-                _journeys!.journeys!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _journeys!.journeys!.length,
-                  itemBuilder: (context, index) {
-                    final journey = _journeys!.journeys![index];
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10.0),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12.0),
-                        child: JourneyCard(
-                          journey: journey,
-                          onJourneySelected: _displayJourneyOnMap,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              )
-            else
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text("Aucun itinéraire trouvé."),
-                ),
-              ),
-        ],
-      ),
-      body: FlutterMap(
+      panelBuilder: (sc) {
+        if (_activeJourney != null) {
+          return JourneyDetailsPanel(
+            sc: sc,
+            journey: _activeJourney!,
+            onReturn: _returnToSearch,
+          );
+        } else {
+          return SearchPanel(
+            sc: sc,
+            startController: _startController,
+            destinationController: _destinationController,
+            onStartTap: () => _navigateToSearchScreen(isStart: true),
+            onDestinationTap: () => _navigateToSearchScreen(isStart: false),
+            isLoading: _isLoadingJourneys,
+            showRoutes: _showRoutes,
+            journeys: _journeys,
+            onJourneySelected: _displayJourneyOnMap,
+          );
+        }
+      },
+      body: MainMap(
         mapController: _mapController,
-        options: const MapOptions(
-          initialCenter: LatLng(48.864716, 2.349014),
-          initialZoom: 11,
-          interactionOptions: InteractionOptions(
-            flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-          ),
-        ),
-        children: [
-          TileLayer(
-            urlTemplate:
-                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.guillaumedamiens',
-          ),
-          PolylineLayer(
-            polylines: polylines,
-          ),
-          if (_currentPosition != null) ...[
-            CircleLayer(
-              circles: [
-                CircleMarker(
-                  point: _animatedLatLng ??
-                      LatLng(_currentPosition!.latitude,
-                          _currentPosition!.longitude),
-                  radius: _animatedRadius ?? _currentPosition!.accuracy,
-                  useRadiusInMeter: true,
-                  color: Colors.blue.withValues(alpha: 0.2),
-                  borderColor: Colors.blue.withValues(alpha: 0.4),
-                  borderStrokeWidth: 1.5,
-                ),
-              ],
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: _animatedLatLng ??
-                      LatLng(_currentPosition!.latitude,
-                          _currentPosition!.longitude),
-                  width: 80,
-                  height: 80,
-                  child: Center(
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2.0),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          if (_activeJourney != null) ...[
-            MarkerLayer(
-                markers: MapUtils.buildActiveJourneyMarkers(_activeJourney!)),
-          ]
-        ],
+        polylines: polylines,
+        currentPosition: _currentPosition,
+        animatedLatLng: _animatedLatLng,
+        animatedRadius: _animatedRadius,
+        activeJourney: _activeJourney,
       ),
     );
   }

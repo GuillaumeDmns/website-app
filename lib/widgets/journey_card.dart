@@ -111,7 +111,7 @@ class JourneyCard extends StatelessWidget {
         children: [
           Icon(
             _getTransportIcon(displayInfo.physicalMode),
-            color: hexToColor(displayInfo.color),
+            color: StyleUtils.hexToColor(displayInfo.color),
             size: 24,
           ),
           const SizedBox(width: 6),
@@ -119,13 +119,13 @@ class JourneyCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: hexToColor(displayInfo.color),
+                color: StyleUtils.hexToColor(displayInfo.color),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 displayInfo.code!,
                 style: TextStyle(
-                  color: hexToColor(displayInfo.textColor),
+                  color: StyleUtils.hexToColor(displayInfo.textColor),
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
