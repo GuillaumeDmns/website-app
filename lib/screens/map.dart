@@ -273,10 +273,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       topRight: Radius.circular(24.0),
     );
 
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bool isDetailsActive = _activeJourney != null;
+    final double panelMinHeight = isDetailsActive ? screenHeight * 0.5 : 150;
+    final double panelMaxHeight = isDetailsActive ? screenHeight * 0.5 : 500;
+    final bool isDraggable = !isDetailsActive;
+    final bool parallaxEnabled = !isDetailsActive;
+    final double parallaxOffset = !isDetailsActive ? 0.5 : 0.0;
+
     return SlidingUpPanel(
-      parallaxEnabled: true,
-      parallaxOffset: 0.5,
-      minHeight: 150,
+      parallaxEnabled: parallaxEnabled,
+      parallaxOffset: parallaxOffset,
+      minHeight: panelMinHeight,
+      maxHeight: panelMaxHeight,
+      isDraggable: isDraggable,
       controller: _panelController,
       borderRadius: radius,
       panelBuilder: (sc) {

@@ -17,9 +17,7 @@ class JourneyDetailsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      controller: sc,
-      padding: EdgeInsets.zero,
+    return Column(
       children: [
         Center(
           child: Padding(
@@ -54,20 +52,21 @@ class JourneyDetailsPanel extends StatelessWidget {
           ),
         ),
         const Divider(),
-        if (journey.sections == null || journey.sections!.isEmpty)
-          const Center(child: Text("No detail for this journey"))
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: journey.sections!.length,
-            itemBuilder: (context, index) {
-              return SectionListItem(
-                section: journey.sections![index],
-                isLast: index == journey.sections!.length - 1,
-              );
-            },
-          ),
+        Expanded(
+          child: (journey.sections == null || journey.sections!.isEmpty)
+              ? const Center(child: Text("No detail for this journey"))
+              : ListView.builder(
+                  controller: sc,
+                  padding: EdgeInsets.zero,
+                  itemCount: journey.sections!.length,
+                  itemBuilder: (context, index) {
+                    return SectionListItem(
+                      section: journey.sections![index],
+                      isLast: index == journey.sections!.length - 1,
+                    );
+                  },
+                ),
+        ),
       ],
     );
   }

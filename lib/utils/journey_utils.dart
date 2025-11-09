@@ -243,7 +243,9 @@ class JourneyUtils {
     if (displayInfos != null) {
       String title = displayInfos.commercialMode ?? "";
       title += displayInfos.label != null ? " ${displayInfos.label}" : "";
-      title += displayInfos.direction != null ? " direction ${displayInfos.direction}" : "";
+      title += displayInfos.direction != null
+          ? " direction ${displayInfos.direction}"
+          : "";
 
       return title.isEmpty ? "Section" : title;
     }
@@ -258,7 +260,9 @@ class JourneyUtils {
     }
 
     if (section.type != null) {
-      String duration = section.duration != null ? "(~ ${(section.duration! / 60).ceil()} min)" : "";
+      String duration = section.duration != null
+          ? "(~ ${(section.duration! / 60).ceil()} min)"
+          : "";
       switch (section.type) {
         case 'transfer':
           return "Transfer at ${section.to?.stopPoint?.name ?? "current stop"}";

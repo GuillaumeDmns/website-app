@@ -22,7 +22,6 @@ class JourneyCard extends StatelessWidget {
 
       return '$hour:$minute';
     } catch (e) {
-      print('Erreur lors de l\'extraction de l\'heure : $e');
       return '--:--';
     }
   }
@@ -147,7 +146,7 @@ class JourneyCard extends StatelessWidget {
       case 'bus':
         return Icons.directions_bus_outlined;
       case 'rer':
-      case 'transilien':
+      case 'train transilien':
       case 'ter':
         return Icons.train_outlined;
       case 'tram':

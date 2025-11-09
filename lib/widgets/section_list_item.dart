@@ -62,53 +62,52 @@ class SectionListItem extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: List.generate(section.stopDateTimes!.length,
-                                (index) {
-                              final stop = section.stopDateTimes![index];
-                              final stopName = stop.stopPoint?.name ?? '';
-                              if (index == 0) {
-                                final departureTime =
+                            (index) {
+                          final stop = section.stopDateTimes![index];
+                          final stopName = stop.stopPoint?.name ?? '';
+                          if (index == 0) {
+                            final departureTime =
                                 TimeUtils.formatTime(section.departureDateTime);
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    '$departureTime - $stopName',
-                                    style: TextStyle(
-                                      color: Colors.grey[850],
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                );
-                              }
-                              if (index == section.stopDateTimes!.length - 1) {
-                                final arrivalTime =
-                                TimeUtils.formatTime(section.arrivalDateTime);
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    '$arrivalTime - $stopName',
-                                    style: TextStyle(
-                                      color: Colors.grey[850],
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                );
-                              }
-                              final arrivalTime =
-                              TimeUtils.formatTime(stop.arrivalDateTime);
-                              return Padding(
-                                padding:
-                                const EdgeInsets.only(left: 8.0, top: 4.0),
-                                child: Text(
-                                  '• $arrivalTime: $stopName',
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: 13,
-                                  ),
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                '$departureTime - $stopName',
+                                style: TextStyle(
+                                  color: Colors.grey[850],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              );
-                            }).toList(),
+                              ),
+                            );
+                          }
+                          if (index == section.stopDateTimes!.length - 1) {
+                            final arrivalTime =
+                                TimeUtils.formatTime(section.arrivalDateTime);
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                '$arrivalTime - $stopName',
+                                style: TextStyle(
+                                  color: Colors.grey[850],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }
+                          final arrivalTime =
+                              TimeUtils.formatTime(stop.arrivalDateTime);
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                            child: Text(
+                              '• $arrivalTime: $stopName',
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontSize: 13,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
                   ],
                 ),
