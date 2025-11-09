@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/models/navitia/journey.dart';
 
-import '../seaction_list_item.dart';
+import '../section_list_item.dart';
 
 class JourneyDetailsPanel extends StatelessWidget {
   final ScrollController sc;
@@ -44,7 +44,7 @@ class JourneyDetailsPanel extends StatelessWidget {
               ),
               const Expanded(
                 child: Text(
-                  'Votre itinéraire',
+                  'Your journey',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
@@ -55,15 +55,17 @@ class JourneyDetailsPanel extends StatelessWidget {
         ),
         const Divider(),
         if (journey.sections == null || journey.sections!.isEmpty)
-          const Center(child: Text("Aucun détail pour cet itinéraire."))
+          const Center(child: Text("No detail for this journey"))
         else
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: journey.sections!.length,
             itemBuilder: (context, index) {
-              final section = journey.sections![index];
-              return SectionListItem(section: section);
+              return SectionListItem(
+                section: journey.sections![index],
+                isLast: index == journey.sections!.length - 1,
+              );
             },
           ),
       ],

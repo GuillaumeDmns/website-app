@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:website_app/models/navitia/journey.dart';
+import 'package:website_app/models/navitia/section.dart';
 import 'package:website_app/utils/style_utils.dart';
 
 class ProcessedJourneyData {
@@ -235,5 +236,39 @@ class JourneyUtils {
       traveledDistance: traveledDistance,
       isJourneyFinished: isJourneyFinished,
     );
+  }
+
+  static String getSectionTitle(Section section) {
+    final displayInfos = section.displayInformations;
+    if (displayInfos != null) {
+      String title = displayInfos.commercialMode ?? "";
+      title += displayInfos.label != null ? " ${displayInfos.label}" : "";
+      title += displayInfos.direction != null ? " direction ${displayInfos.direction}" : "";
+
+      return title.isEmpty ? "Section" : title;
+    }
+
+    if (section.mode != null) {
+      switch (section.mode) {
+        case 'walking':
+          return "Walk to ${section.to?.name ?? "next section"}";
+        default:
+          return "Smogogoooo";
+      }
+    }
+
+    if (section.type != null) {
+      String duration = section.duration != null ? "(~ ${(section.duration! / 60).ceil()} min)" : "";
+      switch (section.type) {
+        case 'transfer':
+          return "Transfer at ${section.to?.stopPoint?.name ?? "current stop"}";
+        case 'waiting':
+          return "Waiting for the next passage at ${section.to?.stopPoint?.name ?? "current stop"} $duration";
+        default:
+          return "Gravalanch";
+      }
+    }
+
+    return "Scoubidou";
   }
 }

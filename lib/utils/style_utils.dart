@@ -12,16 +12,48 @@ class StyleUtils {
   }
 
   static IconData getSectionIcon(Section section) {
-    switch (section.mode) {
-      case 'walking':
-        return Icons.directions_walk;
-      case 'public_transport':
-      case 'vehicle':
-        return Icons.directions_bus;
-      case 'transfer':
-        return Icons.transfer_within_a_station;
-      default:
-        return Icons.trip_origin;
+    final displayInfos = section.displayInformations;
+    if (displayInfos != null) {
+      switch (displayInfos.commercialMode) {
+        case 'RER':
+        case 'Train Transilien':
+          return Icons.train;
+        case 'Métro':
+          return Icons.subway;
+        case 'Tramway':
+          return Icons.tram;
+        case 'Bus':
+          return Icons.directions_bus;
+        default:
+          return Icons.directions_walk;
+      }
     }
+
+    if (section.mode != null) {
+      switch (section.mode) {
+        case 'walking':
+          return Icons.directions_walk;
+        case 'public_transport':
+        case 'vehicle':
+          return Icons.directions_bus;
+        case 'transfer':
+          return Icons.transfer_within_a_station;
+        default:
+          return Icons.directions_walk;
+      }
+    }
+
+    if (section.type != null) {
+      switch (section.type) {
+        case 'transfer':
+          return Icons.transfer_within_a_station;
+        case 'waiting':
+          return Icons.hourglass_top;
+        default:
+          return Icons.directions_walk;
+      }
+    }
+
+    return Icons.directions_walk;
   }
 }
