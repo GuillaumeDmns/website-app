@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -29,7 +30,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<Polyline> polylines = [];
   final api = ApiRepository();
 
-  final MapController _mapController = MapController();
+  // final MapController _mapController = MapController();
+  late final AnimatedMapController _mapController;
   final PanelController _panelController = PanelController();
 
   Place? selectedStartPlace;
@@ -44,6 +46,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   StreamSubscription<Position>? _positionStreamSubscription;
   Position? _currentPosition;
   int _currentSectionIndex = -1;
+  int _focusedSectionIndex = -1;
   double _totalJourneyDistanceInMeters = 0.0;
   final List<LatLng> _fullJourneyPolyline = [];
   final List<double> _cumulativeDistances = [];
@@ -61,6 +64,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _notificationService.init();
+    _mapController = AnimatedMapController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 750),
@@ -82,6 +90,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _startController.dispose();
     _destinationController.dispose();
     _animationController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -141,6 +150,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     setState(() {
       _activeJourney = journey;
       _currentSectionIndex = -1;
+      _focusedSectionIndex = -1;
       _totalJourneyDistanceInMeters =
           processedData.totalJourneyDistanceInMeters;
 
@@ -159,12 +169,35 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     if (processedData.allJourneyPoints.isNotEmpty) {
       final bounds = LatLngBounds.fromPoints(processedData.allJourneyPoints);
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(50.0),
-        ),
+      // _mapController.fitCamera(
+      //   CameraFit.bounds(
+      //     bounds: bounds,
+      //     padding: const EdgeInsets.all(50.0),
+      //   ),
+      // );
+      _mapController.animatedFitCamera(
+        cameraFit: CameraFit.bounds(
+            bounds: bounds, padding: const EdgeInsets.all(50.0)),
       );
+    }
+  }
+
+  void _fitMapToSection(int sectionIndex) {
+    if (sectionIndex == _focusedSectionIndex || polylines.isEmpty) return;
+
+    if (sectionIndex >= 0 && sectionIndex < polylines.length) {
+      final Polyline sectionPolyline = polylines[sectionIndex];
+
+      if (sectionPolyline.points.isNotEmpty) {
+        setState(() {
+          _focusedSectionIndex = sectionIndex;
+        });
+
+        final bounds = LatLngBounds.fromPoints(sectionPolyline.points);
+
+        _mapController.animatedFitCamera(
+            cameraFit: CameraFit.bounds(bounds: bounds));
+      }
     }
   }
 
@@ -254,6 +287,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     setState(() {
       polylines.clear();
       _currentSectionIndex = -1;
+      _focusedSectionIndex = -1;
       _fullJourneyPolyline.clear();
       _cumulativeDistances.clear();
       _currentPosition = null;
@@ -295,6 +329,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             sc: sc,
             journey: _activeJourney!,
             onReturn: _returnToSearch,
+            onSectionFocused: _fitMapToSection,
           );
         } else {
           return SearchPanel(
@@ -311,7 +346,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         }
       },
       body: MainMap(
-        mapController: _mapController,
+        mapController: _mapController.mapController,
         polylines: polylines,
         currentPosition: _currentPosition,
         animatedLatLng: _animatedLatLng,
