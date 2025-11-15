@@ -36,15 +36,15 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
-  local_auth: ^2.3.0
+  local_auth: ^3.0.0
   flutter_secure_storage: ^9.2.4
-  http: ^1.5.0
+  http: ^1.6.0
   jwt_decoder: ^2.0.1
   geojson_vi: ^2.2.5
   http_interceptor: ^2.0.0
   geolocator: ^14.0.2
   intl: ^0.20.2
-  flutter_local_notifications: ^19.4.2
+  flutter_local_notifications: ^19.5.0
   turf: ^0.0.10
   sliding_up_panel: ^2.0.0+1
   visibility_detector: ^0.4.0+2

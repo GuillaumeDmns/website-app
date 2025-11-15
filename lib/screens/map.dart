@@ -66,7 +66,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _notificationService.init();
     _mapController = AnimatedMapController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 2000),
       curve: Curves.easeInOut,
     );
     _animationController = AnimationController(
@@ -142,6 +142,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
+  EdgeInsets _getMapPadding() {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final panelHeight = screenHeight * 0.5;
+
+    const safePadding = 100.0;
+
+    return EdgeInsets.only(
+      left: safePadding,
+      right: safePadding,
+      top: safePadding,
+      bottom: panelHeight + safePadding,
+    );
+  }
+
   void _displayJourneyOnMap(Journey journey) {
     _stopGpsTracking();
 
@@ -169,12 +184,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     if (processedData.allJourneyPoints.isNotEmpty) {
       final bounds = LatLngBounds.fromPoints(processedData.allJourneyPoints);
-      // _mapController.fitCamera(
-      //   CameraFit.bounds(
-      //     bounds: bounds,
-      //     padding: const EdgeInsets.all(50.0),
-      //   ),
-      // );
       _mapController.animatedFitCamera(
         cameraFit: CameraFit.bounds(
             bounds: bounds, padding: const EdgeInsets.all(50.0)),
@@ -196,7 +205,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final bounds = LatLngBounds.fromPoints(sectionPolyline.points);
 
         _mapController.animatedFitCamera(
-            cameraFit: CameraFit.bounds(bounds: bounds));
+            cameraFit: CameraFit.bounds(bounds: bounds, padding: _getMapPadding()));
       }
     }
   }

@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final authenticated = await _auth.authenticate(
         localizedReason: 'Veuillez vous authentifier pour accéder à l\'app',
-        options: const AuthenticationOptions(biometricOnly: true),
+        biometricOnly: true,
       );
 
       if (authenticated) {
