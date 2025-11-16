@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/models/navitia/journey.dart';
-import 'package:visibility_detector/visibility_detector.dart';
 
 import '../section_list_item.dart';
 
@@ -59,24 +58,17 @@ class JourneyDetailsPanel extends StatelessWidget {
           child: (journey.sections == null || journey.sections!.isEmpty)
               ? const Center(child: Text("No detail for this journey"))
               : ListView.builder(
-            controller: sc,
-            padding: EdgeInsets.zero,
-            itemCount: journey.sections!.length,
-            itemBuilder: (context, index) {
-              return VisibilityDetector(
-                key: Key('section-$index'),
-                child: SectionListItem(
-                  section: journey.sections![index],
-                  isLast: index == journey.sections!.length - 1,
+                  controller: sc,
+                  padding: EdgeInsets.zero,
+                  itemCount: journey.sections!.length,
+                  itemBuilder: (context, index) {
+                    return SectionListItem(
+                      section: journey.sections![index],
+                      isLast: index == journey.sections!.length - 1,
+                      onTap: () => onSectionFocused(index),
+                    );
+                  },
                 ),
-                onVisibilityChanged: (visibilityInfo) {
-                  if (visibilityInfo.visibleFraction > 0.5) {
-                    onSectionFocused(index);
-                  }
-                },
-              );
-            },
-          ),
         ),
       ],
     );

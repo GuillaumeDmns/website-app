@@ -11,6 +11,7 @@ import 'package:website_app/screens/search_places.dart';
 import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
+import '../models/navitia/section.dart';
 import '../services/api_repository.dart';
 import '../services/notification_service.dart';
 import '../utils/journey_utils.dart';
@@ -192,20 +193,40 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _fitMapToSection(int sectionIndex) {
-    if (sectionIndex == _focusedSectionIndex || polylines.isEmpty) return;
+    if (_activeJourney?.sections == null || _activeJourney!.sections!.isEmpty) {
+      return;
+    }
 
-    if (sectionIndex >= 0 && sectionIndex < polylines.length) {
-      final Polyline sectionPolyline = polylines[sectionIndex];
+    final Section focusedSection = _activeJourney!.sections![sectionIndex];
+
+    if (focusedSection.geojson == null) {
+      return;
+    }
+
+    int polylineIndex = 0;
+    for (int i = 0; i < sectionIndex; i++) {
+      if (_activeJourney!.sections![i].geojson != null) {
+        polylineIndex++;
+      }
+    }
+
+    if (polylineIndex == _focusedSectionIndex || polylines.isEmpty) {
+      return;
+    }
+
+    if (polylineIndex >= 0 && polylineIndex < polylines.length) {
+      final Polyline sectionPolyline = polylines[polylineIndex];
 
       if (sectionPolyline.points.isNotEmpty) {
         setState(() {
-          _focusedSectionIndex = sectionIndex;
+          _focusedSectionIndex = polylineIndex;
         });
 
         final bounds = LatLngBounds.fromPoints(sectionPolyline.points);
 
         _mapController.animatedFitCamera(
-            cameraFit: CameraFit.bounds(bounds: bounds, padding: _getMapPadding()));
+          cameraFit: CameraFit.bounds(bounds: bounds, padding: _getMapPadding()),
+        );
       }
     }
   }
