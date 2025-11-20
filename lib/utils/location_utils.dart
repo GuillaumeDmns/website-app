@@ -85,6 +85,14 @@ class LocationUtils {
             enableWakeLock: true,
             color: Colors.green),
       );
+    } else if (defaultTargetPlatform == TargetPlatform.iOS  || defaultTargetPlatform == TargetPlatform.macOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 2,
+        showBackgroundLocationIndicator: false,
+        activityType: ActivityType.otherNavigation,
+        allowBackgroundLocationUpdates: true
+      );
     } else if (kIsWeb) {
       return WebSettings(
         accuracy: LocationAccuracy.high,

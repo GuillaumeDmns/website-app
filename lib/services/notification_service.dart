@@ -6,24 +6,54 @@ class NotificationService {
   static const String _channelId = 'journey_progress_channel';
   static const String _channelName = 'Journey Progress';
   static const String _channelDescription = 'Live journey progress';
-  static const int _notificationId = 75415; // Same value as https://github.com/Baseflow/flutter-geolocator/blob/756b8d8015f06ecfcc64b438f71cb3b362b5e350/geolocator_android/android/src/main/java/com/baseflow/geolocator/GeolocatorLocationService.java#L31
+  static const int _notificationId =
+      75415; // Same value as https://github.com/Baseflow/flutter-geolocator/blob/756b8d8015f06ecfcc64b438f71cb3b362b5e350/geolocator_android/android/src/main/java/com/baseflow/geolocator/GeolocatorLocationService.java#L31
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     final LinuxInitializationSettings initializationSettingsLinux =
-    LinuxInitializationSettings(
-        defaultActionName: 'Open notification',
-        defaultIcon: AssetsLinuxIcon('launch_background')
+        LinuxInitializationSettings(
+            defaultActionName: 'Open notification',
+            defaultIcon: AssetsLinuxIcon('launch_background'));
+
+    final DarwinInitializationSettings darwinInitializationSettings =
+    DarwinInitializationSettings(
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
     );
 
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      linux: initializationSettingsLinux
+    // For macOS
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        MacOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+      alert: true,
+      badge: true,
+      sound: true,
     );
+
+    // For macOS
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    final InitializationSettings initializationSettings =
+        InitializationSettings(
+            android: initializationSettingsAndroid,
+            linux: initializationSettingsLinux,
+            iOS: darwinInitializationSettings,
+            macOS: darwinInitializationSettings);
 
     await _notificationsPlugin.initialize(
       initializationSettings,
@@ -42,19 +72,23 @@ class NotificationService {
       int currentSectionIndex,
       double traveledDistance,
       double totalDistance) async {
-    if (journey.sections == null || journey.sections!.length <= currentSectionIndex) return;
+    if (journey.sections == null ||
+        journey.sections!.length <= currentSectionIndex) return;
 
     final section = journey.sections![currentSectionIndex];
-    await _updateJourneyProgress(journey, section, (traveledDistance.clamp(0, totalDistance)*100/totalDistance).toInt());
+    await _updateJourneyProgress(
+        journey,
+        section,
+        (traveledDistance.clamp(0, totalDistance) * 100 / totalDistance)
+            .toInt());
   }
 
   Future<void> _updateJourneyProgress(
-      Journey journey,
-      Section currentSection,
-      int traveledPercentage) async {
+      Journey journey, Section currentSection, int traveledPercentage) async {
     final String contentText = _formatSectionText(currentSection);
 
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       _channelId,
       _channelName,
       channelDescription: _channelDescription,
@@ -76,7 +110,10 @@ class NotificationService {
       timeout: const LinuxNotificationTimeout.expiresNever(),
     );
 
-    final NotificationDetails notificationDetails = NotificationDetails(android: androidDetails, linux: linuxDetails);
+    final appleDetails = DarwinNotificationDetails(threadIdentifier: _channelName);
+
+    final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails, linux: linuxDetails, macOS: appleDetails, iOS: appleDetails);
 
     await _notificationsPlugin.show(
       _notificationId,
@@ -84,7 +121,6 @@ class NotificationService {
       contentText,
       notificationDetails,
     );
-
   }
 
   Future<void> cancelJourneyNotification() async {
@@ -92,7 +128,7 @@ class NotificationService {
   }
 
   String _formatSectionText(Section section) {
-    final type = section.type ?? 'street_network' ;
+    final type = section.type ?? 'street_network';
     if (type == 'public_transport') {
       final mode = section.displayInformations?.commercialMode ?? '';
       final line = section.displayInformations?.label ?? '';

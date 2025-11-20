@@ -241,8 +241,13 @@ class JourneyUtils {
   static String getSectionTitle(Section section) {
     final displayInfos = section.displayInformations;
     if (displayInfos != null) {
-      String title = displayInfos.commercialMode ?? "";
-      title += displayInfos.label != null ? " ${displayInfos.label}" : "";
+      String title;
+      if (displayInfos.commercialMode == "TER") {
+        title = displayInfos.name ?? "TER";
+      } else {
+        title = displayInfos.commercialMode ?? "";
+        title += displayInfos.label != null ? " ${displayInfos.label}" : "";
+      }
       title += displayInfos.direction != null
           ? " direction ${displayInfos.direction}"
           : "";

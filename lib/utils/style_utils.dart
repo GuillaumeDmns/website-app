@@ -17,6 +17,7 @@ class StyleUtils {
       switch (displayInfos.commercialMode) {
         case 'RER':
         case 'Train Transilien':
+        case 'TER':
           return Icons.train;
         case 'Métro':
           return Icons.subway;
