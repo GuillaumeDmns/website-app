@@ -22,7 +22,7 @@ class NotificationService {
             defaultIcon: AssetsLinuxIcon('launch_background'));
 
     final DarwinInitializationSettings darwinInitializationSettings =
-    DarwinInitializationSettings(
+        DarwinInitializationSettings(
       requestSoundPermission: true,
       requestBadgePermission: true,
       requestAlertPermission: true,
@@ -31,29 +31,36 @@ class NotificationService {
     // For macOS
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-        MacOSFlutterLocalNotificationsPlugin>()
+            MacOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+          alert: true,
+          badge: true,
+          sound: true,
+        );
 
     // For macOS
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>()
+            IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+    final WindowsInitializationSettings windowsInitializationSettings =
+        WindowsInitializationSettings(
+            appName: 'Guillaume',
+            appUserModelId: 'Com.GuillaumeDamiens.App',
+            guid: '9772cf58-6762-4621-8ae2-0c03aba9dfa1');
 
     final InitializationSettings initializationSettings =
         InitializationSettings(
             android: initializationSettingsAndroid,
             linux: initializationSettingsLinux,
             iOS: darwinInitializationSettings,
-            macOS: darwinInitializationSettings);
+            macOS: darwinInitializationSettings,
+            windows: windowsInitializationSettings);
 
     await _notificationsPlugin.initialize(
       initializationSettings,
@@ -110,10 +117,23 @@ class NotificationService {
       timeout: const LinuxNotificationTimeout.expiresNever(),
     );
 
-    final appleDetails = DarwinNotificationDetails(threadIdentifier: _channelName);
+    final appleDetails =
+        DarwinNotificationDetails(threadIdentifier: _channelName);
+
+    final windowsDetails =
+        WindowsNotificationDetails(progressBars: <WindowsProgressBar>[
+      WindowsProgressBar(
+          id: _channelName,
+          status: 'Progress...',
+          value: traveledPercentage / 100)
+    ]);
 
     final NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails, linux: linuxDetails, macOS: appleDetails, iOS: appleDetails);
+        android: androidDetails,
+        linux: linuxDetails,
+        macOS: appleDetails,
+        iOS: appleDetails,
+        windows: windowsDetails);
 
     await _notificationsPlugin.show(
       _notificationId,
