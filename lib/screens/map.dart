@@ -14,6 +14,7 @@ import '../models/navitia/place.dart';
 import '../models/navitia/section.dart';
 import '../services/api_repository.dart';
 import '../services/notification_service.dart';
+import '../utils/constants.dart' as constants;
 import '../utils/journey_utils.dart';
 import '../utils/location_utils.dart';
 import '../widgets/main_map.dart';
@@ -29,9 +30,9 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<Polyline> polylines = [];
+  final List<Polyline> _originalPolylines = [];
   final api = ApiRepository();
 
-  // final MapController _mapController = MapController();
   late final AnimatedMapController _mapController;
   final PanelController _panelController = PanelController();
 
@@ -146,15 +147,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   EdgeInsets _getMapPadding() {
     final screenHeight = MediaQuery.of(context).size.height;
 
-    final panelHeight = screenHeight * 0.5;
+    final panelHeight = (screenHeight - constants.navigationBarHeight) * 0.5;
 
-    const safePadding = 100.0;
+    const safePadding = 50.0;
 
     return EdgeInsets.only(
       left: safePadding,
       right: safePadding,
       top: safePadding,
-      bottom: panelHeight + safePadding,
+      bottom: panelHeight + 200,
     );
   }
 
@@ -176,6 +177,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _fullJourneyPolyline.clear();
       _fullJourneyPolyline.addAll(processedData.fullJourneyPolyline);
 
+      _originalPolylines.clear();
+      _originalPolylines.addAll(processedData.polylines);
+
       polylines.clear();
       polylines.addAll(processedData.polylines);
     });
@@ -187,7 +191,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final bounds = LatLngBounds.fromPoints(processedData.allJourneyPoints);
       _mapController.animatedFitCamera(
         cameraFit: CameraFit.bounds(
-            bounds: bounds, padding: const EdgeInsets.all(50.0)),
+            bounds: bounds, padding: _getMapPadding()),
       );
     }
   }
@@ -210,12 +214,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
     }
 
-    if (polylineIndex == _focusedSectionIndex || polylines.isEmpty) {
+    if (polylineIndex == _focusedSectionIndex || _originalPolylines.isEmpty) {
       return;
     }
 
-    if (polylineIndex >= 0 && polylineIndex < polylines.length) {
-      final Polyline sectionPolyline = polylines[polylineIndex];
+    if (polylineIndex >= 0 && polylineIndex < _originalPolylines.length) {
+      final Polyline sectionPolyline = _originalPolylines[polylineIndex];
 
       if (sectionPolyline.points.isNotEmpty) {
         setState(() {
@@ -316,6 +320,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _stopGpsTracking();
     setState(() {
       polylines.clear();
+      _originalPolylines.clear();
       _currentSectionIndex = -1;
       _focusedSectionIndex = -1;
       _fullJourneyPolyline.clear();
@@ -332,7 +337,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    BorderRadiusGeometry radius = BorderRadius.only(
+    BorderRadiusGeometry radius = const BorderRadius.only(
       topLeft: Radius.circular(24.0),
       topRight: Radius.circular(24.0),
     );
@@ -345,43 +350,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     final bool parallaxEnabled = !isDetailsActive;
     final double parallaxOffset = !isDetailsActive ? 0.5 : 0.0;
 
-    return SlidingUpPanel(
-      parallaxEnabled: parallaxEnabled,
-      parallaxOffset: parallaxOffset,
-      minHeight: panelMinHeight,
-      maxHeight: panelMaxHeight,
-      isDraggable: isDraggable,
-      controller: _panelController,
-      borderRadius: radius,
-      panelBuilder: (sc) {
-        if (_activeJourney != null) {
-          return JourneyDetailsPanel(
-            sc: sc,
-            journey: _activeJourney!,
-            onReturn: _returnToSearch,
-            onSectionFocused: _fitMapToSection,
-          );
-        } else {
-          return SearchPanel(
-            sc: sc,
-            startController: _startController,
-            destinationController: _destinationController,
-            onStartTap: () => _navigateToSearchScreen(isStart: true),
-            onDestinationTap: () => _navigateToSearchScreen(isStart: false),
-            isLoading: _isLoadingJourneys,
-            showRoutes: _showRoutes,
-            journeys: _journeys,
-            onJourneySelected: _displayJourneyOnMap,
-          );
-        }
-      },
-      body: MainMap(
-        mapController: _mapController.mapController,
-        polylines: polylines,
-        currentPosition: _currentPosition,
-        animatedLatLng: _animatedLatLng,
-        animatedRadius: _animatedRadius,
-        activeJourney: _activeJourney,
+    return Scaffold(
+      body: SlidingUpPanel(
+        parallaxEnabled: parallaxEnabled,
+        parallaxOffset: parallaxOffset,
+        minHeight: panelMinHeight,
+        maxHeight: panelMaxHeight,
+        isDraggable: isDraggable,
+        controller: _panelController,
+        borderRadius: radius,
+        panelBuilder: (sc) {
+          if (_activeJourney != null) {
+            return JourneyDetailsPanel(
+              sc: sc,
+              journey: _activeJourney!,
+              onReturn: _returnToSearch,
+              onSectionFocused: _fitMapToSection,
+            );
+          } else {
+            return SearchPanel(
+              sc: sc,
+              startController: _startController,
+              destinationController: _destinationController,
+              onStartTap: () => _navigateToSearchScreen(isStart: true),
+              onDestinationTap: () => _navigateToSearchScreen(isStart: false),
+              isLoading: _isLoadingJourneys,
+              showRoutes: _showRoutes,
+              journeys: _journeys,
+              onJourneySelected: _displayJourneyOnMap,
+            );
+          }
+        },
+        body: MainMap(
+          mapController: _mapController.mapController,
+          polylines: polylines,
+          currentPosition: _currentPosition,
+          animatedLatLng: _animatedLatLng,
+          animatedRadius: _animatedRadius,
+          activeJourney: _activeJourney,
+        ),
       ),
     );
   }

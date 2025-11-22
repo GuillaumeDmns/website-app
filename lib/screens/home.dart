@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/screens/lines.dart';
 
+import '../utils/constants.dart' as constants;
 import 'map.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -12,32 +13,29 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentPageIndex = 0;
-  final List<Widget> _screens = [
-    MapScreen(),
-    LinesScreen()
-  ];
+  final List<Widget> _screens = [MapScreen(), LinesScreen()];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: NavigationBar(
-        onDestinationSelected: _onDestinationTap,
-        selectedIndex: _currentPageIndex,
-        destinations: const <Widget>[
-          NavigationDestination(
-            selectedIcon: Icon(Icons.map),
-            icon: Icon(Icons.map_outlined),
-            label: 'Map',
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Icons.calendar_month),
-            icon: Icon(Icons.calendar_month_outlined),
-            label: 'Lines',
-          ),
-        ],
-      ),
-      body: _screens[_currentPageIndex]
-    );
+        bottomNavigationBar: NavigationBar(
+          height: constants.navigationBarHeight,
+          onDestinationSelected: _onDestinationTap,
+          selectedIndex: _currentPageIndex,
+          destinations: const <Widget>[
+            NavigationDestination(
+              selectedIcon: Icon(Icons.map),
+              icon: Icon(Icons.map_outlined),
+              label: 'Map',
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Icons.calendar_month),
+              icon: Icon(Icons.calendar_month_outlined),
+              label: 'Lines',
+            ),
+          ],
+        ),
+        body: _screens[_currentPageIndex]);
   }
 
   void _onDestinationTap(int index) {
