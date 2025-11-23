@@ -19,7 +19,7 @@ class SearchPlaceScreen extends StatefulWidget {
 class _SearchPlaceScreenState extends State<SearchPlaceScreen> {
   final _searchController = TextEditingController();
   final _api = ApiRepository();
-  final _debouncer = AsyncDebouncer(delay: const Duration(milliseconds: 300));
+  final _debouncer = Debouncer(delay: const Duration(milliseconds: 300));
 
   List<Place> _places = [];
   bool _isLoading = false;
@@ -51,13 +51,17 @@ class _SearchPlaceScreenState extends State<SearchPlaceScreen> {
       _isLoading = true;
     });
 
-    _debouncer.debounce<void>(() async {
-      final response = await _api.autocompletePlaces(_searchController.text);
-      if (mounted) {
-        setState(() {
-          _places = response.places ?? [];
-          _isLoading = false;
-        });
+    _debouncer.run(() async {
+      try {
+        final response = await _api.autocompletePlaces(_searchController.text);
+        if (mounted) {
+          setState(() {
+            _places = response.places ?? [];
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        debugPrint(e.toString());
       }
     });
   }

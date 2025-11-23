@@ -1,35 +1,15 @@
 import 'dart:async';
+import 'dart:ui';
 
-class AsyncDebouncer {
+class Debouncer {
   final Duration delay;
   Timer? _timer;
-  Completer? _completer;
 
-  AsyncDebouncer({required this.delay});
+  Debouncer({required this.delay});
 
-  Future<T> debounce<T>(Future<T> Function() callback) {
+  void run(VoidCallback action) {
     _timer?.cancel();
-
-    if (_completer?.isCompleted == false) {
-      _completer!.completeError('Cancelled');
-    }
-
-    _completer = Completer<T>();
-
-    _timer = Timer(delay, () async {
-      try {
-        final result = await callback();
-        if (!_completer!.isCompleted) {
-          _completer!.complete(result);
-        }
-      } catch (e) {
-        if (!_completer!.isCompleted) {
-          _completer!.completeError(e);
-        }
-      }
-    });
-
-    return _completer!.future as Future<T>;
+    _timer = Timer(delay, action);
   }
 
   void dispose() {

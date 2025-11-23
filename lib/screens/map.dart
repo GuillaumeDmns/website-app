@@ -190,8 +190,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (processedData.allJourneyPoints.isNotEmpty) {
       final bounds = LatLngBounds.fromPoints(processedData.allJourneyPoints);
       _mapController.animatedFitCamera(
-        cameraFit: CameraFit.bounds(
-            bounds: bounds, padding: _getMapPadding()),
+        cameraFit: CameraFit.bounds(bounds: bounds, padding: _getMapPadding()),
       );
     }
   }
@@ -229,7 +228,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final bounds = LatLngBounds.fromPoints(sectionPolyline.points);
 
         _mapController.animatedFitCamera(
-          cameraFit: CameraFit.bounds(bounds: bounds, padding: _getMapPadding()),
+          cameraFit:
+              CameraFit.bounds(bounds: bounds, padding: _getMapPadding()),
         );
       }
     }

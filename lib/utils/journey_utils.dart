@@ -96,7 +96,9 @@ class JourneyUtils {
     for (int i = 0; i < activeJourney.sections!.length; i++) {
       final section = activeJourney.sections![i];
       if (section.geojson?.coordinates == null ||
-          section.geojson!.coordinates!.isEmpty) continue;
+          section.geojson!.coordinates!.isEmpty) {
+        continue;
+      }
 
       final sectionPoints = section.geojson!.coordinates!
           .where((c) => c.length >= 2)
@@ -124,7 +126,9 @@ class JourneyUtils {
     for (int i = 0; i < activeJourney.sections!.length; i++) {
       final section = activeJourney.sections![i];
       if (section.geojson?.coordinates == null ||
-          section.geojson!.coordinates!.isEmpty) continue;
+          section.geojson!.coordinates!.isEmpty) {
+        continue;
+      }
 
       final sectionPoints = section.geojson!.coordinates!
           .where((c) => c.length >= 2)
