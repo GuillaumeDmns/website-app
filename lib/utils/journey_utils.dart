@@ -3,8 +3,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:website_app/models/navitia/journey.dart';
+import 'package:website_app/models/navitia/place.dart';
 import 'package:website_app/models/navitia/section.dart';
 import 'package:website_app/utils/style_utils.dart';
+
+import '../models/navitia/embedded_type.dart';
 
 class ProcessedJourneyData {
   final List<Polyline> polylines;
@@ -250,38 +253,56 @@ class JourneyUtils {
         title = displayInfos.name ?? "TER";
       } else {
         title = displayInfos.commercialMode ?? "";
-        title += displayInfos.label != null ? " ${displayInfos.label}" : "";
+        if (displayInfos.label != null && displayInfos.label!.isNotEmpty) {
+          title += " ${displayInfos.label}";
+        }
       }
-      title += displayInfos.direction != null
-          ? " direction ${displayInfos.direction}"
-          : "";
 
-      return title.isEmpty ? "Section" : title;
+      if (displayInfos.direction != null && displayInfos.direction!.isNotEmpty) {
+        title += " direction ${displayInfos.direction}";
+      }
+
+      return title.isEmpty ? "Transport line" : title;
     }
 
     if (section.mode != null) {
       switch (section.mode) {
         case 'walking':
-          return "Walk to ${section.to?.name ?? "next section"}";
+          return "Walk to ${getPlaceBeautifulName(section.to, "destination")}";
         default:
-          return "Smogogoooo";
+          return "Travel by ${_capitalize(section.mode!)}";
       }
     }
 
     if (section.type != null) {
-      String duration = section.duration != null
-          ? "(~ ${(section.duration! / 60).ceil()} min)"
+      String durationStr = section.duration != null
+          ? " (~ ${(section.duration! / 60).ceil()} min)"
           : "";
+
       switch (section.type) {
         case 'transfer':
-          return "Transfer at ${section.to?.stopPoint?.name ?? "current stop"}";
+          return "Transfer at ${getPlaceBeautifulName(section.to, "stop")}";
         case 'waiting':
-          return "Waiting for the next passage at ${section.to?.stopPoint?.name ?? "current stop"} $duration";
+          return "Wait for connection at ${getPlaceBeautifulName(section.to, "station")}$durationStr";
         default:
-          return "Gravalanch";
+          return _capitalize(section.type!);
       }
     }
 
-    return "Scoubidou";
+    return "Journey step";
+  }
+
+  static String getPlaceBeautifulName(Place? place, String defaultName) {
+    if (place == null) return defaultName;
+
+    final name = place.stopPoint?.name ?? place.stopArea?.name ?? place.name;
+
+    return name ?? defaultName;
+  }
+
+  static String _capitalize(String input) {
+    if (input.isEmpty) return input;
+    final formatted = input.replaceAll('_', ' ');
+    return "${formatted[0].toUpperCase()}${formatted.substring(1)}";
   }
 }
