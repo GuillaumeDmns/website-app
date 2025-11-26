@@ -3,11 +3,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:website_app/models/navitia/journey.dart';
+import 'package:website_app/models/navitia/link_schema.dart';
 import 'package:website_app/models/navitia/place.dart';
 import 'package:website_app/models/navitia/section.dart';
 import 'package:website_app/utils/style_utils.dart';
 
-import '../models/navitia/embedded_type.dart';
+import '../models/navitia/stop_area.dart';
 
 class ProcessedJourneyData {
   final List<Polyline> polylines;
@@ -245,7 +246,7 @@ class JourneyUtils {
     );
   }
 
-  static String getSectionTitle(Section section) {
+  static String getSectionTitle(Section section, List<StopArea> terminusList) {
     final displayInfos = section.displayInformations;
     if (displayInfos != null) {
       String title;
@@ -258,8 +259,10 @@ class JourneyUtils {
         }
       }
 
-      if (displayInfos.direction != null && displayInfos.direction!.isNotEmpty) {
-        title += " direction ${displayInfos.direction}";
+      if (displayInfos.direction != null &&
+          displayInfos.direction!.isNotEmpty) {
+        title += _getTerminus(
+            terminusList, displayInfos.links, displayInfos.direction);
       }
 
       return title.isEmpty ? "Transport line" : title;
@@ -304,5 +307,35 @@ class JourneyUtils {
     if (input.isEmpty) return input;
     final formatted = input.replaceAll('_', ' ');
     return "${formatted[0].toUpperCase()}${formatted.substring(1)}";
+  }
+
+  static String _getTerminus(
+      List<StopArea> terminusList, List<LinkSchema>? links, String? direction) {
+    LinkSchema? terminusLink;
+    try {
+      terminusLink = links?.firstWhere((link) => link.rel == "terminus");
+    } catch (_) {
+      terminusLink = null;
+    }
+
+    if (terminusLink != null && terminusLink.id != null) {
+      StopArea? matchingStop;
+      try {
+        matchingStop =
+            terminusList.firstWhere((stop) => stop.id == terminusLink!.id);
+      } catch (_) {
+        matchingStop = null;
+      }
+
+      if (matchingStop != null && matchingStop.name != null) {
+        return " direction ${matchingStop.name}";
+      }
+    }
+
+    if (direction != null && direction.isNotEmpty) {
+      return " direction $direction";
+    }
+
+    return "";
   }
 }

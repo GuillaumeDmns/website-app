@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:website_app/models/navitia/journey.dart';
+import 'package:website_app/models/navitia/stop_area.dart';
 
 import '../section_list_item.dart';
 
@@ -8,6 +9,7 @@ class JourneyDetailsPanel extends StatelessWidget {
   final Journey journey;
   final VoidCallback onReturn;
   final Function(int) onSectionFocused;
+  final List<StopArea> terminusList;
 
   const JourneyDetailsPanel({
     super.key,
@@ -15,6 +17,7 @@ class JourneyDetailsPanel extends StatelessWidget {
     required this.journey,
     required this.onReturn,
     required this.onSectionFocused,
+    required this.terminusList,
   });
 
   @override
@@ -64,6 +67,7 @@ class JourneyDetailsPanel extends StatelessWidget {
                   itemBuilder: (context, index) {
                     return SectionListItem(
                       section: journey.sections![index],
+                      terminusList: terminusList,
                       isLast: index == journey.sections!.length - 1,
                       onTap: () => onSectionFocused(index),
                     );

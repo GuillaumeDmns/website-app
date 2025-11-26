@@ -11,7 +11,7 @@ class SearchPanel extends StatelessWidget {
   final VoidCallback onDestinationTap;
   final bool isLoading;
   final bool showRoutes;
-  final Journeys? journeys;
+  final JourneysResponse? journeysList;
   final ValueChanged<Journey> onJourneySelected;
 
   const SearchPanel({
@@ -23,7 +23,7 @@ class SearchPanel extends StatelessWidget {
     required this.onDestinationTap,
     required this.isLoading,
     required this.showRoutes,
-    this.journeys,
+    this.journeysList,
     required this.onJourneySelected,
   });
 
@@ -93,18 +93,18 @@ class SearchPanel extends StatelessWidget {
                 child: CircularProgressIndicator(),
               ),
             )
-          else if (journeys != null &&
-              journeys!.journeys != null &&
-              journeys!.journeys!.isNotEmpty)
+          else if (journeysList != null &&
+              journeysList!.journeys != null &&
+              journeysList!.journeys!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: ListView.builder(
                 padding: const EdgeInsets.only(top: 8.0),
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: journeys!.journeys!.length,
+                itemCount: journeysList!.journeys!.length,
                 itemBuilder: (context, index) {
-                  final journey = journeys!.journeys![index];
+                  final journey = journeysList!.journeys![index];
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10.0),
                     decoration: BoxDecoration(

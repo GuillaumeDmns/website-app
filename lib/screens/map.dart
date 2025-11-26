@@ -39,7 +39,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Place? selectedStartPlace;
   Place? selectedDestinationPlace;
 
-  Journeys? _journeys;
+  JourneysResponse? _journeysResponse;
   Journey? _activeJourney;
 
   bool _isLoadingJourneys = false;
@@ -124,7 +124,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       setState(() {
         _isLoadingJourneys = true;
         _showRoutes = true;
-        _journeys = null;
+        _journeysResponse = null;
         polylines.clear();
       });
 
@@ -132,7 +132,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final journeysResult = await api.getJourneys(
             selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
         setState(() {
-          _journeys = journeysResult;
+          _journeysResponse = journeysResult;
           _isLoadingJourneys = false;
         });
       } catch (e) {
@@ -362,11 +362,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         panelBuilder: (sc) {
           if (_activeJourney != null) {
             return JourneyDetailsPanel(
-              sc: sc,
-              journey: _activeJourney!,
-              onReturn: _returnToSearch,
-              onSectionFocused: _fitMapToSection,
-            );
+                sc: sc,
+                journey: _activeJourney!,
+                onReturn: _returnToSearch,
+                onSectionFocused: _fitMapToSection,
+                terminusList: _journeysResponse?.terminus ?? []);
           } else {
             return SearchPanel(
               sc: sc,
@@ -376,7 +376,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               onDestinationTap: () => _navigateToSearchScreen(isStart: false),
               isLoading: _isLoadingJourneys,
               showRoutes: _showRoutes,
-              journeys: _journeys,
+              journeysList: _journeysResponse,
               onJourneySelected: _displayJourneyOnMap,
             );
           }

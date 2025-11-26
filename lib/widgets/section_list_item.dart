@@ -4,14 +4,18 @@ import 'package:website_app/utils/journey_utils.dart';
 import 'package:website_app/utils/style_utils.dart';
 import 'package:website_app/utils/time_utils.dart';
 
+import '../models/navitia/stop_area.dart';
+
 class SectionListItem extends StatelessWidget {
   final Section section;
+  final List<StopArea> terminusList;
   final bool isLast;
   final VoidCallback? onTap;
 
   const SectionListItem({
     super.key,
     required this.section,
+    required this.terminusList,
     required this.isLast,
     this.onTap,
   });
@@ -20,7 +24,7 @@ class SectionListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = StyleUtils.getSectionIcon(section);
     final color = StyleUtils.hexToColor(section.displayInformations?.color);
-    String title = JourneyUtils.getSectionTitle(section);
+    String title = JourneyUtils.getSectionTitle(section, terminusList);
 
     return InkWell(
       onTap: onTap,
@@ -70,8 +74,8 @@ class SectionListItem extends StatelessWidget {
                             final stop = section.stopDateTimes![index];
                             final stopName = stop.stopPoint?.name ?? '';
                             if (index == 0) {
-                              final departureTime =
-                                  TimeUtils.formatTime(section.departureDateTime);
+                              final departureTime = TimeUtils.formatTime(
+                                  section.departureDateTime);
                               return Padding(
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Text(
@@ -102,7 +106,8 @@ class SectionListItem extends StatelessWidget {
                             final arrivalTime =
                                 TimeUtils.formatTime(stop.arrivalDateTime);
                             return Padding(
-                              padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                              padding:
+                                  const EdgeInsets.only(left: 8.0, top: 4.0),
                               child: Text(
                                 '• $arrivalTime: $stopName',
                                 style: TextStyle(

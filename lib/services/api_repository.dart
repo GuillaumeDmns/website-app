@@ -91,14 +91,14 @@ class ApiRepository {
     }
   }
 
-  Future<Journeys> getJourneys(String startPoint, String endPoint) async {
+  Future<JourneysResponse> getJourneys(String startPoint, String endPoint) async {
     final response = await client.get(
       Uri.parse('https://guillaumedamiens.com/api/journeys?startPoint=$startPoint&endPoint=$endPoint'),
     );
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return Journeys.fromJson(json);
+      return JourneysResponse.fromJson(json);
     } else {
       throw Exception('Failed to get journeys');
     }
