@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:website_app/app_settings.dart';
 import 'package:website_app/screens/auth_wrapper.dart';
 import 'package:website_app/screens/home.dart';
 import 'package:website_app/screens/map.dart';
+import 'home_widgets/HomeWidgetService.dart';
 import 'screens/login.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await HomeWidget.registerInteractivityCallback(refreshCallback);
+
   runApp(const App());
 }
 
@@ -17,14 +23,13 @@ class App extends StatelessWidget {
     return MaterialApp(
       title: 'Guillaume Damiens',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent),
-        useMaterial3: true,
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: <TargetPlatform, PageTransitionsBuilder>{
-            TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          },
-        )
-      ),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent),
+          useMaterial3: true,
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: <TargetPlatform, PageTransitionsBuilder>{
+              TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+            },
+          )),
       home: const AuthWrapperScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
