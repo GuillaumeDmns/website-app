@@ -1,3 +1,4 @@
+import 'package:website_app/models/navitia/boarding_position.dart';
 import 'package:website_app/models/navitia/section_display_information.dart';
 
 import 'path.dart';
@@ -32,6 +33,8 @@ class Section {
 
   final String? mode;
 
+  final List<BoardingPositionEnum>? bestBoardingPositions;
+
   final SectionDisplayInformation? displayInformations;
 
   Section(
@@ -48,6 +51,7 @@ class Section {
       this.id,
       this.dataFreshness,
       this.mode,
+      this.bestBoardingPositions,
       this.displayInformations});
 
   factory Section.fromJson(Map<String, dynamic> json) {
@@ -75,8 +79,14 @@ class Section {
         id: json['id'] as String?,
         dataFreshness: json['dataFreshness'] as String?,
         mode: json['mode'] as String?,
+        bestBoardingPositions: json['bestBoardingPositions'] != null
+            ? (json['bestBoardingPositions'] as List<dynamic>)
+                .map((position) => BoardingPositionEnum.values
+                    .firstWhere((e) => e.value == position))
+                .toList()
+            : null,
         displayInformations: json['displayInformations'] != null
-        ? SectionDisplayInformation.fromJson(json['displayInformations'])
-        : null);
+            ? SectionDisplayInformation.fromJson(json['displayInformations'])
+            : null);
   }
 }

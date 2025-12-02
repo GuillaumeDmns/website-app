@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:website_app/models/navitia/boarding_position.dart';
 import 'package:website_app/models/navitia/section.dart';
 import 'package:website_app/utils/journey_utils.dart';
 import 'package:website_app/utils/style_utils.dart';
@@ -57,6 +58,59 @@ class SectionListItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (section.bestBoardingPositions != null &&
+                          section.bestBoardingPositions!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Boarding:',
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                height: 12,
+                                width: 25,
+                                decoration: BoxDecoration(
+                                  color: section.bestBoardingPositions!
+                                          .contains(BoardingPositionEnum.back)
+                                      ? color
+                                      : Colors.grey[300],
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(3),
+                                    bottomLeft: Radius.circular(3),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                height: 12,
+                                width: 25,
+                                color: section.bestBoardingPositions!
+                                        .contains(BoardingPositionEnum.middle)
+                                    ? color
+                                    : Colors.grey[300],
+                              ),
+                              Container(
+                                height: 12,
+                                width: 25,
+                                decoration: BoxDecoration(
+                                  color: section.bestBoardingPositions!
+                                          .contains(BoardingPositionEnum.front)
+                                      ? color
+                                      : Colors.grey[300],
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(3),
+                                    bottomRight: Radius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       Text(
                         title,
                         style: TextStyle(
