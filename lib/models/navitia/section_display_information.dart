@@ -16,8 +16,26 @@ class SectionDisplayInformation {
   final List<String>? headsigns;
   final String? commercialMode;
   final String? description;
+  final String? tripShortName;
+  final String? company;
 
-  SectionDisplayInformation({this.direction, this.code, this.network, this.links, this.color, this.name, this.physicalMode, this.headsign, this.label, this.equipments, this.textColor, this.headsigns, this.commercialMode, this.description});
+  SectionDisplayInformation(
+      {this.direction,
+      this.code,
+      this.network,
+      this.links,
+      this.color,
+      this.name,
+      this.physicalMode,
+      this.headsign,
+      this.label,
+      this.equipments,
+      this.textColor,
+      this.headsigns,
+      this.commercialMode,
+      this.description,
+      this.tripShortName,
+      this.company});
 
   factory SectionDisplayInformation.fromJson(Map<String, dynamic> json) {
     return SectionDisplayInformation(
@@ -37,10 +55,13 @@ class SectionDisplayInformation {
       //     .toList(),
       textColor: json['textColor'] as String?,
       headsigns: (json['headsigns'] as List<dynamic>?)
-          ?.map((code) => code as String)
-          .toList() ?? [],
+              ?.map((code) => code as String)
+              .toList() ??
+          [],
       commercialMode: json['commercialMode'] as String?,
       description: json['description'] as String?,
+      tripShortName: json['tripShortName'] as String?,
+      company: json['company'] as String?,
     );
   }
 }

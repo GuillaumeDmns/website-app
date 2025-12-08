@@ -1,6 +1,7 @@
 import 'address.dart';
 import 'admin.dart';
 import 'embedded_type.dart';
+import 'pathway.dart';
 import 'poi.dart';
 import 'stop_area.dart';
 import 'stop_point.dart';
@@ -16,8 +17,7 @@ class Place {
   final Address? address;
   final Poi? poi;
   final String? distance;
-
-  // final PathWay? accessPoint;
+  final Pathway? accessPoint;
 
   Place(
       {this.id,
@@ -29,7 +29,8 @@ class Place {
       this.embeddedType,
       this.address,
       this.poi,
-      this.distance});
+      this.distance,
+      this.accessPoint});
 
   factory Place.fromJson(Map<String, dynamic> json) {
     return Place(
@@ -55,6 +56,7 @@ class Place {
           json['address'] != null ? Address.fromJson(json['address']) : null,
       poi: json['poi'] != null ? Poi.fromJson(json['poi']) : null,
       distance: json['distance'] as String?,
+      accessPoint: json['poi'] != null ? Pathway.fromJson(json['poi']) : null,
     );
   }
 }
