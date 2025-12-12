@@ -1,16 +1,29 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/navitia/journey.dart';
+
 import '../models/navitia/section.dart';
+import 'live_notification_bridge.dart';
 
 class NotificationService {
   static const String _channelId = 'journey_progress_channel';
   static const String _channelName = 'Journey Progress';
   static const String _channelDescription = 'Live journey progress';
+
   static const int _notificationId =
       75415; // Same value as https://github.com/Baseflow/flutter-geolocator/blob/756b8d8015f06ecfcc64b438f71cb3b362b5e350/geolocator_android/android/src/main/java/com/baseflow/geolocator/GeolocatorLocationService.java#L31
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  final LiveNotificationBridge _liveBridge = LiveNotificationBridge();
+
+  static final NotificationService _notificationService =
+      NotificationService._internal();
+
+  factory NotificationService() => _notificationService;
+
+  NotificationService._internal();
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -71,23 +84,34 @@ class NotificationService {
   Future<void> showJourneyProgressNotification(Journey journey) async {
     if (journey.sections == null || journey.sections!.isEmpty) return;
 
-    await _updateJourneyProgress(journey, journey.sections!.first, 0);
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      await _updateJourneyProgress(journey, journey.sections!.first, 0);
+    } else {
+      await _liveBridge.updateJourneyProgress(
+          journey: journey, distanceTraveledMeters: 0, currentSectionIndex: 0);
+    }
   }
 
   Future<void> updateJourneyProgressNotification(
       Journey journey,
       int currentSectionIndex,
       double traveledDistance,
-      double totalDistance) async {
-    if (journey.sections == null ||
-        journey.sections!.length <= currentSectionIndex) return;
+      double totalJourneyDistance) async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      await _updateJourneyProgress(journey, journey.sections!.first, 0);
+    } else {
+      if (journey.sections == null ||
+          journey.sections!.length <= currentSectionIndex) return;
 
-    final section = journey.sections![currentSectionIndex];
-    await _updateJourneyProgress(
-        journey,
-        section,
-        (traveledDistance.clamp(0, totalDistance) * 100 / totalDistance)
-            .toInt());
+      final section = journey.sections![currentSectionIndex];
+      await _updateJourneyProgress(
+          journey,
+          section,
+          (traveledDistance.clamp(0, totalJourneyDistance) *
+                  100 /
+                  totalJourneyDistance)
+              .toInt());
+    }
   }
 
   Future<void> _updateJourneyProgress(
@@ -144,6 +168,9 @@ class NotificationService {
   }
 
   Future<void> cancelJourneyNotification() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _liveBridge.stop();
+    }
     await _notificationsPlugin.cancel(_notificationId);
   }
 

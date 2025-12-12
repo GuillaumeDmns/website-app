@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:website_app/app_settings.dart';
@@ -10,7 +11,9 @@ import 'screens/login.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await HomeWidget.registerInteractivityCallback(refreshCallback);
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await HomeWidget.registerInteractivityCallback(refreshCallback);
+  }
 
   runApp(const App());
 }
