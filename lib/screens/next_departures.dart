@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:website_app/models/call_unit.dart';
 import 'package:website_app/models/stops_by_line_dto.dart';
 
+import '../home_widgets/HomeWidgetService.dart';
 import '../services/api_repository.dart';
 import '../widgets/next_departures_card.dart';
 
@@ -23,19 +24,23 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   bool isLoading = false;
 
   Future<void> fetchNextDepartures() async {
-
-
     try {
       final response =
           await api.fetchNextDepartures(widget.stop.id!, widget.lineId);
-      nextDepartures = response.nextPassages;
-      nextDepartures.sort((a, b) {
-        return DateTime.parse(a.expectedDepartureTime ?? a.expectedArrivalTime!)
-                .isBefore(DateTime.parse((b.expectedDepartureTime ?? b.expectedArrivalTime!)))
-            ? -1
-            : 1;
+      setState(() {
+        nextDepartures = response.nextPassages;
+        nextDepartures.sort((a, b) {
+          return DateTime.parse(
+                      a.expectedDepartureTime ?? a.expectedArrivalTime!)
+                  .isBefore(DateTime.parse(
+                      (b.expectedDepartureTime ?? b.expectedArrivalTime!)))
+              ? -1
+              : 1;
+        });
+        nextDeparturesDestinations = response.nextPassageDestinations;
       });
-      nextDeparturesDestinations = response.nextPassageDestinations;
+      HomeWidgetService.updateWidgetData(
+          widget.lineId, widget.stop.id!, widget.stop.name!, nextDepartures);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching next departures: $e')),
@@ -65,24 +70,23 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-        onRefresh: fetchNextDepartures,
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ListView(
-            children: [
-              for (var destination in nextDeparturesDestinations)
-                NextDepartureCard(
-                  destination: destination,
-                  nextDepartures: List.from(nextDepartures
-                      .where((departure) =>
-                  departure.destinationName == destination)
-                      .toList()),
+              onRefresh: fetchNextDepartures,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ListView(
+                  children: [
+                    for (var destination in nextDeparturesDestinations)
+                      NextDepartureCard(
+                        destination: destination,
+                        nextDepartures: List.from(nextDepartures
+                            .where((departure) =>
+                                departure.destinationName == destination)
+                            .toList()),
+                      ),
+                  ],
                 ),
-            ],
-          ),
-        ),
-      ),
+              ),
+            ),
     );
   }
-
 }

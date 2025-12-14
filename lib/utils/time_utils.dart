@@ -31,4 +31,15 @@ class TimeUtils {
       return 'in ${difference.inHours} h ${difference.inMinutes % 60} min';
     }
   }
+
+  static String formatTime(String? dateTimeStr) {
+    if (dateTimeStr == null || dateTimeStr.length != 15) return '';
+    try {
+      final hour = int.parse(dateTimeStr.substring(9, 11));
+      final minute = int.parse(dateTimeStr.substring(11, 13));
+      return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return '';
+    }
+  }
 }
