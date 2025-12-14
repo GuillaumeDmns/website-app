@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_interceptor/http/intercepted_client.dart';
@@ -10,6 +11,9 @@ import '../models/stops_by_line_dto.dart';
 import '../models/unit_idfm_dto.dart';
 import 'api_interceptor.dart';
 
+const String _baseUrl =
+    kDebugMode ? 'http://localhost:8080' : 'https://guillaumedamiens.com';
+
 class ApiRepository {
   http.Client client = InterceptedClient.build(interceptors: [
     APIInterceptor(),
@@ -18,7 +22,7 @@ class ApiRepository {
 
   Future<bool> login(String username, String password) async {
     final response = await http.post(
-      Uri.parse('https://guillaumedamiens.com/api/signin'),
+      Uri.parse('$_baseUrl/api/signin'),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -40,9 +44,7 @@ class ApiRepository {
   }
 
   Future<LinesResponse> fetchLines() async {
-    final response = await client.get(
-      Uri.parse('https://guillaumedamiens.com/api/lines')
-    );
+    final response = await client.get(Uri.parse('$_baseUrl/api/lines'));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -53,9 +55,8 @@ class ApiRepository {
   }
 
   Future<StopsByLineDTO> fetchStopsAndShape(String lineId) async {
-    final response = await client.get(
-      Uri.parse('https://guillaumedamiens.com/api/stops-by-line?lineId=$lineId')
-    );
+    final response = await client
+        .get(Uri.parse('$_baseUrl/api/stops-by-line?lineId=$lineId'));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -67,7 +68,8 @@ class ApiRepository {
 
   Future<UnitIDFMDTO> fetchNextDepartures(String stopId, String lineId) async {
     final response = await client.get(
-      Uri.parse('https://guillaumedamiens.com/api/get-stop-next-passages?stopId=$stopId&lineId=$lineId'),
+      Uri.parse(
+          '$_baseUrl/api/get-stop-next-passages?stopId=$stopId&lineId=$lineId'),
     );
 
     if (response.statusCode == 200) {
@@ -79,9 +81,8 @@ class ApiRepository {
   }
 
   Future<Places> autocompletePlaces(String query) async {
-    final response = await client.get(
-      Uri.parse('https://guillaumedamiens.com/api/places?query=$query'),
-    );
+    final response =
+        await client.get(Uri.parse('$_baseUrl/api/places?query=$query'));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -91,9 +92,11 @@ class ApiRepository {
     }
   }
 
-  Future<JourneysResponse> getJourneys(String startPoint, String endPoint) async {
+  Future<JourneysResponse> getJourneys(
+      String startPoint, String endPoint) async {
     final response = await client.get(
-      Uri.parse('https://guillaumedamiens.com/api/journeys?startPoint=$startPoint&endPoint=$endPoint'),
+      Uri.parse(
+          '$_baseUrl/api/journeys?startPoint=$startPoint&endPoint=$endPoint'),
     );
 
     if (response.statusCode == 200) {
@@ -103,5 +106,4 @@ class ApiRepository {
       throw Exception('Failed to get journeys');
     }
   }
-
 }

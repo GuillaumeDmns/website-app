@@ -101,16 +101,15 @@ class NotificationService {
       await _updateJourneyProgress(journey, journey.sections!.first, 0);
     } else {
       if (journey.sections == null ||
-          journey.sections!.length <= currentSectionIndex) return;
+          journey.sections!.length <= currentSectionIndex) {
+        return;
+      }
 
-      final section = journey.sections![currentSectionIndex];
-      await _updateJourneyProgress(
-          journey,
-          section,
-          (traveledDistance.clamp(0, totalJourneyDistance) *
-                  100 /
-                  totalJourneyDistance)
-              .toInt());
+      await _liveBridge.updateJourneyProgress(
+        journey: journey,
+        distanceTraveledMeters: traveledDistance,
+        currentSectionIndex: currentSectionIndex,
+      );
     }
   }
 
