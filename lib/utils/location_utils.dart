@@ -1,75 +1,61 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import '../services/permission_manager.dart';
 
 class LocationUtils {
-  static Future<bool> checkAndRequestLocationPermissions(
-      BuildContext context) async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled && context.mounted) {
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Services de localisation désactivés'),
-          content: const Text(
-              'Veuillez activer les services de localisation pour le suivi.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: const Text('Ouvrir les paramètres'),
-              onPressed: () {
-                Geolocator.openLocationSettings();
-                Navigator.of(context).pop(false);
-              },
-            ),
-          ],
-        ),
-      );
-      return false;
-    }
+  static const MethodChannel _nativeChannel =
+      MethodChannel('com.guillaumedamiens.live_notification/bridge');
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'La permission de localisation est requise pour suivre le trajet.')),
+  static Future<bool> checkAndRequestLocationPermissions(
+    BuildContext context, {
+    String? title,
+    String? description,
+  }) async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          final result = await _nativeChannel.invokeMethod('requestLocationService');
+          serviceEnabled = result == true;
+        } on PlatformException {
+          serviceEnabled = false;
+        }
+      } else if (context.mounted) {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('Location services disabled'),
+            content: const Text(
+                'Please enable location services to use journey guidance.'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              TextButton(
+                child: const Text('Open Settings'),
+                onPressed: () {
+                  Geolocator.openLocationSettings();
+                  Navigator.of(context).pop(false);
+                },
+              ),
+            ],
+          ),
         );
         return false;
       }
+
+      if (!serviceEnabled) return false;
     }
 
-    if (permission == LocationPermission.deniedForever && context.mounted) {
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Permission de localisation refusée'),
-          content: const Text(
-              'La permission a été refusée de manière permanente. Veuillez l\'activer dans les paramètres de l\'application.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: const Text('Ouvrir les paramètres'),
-              onPressed: () {
-                Geolocator.openAppSettings();
-                Navigator.of(context).pop(false);
-              },
-            ),
-          ],
-        ),
-      );
-      return false;
-    }
-
-    return true;
+    if (!context.mounted) return false;
+    return await PermissionManager().requestLocationPermission(
+      context,
+      title: title,
+      description: description,
+    );
   }
 
   static LocationSettings getPlatformLocationSettings() {

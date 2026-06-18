@@ -12,64 +12,92 @@ class JourneyCard extends StatelessWidget {
       {super.key, required this.journey, required this.onJourneySelected});
 
   String _formatTime(String? dateTimeString) {
-    if (dateTimeString == null || dateTimeString.length < 13) {
-      return '--:--';
-    }
-
+    if (dateTimeString == null || dateTimeString.length < 13) return '--:--';
     try {
-      final String hour = dateTimeString.substring(9, 11);
-      final String minute = dateTimeString.substring(11, 13);
-
-      return '$hour:$minute';
-    } catch (e) {
+      return '${dateTimeString.substring(9, 11)}:${dateTimeString.substring(11, 13)}';
+    } catch (_) {
       return '--:--';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final totalDurationInMinutes = (journey.duration ?? 0) ~/ 60;
-    return GestureDetector(
-      onTap: () => onJourneySelected(journey),
-      behavior: HitTestBehavior.translucent,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildJourneyHeader(totalDurationInMinutes),
-            const SizedBox(height: 16),
-            _buildJourneySections(),
-          ],
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => onJourneySelected(journey),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(context, colorScheme, textTheme, totalDurationInMinutes),
+              const SizedBox(height: 14),
+              _buildJourneySections(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildJourneyHeader(int duration) {
+  Widget _buildHeader(BuildContext context, ColorScheme colorScheme,
+      TextTheme textTheme, int duration) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               _formatTime(journey.departureDateTime),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Icon(Icons.arrow_forward, size: 18, color: Colors.black54),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.arrow_forward_rounded,
+                  size: 18, color: colorScheme.onSurface.withValues(alpha: 0.4)),
             ),
             Text(
               _formatTime(journey.arrivalDateTime),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
-        Text(
-          '$duration min',
-          style: const TextStyle(fontSize: 16, color: Colors.black87),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$duration min',
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
@@ -79,9 +107,8 @@ class JourneyCard extends StatelessWidget {
     if (journey.sections == null || journey.sections!.isEmpty) {
       return const SizedBox.shrink();
     }
-
     final sectionsToDisplay = journey.sections!
-        .where((s) => !["crow_fly", "waiting", "transfer"].contains(s.type))
+        .where((s) => !['crow_fly', 'waiting', 'transfer'].contains(s.type))
         .toList();
 
     return SizedBox(
@@ -90,53 +117,51 @@ class JourneyCard extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         shrinkWrap: true,
         itemCount: sectionsToDisplay.length,
-        itemBuilder: (context, index) {
-          final section = sectionsToDisplay[index];
-          return _buildSectionItem(section);
-        },
-        separatorBuilder: (context, index) => const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4.0),
-          child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+        itemBuilder: (context, index) =>
+            _buildSectionItem(sectionsToDisplay[index]),
+        separatorBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey),
         ),
       ),
     );
   }
 
   Widget _buildSectionItem(Section section) {
-    if (section.type == 'public_transport' &&
-        section.displayInformations != null) {
-      final displayInfo = section.displayInformations!;
+    if (section.type == 'public_transport' && section.displayInformations != null) {
+      final info = section.displayInformations!;
       return Row(
         children: [
           Icon(
-            _getTransportIcon(displayInfo.physicalMode),
-            color: StyleUtils.hexToColor(displayInfo.color),
-            size: 24,
+            _getTransportIcon(info.physicalMode),
+            color: StyleUtils.hexToColor(info.color),
+            size: 20,
           ),
-          const SizedBox(width: 6),
-          if (displayInfo.code != null && displayInfo.code!.isNotEmpty)
+          if (info.code != null && info.code!.isNotEmpty) ...[
+            const SizedBox(width: 4),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: StyleUtils.hexToColor(displayInfo.color),
+                color: StyleUtils.hexToColor(info.color),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                displayInfo.code!,
+                info.code!,
                 style: TextStyle(
-                  color: StyleUtils.hexToColor(displayInfo.textColor),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  color: StyleUtils.hexToColor(info.textColor),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
               ),
             ),
+          ],
         ],
       );
     } else if (section.mode == 'walking') {
-      return const Icon(Icons.directions_walk, color: Colors.black54, size: 24);
-    } else {
-      return const SizedBox.shrink();
+      return const Icon(Icons.directions_walk_rounded,
+          color: Colors.grey, size: 20);
     }
+    return const SizedBox.shrink();
   }
 
   IconData _getTransportIcon(String? physicalMode) {

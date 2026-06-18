@@ -27,18 +27,16 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
   }) {
     for (var i = 0; i < oldItems.length; i++) {
       final oldItem = oldItems[i];
-
-      if (!newItems.any((newItem) {
-        return newItem.id == oldItem.id;
-      })) {
+      if (!newItems.any((newItem) => newItem.id == oldItem.id)) {
         _listKey.currentState?.removeItem(
           i,
           (context, animation) => SizeTransition(
             sizeFactor: animation,
             child: DepartureItem(
-                widget: widget,
-                departure: widget.nextDepartures[i],
-                isLastItem: false),
+              widget: widget,
+              departure: widget.nextDepartures[i],
+              isLastItem: false,
+            ),
           ),
         );
       }
@@ -51,10 +49,7 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
   }) {
     for (var i = 0; i < newItems.length; i++) {
       final newItem = newItems[i];
-
-      if (!oldItems.any((oldItem) {
-        return newItem.id == oldItem.id;
-      })) {
+      if (!oldItems.any((oldItem) => newItem.id == oldItem.id)) {
         _listKey.currentState?.insertItem(i);
       }
     }
@@ -71,27 +66,66 @@ class _NextDepartureCardState extends State<NextDepartureCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.destination),
-            const SizedBox(height: 8.0),
-            AnimatedList(
-              key: _listKey,
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              initialItemCount: _initialItemCount,
-              itemBuilder: (context, index, animation) => SizeTransition(
-                sizeFactor: animation,
-                child: DepartureItem(
-                  widget: widget,
-                  departure: widget.nextDepartures[index],
-                  isLastItem: widget.nextDepartures[index] ==
-                      widget.nextDepartures.lastWhere(
-                          (d) => d.destinationName == widget.destination),
+            // Destination header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+              child: Row(
+                children: [
+                  Icon(Icons.directions_rounded,
+                      size: 16,
+                      color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.destination,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: AnimatedList(
+                key: _listKey,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                initialItemCount: _initialItemCount,
+                itemBuilder: (context, index, animation) => SizeTransition(
+                  sizeFactor: animation,
+                  child: DepartureItem(
+                    widget: widget,
+                    departure: widget.nextDepartures[index],
+                    isLastItem: widget.nextDepartures[index] ==
+                        widget.nextDepartures.lastWhere(
+                            (d) => d.destinationName == widget.destination),
+                  ),
                 ),
               ),
             ),
@@ -116,21 +150,65 @@ class DepartureItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final timeStr = TimeUtils.getTimeFromIso8601(
+        departure.expectedDepartureTime ?? departure.expectedArrivalTime!);
+
+    final subtitle = [
+      departure.journeyNote,
+      departure.arrivalPlatformName != null
+          ? 'Quai ${departure.arrivalPlatformName}'
+          : null,
+    ].where((item) => item != null).join(' — ');
+
     return Column(
       children: [
-        ListTile(
-          leading: Text(
-            TimeUtils.getTimeFromIso8601(departure.expectedDepartureTime ??
-                departure.expectedArrivalTime!),
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          title: Text(departure.destinationName ?? ''),
-          subtitle: Text([departure.journeyNote, departure.arrivalPlatformName != null ? "Platform ${departure.arrivalPlatformName}" : null]
-              .where((item) => item != null)
-              .join(" - "),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              // Time badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  timeStr,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      departure.destinationName ?? '',
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        if (!isLastItem) const Divider(height: 0),
+        if (!isLastItem)
+          Divider(height: 1, color: colorScheme.outlineVariant, indent: 16),
       ],
     );
   }

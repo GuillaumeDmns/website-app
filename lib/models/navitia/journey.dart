@@ -3,27 +3,22 @@ import 'section.dart';
 
 class Journey {
   final int? nbTransfers;
-
   final Durations? durations;
-
   final String? arrivalDateTime;
-
   final String? departureDateTime;
-
   final String? requestedDateTime;
-
   final int? duration;
-
   final List<Section>? sections;
 
-  Journey(
-      {this.nbTransfers,
-      this.durations,
-      this.arrivalDateTime,
-      this.departureDateTime,
-      this.requestedDateTime,
-      this.duration,
-      this.sections});
+  Journey({
+    this.nbTransfers,
+    this.durations,
+    this.arrivalDateTime,
+    this.departureDateTime,
+    this.requestedDateTime,
+    this.duration,
+    this.sections,
+  });
 
   factory Journey.fromJson(Map<String, dynamic> json) {
     return Journey(
@@ -40,6 +35,27 @@ class Journey {
               .map((place) => Section.fromJson(place))
               .toList()
           : null,
+    );
+  }
+
+  /// Creates a copy of this Journey but with the given fields replaced with the new values.
+  Journey copyWith({
+    int? nbTransfers,
+    Durations? durations,
+    String? arrivalDateTime,
+    String? departureDateTime,
+    String? requestedDateTime,
+    int? duration,
+    List<Section>? sections,
+  }) {
+    return Journey(
+      nbTransfers: nbTransfers ?? this.nbTransfers,
+      durations: durations ?? this.durations,
+      arrivalDateTime: arrivalDateTime ?? this.arrivalDateTime,
+      departureDateTime: departureDateTime ?? this.departureDateTime,
+      requestedDateTime: requestedDateTime ?? this.requestedDateTime,
+      duration: duration ?? this.duration,
+      sections: sections ?? this.sections,
     );
   }
 }

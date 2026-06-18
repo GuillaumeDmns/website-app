@@ -12,11 +12,14 @@ import '../models/navitia/journey.dart';
 import '../models/navitia/journeys.dart';
 import '../models/navitia/place.dart';
 import '../models/navitia/section.dart';
+import '../models/navitia/vehicle_journey.dart';
 import '../services/api_repository.dart';
 import '../services/notification_service.dart';
+import '../services/permission_manager.dart';
 import '../utils/constants.dart' as constants;
 import '../utils/journey_utils.dart';
 import '../utils/location_utils.dart';
+import '../utils/time_utils.dart';
 import '../widgets/main_map.dart';
 import '../widgets/panels/journey_details_panel.dart';
 import '../widgets/panels/search_panel.dart';
@@ -52,6 +55,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   double _totalJourneyDistanceInMeters = 0.0;
   final List<LatLng> _fullJourneyPolyline = [];
   final List<double> _cumulativeDistances = [];
+  final ValueNotifier<double> _panelPositionNotifier = ValueNotifier<double>(0.0);
 
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
@@ -93,6 +97,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _destinationController.dispose();
     _animationController.dispose();
     _mapController.dispose();
+    _panelPositionNotifier.dispose();
     super.dispose();
   }
 
@@ -128,6 +133,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         polylines.clear();
       });
 
+      _panelController.animatePanelToPosition(
+        1.0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
+
       try {
         final journeysResult = await api.getJourneys(
             selectedStartPlace?.id ?? '', selectedDestinationPlace?.id ?? '');
@@ -136,7 +147,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           _isLoadingJourneys = false;
         });
       } catch (e) {
-        print('Erreur lors de la récupération des itinéraires: $e');
+        debugPrint('Erreur lors de la récupération des itinéraires: $e');
         setState(() {
           _isLoadingJourneys = false;
         });
@@ -242,9 +253,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         await LocationUtils.checkAndRequestLocationPermissions(context);
     if (!hasPermission) return;
 
+    if (mounted) {
+      await PermissionManager().requestNotificationPermission(context);
+    }
+
     final locationSettings = LocationUtils.getPlatformLocationSettings();
 
     if (_activeJourney != null) {
+      await _notificationService.requestWebNotificationPermission();
       await _notificationService
           .showJourneyProgressNotification(_activeJourney!);
     }
@@ -335,6 +351,176 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ... inside _MapScreenState
+
+  /// 1. Updates the specific section with new details from the selected VehicleJourney
+  /// 2. Calculates the time difference
+  /// 3. Shifts all subsequent sections by that difference
+  void _onSectionChanged(int sectionIndex, VehicleJourney newVehicleJourney, Section originalSection) {
+    if (_activeJourney == null || _activeJourney!.sections == null) return;
+
+    // 1. Find new times from the selected vehicle journey
+    String? newDepartureTime;
+    String? newArrivalTime;
+
+    // Simple lookup: Find stop time matching the 'from' ID
+    var startStop = newVehicleJourney.stopTimes?.firstWhere(
+          (st) => st.stopPoint?.id == originalSection.from?.stopPoint?.id,
+      orElse: () => newVehicleJourney.stopTimes!.first,
+    );
+
+    // Simple lookup: Find stop time matching the 'to' ID
+    var endStop = newVehicleJourney.stopTimes?.firstWhere(
+          (st) => st.stopPoint?.id == originalSection.to?.stopPoint?.id,
+      orElse: () => newVehicleJourney.stopTimes!.last,
+    );
+
+    newDepartureTime = startStop?.departureTime;
+    newArrivalTime = endStop?.arrivalTime;
+
+    if (newDepartureTime == null || newArrivalTime == null) return;
+
+    DateTime getTrueTime(String timeStr, DateTime ref) {
+      if (timeStr.length == 15) {
+        try {
+          return DateTime.parse(
+              "${timeStr.substring(0, 4)}-${timeStr.substring(4, 6)}-${timeStr.substring(6, 8)} ${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}:${timeStr.substring(13, 15)}");
+        } catch (_) {
+          return ref;
+        }
+      } else if (timeStr.length >= 6) {
+        try {
+          int h = int.parse(timeStr.substring(0, 2));
+          int m = int.parse(timeStr.substring(2, 4));
+          int s = int.parse(timeStr.substring(4, 6));
+
+          int extraDays = h ~/ 24;
+          h = h % 24;
+
+          DateTime constructed = DateTime(ref.year, ref.month, ref.day, h, m, s).add(Duration(days: extraDays));
+          
+          if (extraDays == 0) {
+            if (constructed.difference(ref).inHours > 12) {
+              constructed = constructed.subtract(const Duration(days: 1));
+            } else if (constructed.difference(ref).inHours < -12) {
+              constructed = constructed.add(const Duration(days: 1));
+            }
+          }
+          return constructed;
+        } catch (_) {
+          return ref;
+        }
+      }
+      return ref;
+    }
+
+    setState(() {
+      // 2. Calculate the time shift (Delta)
+      DateTime oldDeparture = TimeUtils.parseNavitiaTime(originalSection.departureDateTime!);
+      DateTime newDepartureParsed = getTrueTime(newDepartureTime!, oldDeparture);
+      Duration shift = newDepartureParsed.difference(oldDeparture);
+
+      // 3. Create a NEW list from the existing sections (mutable copy)
+      List<Section> updatedSections = List.from(_activeJourney!.sections!);
+
+      // 4. Update the target section and all subsequent sections
+      for (int i = sectionIndex; i < updatedSections.length; i++) {
+        Section sec = updatedSections[i];
+
+        String? shiftedDeparture;
+        String? shiftedArrival;
+
+        if (sec.departureDateTime != null) {
+          DateTime sDep = TimeUtils.parseNavitiaTime(sec.departureDateTime!);
+          shiftedDeparture = TimeUtils.formatNavitiaTime(sDep.add(shift));
+        }
+
+        if (sec.arrivalDateTime != null) {
+          DateTime sArr = TimeUtils.parseNavitiaTime(sec.arrivalDateTime!);
+          shiftedArrival = TimeUtils.formatNavitiaTime(sArr.add(shift));
+        }
+
+        var shiftedStops = sec.stopDateTimes?.map((stop) {
+          String? newStopArr;
+          String? newStopDep;
+          if (stop.arrivalDateTime != null) {
+            DateTime arr = TimeUtils.parseNavitiaTime(stop.arrivalDateTime!);
+            newStopArr = TimeUtils.formatNavitiaTime(arr.add(shift));
+          }
+          if (stop.departureDateTime != null) {
+            DateTime dep = TimeUtils.parseNavitiaTime(stop.departureDateTime!);
+            newStopDep = TimeUtils.formatNavitiaTime(dep.add(shift));
+          }
+          return stop.copyWith(
+            arrivalDateTime: newStopArr,
+            departureDateTime: newStopDep,
+          );
+        }).toList();
+
+        updatedSections[i] = sec.copyWith(
+          departureDateTime: shiftedDeparture,
+          arrivalDateTime: shiftedArrival,
+          stopDateTimes: shiftedStops,
+        );
+      }
+
+      String? journeyArrival = _activeJourney!.arrivalDateTime;
+      String? journeyDeparture = _activeJourney!.departureDateTime;
+      int? journeyDuration = _activeJourney!.duration;
+
+      if (journeyArrival != null) {
+        DateTime jArr = TimeUtils.parseNavitiaTime(journeyArrival);
+        journeyArrival = TimeUtils.formatNavitiaTime(jArr.add(shift));
+      }
+      
+      if (sectionIndex == 0 && journeyDeparture != null) {
+         DateTime jDep = TimeUtils.parseNavitiaTime(journeyDeparture);
+         journeyDeparture = TimeUtils.formatNavitiaTime(jDep.add(shift));
+      }
+
+      if (sectionIndex > 0 && journeyDeparture != null && journeyArrival != null) {
+        DateTime jArr = TimeUtils.parseNavitiaTime(journeyArrival);
+        DateTime jDep = TimeUtils.parseNavitiaTime(journeyDeparture);
+        journeyDuration = jArr.difference(jDep).inSeconds;
+      }
+
+      _activeJourney = _activeJourney!.copyWith(
+        sections: updatedSections,
+        arrivalDateTime: journeyArrival,
+        departureDateTime: journeyDeparture,
+        duration: journeyDuration,
+      );
+    });
+  }
+
+  Future<void> _centerOnCurrentLocation() async {
+    if (_currentPosition != null) {
+      _mapController.animateTo(
+        dest: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        zoom: 15,
+      );
+    } else {
+      bool hasPermission = await LocationUtils.checkAndRequestLocationPermissions(
+        context,
+        title: 'Ma position',
+        description: 'Autorisez l\'accès à votre position pour vous situer sur la carte.',
+      );
+      if (!hasPermission || !mounted) return;
+      try {
+        final position = await Geolocator.getCurrentPosition();
+        setState(() {
+          _currentPosition = position;
+        });
+        _mapController.animateTo(
+          dest: LatLng(position.latitude, position.longitude),
+          zoom: 15,
+        );
+      } catch (e) {
+        debugPrint('GPS error: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     BorderRadiusGeometry radius = const BorderRadius.only(
@@ -351,44 +537,74 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     final double parallaxOffset = !isDetailsActive ? 0.5 : 0.0;
 
     return Scaffold(
-      body: SlidingUpPanel(
-        parallaxEnabled: parallaxEnabled,
-        parallaxOffset: parallaxOffset,
-        minHeight: panelMinHeight,
-        maxHeight: panelMaxHeight,
-        isDraggable: isDraggable,
-        controller: _panelController,
-        borderRadius: radius,
-        panelBuilder: (sc) {
-          if (_activeJourney != null) {
-            return JourneyDetailsPanel(
-                sc: sc,
-                journey: _activeJourney!,
-                onReturn: _returnToSearch,
-                onSectionFocused: _fitMapToSection,
-                terminusList: _journeysResponse?.terminus ?? []);
-          } else {
-            return SearchPanel(
-              sc: sc,
-              startController: _startController,
-              destinationController: _destinationController,
-              onStartTap: () => _navigateToSearchScreen(isStart: true),
-              onDestinationTap: () => _navigateToSearchScreen(isStart: false),
-              isLoading: _isLoadingJourneys,
-              showRoutes: _showRoutes,
-              journeysList: _journeysResponse,
-              onJourneySelected: _displayJourneyOnMap,
-            );
-          }
-        },
-        body: MainMap(
-          mapController: _mapController.mapController,
-          polylines: polylines,
-          currentPosition: _currentPosition,
-          animatedLatLng: _animatedLatLng,
-          animatedRadius: _animatedRadius,
-          activeJourney: _activeJourney,
-        ),
+      body: Stack(
+        children: [
+          SlidingUpPanel(
+            color: Theme.of(context).colorScheme.surface,
+            parallaxEnabled: parallaxEnabled,
+            parallaxOffset: parallaxOffset,
+            minHeight: panelMinHeight,
+            maxHeight: panelMaxHeight,
+            isDraggable: isDraggable,
+            controller: _panelController,
+            borderRadius: radius,
+            onPanelSlide: (position) => _panelPositionNotifier.value = position,
+            panelBuilder: (sc) {
+              if (_activeJourney != null) {
+                return JourneyDetailsPanel(
+                  sc: sc,
+                  journey: _activeJourney!,
+                  onReturn: _returnToSearch,
+                  onSectionFocused: _fitMapToSection,
+                  terminusList: _journeysResponse?.terminus ?? [],
+                  onSectionUpdate: (index, vj, section) =>
+                      _onSectionChanged(index, vj, section),
+                );
+              } else {
+                return SearchPanel(
+                  sc: sc,
+                  startController: _startController,
+                  destinationController: _destinationController,
+                  onStartTap: () => _navigateToSearchScreen(isStart: true),
+                  onDestinationTap: () => _navigateToSearchScreen(isStart: false),
+                  isLoading: _isLoadingJourneys,
+                  showRoutes: _showRoutes,
+                  journeysList: _journeysResponse,
+                  onJourneySelected: _displayJourneyOnMap,
+                );
+              }
+            },
+            body: MainMap(
+              mapController: _mapController.mapController,
+              polylines: polylines,
+              currentPosition: _currentPosition,
+              animatedLatLng: _animatedLatLng,
+              animatedRadius: _animatedRadius,
+              activeJourney: _activeJourney,
+            ),
+          ),
+          if (!isDetailsActive)
+            ValueListenableBuilder<double>(
+              valueListenable: _panelPositionNotifier,
+              builder: (context, position, child) {
+                final double currentPanelHeight =
+                    panelMinHeight + (panelMaxHeight - panelMinHeight) * position;
+                return Positioned(
+                  right: 16.0,
+                  bottom: currentPanelHeight + 16.0,
+                  child: child!,
+                );
+              },
+              child: FloatingActionButton.small(
+                onPressed: _centerOnCurrentLocation,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                elevation: 2,
+                tooltip: 'Ma position',
+                child: const Icon(Icons.my_location_rounded),
+              ),
+            ),
+        ],
       ),
     );
   }

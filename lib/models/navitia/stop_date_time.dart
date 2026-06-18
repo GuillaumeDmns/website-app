@@ -11,8 +11,8 @@ class StopDateTime {
 
   final String? baseDepartureDateTime;
 
-  StopDateTime(
-      {this.stopPoint,
+  StopDateTime({
+      this.stopPoint,
       this.arrivalDateTime,
       this.departureDateTime,
       this.baseArrivalDateTime,
@@ -27,6 +27,22 @@ class StopDateTime {
       departureDateTime: json['departureDateTime'] as String?,
       baseArrivalDateTime: json['baseArrivalDateTime'] as String?,
       baseDepartureDateTime: json['baseDepartureDateTime'] as String?,
+    );
+  }
+
+  StopDateTime copyWith({
+    StopPoint? stopPoint,
+    String? arrivalDateTime,
+    String? departureDateTime,
+    String? baseArrivalDateTime,
+    String? baseDepartureDateTime,
+  }) {
+    return StopDateTime(
+      stopPoint: stopPoint ?? this.stopPoint,
+      arrivalDateTime: arrivalDateTime ?? this.arrivalDateTime,
+      departureDateTime: departureDateTime ?? this.departureDateTime,
+      baseArrivalDateTime: baseArrivalDateTime ?? this.baseArrivalDateTime,
+      baseDepartureDateTime: baseDepartureDateTime ?? this.baseDepartureDateTime,
     );
   }
 }

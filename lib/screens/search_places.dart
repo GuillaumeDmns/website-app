@@ -46,11 +46,7 @@ class _SearchPlaceScreenState extends State<SearchPlaceScreen> {
       });
       return;
     }
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     _debouncer.run(() async {
       try {
         final response = await _api.autocompletePlaces(_searchController.text);
@@ -62,48 +58,120 @@ class _SearchPlaceScreenState extends State<SearchPlaceScreen> {
         }
       } catch (e) {
         debugPrint(e.toString());
+        if (mounted) setState(() => _isLoading = false);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: TextField(
           controller: _searchController,
           autofocus: true,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurface,
+              ),
           decoration: InputDecoration(
             hintText: widget.hintText,
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.grey[600]),
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            fillColor: Colors.transparent,
+            filled: false,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  )
+                : null,
           ),
-          style: const TextStyle(color: Colors.black, fontSize: 18),
         ),
       ),
-      body: _buildBody(),
+      body: _buildBody(colorScheme),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ColorScheme colorScheme) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: CircularProgressIndicator(color: colorScheme.primary),
+      );
     }
 
     if (_searchController.text.isNotEmpty && _places.isEmpty) {
-      return const Center(child: Text('No results found.'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 52, color: colorScheme.onSurface.withValues(alpha: 0.25)),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun résultat trouvé',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+            ),
+          ],
+        ),
+      );
     }
 
-    return ListView.builder(
+    if (_places.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_rounded,
+                size: 52, color: colorScheme.onSurface.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(
+              'Entrez une adresse ou un lieu',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
       itemCount: _places.length,
+      separatorBuilder: (_, __) => Divider(
+        height: 1,
+        indent: 56,
+        color: colorScheme.outlineVariant,
+      ),
       itemBuilder: (context, index) {
         final place = _places[index];
         return ListTile(
-          leading: const Icon(Icons.location_on_outlined),
-          title: Text(place.name ?? 'Unknown place'),
-          onTap: () {
-            Navigator.of(context).pop(place);
-          },
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.location_on_rounded,
+                size: 18, color: colorScheme.primary),
+          ),
+          title: Text(
+            place.name ?? 'Lieu inconnu',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w500),
+          ),
+          onTap: () => Navigator.of(context).pop(place),
         );
       },
     );
