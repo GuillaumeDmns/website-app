@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:website_app/models/call_unit.dart';
 import 'package:website_app/models/stops_by_line_dto.dart';
 
-import '../home_widgets/HomeWidgetService.dart';
+import '../home_widgets/home_widget_service.dart';
 import '../services/api_repository.dart';
 import '../widgets/next_departures_card.dart';
 
@@ -24,6 +24,7 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   bool isLoading = false;
 
   Future<void> fetchNextDepartures() async {
+    setState(() => isLoading = true);
     try {
       final response =
           await api.fetchNextDepartures(widget.stop.id!, widget.lineId);
@@ -42,51 +43,84 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
       HomeWidgetService.updateWidgetData(
           widget.lineId, widget.stop.id!, widget.stop.name!, nextDepartures);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching next departures: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e')),
+        );
+      }
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
   @override
   void initState() {
     super.initState();
-    setState(() {
-      isLoading = true;
-    });
     fetchNextDepartures();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.stop.name!),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              widget.stop.name!,
+              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              'Prochains départs',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.55),
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: fetchNextDepartures,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ListView(
-                  children: [
-                    for (var destination in nextDeparturesDestinations)
-                      NextDepartureCard(
+          : nextDeparturesDestinations.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.departure_board_outlined,
+                          size: 48,
+                          color: colorScheme.onSurface.withValues(alpha: 0.3)),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Aucun départ à venir',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: fetchNextDepartures,
+                  color: colorScheme.primary,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: nextDeparturesDestinations.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final destination = nextDeparturesDestinations[index];
+                      return NextDepartureCard(
                         destination: destination,
                         nextDepartures: List.from(nextDepartures
-                            .where((departure) =>
-                                departure.destinationName == destination)
+                            .where((d) => d.destinationName == destination)
                             .toList()),
-                      ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ),
     );
   }
 }

@@ -1,9 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/navitia/journey.dart';
-
 import '../models/navitia/section.dart';
-import 'live_notification_bridge.dart';
 
 class NotificationService {
   static const String _channelId = 'journey_progress_channel';
@@ -13,10 +12,11 @@ class NotificationService {
   static const int _notificationId =
       75415; // Same value as https://github.com/Baseflow/flutter-geolocator/blob/756b8d8015f06ecfcc64b438f71cb3b362b5e350/geolocator_android/android/src/main/java/com/baseflow/geolocator/GeolocatorLocationService.java#L31
 
+  static const MethodChannel _nativeChannel =
+  MethodChannel('com.guillaumedamiens.live_notification/bridge');
+
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
-
-  final LiveNotificationBridge _liveBridge = LiveNotificationBridge();
 
   static final NotificationService _notificationService =
       NotificationService._internal();
@@ -31,35 +31,15 @@ class NotificationService {
 
     final LinuxInitializationSettings initializationSettingsLinux =
         LinuxInitializationSettings(
-            defaultActionName: 'Open notification',
-            defaultIcon: AssetsLinuxIcon('launch_background'));
+            defaultActionName: 'Open App',
+            defaultIcon: ThemeLinuxIcon('network-transmit'));
 
-    final DarwinInitializationSettings darwinInitializationSettings =
+    const DarwinInitializationSettings darwinInitializationSettings =
         DarwinInitializationSettings(
-      requestSoundPermission: true,
+      requestSoundPermission: false,
       requestBadgePermission: true,
       requestAlertPermission: true,
     );
-
-    // For macOS
-    await _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            MacOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-
-    // For macOS
-    await _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
 
     final WindowsInitializationSettings windowsInitializationSettings =
         WindowsInitializationSettings(
@@ -76,20 +56,23 @@ class NotificationService {
             windows: windowsInitializationSettings);
 
     await _notificationsPlugin.initialize(
-      initializationSettings,
+      settings: initializationSettings,
       onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
     );
   }
 
+  Future<void> requestWebNotificationPermission() async {
+    if (kIsWeb) {
+      await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              WebFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
+  }
+
   Future<void> showJourneyProgressNotification(Journey journey) async {
     if (journey.sections == null || journey.sections!.isEmpty) return;
-
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      await _updateJourneyProgress(journey, journey.sections!.first, 0);
-    } else {
-      await _liveBridge.updateJourneyProgress(
-          journey: journey, distanceTraveledMeters: 0, currentSectionIndex: 0);
-    }
+    await updateJourneyProgressNotification(journey, 0, 0, 0);
   }
 
   Future<void> updateJourneyProgressNotification(
@@ -97,26 +80,133 @@ class NotificationService {
       int currentSectionIndex,
       double traveledDistance,
       double totalJourneyDistance) async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      await _updateJourneyProgress(journey, journey.sections!.first, 0);
-    } else {
-      if (journey.sections == null ||
-          journey.sections!.length <= currentSectionIndex) {
-        return;
-      }
+      
+    final sections = journey.sections!;
+    if (sections.length <= currentSectionIndex) return;
 
-      await _liveBridge.updateJourneyProgress(
+    Section? currentSection = sections[currentSectionIndex];
+    String currentMode = _getSectionMode(currentSection);
+
+    int remainingSeconds = 0;
+    for (int i = currentSectionIndex; i < sections.length; i++) {
+      remainingSeconds += sections[i].duration ?? 0;
+    }
+    String remainingTimeStr = "${(remainingSeconds / 60).ceil()} min";
+
+    String chipText = _generateShortChipText(currentSection, remainingTimeStr);
+    String longInfo = _generateLongInfoText(currentSection, remainingTimeStr);
+    String destName = sections.lastWhere((s) => s.to?.name != null, orElse: () => sections.last).to?.name ?? 'Destination';
+    String title = "Trip to $destName";
+    String status = "Remaining: $remainingTimeStr • ${_buildStatusText(traveledDistance)}";
+    int remainingMinutes = (remainingSeconds / 60).ceil();
+
+    String subtitle = _generateSubtitle(currentSection);
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _updateAndroidNativeNotification(
         journey: journey,
-        distanceTraveledMeters: traveledDistance,
+        sections: sections,
         currentSectionIndex: currentSectionIndex,
+        currentSection: currentSection,
+        currentMode: currentMode,
+        distanceTraveledMeters: traveledDistance,
+        remainingTimeStr: remainingTimeStr,
+        chipText: chipText,
+        longInfo: longInfo,
+        title: title,
+        status: status,
+      );
+    } else {
+      await _updateCrossPlatformNotification(
+        title: title,
+        subtitle: subtitle,
+        contentText: "$chipText • $status",
+        traveledPercentage: totalJourneyDistance > 0 ? ((traveledDistance / totalJourneyDistance) * 100).toInt() : 0,
+        remainingMinutes: remainingMinutes,
+        chipText: chipText,
+        destName: destName,
+        remainingTimeStr: remainingTimeStr,
       );
     }
   }
 
-  Future<void> _updateJourneyProgress(
-      Journey journey, Section currentSection, int traveledPercentage) async {
-    final String contentText = _formatSectionText(currentSection);
+  Future<void> cancelJourneyNotification() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _nativeChannel.invokeMethod('stopNotification');
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    }
+    await _notificationsPlugin.cancel(id: _notificationId);
+  }
 
+  Future<void> _updateAndroidNativeNotification({
+    required Journey journey,
+    required List<Section> sections,
+    required int currentSectionIndex,
+    required Section currentSection,
+    required String currentMode,
+    required double distanceTraveledMeters,
+    required String remainingTimeStr,
+    required String chipText,
+    required String longInfo,
+    required String title,
+    required String status,
+  }) async {
+    final segmentsPayload = sections
+        .where((s) =>
+            !["crow_fly", "waiting", "transfer", "street_network"].contains(s.type) &&
+            s.mode != "walking" &&
+            (s.geojson?.properties?[0].length ?? 0) > 0)
+        .map((section) {
+      return {
+        'length': section.geojson?.properties?[0].length ?? 0,
+        'color': _getHexColorForSection(section),
+        'type': section.type ?? 'unknown',
+      };
+    }).toList();
+
+    String mainColor = "#050A11";
+    for (int i = currentSectionIndex; i < sections.length; i++) {
+      Section s = sections[i];
+      String mode = _getSectionMode(s);
+      if (mode != "default" && mode != "walking" && mode != "transfer" && s.type != "waiting" && s.type != "crow_fly") {
+        String secColor = _getHexColorForSection(s);
+        if (secColor != "#D3D3D3" && secColor != "#A0A0A0") {
+          mainColor = secColor;
+          break;
+        }
+      }
+    }
+
+    try {
+      await _nativeChannel.invokeMethod('updateJourney', {
+        'title': title,
+        'status': status,
+        'progress': distanceTraveledMeters.toInt(),
+        'currentMode': currentMode,
+        'mainColor': mainColor,
+        'remainingTime': remainingTimeStr,
+        'chipText': chipText,
+        'longInfo': longInfo,
+        'segments': segmentsPayload,
+      });
+    } on PlatformException catch (e) {
+      debugPrint("Bridge Error: ${e.message}");
+    }
+  }
+
+  Future<void> _updateCrossPlatformNotification({
+    required String title,
+    required String subtitle,
+    required String contentText,
+    required int traveledPercentage,
+    required int remainingMinutes,
+    required String chipText,
+    required String destName,
+    required String remainingTimeStr,
+  }) async {
     final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       _channelId,
@@ -132,59 +222,165 @@ class NotificationService {
       onlyAlertOnce: true,
     );
 
+    final DarwinNotificationDetails appleDetails = DarwinNotificationDetails(
+      subtitle: subtitle,
+      threadIdentifier: _channelName,
+      badgeNumber: remainingMinutes > 0 ? remainingMinutes : null,
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: false,
+    );
+
+    final windowsDetails = WindowsNotificationDetails(
+      progressBars: <WindowsProgressBar>[
+        WindowsProgressBar(
+          id: _channelName,
+          title: chipText,
+          status: remainingTimeStr,
+          value: traveledPercentage / 100,
+        )
+      ],
+      actions: <WindowsAction>[
+        WindowsAction(
+          content: 'Open App',
+          arguments: 'open_app',
+          activationType: WindowsActivationType.foreground,
+          activationBehavior: WindowsNotificationBehavior.dismiss,
+        ),
+      ],
+      scenario: WindowsNotificationScenario.reminder,
+    );
+
     final LinuxNotificationDetails linuxDetails = LinuxNotificationDetails(
       urgency: LinuxNotificationUrgency.normal,
       category: LinuxNotificationCategory.device,
       resident: true,
       suppressSound: true,
       timeout: const LinuxNotificationTimeout.expiresNever(),
+      actions: <LinuxNotificationAction>[
+        const LinuxNotificationAction(
+          key: 'open',
+          label: 'Open App',
+        ),
+      ],
     );
 
-    final appleDetails =
-        DarwinNotificationDetails(threadIdentifier: _channelName);
-
-    final windowsDetails =
-        WindowsNotificationDetails(progressBars: <WindowsProgressBar>[
-      WindowsProgressBar(
-          id: _channelName,
-          status: 'Progress...',
-          value: traveledPercentage / 100)
-    ]);
+    const WebNotificationDetails webDetails = WebNotificationDetails(
+      requireInteraction: true,
+      isSilent: true,
+    );
 
     final NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        linux: linuxDetails,
-        macOS: appleDetails,
-        iOS: appleDetails,
-        windows: windowsDetails);
+      android: androidDetails,
+      linux: linuxDetails,
+      macOS: appleDetails,
+      iOS: appleDetails,
+      windows: windowsDetails,
+      web: webDetails,
+    );
 
     await _notificationsPlugin.show(
-      _notificationId,
-      'Journey to ${journey.sections?.last.to?.name ?? 'Destination'}',
-      contentText,
-      notificationDetails,
+      id: _notificationId,
+      title: title,
+      body: contentText,
+      notificationDetails: notificationDetails,
     );
   }
 
-  Future<void> cancelJourneyNotification() async {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      await _liveBridge.stop();
+  String _generateSubtitle(Section? section) {
+    if (section == null) return '';
+    if (section.mode == 'walking' || section.type == 'street_network') {
+      final dest = section.to?.name;
+      return dest != null ? 'Walk to $dest' : 'Walking';
     }
-    await _notificationsPlugin.cancel(_notificationId);
+    if (section.type == 'transfer') return 'Transfer';
+    if (section.displayInformations != null) {
+      final mode = section.displayInformations!.commercialMode ?? '';
+      final code = section.displayInformations!.code ?? '';
+      final direction = section.displayInformations?.direction ?? '';
+      if (direction.isNotEmpty) {
+        return '$mode $code → $direction';
+      }
+      return '$mode $code';
+    }
+    return '';
   }
 
-  String _formatSectionText(Section section) {
-    final type = section.type ?? 'street_network';
-    if (type == 'public_transport') {
-      final mode = section.displayInformations?.commercialMode ?? '';
-      final line = section.displayInformations?.label ?? '';
-      final direction = section.displayInformations?.direction ?? '';
-      return '$mode $line towards $direction';
-    } else if (type == 'street_network') {
-      final mode = section.mode == 'walking' ? 'Walk' : 'Ride';
-      return '$mode to ${section.to?.name ?? 'next stop'}';
+  String _generateShortChipText(Section section, String timeStr) {
+    String currentMode = _getSectionMode(section);
+    String code = section.displayInformations?.code ?? "";
+
+    switch (currentMode) {
+      case 'RER':
+        return "RER $code";
+      case 'Train Transilien':
+      case 'Train':
+        return "Train $code";
+      case 'TER':
+        return "TER";
+      case 'Métro':
+      case 'Metro':
+        return "Metro $code";
+      case 'Tramway':
+      case 'Tram':
+        return "Tram $code";
+      case 'Bus':
+      case 'public_transport':
+      case 'vehicle':
+        return "Bus $code";
+      case 'transfer':
+        return "Transfer";
+      case 'crow_fly':
+        return "Crowfly";
+      case 'waiting':
+        return "Wait";
+      case 'walking':
+      case 'street_network':
+        return 'Walk';
+      default:
+        return timeStr.replaceAll(" min", "'");
     }
-    return 'Proceed to next step';
+  }
+
+  String _generateLongInfoText(Section section, String timeStr) {
+    String modePart = "";
+    if (section.mode == "walking" || section.type == "street_network") {
+      modePart = "Walk";
+    } else if (section.displayInformations != null) {
+      modePart =
+          "${section.displayInformations!.commercialMode} ${section.displayInformations!.code}";
+    } else if (section.type == "transfer") {
+      modePart = "Transfer";
+    }
+
+    if (modePart.isNotEmpty) {
+      return "$modePart • $timeStr";
+    }
+    return timeStr;
+  }
+
+  String _getHexColorForSection(Section section) {
+    if (section.displayInformations?.color != null && section.displayInformations!.color!.isNotEmpty) {
+      return "#${section.displayInformations!.color}";
+    }
+    if (section.type == "street_network" || section.type == "transfer" || section.mode == "walking") {
+      return "#A0A0A0"; 
+    }
+    return "#D3D3D3";
+  }
+
+  String _buildStatusText(double distTraveled) {
+    String distStr = (distTraveled > 1000)
+        ? "${(distTraveled / 1000).toStringAsFixed(1)} km"
+        : "${distTraveled.toInt()} m";
+    return "Traveled: $distStr";
+  }
+
+  String _getSectionMode(Section section) {
+    return section.displayInformations?.commercialMode ??
+        section.mode ??
+        section.type ??
+        "default";
   }
 
   static void onDidReceiveLocalNotification(

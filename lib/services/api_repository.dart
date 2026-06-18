@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_interceptor/http/intercepted_client.dart';
+import 'package:http_interceptor/http_interceptor.dart';
 import 'package:website_app/models/navitia/journeys.dart';
+import 'package:website_app/models/navitia/vehicle_journeys.dart';
 import 'dart:convert';
 
 import '../models/lines_response.dart';
@@ -12,7 +12,7 @@ import '../models/unit_idfm_dto.dart';
 import 'api_interceptor.dart';
 
 const String _baseUrl =
-    kDebugMode ? 'http://localhost:8080' : 'https://guillaumedamiens.com';
+     'https://guillaumedamiens.com';
 
 class ApiRepository {
   http.Client client = InterceptedClient.build(interceptors: [
@@ -102,6 +102,21 @@ class ApiRepository {
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return JourneysResponse.fromJson(json);
+    } else {
+      throw Exception('Failed to get journeys');
+    }
+  }
+
+  Future<VehicleJourneys> getVehiclesJourneys(
+      String stopPointId, String since, String until) async {
+    final response = await client.get(
+      Uri.parse(
+          '$_baseUrl/api/stop/$stopPointId/journeys?since=$since&until=$until'),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return VehicleJourneys.fromJson(json);
     } else {
       throw Exception('Failed to get journeys');
     }

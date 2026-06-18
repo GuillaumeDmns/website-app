@@ -40,35 +40,36 @@ class Route {
     return Route(
       id: json['id'] as String?,
       name: json['name'] as String?,
-      isFrequence: json['isFrequence'] as IsFrequenceEnum?,
+      isFrequence: json['isFrequence'] != null
+          ? IsFrequenceEnum.values.firstWhere(
+              (e) => e.value == json['isFrequence'].toString(),
+              orElse: () => IsFrequenceEnum.false_,
+            )
+          : null,
       directionType: json['directionType'] as String?,
-      physicalModes: (json['physicalModes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((mode) => PhysicalMode.fromJson(mode)))
+      physicalModes: (json['physicalModes'] as List?)
+          ?.map((e) => PhysicalMode.fromJson(e as Map<String, dynamic>))
           .toList(),
-      comments: (json['comments'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((comment) => Comment.fromJson(comment)))
+      comments: (json['comments'] as List?)
+          ?.map((e) => Comment.fromJson(e as Map<String, dynamic>))
           .toList(),
-      codes: (json['codes'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((code) => Code.fromJson(code)))
+      codes: (json['codes'] as List?)
+          ?.map((e) => Code.fromJson(e as Map<String, dynamic>))
           .toList(),
-      direction: Place.fromJson(json['direction']),
-      geojson: MultiLineStringSchema.fromJson(json['geojson']),
-      links: (json['links'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((link) => LinkSchema.fromJson(link)))
+      direction: json['direction'] != null
+          ? Place.fromJson(json['direction'] as Map<String, dynamic>)
+          : null,
+      geojson: json['geojson'] != null
+          ? MultiLineStringSchema.fromJson(json['geojson'] as Map<String, dynamic>)
+          : null,
+      links: (json['links'] as List?)
+          ?.map((e) => LinkSchema.fromJson(e as Map<String, dynamic>))
           .toList(),
-      line: Line.fromJson(json['line']),
-      stopPoints: (json['stopPoints'] as Map<String, dynamic>)
-          .entries
-          .expand((entry) =>
-              (entry.value as List).map((stop) => StopPoint.fromJson(stop)))
+      line: json['line'] != null
+          ? Line.fromJson(json['line'] as Map<String, dynamic>)
+          : null,
+      stopPoints: (json['stopPoints'] as List?)
+          ?.map((e) => StopPoint.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }

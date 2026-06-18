@@ -5,7 +5,8 @@ import 'package:website_app/app_settings.dart';
 import 'package:website_app/screens/auth_wrapper.dart';
 import 'package:website_app/screens/home.dart';
 import 'package:website_app/screens/map.dart';
-import 'home_widgets/HomeWidgetService.dart';
+import 'package:website_app/utils/app_theme.dart';
+import 'home_widgets/home_widget_service.dart';
 import 'screens/login.dart';
 
 void main() async {
@@ -25,14 +26,9 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Guillaume Damiens',
-      theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent),
-          useMaterial3: true,
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: <TargetPlatform, PageTransitionsBuilder>{
-              TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-            },
-          )),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       home: const AuthWrapperScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),

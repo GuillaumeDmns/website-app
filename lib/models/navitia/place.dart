@@ -56,7 +56,7 @@ class Place {
           json['address'] != null ? Address.fromJson(json['address']) : null,
       poi: json['poi'] != null ? Poi.fromJson(json['poi']) : null,
       distance: json['distance'] as String?,
-      accessPoint: json['poi'] != null ? Pathway.fromJson(json['poi']) : null,
+      accessPoint: json['accessPoint'] != null ? Pathway.fromJson(json['accessPoint']) : null,
     );
   }
 }
