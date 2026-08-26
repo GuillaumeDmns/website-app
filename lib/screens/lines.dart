@@ -35,6 +35,9 @@ class _LinesScreenState extends State<LinesScreen> with SingleTickerProviderStat
 
   List<LineDTO> lines = [];
   bool _isLoading = true;
+  bool _hasError = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
   final api = ApiRepository();
   late TabController _tabController;
 
@@ -47,19 +50,31 @@ class _LinesScreenState extends State<LinesScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
   Future<void> fetchLines() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
       final response = await api.fetchLines();
-      setState(() {
-        lines = response.lines;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          lines = response.lines;
+          _isLoading = false;
+        });
+      }
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
 
@@ -70,39 +85,97 @@ class _LinesScreenState extends State<LinesScreen> with SingleTickerProviderStat
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lignes & arrêts'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabAlignment: TabAlignment.start,
-          isScrollable: true,
-          dividerColor: colorScheme.outlineVariant,
-          indicatorColor: colorScheme.primary,
-          indicatorWeight: 3,
-          labelColor: colorScheme.primary,
-          unselectedLabelColor: colorScheme.onSurface.withValues(alpha: 0.55),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-          tabs: transportModes
-              .map((mode) => Tab(text: _modeLabels[mode] ?? mode))
-              .toList(),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(104),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: SizedBox(
+                  height: 44,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher une ligne...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                      fillColor: colorScheme.surfaceContainerHighest,
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                tabAlignment: TabAlignment.start,
+                isScrollable: true,
+                dividerColor: colorScheme.outlineVariant,
+                indicatorColor: colorScheme.primary,
+                indicatorWeight: 3,
+                labelColor: colorScheme.primary,
+                unselectedLabelColor: colorScheme.onSurface.withValues(alpha: 0.55),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                tabs: transportModes
+                    .map((mode) => Tab(text: _modeLabels[mode] ?? mode))
+                    .toList(),
+              ),
+            ],
+          ),
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: transportModes.map((String mode) {
-                return LineList(
-                  selectedMode: mode,
-                  lines: lines,
-                  onLineSelected: (line) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => StopsScreen(line: line)),
-                    );
-                  },
-                );
-              }).toList(),
-            ),
+          : _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off_rounded, size: 48, color: colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Erreur de chargement des lignes',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: fetchLines,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: fetchLines,
+                  color: colorScheme.primary,
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: transportModes.map((String mode) {
+                      return LineList(
+                        selectedMode: mode,
+                        searchQuery: _searchQuery,
+                        lines: lines,
+                        onLineSelected: (line) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => StopsScreen(line: line),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
     );
   }
 }

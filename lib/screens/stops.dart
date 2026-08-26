@@ -19,12 +19,16 @@ class _StopsScreenState extends State<StopsScreen> {
   final api = ApiRepository();
   List<IDFMStopArea> stops = [];
   bool isLoading = false;
+  String searchQuery = '';
+  final _searchController = TextEditingController();
 
   Future<void> fetchStops() async {
     setState(() => isLoading = true);
     try {
       final response = await api.fetchStopsAndShape(widget.line.id!);
-      setState(() => stops = response.stops);
+      if (mounted) {
+        setState(() => stops = response.stops);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -32,7 +36,9 @@ class _StopsScreenState extends State<StopsScreen> {
         );
       }
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -43,9 +49,21 @@ class _StopsScreenState extends State<StopsScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final filteredStops = stops.where((stop) {
+      if (searchQuery.trim().isEmpty) return true;
+      final name = (stop.name ?? '').toLowerCase();
+      return name.contains(searchQuery.trim().toLowerCase());
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -65,9 +83,34 @@ class _StopsScreenState extends State<StopsScreen> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SizedBox(
+              height: 44,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un arrêt...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                  fillColor: colorScheme.surfaceContainerHighest,
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => searchQuery = '');
+                          },
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
           if (isLoading) LinearProgressIndicator(color: colorScheme.primary),
           Expanded(
-            child: stops.isEmpty && !isLoading
+            child: filteredStops.isEmpty && !isLoading
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -76,63 +119,78 @@ class _StopsScreenState extends State<StopsScreen> {
                             size: 44,
                             color: colorScheme.onSurface.withValues(alpha: 0.3)),
                         const SizedBox(height: 12),
-                        Text('Aucun arrêt trouvé',
-                            style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.5))),
+                        Text(
+                          searchQuery.isNotEmpty
+                              ? 'Aucun arrêt trouvé pour "$searchQuery"'
+                              : 'Aucun arrêt trouvé',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
                       ],
                     ),
                   )
-                : ListView.separated(
-                    itemCount: stops.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      indent: 70,
-                      color: colorScheme.outlineVariant,
+                : RefreshIndicator(
+                    onRefresh: fetchStops,
+                    color: colorScheme.primary,
+                    child: ListView.separated(
+                      itemCount: filteredStops.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        indent: 70,
+                        color: colorScheme.outlineVariant,
+                      ),
+                      itemBuilder: (context, index) {
+                        final stop = filteredStops[index];
+                        final stopName = stop.name ?? 'Arrêt inconnu';
+                        final initial = stopName.isNotEmpty
+                            ? stopName[0].toUpperCase()
+                            : '?';
+
+                        return ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                initial,
+                                style: textTheme.titleSmall?.copyWith(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            stopName,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: colorScheme.onSurface.withValues(alpha: 0.4),
+                          ),
+                          onTap: () {
+                            if (widget.line.id != null && stop.id != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NextDeparturesScreen(
+                                    lineId: widget.line.id!,
+                                    stop: stop,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
                     ),
-                    itemBuilder: (context, index) {
-                      final stop = stops[index];
-                      return ListTile(
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              stop.name![0].toUpperCase(),
-                              style: textTheme.titleSmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          stop.name!,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.onSurface.withValues(alpha: 0.4),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => NextDeparturesScreen(
-                                lineId: widget.line.id!,
-                                stop: stop,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
                   ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 class AuthUtils {
   static bool isTokenExpired(String? token) {
@@ -10,7 +11,7 @@ class AuthUtils {
       final expiryTime = DateTime.fromMillisecondsSinceEpoch(decodedToken['exp'] * 1000);
       return DateTime.now().isAfter(expiryTime);
     } catch (e) {
-      print('Erreur lors de la vérification du token : $e');
+      debugPrint('Erreur lors de la vérification du token : $e');
       return true;
     }
   }

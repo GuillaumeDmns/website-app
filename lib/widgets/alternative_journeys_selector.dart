@@ -323,8 +323,9 @@ class _AlternativeVehicleSelectorState
                                         }
                                       }
 
-                                      if (sub.isEmpty)
+                                      if (sub.isEmpty) {
                                         return const SizedBox.shrink();
+                                      }
                                       return Text(
                                         sub.join(' • '),
                                         maxLines: 1,

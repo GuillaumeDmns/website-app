@@ -15,20 +15,25 @@ class TimeUtils {
   }
 
   static String formatTimeRelativeToNow(String? timestamp) {
-    if (timestamp == null) return 'N/A';
+    if (timestamp == null) return '';
 
     final departureTime = DateTime.tryParse(timestamp);
-    if (departureTime == null) return 'N/A';
+    if (departureTime == null) return '';
 
     final now = DateTime.now();
     final difference = departureTime.difference(now);
 
-    if (difference.inMinutes < 1) {
-      return 'Now';
-    } else if (difference.inMinutes < 60) {
-      return 'in ${difference.inMinutes} min';
+    if (difference.inSeconds <= 45 && difference.inSeconds >= -45) {
+      return "À quai";
+    } else if (difference.inMinutes >= 0 && difference.inMinutes < 60) {
+      final mins = difference.inMinutes;
+      return mins == 0 ? "À l'approche" : "dans $mins min";
+    } else if (difference.inMinutes >= 60) {
+      final hours = difference.inHours;
+      final mins = difference.inMinutes % 60;
+      return mins > 0 ? "dans ${hours}h${mins}min" : "dans ${hours}h";
     } else {
-      return 'in ${difference.inHours} h ${difference.inMinutes % 60} min';
+      return "Départ effectif";
     }
   }
 
