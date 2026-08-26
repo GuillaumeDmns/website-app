@@ -1,61 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/next_departures_background"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="0dp">
 
+    <!-- ═══ HEADER ═══ -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/widget_header_bg"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp">
+
+        <!-- Station icon badge -->
+        <ImageView
+            android:id="@+id/iv_transport_icon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/widget_station_badge_bg"
+            android:contentDescription="Transport"
+            android:padding="4dp"
+            android:src="@drawable/ic_bus" />
+
+        <!-- Station name -->
+        <TextView
+            android:id="@+id/tv_stop_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="8dp"
+            android:layout_toStartOf="@+id/btn_refresh"
+            android:layout_toEndOf="@+id/iv_transport_icon"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.02"
+            android:maxLines="1"
+            android:text="Station"
+            android:textColor="#F0F0F5"
+            android:textSize="14sp" />
+
+        <!-- Refresh button -->
+        <FrameLayout
+            android:id="@+id/btn_refresh"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/widget_refresh_btn_bg"
+            android:clickable="true"
+            android:contentDescription="Actualiser"
+            android:focusable="true"
+            android:padding="6dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Actualiser"
+                android:src="@drawable/ic_refresh" />
+        </FrameLayout>
+    </RelativeLayout>
+
+    <!-- ═══ DEPARTURES GRID (2 Columns x 2 Rows) ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingStart="10dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="2dp">
+
+        <!-- Row Grid 1 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:orientation="horizontal">
+
+            <!-- Col 1, Row 1 (Departure 1) -->
+            <LinearLayout
+                android:id="@+id/departure_row_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:background="@drawable/widget_departure_row_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="4dp"
+                    android:contentDescription="Heure"
+                    android:src="@drawable/ic_clock" />
+
+                <TextView
+                    android:id="@+id/tv_time_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="#667EEA"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="2dp"
+                    android:contentDescription="Direction"
+                    android:src="@drawable/ic_arrow_right" />
+
+                <TextView
+                    android:id="@+id/tv_dest_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#C8C8D8"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Col 2, Row 1 (Departure 2) -->
+            <LinearLayout
+                android:id="@+id/departure_row_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_departure_row_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="4dp"
+                    android:contentDescription="Heure"
+                    android:src="@drawable/ic_clock" />
+
+                <TextView
+                    android:id="@+id/tv_time_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="#667EEA"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="2dp"
+                    android:contentDescription="Direction"
+                    android:src="@drawable/ic_arrow_right" />
+
+                <TextView
+                    android:id="@+id/tv_dest_2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#C8C8D8"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Row Grid 2 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <!-- Col 1, Row 2 (Departure 3) -->
+            <LinearLayout
+                android:id="@+id/departure_row_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:background="@drawable/widget_departure_row_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="4dp"
+                    android:contentDescription="Heure"
+                    android:src="@drawable/ic_clock" />
+
+                <TextView
+                    android:id="@+id/tv_time_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="#667EEA"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="2dp"
+                    android:contentDescription="Direction"
+                    android:src="@drawable/ic_arrow_right" />
+
+                <TextView
+                    android:id="@+id/tv_dest_3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#C8C8D8"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Col 2, Row 2 (Departure 4) -->
+            <LinearLayout
+                android:id="@+id/departure_row_4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_departure_row_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="4dp"
+                    android:contentDescription="Heure"
+                    android:src="@drawable/ic_clock" />
+
+                <TextView
+                    android:id="@+id/tv_time_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="#667EEA"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="2dp"
+                    android:contentDescription="Direction"
+                    android:src="@drawable/ic_arrow_right" />
+
+                <TextView
+                    android:id="@+id/tv_dest_4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#C8C8D8"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Status message (shown when no structured data) -->
+        <TextView
+            android:id="@+id/tv_status_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="Chargement..."
+            android:textColor="#8888A0"
+            android:textSize="12sp"
+            android:visibility="visible" />
+    </LinearLayout>
+
+    <!-- ═══ FOOTER ═══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
         android:paddingBottom="8dp">
 
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginEnd="8dp"
-            android:contentDescription="Bus"
-            android:src="@drawable/ic_bus" />
-
+        <!-- Last updated timestamp -->
         <TextView
-            android:id="@+id/tv_stop_name"
+            android:id="@+id/tv_last_updated"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Station"
-            android:textColor="#111111"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:fontFamily="sans-serif"
+            android:text="Mis à jour : --:--"
+            android:textColor="#55556B"
+            android:textSize="9sp" />
 
-        <ImageView
-            android:id="@+id/btn_refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Actualiser"
-            android:padding="4dp"
-            android:src="@drawable/ic_refresh" />
+        <!-- Open app button -->
+        <LinearLayout
+            android:id="@+id/btn_open_app"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_open_app_btn_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="Ouvrir"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp" />
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="3dp"
+                android:contentDescription="Ouvrir"
+                android:src="@drawable/ic_open_app" />
+        </LinearLayout>
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/separator"
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginBottom="8dp"
-        android:alpha="0.2"
-        android:src="@android:color/darker_gray" />
-
-    <TextView
-        android:id="@+id/tv_departures"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fontFamily="sans-serif"
-        android:lineSpacingExtra="6dp"
-        android:text="Chargement..."
-        android:textColor="#444444"
-        android:textSize="14sp" />
 </LinearLayout>

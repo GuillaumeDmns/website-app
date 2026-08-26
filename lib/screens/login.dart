@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,7 +6,6 @@ import 'package:local_auth/local_auth.dart';
 import 'package:website_app/services/api_repository.dart';
 import 'package:website_app/utils/app_theme.dart';
 import 'package:website_app/utils/auth_utils.dart';
-
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,25 +56,33 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _checkSupportAndAutoLogin() async {
     bool canCheckBiometrics = false;
-    try {
+
+    if (!Platform.isLinux && !Platform.isWindows) {
       canCheckBiometrics =
           await _auth.isDeviceSupported() || await _auth.canCheckBiometrics;
-    } on PlatformException catch (e) {
-      debugPrint("Erreur lors de la vérification du support : $e");
+    } else {
       canCheckBiometrics = false;
     }
 
     if (!mounted) return;
     setState(() => _canCheckBiometrics = canCheckBiometrics);
 
-    if (_canCheckBiometrics) {
+    // Sur desktop: auto-login avec token, sinon afficher formulaire
+    if (!_canCheckBiometrics) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final token = await _storage.read(key: 'jwt');
+        if (token != null && !AuthUtils.isTokenExpired(token)) {
+          if (mounted) Navigator.pushReplacementNamed(context, '/home');
+        }
+      });
+    } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkForBiometricLogin();
       });
     }
   }
 
-  Future<void> _login(BuildContext context) async {
+  Future<void> _login() async {
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       return;
     }
@@ -90,8 +98,10 @@ class _LoginScreenState extends State<LoginScreen>
     if (loginSuccess) {
       await _storage.write(key: 'username', value: _usernameController.text);
       await _storage.write(key: 'password', value: _passwordController.text);
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Identifiants incorrects')),
       );
@@ -121,7 +131,8 @@ class _LoginScreenState extends State<LoginScreen>
           errorMessage = "Biométrie non disponible ou non configurée";
           break;
         case LocalAuthExceptionCode.temporaryLockout:
-          errorMessage = "Trop de tentatives, biométrie temporairement verrouillée";
+          errorMessage =
+              "Trop de tentatives, biométrie temporairement verrouillée";
           break;
         case LocalAuthExceptionCode.biometricLockout:
           errorMessage = "Biométrie désactivée, utilisez le mot de passe";
@@ -135,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen>
           errorMessage = "Erreur biométrique : ${e.description ?? 'Inconnue'}";
       }
 
-      if (shouldShowError) {
+      if (shouldShowError && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),
         );
@@ -221,10 +232,11 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 24),
                     Text(
                       'Bienvenue',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -251,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen>
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _login(context),
+                      onSubmitted: (_) => _login(),
                       decoration: InputDecoration(
                         hintText: 'Mot de passe',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -262,8 +274,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
@@ -278,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen>
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: () => _login(context),
+                          onPressed: _login,
                           child: const Text('Se connecter'),
                         ),
                       ),
@@ -288,20 +300,25 @@ class _LoginScreenState extends State<LoginScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: Divider(color: colorScheme.outline.withValues(alpha: 0.5)),
+                            child: Divider(
+                                color:
+                                    colorScheme.outline.withValues(alpha: 0.5)),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
                               'ou',
                               style: TextStyle(
-                                color: colorScheme.onSurface.withValues(alpha: 0.45),
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.45),
                                 fontSize: 13,
                               ),
                             ),
                           ),
                           Expanded(
-                            child: Divider(color: colorScheme.outline.withValues(alpha: 0.5)),
+                            child: Divider(
+                                color:
+                                    colorScheme.outline.withValues(alpha: 0.5)),
                           ),
                         ],
                       ),

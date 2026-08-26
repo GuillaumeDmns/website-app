@@ -18,6 +18,8 @@ class HomeWidgetService {
     await _saveWidgetConfig(lineId, stopId, stopName);
     await HomeWidget.saveWidgetData<String>(
         'departures_list', "Appuyez pour charger");
+    // Clear structured data so widget shows the status message
+    await HomeWidget.saveWidgetData<String?>('departures_json', null);
     await HomeWidget.updateWidget(
         name: _androidWidgetName, androidName: _androidWidgetName);
   }
@@ -27,19 +29,35 @@ class HomeWidgetService {
 
     await _saveWidgetConfig(lineId, stopId, stopName);
 
-    String formattedDepartures;
+    // Update timestamp
+    final now = DateTime.now();
+    final timestamp = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    await HomeWidget.saveWidgetData<String>('last_updated', timestamp);
+
     if (departures.isEmpty) {
-      formattedDepartures = "Aucun départ prévu";
+      await HomeWidget.saveWidgetData<String>(
+          'departures_list', "Aucun départ prévu");
+      await HomeWidget.saveWidgetData<String?>('departures_json', null);
     } else {
-      formattedDepartures = departures.take(4).map((d) {
+      // Build structured data: "HH:MM|Destination||HH:MM|Destination||..."
+      final structured = departures.take(4).map((d) {
+        String time = d.expectedDepartureTime?.substring(11, 16) ?? "--:--";
+        String direction = d.destinationName ?? "";
+        return "$time|$direction";
+      }).join('||');
+
+      await HomeWidget.saveWidgetData<String>('departures_json', structured);
+
+      // Keep legacy format as fallback
+      String formattedDepartures = departures.take(4).map((d) {
         String time = d.expectedDepartureTime?.substring(11, 16) ?? "--:--";
         String direction = d.destinationName ?? "";
         return "🕒 $time  ➜ $direction";
       }).join('\n');
-    }
 
-    await HomeWidget.saveWidgetData<String>(
-        'departures_list', formattedDepartures);
+      await HomeWidget.saveWidgetData<String>(
+          'departures_list', formattedDepartures);
+    }
 
     await HomeWidget.updateWidget(
       name: _androidWidgetName,
@@ -53,6 +71,7 @@ Future<void> refreshCallback(Uri? uri) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await HomeWidget.saveWidgetData<String>('departures_list', "Chargement en cours...");
+  await HomeWidget.saveWidgetData<String?>('departures_json', null);
   await HomeWidget.updateWidget(name: 'NextDepartures', androidName: 'NextDepartures');
 
   try {
@@ -62,6 +81,7 @@ Future<void> refreshCallback(Uri? uri) async {
 
     if (stopId == null || lineId == null) {
       await HomeWidget.saveWidgetData<String>('departures_list', "Ouvrez l'app pour configurer un arrêt");
+      await HomeWidget.saveWidgetData<String?>('departures_json', null);
       await HomeWidget.updateWidget(name: 'NextDepartures', androidName: 'NextDepartures');
       return;
     }
@@ -73,6 +93,7 @@ Future<void> refreshCallback(Uri? uri) async {
 
   } catch (e) {
     await HomeWidget.saveWidgetData<String>('departures_list', "Erreur de connexion");
+    await HomeWidget.saveWidgetData<String?>('departures_json', null);
     await HomeWidget.updateWidget(name: 'NextDepartures', androidName: 'NextDepartures');
   }
 }

@@ -14,10 +14,12 @@ class PermissionManager {
     String? description,
   }) async {
     PermissionStatus status = await Permission.location.status;
+    if (!context.mounted) return false;
 
     if (status.isGranted) return true;
 
     if (status.isPermanentlyDenied) {
+      if (!context.mounted) return false;
       return await _showPermanentlyDeniedDialog(
         context,
         'Localisation désactivée',
@@ -33,6 +35,8 @@ class PermissionManager {
       description: description ??
           'Nous avons besoin de votre position pour vous guider tout au long de votre itinéraire et vous alerter en cas de changement.',
     );
+
+    if (!context.mounted) return false;
 
     if (shouldRequest == true) {
       status = await Permission.location.request();
@@ -54,6 +58,7 @@ class PermissionManager {
   /// Handles notification permission request with educational UI
   Future<bool> requestNotificationPermission(BuildContext context) async {
     PermissionStatus status = await Permission.notification.status;
+    if (!context.mounted) return false;
 
     if (status.isGranted) return true;
 
@@ -69,6 +74,8 @@ class PermissionManager {
       title: 'Alertes en direct',
       description: 'Recevez des notifications pour savoir quand descendre ou si votre trajet subit des perturbations.',
     );
+
+    if (!context.mounted) return false;
 
     if (shouldRequest == true) {
       status = await Permission.notification.request();

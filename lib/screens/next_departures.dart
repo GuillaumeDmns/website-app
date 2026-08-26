@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:website_app/models/call_unit.dart';
 import 'package:website_app/models/stops_by_line_dto.dart';
@@ -22,41 +23,88 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
   List<CallUnit> nextDepartures = [];
   List<String> nextDeparturesDestinations = [];
   bool isLoading = false;
+  Timer? _autoRefreshTimer;
+  Timer? _countdownTickTimer;
+  String? _disruptionMessage;
 
-  Future<void> fetchNextDepartures() async {
-    setState(() => isLoading = true);
+  bool _autoRefreshEnabled = false;
+  bool get isAutoRefreshing => _autoRefreshEnabled && nextDepartures.isNotEmpty;
+
+  int _scrollYPosition = 0;
+  late final ScrollController _scrollController;
+
+  Future<void> fetchNextDepartures({bool showLoading = true}) async {
+    if (showLoading) setState(() => isLoading = true);
     try {
       final response =
           await api.fetchNextDepartures(widget.stop.id!, widget.lineId);
+      if (!mounted) return;
+
       setState(() {
         nextDepartures = response.nextPassages;
         nextDepartures.sort((a, b) {
-          return DateTime.parse(
-                      a.expectedDepartureTime ?? a.expectedArrivalTime!)
-                  .isBefore(DateTime.parse(
-                      (b.expectedDepartureTime ?? b.expectedArrivalTime!)))
-              ? -1
-              : 1;
+          final aTime = a.expectedDepartureTime ?? a.expectedArrivalTime ?? '';
+          final bTime = b.expectedDepartureTime ?? b.expectedArrivalTime ?? '';
+          if (aTime.isEmpty || bTime.isEmpty) return 0;
+          return DateTime.parse(aTime).isBefore(DateTime.parse(bTime)) ? -1 : 1;
         });
         nextDeparturesDestinations = response.nextPassageDestinations;
       });
-      HomeWidgetService.updateWidgetData(
-          widget.lineId, widget.stop.id!, widget.stop.name!, nextDepartures);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e')),
-        );
+      
+      if (!_scrollController.hasClients || _scrollYPosition == 0) {
+        HomeWidgetService.updateWidgetData(
+          widget.lineId, widget.stop.id!, widget.stop.name ?? '', nextDepartures);
       }
+    } catch (e) {
+      if (mounted && showLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du rafraîchissement'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+}
     } finally {
-      setState(() => isLoading = false);
+      if (mounted && showLoading) {
+        setState(() => isLoading = false);
+      }
     }
+  }
+
+  void _enableAutoRefresh() {
+    setState(() => _autoRefreshEnabled = true);
+    _startAutoRefresh();
+  }
+
+  void _disableAutoRefresh() {
+    setState(() => _autoRefreshEnabled = false);
+    _autoRefreshTimer?.cancel();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      fetchNextDepartures(showLoading: false);
+    });
   }
 
   @override
   void initState() {
     super.initState();
+    
+    _scrollController = ScrollController();
+    
     fetchNextDepartures();
+    _countdownTickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    _countdownTickTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -70,21 +118,40 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              widget.stop.name!,
+              widget.stop.name ?? 'Arrêt',
               style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
-            Text(
-              'Prochains départs',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.55),
-                fontWeight: FontWeight.w400,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'En direct',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+        actions: [
+          _buildRefreshToggle(),
+          const SizedBox(width: 8),
+        ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildSkeletonLoading()
           : nextDeparturesDestinations.isEmpty
               ? Center(
                   child: Column(
@@ -100,6 +167,12 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
                           color: colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: fetchNextDepartures,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Actualiser'),
+                      ),
                     ],
                   ),
                 )
@@ -107,6 +180,8 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
                   onRefresh: fetchNextDepartures,
                   color: colorScheme.primary,
                   child: ListView.separated(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: nextDeparturesDestinations.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -121,6 +196,56 @@ class _NextDeparturesScreenState extends State<NextDeparturesScreen> {
                     },
                   ),
                 ),
+      floatingActionButton: _disruptionMessage != null
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_disruptionMessage!),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.warning_rounded),
+              label: const Text('Incident'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildRefreshToggle() {
+    final isSelected = isAutoRefreshing;
+    
+    return Checkbox(
+      value: isSelected,
+      onChanged: (value) {
+        setState(() {
+          _autoRefreshEnabled = value!;
+        });
+        
+        if (value == true && nextDepartures.isEmpty) {
+          _enableAutoRefresh();
+        } else if (value == false) {
+          _disableAutoRefresh();
+        }
+      },
+    );
+  }
+
+  Widget _buildSkeletonLoading() {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: 3, // Nombre de placeholders
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return Container(
+          height: 80,
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+        );
+      },
     );
   }
 }
