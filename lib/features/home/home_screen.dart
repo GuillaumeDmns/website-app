@@ -10,6 +10,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../auth/auth_controller.dart';
 import '../favorites/favorite_widgets.dart';
+import '../traffic/traffic_screen.dart';
 import 'nearby_departures.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -43,6 +44,10 @@ class HomeScreen extends ConsumerWidget {
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+              sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
             ),
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),

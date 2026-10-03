@@ -40,3 +40,18 @@ String formatDuration(int seconds) {
 
 /// `2,55 €`
 String formatFare(int cents) => '${(cents / 100).toStringAsFixed(2).replaceFirst('.', ',')}\u00a0€';
+
+const _weekdays = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+const _months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/// `sam. 3 oct.`, or `aujourd'hui` / `demain`
+String formatDay(DateTime time, DateTime now) {
+  final local = time.toLocal();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  return switch (day.difference(today).inDays) {
+    0 => 'aujourd\'hui',
+    1 => 'demain',
+    _ => '${_weekdays[local.weekday - 1]} ${local.day} ${_months[local.month - 1]}',
+  };
+}

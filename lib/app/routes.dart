@@ -10,6 +10,8 @@ abstract final class Routes {
   static const aroundPath = '/around';
   static const journeyPath = '/journey';
   static const journeyDetail = '/journey/detail';
+  static const traffic = '/traffic';
+  static const welcome = '/welcome';
 
   static String journey(JourneyRequest request) => Uri(path: journeyPath, queryParameters: request.toQuery()).toString();
 

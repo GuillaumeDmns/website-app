@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../traffic/disruption_widgets.dart';
+import '../../traffic/traffic_providers.dart';
 
 /// User-facing name of a Navitia journey type
 String journeyTypeLabel(String? type) => switch (type) {
@@ -118,20 +121,28 @@ class JourneyCard extends StatelessWidget {
   }
 }
 
-/// Walk / line badges chain: 🚶 3 › (14) › (9) › 🚶 17
-class SectionsStrip extends StatelessWidget {
+/// Walk / line badges chain: 🚶 3 › (14) › (9) › 🚶 17, disrupted lines marked
+class SectionsStrip extends ConsumerWidget {
   const SectionsStrip({super.key, required this.journey});
 
   final JourneyOption journey;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final severities = ref.watch(lineSeveritiesProvider);
     final items = <Widget>[];
 
     for (final section in journey.sections) {
       final Widget? item = switch (section.kind) {
-        SectionKind.transit when section.line != null => LineBadge(section.line!, size: 24),
+        SectionKind.transit when section.line != null => WithSeverity(
+            severity: switch (severities[section.line!.id]) {
+              DisruptionSeverity.info => null,
+              final severity => severity,
+            },
+            dotSize: 12,
+            child: LineBadge(section.line!, size: 24),
+          ),
         SectionKind.walk || SectionKind.bike when section.duration >= 60 => Row(
             mainAxisSize: MainAxisSize.min,
             children: [

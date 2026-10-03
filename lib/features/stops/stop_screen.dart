@@ -15,6 +15,8 @@ import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../favorites/favorite_widgets.dart';
 import '../journey/journey_request.dart';
+import '../traffic/disruption_widgets.dart';
+import '../traffic/traffic_providers.dart';
 import 'widgets/stop_departures_card.dart';
 
 final stopAreaProvider = FutureProvider.autoDispose.family<StopAreaDetail, String>(
@@ -124,6 +126,7 @@ class _StopContent extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _StopDisruptions(detail: detail),
                 Text('Prochains départs', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 AsyncView(
@@ -150,6 +153,36 @@ class _StopContent extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Disruptions of the stop (elevators…) and of its main lines, with the line badges
+class _StopDisruptions extends ConsumerWidget {
+  const _StopDisruptions({required this.detail});
+
+  final StopAreaDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disruptions = ref.watch(stopDisruptionsProvider(detail.id)).value;
+    if (disruptions == null || disruptions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final lines = {for (final line in detail.lines) line.id: line};
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: DisruptionList(
+        disruptions: disruptions,
+        leading: (disruption) {
+          final badges = disruption.lineIds.map((id) => lines[id]).nonNulls.take(2).toList();
+          if (badges.isEmpty) {
+            return null;
+          }
+          return Row(mainAxisSize: MainAxisSize.min, children: [for (final line in badges) LineBadge(line, size: 24)]);
+        },
       ),
     );
   }

@@ -13,8 +13,11 @@ import '../features/journey/journey_detail_screen.dart';
 import '../features/journey/journey_request.dart';
 import '../features/journey/journey_screen.dart';
 import '../features/lines/line_screen.dart';
+import '../features/onboarding/onboarding.dart';
+import '../features/onboarding/welcome_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/stops/stop_screen.dart';
+import '../features/traffic/traffic_screen.dart';
 import 'routes.dart';
 import 'shell.dart';
 
@@ -43,6 +46,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return switch (status) {
         AuthStatus.unknown => location == Routes.splash ? null : withFrom(Routes.splash),
         AuthStatus.signedOut => onAuthPage ? null : withFrom(Routes.login),
+        // Welcome pages once per device (a restored session may skip the splash page, so from any page). The search
+        // stays reachable: the welcome pages use it to choose home and work.
+        AuthStatus.signedIn when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search =>
+          Uri(path: Routes.welcome, queryParameters: {'from': waiting ? (from ?? Routes.home) : state.uri.toString()}).toString(),
         AuthStatus.signedIn when waiting => from ?? Routes.home,
         AuthStatus.signedIn => null,
       };
@@ -51,6 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.splash, builder: (context, state) => const _SplashScreen()),
       GoRoute(path: Routes.login, builder: (context, state) => const LoginScreen()),
       GoRoute(path: Routes.signup, builder: (context, state) => const SignupScreen()),
+      GoRoute(path: Routes.welcome, builder: (context, state) => WelcomeScreen(from: state.uri.queryParameters['from'])),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
@@ -67,6 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => JourneyScreen(request: JourneyRequest.fromQuery(state.uri.queryParameters)),
           ),
           GoRoute(path: Routes.journeyDetail, builder: (context, state) => const JourneyDetailScreen()),
+          GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
           GoRoute(
             path: Routes.aroundPath,
             builder: (context, state) {
