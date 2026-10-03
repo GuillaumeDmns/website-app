@@ -1,41 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:home_widget/home_widget.dart';
-import 'package:website_app/app_settings.dart';
-import 'package:website_app/screens/auth_wrapper.dart';
-import 'package:website_app/screens/home.dart';
-import 'package:website_app/screens/map.dart';
-import 'package:website_app/utils/app_theme.dart';
-import 'home_widgets/home_widget_service.dart';
-import 'screens/login.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+import 'app/app.dart';
 
-  if (defaultTargetPlatform == TargetPlatform.android) {
-    await HomeWidget.registerInteractivityCallback(refreshCallback);
-  }
-
-  runApp(const App());
-}
-
-class App extends StatelessWidget {
-  const App({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Guillaume Damiens',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const AuthWrapperScreen(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/map': (context) => const MapScreen(),
-        '/home': (context) => const HomeScreen(),
-      },
-      navigatorKey: AppSettings.navigatorState,
-    );
-  }
+void main() {
+  // Clean URLs on the web (/stops/IDFM:71264 instead of /#/stops/…)
+  usePathUrlStrategy();
+  runApp(const ProviderScope(child: MobilityApp()));
 }
