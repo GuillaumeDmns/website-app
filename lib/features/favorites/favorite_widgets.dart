@@ -8,6 +8,8 @@ import '../../core/location/location_providers.dart';
 import '../../core/widgets/line_badge.dart';
 import '../journey/journey_request.dart';
 import '../stops/stop_screen.dart';
+import '../traffic/disruption_widgets.dart';
+import '../traffic/traffic_providers.dart';
 import '../stops/widgets/stop_departures_card.dart';
 import 'favorites_controller.dart';
 
@@ -248,6 +250,7 @@ class FavoriteLinesSection extends ConsumerWidget {
     if (lines.isEmpty) {
       return const SizedBox.shrink();
     }
+    final severities = ref.watch(lineSeveritiesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +264,10 @@ class FavoriteLinesSection extends ConsumerWidget {
             for (final line in lines)
               Tooltip(
                 message: '${line.mode.label} ${line.name ?? ''}',
-                child: InkWell(onTap: () => context.push(Routes.line(line.id)), child: LineBadge(line, size: 34)),
+                child: InkWell(
+                  onTap: () => context.push(Routes.line(line.id)),
+                  child: WithSeverity(severity: severities[line.id], child: LineBadge(line, size: 34)),
+                ),
               ),
           ],
         ),

@@ -440,3 +440,63 @@ abstract class Favorite with _$Favorite {
 
   factory Favorite.fromJson(Map<String, dynamic> json) => _$FavoriteFromJson(json);
 }
+
+enum DisruptionSeverity {
+  @JsonValue('INFO')
+  info,
+  @JsonValue('DISRUPTED')
+  disrupted,
+  @JsonValue('BLOCKING')
+  blocking,
+}
+
+enum DisruptionCategory {
+  @JsonValue('TRAFFIC')
+  traffic,
+  @JsonValue('WORKS')
+  works,
+  @JsonValue('ELEVATOR')
+  elevator,
+}
+
+@freezed
+abstract class Disruption with _$Disruption {
+  const factory Disruption({
+    required String id,
+    @JsonKey(unknownEnumValue: DisruptionSeverity.info) required DisruptionSeverity severity,
+    @JsonKey(unknownEnumValue: DisruptionCategory.traffic) required DisruptionCategory category,
+    String? title,
+
+    /// Plain text, paragraphs separated by blank lines
+    String? message,
+    String? cause,
+
+    /// Current period, or the next one when not active
+    DateTime? start,
+    DateTime? end,
+
+    /// False for an upcoming disruption
+    required bool active,
+    DateTime? updatedAt,
+
+    /// Impacted lines, empty for a stop-only disruption (elevator…)
+    @Default([]) List<String> lineIds,
+  }) = _Disruption;
+
+  factory Disruption.fromJson(Map<String, dynamic> json) => _$DisruptionFromJson(json);
+}
+
+@freezed
+abstract class LineTraffic with _$LineTraffic {
+  const factory LineTraffic({
+    required LineSummary line,
+
+    /// Worst active disruption, null when the traffic is normal
+    @JsonKey(unknownEnumValue: DisruptionSeverity.info) DisruptionSeverity? severity,
+
+    /// Titles of the active disruptions, worst first
+    @Default([]) List<String> titles,
+  }) = _LineTraffic;
+
+  factory LineTraffic.fromJson(Map<String, dynamic> json) => _$LineTrafficFromJson(json);
+}

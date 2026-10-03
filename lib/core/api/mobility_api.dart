@@ -25,6 +25,15 @@ class MobilityApi {
 
   Future<LineDetail> line(String lineId) => _get('/api/v2/lines/${Uri.encodeComponent(lineId)}', LineDetail.fromJson);
 
+  Future<List<Disruption>> lineDisruptions(String lineId) =>
+      _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/disruptions', Disruption.fromJson);
+
+  Future<List<Disruption>> stopDisruptions(String stopAreaId) =>
+      _getList('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/disruptions', Disruption.fromJson);
+
+  /// Metro, RER, Transilien and tram lines, and every other disrupted line
+  Future<List<LineTraffic>> traffic() => _getList('/api/v2/traffic', LineTraffic.fromJson);
+
   /// [from] / [to]: `lat,lon` or a stop area id. [modes]: allowed modes, all when empty.
   Future<JourneyPlan> journeys({
     required String from,

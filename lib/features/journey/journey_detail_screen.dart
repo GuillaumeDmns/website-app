@@ -7,8 +7,12 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/colors.dart';
+import '../../core/location/location_providers.dart';
 import '../../core/utils/time_format.dart';
+import '../../core/widgets/departure_time.dart';
 import '../../core/widgets/line_badge.dart';
+import '../traffic/disruption_widgets.dart';
+import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
@@ -169,6 +173,8 @@ class _RideTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lineId = section.line?.id;
+    final hasLine = lineId != null && lineId.isNotEmpty;
     final theme = Theme.of(context);
     final line = section.line;
     final color = parseHexColor(line?.color, theme.colorScheme.primary);
@@ -222,6 +228,9 @@ class _RideTile extends StatelessWidget {
                       _Tag(icon: Icons.train, color: theme.colorScheme.primary, text: _boardingLabel(section.boardingPositions)),
                   ],
                 ),
+                if (hasLine) _RideDisruptions(lineId: lineId),
+                if (hasLine && section.from?.stopAreaId != null)
+                  _NextDepartures(section: section, stopAreaId: section.from!.stopAreaId!, lineId: lineId),
                 if (intermediate.isNotEmpty)
                   Theme(
                     data: theme.copyWith(dividerColor: Colors.transparent),
@@ -273,6 +282,111 @@ class _RideTile extends StatelessWidget {
           _ => position,
         };
     return positions.length >= 3 ? 'Montez n\'importe où' : 'Montez ${positions.map(name).join(' ou ')}';
+  }
+}
+
+/// Active disruptions of the ride's line (information messages left out)
+class _RideDisruptions extends ConsumerWidget {
+  const _RideDisruptions({required this.lineId});
+
+  final String lineId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disruptions = (ref.watch(lineDisruptionsProvider(lineId)).value ?? const <Disruption>[])
+        .where((disruption) => disruption.active && disruption.severity != DisruptionSeverity.info)
+        .toList();
+    if (disruptions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final disruption in disruptions.take(3)) DisruptionLine(disruption: disruption)],
+      ),
+    );
+  }
+}
+
+/// Next departures of the line at the boarding stop, towards the ride's direction when the destinations match:
+/// what to take if the planned one is missed. Only for rides leaving within the next 90 min.
+class _NextDepartures extends ConsumerWidget {
+  const _NextDepartures({required this.section, required this.stopAreaId, required this.lineId});
+
+  final JourneySection section;
+  final String stopAreaId;
+  final String lineId;
+
+  static String _normalize(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp('[éèêë]'), 'e')
+      .replaceAll(RegExp('[àâä]'), 'a')
+      .replaceAll(RegExp('[îï]'), 'i')
+      .replaceAll(RegExp('[ôö]'), 'o')
+      .replaceAll(RegExp('[ùûü]'), 'u')
+      .replaceAll('ç', 'c')
+      .replaceAll(RegExp('[^a-z0-9]+'), ' ')
+      .trim();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final minutesAway = section.departure.difference(now).inMinutes;
+    if (minutesAway > 90 || minutesAway < -5) {
+      return const SizedBox.shrink();
+    }
+    final departures = ref.watch(rideDeparturesProvider((stopAreaId: stopAreaId, lineId: lineId))).value;
+    final rows = departures?.lines.where((row) => row.departures.isNotEmpty).toList() ?? const <LineDepartures>[];
+    if (rows.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final headsign = _normalize(section.headsign ?? '');
+    final matching = headsign.isEmpty
+        ? const <LineDepartures>[]
+        : rows.where((row) {
+            final destination = _normalize(row.destination);
+            return destination.isNotEmpty && (destination.contains(headsign) || headsign.contains(destination));
+          }).toList();
+    final shown = (matching.isNotEmpty ? matching : rows).take(2).toList();
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Prochains départs', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            for (final row in shown)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    if (matching.isEmpty)
+                      Flexible(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Text(row.destination, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                        ),
+                      ),
+                    for (final (index, departure) in row.departures.take(4).indexed) ...[
+                      if (index > 0) const SizedBox(width: 12),
+                      DepartureTime(departure, now: now, emphasized: index == 0),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

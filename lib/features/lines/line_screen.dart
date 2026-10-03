@@ -12,6 +12,8 @@ import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../favorites/favorite_widgets.dart';
+import '../traffic/disruption_widgets.dart';
+import '../traffic/traffic_providers.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
@@ -110,6 +112,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           ],
         ),
         const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 0, 12),
+          child: _LineDisruptions(line: line),
+        ),
         if (detail.directions.length > 1)
           Padding(
             padding: const EdgeInsets.only(left: 12),
@@ -162,6 +168,38 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
   static String _branchLabel(LineBranch branch) =>
       branch.stops.isEmpty ? branch.headsign : '${branch.stops.first.name} → ${branch.headsign}';
+}
+
+/// Traffic state of the line, then its disruptions
+class _LineDisruptions extends ConsumerWidget {
+  const _LineDisruptions({required this.line});
+
+  final LineSummary line;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disruptions = ref.watch(lineDisruptionsProvider(line.id));
+    final theme = Theme.of(context);
+    // Disruptions are a bonus: a failure only shows a short line
+    return switch (disruptions) {
+      AsyncValue(:final value?) when value.where((d) => d.active).isEmpty => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(severityIcon(null), size: 18, color: severityColor(null, theme.colorScheme)),
+                const SizedBox(width: 6),
+                Text(severityLabel(null), style: TextStyle(color: severityColor(null, theme.colorScheme), fontWeight: FontWeight.w600)),
+              ],
+            ),
+            if (value.isNotEmpty) DisruptionList(disruptions: value),
+          ],
+        ),
+      AsyncValue(:final value?) => DisruptionList(disruptions: value),
+      AsyncValue(:final error?) => Text('Info trafic indisponible ($error)', style: theme.textTheme.bodySmall),
+      _ => const LinearProgressIndicator(),
+    };
+  }
 }
 
 /// Stop of the line drawn on a vertical line of the line's color

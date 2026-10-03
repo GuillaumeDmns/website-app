@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
@@ -30,6 +32,13 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
         wheelchair: request.wheelchair,
         walkingSpeed: request.walkingSpeed.apiName,
       );
+});
+
+/// Next departures of a line at a stop area (alternatives to the planned ride), refreshed every 30 s while shown
+final rideDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, ({String stopAreaId, String lineId})>((ref, key) async {
+  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+  return ref.watch(mobilityApiProvider).stopDepartures(key.stopAreaId, lineId: key.lineId, limit: 4);
 });
 
 /// Option opened in the detail page (kept here rather than in the URL: it is a snapshot of a search)
