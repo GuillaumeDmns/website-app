@@ -11,15 +11,19 @@ import '../stops/stop_screen.dart';
 import '../stops/widgets/stop_departures_card.dart';
 import 'favorites_controller.dart';
 
-/// Runs a favorite change and shows its error, if any, in a snackbar
-Future<void> runFavoriteAction(BuildContext context, Future<void> Function() action, {String? success}) async {
-  final messenger = ScaffoldMessenger.of(context);
+/// Runs a favorite change and shows the result in a snackbar. The messenger is resolved before running the action:
+/// the widget that started it may be gone when it ends.
+Future<void> runFavoriteAction(BuildContext context, Future<void> Function() action, {String? success}) =>
+    _runFavoriteAction(ScaffoldMessenger.of(context), action, success: success);
+
+Future<void> _runFavoriteAction(ScaffoldMessengerState messenger, Future<void> Function() action, {String? success}) async {
   try {
     await action();
     if (success != null) {
       messenger.showSnackBar(SnackBar(content: Text(success)));
     }
-  } catch (e) {
+  } catch (e, stackTrace) {
+    debugPrint('Favorite action failed: $e\n$stackTrace');
     messenger.showSnackBar(SnackBar(content: Text('Favori non enregistré : $e')));
   }
 }
@@ -60,18 +64,26 @@ class FavoriteLineButton extends ConsumerWidget {
   }
 }
 
-/// Lets the user choose an address or a stop to save as [kind] (no "Ma position": it moves)
+/// Lets the user choose an address or a stop to save as [kind] (no "Ma position": it moves).
+///
+/// Everything needed after the choice is resolved before opening the search: the shortcut that called this can be
+/// rebuilt or disposed while the search is shown, and saving does not depend on it.
 Future<void> chooseFavoritePlace(BuildContext context, WidgetRef ref, FavoriteKind kind) async {
   final title = switch (kind) {
     FavoriteKind.home => 'Maison',
     FavoriteKind.work => 'Travail',
     _ => 'Lieu favori',
   };
-  final place = await context.push<JourneyPlace>(Routes.pickPlace(title, allowCurrentLocation: false));
-  if (place == null || !context.mounted) {
+  final favorites = ref.read(favoritesProvider.notifier);
+  final messenger = ScaffoldMessenger.of(context);
+  final router = GoRouter.of(context);
+
+  final place = await router.push<JourneyPlace>(Routes.pickPlace(title, allowCurrentLocation: false));
+  debugPrint('chooseFavoritePlace($kind): ${place?.param ?? 'cancelled'}');
+  if (place == null) {
     return;
   }
-  await runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).savePlace(kind, place), success: '$title enregistré');
+  await _runFavoriteAction(messenger, () => favorites.savePlace(kind, place), success: '$title enregistré');
 }
 
 /// Home, work and saved places as shortcuts: tap to go there, long press (or the menu) to change them.

@@ -25,9 +25,11 @@ class JourneyScreen extends ConsumerWidget {
   void _update(BuildContext context, JourneyRequest next) => context.replace(Routes.journey(next));
 
   Future<void> _pickPlace(BuildContext context, {required bool from}) async {
-    final place = await context.push<JourneyPlace>(Routes.pickPlace(from ? 'Départ' : 'Arrivée'));
-    if (place != null && context.mounted) {
-      _update(context, from ? request.copyWith(from: place) : request.copyWith(to: place));
+    // Not the context after the await: this page may have been rebuilt while the search was shown
+    final router = GoRouter.of(context);
+    final place = await router.push<JourneyPlace>(Routes.pickPlace(from ? 'Départ' : 'Arrivée'));
+    if (place != null) {
+      router.replace(Routes.journey(from ? request.copyWith(from: place) : request.copyWith(to: place)));
     }
   }
 
