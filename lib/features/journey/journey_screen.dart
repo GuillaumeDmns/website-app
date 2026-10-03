@@ -16,6 +16,20 @@ import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_options_sheet.dart';
 
+/// Option shown on the map, per search (the first one, "Suggéré", until another is chosen)
+class _SelectedOption extends Notifier<int> {
+  _SelectedOption(this.request);
+
+  final JourneyRequest request;
+
+  @override
+  int build() => 0;
+
+  void select(int index) => state = index;
+}
+
+final _selectedOptionProvider = NotifierProvider.autoDispose.family<_SelectedOption, int, JourneyRequest>(_SelectedOption.new);
+
 /// Journey search: from / to, time, options, and the resulting options.
 class JourneyScreen extends ConsumerWidget {
   const JourneyScreen({super.key, required this.request});
@@ -25,9 +39,11 @@ class JourneyScreen extends ConsumerWidget {
   void _update(BuildContext context, JourneyRequest next) => context.replace(Routes.journey(next));
 
   Future<void> _pickPlace(BuildContext context, {required bool from}) async {
-    final place = await context.push<JourneyPlace>(Routes.pickPlace(from ? 'Départ' : 'Arrivée'));
-    if (place != null && context.mounted) {
-      _update(context, from ? request.copyWith(from: place) : request.copyWith(to: place));
+    // Not the context after the await: this page may have been rebuilt while the search was shown
+    final router = GoRouter.of(context);
+    final place = await router.push<JourneyPlace>(Routes.pickPlace(from ? 'Départ' : 'Arrivée'));
+    if (place != null) {
+      router.replace(Routes.journey(from ? request.copyWith(from: place) : request.copyWith(to: place)));
     }
   }
 
@@ -44,11 +60,13 @@ class JourneyScreen extends ConsumerWidget {
             : place.lat != null
                 ? LatLng(place.lat!, place.lon!)
                 : null;
-    final firstJourney = plan?.value?.journeys.firstOrNull;
+    final journeys = plan?.value?.journeys ?? const <JourneyOption>[];
+    final selectedIndex = ref.watch(_selectedOptionProvider(request)).clamp(0, journeys.isEmpty ? 0 : journeys.length - 1);
+    final selectedJourney = journeys.isEmpty ? null : journeys[selectedIndex];
 
     return MapOverlayScope(
-      overlay: firstJourney != null
-          ? journeyOverlay(context, firstJourney, faded: true)
+      overlay: selectedJourney != null
+          ? journeyOverlay(context, selectedJourney)
           : MapOverlay(
               pins: [
                 if (point(request.from) case final from?) MapPin(point: from, color: Colors.green.shade600, size: 16),
@@ -103,6 +121,8 @@ class JourneyScreen extends ConsumerWidget {
                     data: (plan) => _Results(
                       plan: plan,
                       now: now,
+                      selectedIndex: selectedIndex,
+                      onSelect: (index) => ref.read(_selectedOptionProvider(request).notifier).select(index),
                       onOpen: (journey) {
                         ref.read(selectedJourneyProvider.notifier).select(journey);
                         context.push(Routes.journeyDetail);
@@ -260,10 +280,21 @@ class _TimeButton extends StatelessWidget {
 }
 
 class _Results extends StatelessWidget {
-  const _Results({required this.plan, required this.now, required this.onOpen, required this.onPage});
+  const _Results({
+    required this.plan,
+    required this.now,
+    required this.selectedIndex,
+    required this.onSelect,
+    required this.onOpen,
+    required this.onPage,
+  });
 
   final JourneyPlan plan;
   final DateTime now;
+  final int selectedIndex;
+
+  /// Shows the option on the map
+  final ValueChanged<int> onSelect;
   final ValueChanged<JourneyOption> onOpen;
   final ValueChanged<PageCursor> onPage;
 
@@ -290,7 +321,15 @@ class _Results extends StatelessWidget {
             )
           else
             const SizedBox(height: 8),
-          JourneyCard(journey: journey, now: now, onTap: () => onOpen(journey)),
+          // First tap shows the option on the map, a second one (or "Détails") opens it; hovering shows it too
+          JourneyCard(
+            journey: journey,
+            now: now,
+            selected: index == selectedIndex,
+            onTap: () => index == selectedIndex ? onOpen(journey) : onSelect(index),
+            onOpen: () => onOpen(journey),
+            onHover: () => onSelect(index),
+          ),
         ],
         const SizedBox(height: 12),
         Row(

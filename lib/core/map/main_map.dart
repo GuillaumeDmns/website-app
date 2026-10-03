@@ -130,8 +130,9 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
             for (final pin in overlay.pins)
               Marker(
                 point: pin.point,
-                width: pin.size + 16,
-                height: pin.size + 16,
+                width: pin.child != null ? pin.childSize.width : pin.size + 16,
+                height: pin.child != null ? pin.childSize.height : pin.size + 16,
+                alignment: pin.above ? Alignment.topCenter : Alignment.center,
                 child: _PinView(pin: pin, outline: scheme.surface),
               ),
             if (user != null)
@@ -174,7 +175,8 @@ class _PinView extends StatelessWidget {
       child: pin.icon == Icons.circle ? null : Icon(pin.icon, size: pin.size * 0.6, color: Colors.white),
     );
 
-    final child = Center(child: pin.label == null ? dot : Tooltip(message: pin.label!, child: dot));
+    final marker = pin.child ?? dot;
+    final child = Center(child: pin.label == null ? marker : Tooltip(message: pin.label!, child: marker));
     return pin.onTap == null
         ? child
         : MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: pin.onTap, child: child));

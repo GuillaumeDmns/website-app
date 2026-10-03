@@ -13,6 +13,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../favorites/favorite_widgets.dart';
 import '../journey/journey_request.dart';
 import 'widgets/stop_departures_card.dart';
 
@@ -92,7 +93,7 @@ class _StopContent extends ConsumerWidget {
                   message: 'Accessible en fauteuil roulant',
                   child: Icon(Icons.accessible, color: theme.colorScheme.primary),
                 ),
-              const SizedBox(width: 8),
+              FavoriteStopButton(stopAreaId: detail.id),
               FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                 icon: const Icon(Icons.directions, size: 18),

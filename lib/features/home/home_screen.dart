@@ -9,6 +9,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../auth/auth_controller.dart';
+import '../favorites/favorite_widgets.dart';
 import 'nearby_departures.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -38,6 +39,18 @@ class HomeScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              sliver: SliverToBoxAdapter(child: FavoriteStopsSection()),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+              sliver: SliverToBoxAdapter(child: FavoriteLinesSection()),
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),

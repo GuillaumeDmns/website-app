@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../../core/api/models.dart';
 import '../../../core/map/map_overlay.dart';
 import '../../../core/utils/colors.dart';
+import '../../../core/widgets/line_badge.dart';
 
-/// Map overlay of a journey: rides in their line color, walks dotted, start, end and transfer points.
-MapOverlay journeyOverlay(BuildContext context, JourneyOption journey, {bool faded = false}) {
+/// Map overlay of a journey, kept light: rides in their line color, walks dotted, the line badge where you board,
+/// a dot where you get off, start and end. Intermediate stops are left out.
+MapOverlay journeyOverlay(BuildContext context, JourneyOption journey) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
-  final pins = <MapPin>[];
+  final dots = <MapPin>[];
+  final badges = <MapPin>[];
   final points = <LatLng>[];
 
   for (final section in journey.sections) {
@@ -24,30 +27,112 @@ MapOverlay journeyOverlay(BuildContext context, JourneyOption journey, {bool fad
     }
     points.addAll(shape);
 
-    final isRide = section.kind == SectionKind.transit;
-    final color = isRide ? parseHexColor(section.line?.color, scheme.primary) : scheme.onSurfaceVariant;
-    paths.add(MapPath(
-      points: shape,
-      color: faded ? color.withValues(alpha: 0.6) : color,
-      width: isRide ? 6 : 4,
-      dotted: !isRide,
-    ));
+    final ride = section.kind == SectionKind.transit;
+    final color = ride ? parseHexColor(section.line?.color, scheme.primary) : scheme.onSurfaceVariant;
+    paths.add(MapPath(points: shape, color: color, width: ride ? 6 : 4, dotted: !ride));
 
-    if (isRide) {
-      for (final end in [shape.first, shape.last]) {
-        pins.add(MapPin(point: end, color: color, size: 10));
+    if (ride) {
+      // Get off: small dot in the line color
+      dots.add(MapPin(
+        point: shape.last,
+        color: color,
+        label: section.to?.name,
+        childSize: const Size(16, 16),
+        child: _StopDot(color: color),
+      ));
+      // Board: the line badge, above the stop
+      if (section.line != null) {
+        badges.add(MapPin(
+          point: shape.first,
+          color: color,
+          label: '${section.line!.mode.label} ${section.line!.name ?? ''} · ${section.from?.name ?? ''}',
+          above: true,
+          childSize: const Size(56, 34),
+          child: _BadgeCallout(line: section.line!),
+        ));
       }
     }
   }
 
   final start = journey.sections.firstOrNull?.from;
   final end = journey.sections.lastOrNull?.to;
-  if (start != null) {
-    pins.add(MapPin(point: LatLng(start.lat, start.lon), color: Colors.green.shade600, size: 16, label: start.name));
+  return MapOverlay(
+    paths: paths,
+    pins: [
+      ...dots,
+      if (start != null) MapPin(point: LatLng(start.lat, start.lon), color: Colors.green.shade600, size: 16, label: start.name),
+      ...badges,
+      if (end != null) MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name),
+    ],
+    fit: points,
+  );
+}
+
+class _StopDot extends StatelessWidget {
+  const _StopDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 3),
+      ),
+    );
   }
-  if (end != null) {
-    pins.add(MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name));
+}
+
+/// Line badge in a small bubble pointing at the boarding stop
+class _BadgeCallout extends StatelessWidget {
+  const _BadgeCallout({required this.line});
+
+  final LineSummary line;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.bottomCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+            ),
+            child: LineBadge(line, size: 20),
+          ),
+          CustomPaint(size: const Size(10, 6), painter: _ArrowPainter(surface)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArrowPainter extends CustomPainter {
+  _ArrowPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
   }
 
-  return MapOverlay(paths: paths, pins: pins, fit: points);
+  @override
+  bool shouldRepaint(_ArrowPainter oldDelegate) => oldDelegate.color != color;
 }

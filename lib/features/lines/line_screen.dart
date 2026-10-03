@@ -11,6 +11,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../favorites/favorite_widgets.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
@@ -105,6 +106,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                 ],
               ),
             ),
+            FavoriteLineButton(lineId: line.id),
           ],
         ),
         const SizedBox(height: 12),
