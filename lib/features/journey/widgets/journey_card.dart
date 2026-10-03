@@ -18,11 +18,28 @@ String journeyTypeLabel(String? type) => switch (type) {
 
 /// Result row: duration, the chain of lines, times, and when to leave.
 class JourneyCard extends StatelessWidget {
-  const JourneyCard({super.key, required this.journey, required this.now, required this.onTap});
+  const JourneyCard({
+    super.key,
+    required this.journey,
+    required this.now,
+    required this.onTap,
+    this.selected = false,
+    this.onOpen,
+    this.onHover,
+  });
 
   final JourneyOption journey;
   final DateTime now;
   final VoidCallback onTap;
+
+  /// Shown on the map
+  final bool selected;
+
+  /// Opens the detail ("Détails" button)
+  final VoidCallback? onOpen;
+
+  /// Mouse over the card (desktop / web)
+  final VoidCallback? onHover;
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +55,11 @@ class JourneyCard extends StatelessWidget {
       if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
     ].join(' · ');
 
-    return Card(
+    final card = Card(
       clipBehavior: Clip.antiAlias,
+      shape: selected
+          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: scheme.primary, width: 2))
+          : null,
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -54,6 +74,13 @@ class JourneyCard extends StatelessWidget {
                   const SizedBox(width: 12),
                   Text(formatDuration(journey.duration),
                       style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  if (onOpen != null)
+                    IconButton(
+                      tooltip: 'Détails',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: onOpen,
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -87,6 +114,7 @@ class JourneyCard extends StatelessWidget {
         ),
       ),
     );
+    return onHover == null ? card : MouseRegion(onEnter: (_) => onHover!(), child: card);
   }
 }
 

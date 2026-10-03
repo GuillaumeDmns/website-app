@@ -3,9 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
-/// Marker drawn on the shared map
+/// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
 class MapPin {
-  const MapPin({required this.point, required this.color, this.icon = Icons.circle, this.size = 14, this.label, this.onTap});
+  const MapPin({
+    required this.point,
+    required this.color,
+    this.icon = Icons.circle,
+    this.size = 14,
+    this.label,
+    this.onTap,
+    this.child,
+    this.childSize = const Size(40, 28),
+    this.above = false,
+  });
 
   final LatLng point;
   final Color color;
@@ -13,6 +23,13 @@ class MapPin {
   final double size;
   final String? label;
   final VoidCallback? onTap;
+
+  /// Replaces the dot, drawn in a [childSize] box
+  final Widget? child;
+  final Size childSize;
+
+  /// Draws the marker above the point (like a callout) instead of centered on it
+  final bool above;
 }
 
 /// Line drawn on the shared map
