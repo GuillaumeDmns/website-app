@@ -17,11 +17,14 @@ class MapPin {
 
 /// Line drawn on the shared map
 class MapPath {
-  const MapPath({required this.points, required this.color, this.width = 5});
+  const MapPath({required this.points, required this.color, this.width = 5, this.dotted = false});
 
   final List<LatLng> points;
   final Color color;
   final double width;
+
+  /// Walking paths
+  final bool dotted;
 }
 
 /// What a screen shows on the map, and where the camera should go.

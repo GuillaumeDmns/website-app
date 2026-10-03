@@ -13,6 +13,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../journey/journey_request.dart';
 import 'widgets/stop_departures_card.dart';
 
 final stopAreaProvider = FutureProvider.autoDispose.family<StopAreaDetail, String>(
@@ -91,6 +92,16 @@ class _StopContent extends ConsumerWidget {
                   message: 'Accessible en fauteuil roulant',
                   child: Icon(Icons.accessible, color: theme.colorScheme.primary),
                 ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                icon: const Icon(Icons.directions, size: 18),
+                label: const Text('Y aller'),
+                onPressed: () => context.push(Routes.journey(JourneyRequest(
+                  from: const JourneyPlace.currentLocation(),
+                  to: JourneyPlace.stopArea(name: detail.name, id: detail.id, lat: detail.lat, lon: detail.lon),
+                ))),
+              ),
             ],
           ),
           Padding(

@@ -9,6 +9,9 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/home/around_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/journey/journey_detail_screen.dart';
+import '../features/journey/journey_request.dart';
+import '../features/journey/journey_screen.dart';
 import '../features/lines/line_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/stops/stop_screen.dart';
@@ -29,11 +32,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final onAuthPage = location == Routes.login || location == Routes.signup;
 
+      // The requested page is kept in `from` through the splash and sign-in pages (deep links, web reloads)
+      final from = state.uri.queryParameters['from'];
+      final waiting = location == Routes.splash || onAuthPage;
+      String withFrom(String path) => Uri(
+            path: path,
+            queryParameters: {'from': waiting ? (from ?? Routes.home) : state.uri.toString()},
+          ).toString();
+
       return switch (status) {
-        AuthStatus.unknown => location == Routes.splash ? null : '${Routes.splash}?from=${Uri.encodeComponent(state.uri.toString())}',
-        AuthStatus.signedOut => onAuthPage ? null : Routes.login,
-        AuthStatus.signedIn when location == Routes.splash => state.uri.queryParameters['from'] ?? Routes.home,
-        AuthStatus.signedIn when onAuthPage => Routes.home,
+        AuthStatus.unknown => location == Routes.splash ? null : withFrom(Routes.splash),
+        AuthStatus.signedOut => onAuthPage ? null : withFrom(Routes.login),
+        AuthStatus.signedIn when waiting => from ?? Routes.home,
         AuthStatus.signedIn => null,
       };
     },
@@ -45,7 +55,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(path: Routes.home, builder: (context, state) => const HomeScreen()),
-          GoRoute(path: Routes.search, builder: (context, state) => const SearchScreen()),
+          GoRoute(
+            path: Routes.search,
+            builder: (context, state) => SearchScreen(pickTitle: state.uri.queryParameters['pick']),
+          ),
+          GoRoute(
+            path: Routes.journeyPath,
+            builder: (context, state) => JourneyScreen(request: JourneyRequest.fromQuery(state.uri.queryParameters)),
+          ),
+          GoRoute(path: Routes.journeyDetail, builder: (context, state) => const JourneyDetailScreen()),
           GoRoute(
             path: Routes.aroundPath,
             builder: (context, state) {

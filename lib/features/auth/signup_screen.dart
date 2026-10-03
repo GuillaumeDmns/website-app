@@ -117,7 +117,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: _loading ? null : () => context.go(Routes.login),
+          onPressed: _loading ? null : () => context.go(Uri(path: Routes.login, queryParameters: GoRouterState.of(context).uri.queryParameters).toString()),
           child: const Text('Déjà un compte ? Se connecter'),
         ),
       ],

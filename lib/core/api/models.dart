@@ -21,6 +21,9 @@ enum TransportMode {
   @JsonValue('NOCTILIEN')
   noctilien;
 
+  /// Value used by the API (`METRO`…)
+  String get apiName => name.toUpperCase();
+
   String get label => switch (this) {
         metro => 'Métro',
         rer => 'RER',
@@ -255,4 +258,146 @@ abstract class SearchResult with _$SearchResult {
   }) = _SearchResult;
 
   factory SearchResult.fromJson(Map<String, dynamic> json) => _$SearchResultFromJson(json);
+}
+
+@freezed
+abstract class JourneyPoint with _$JourneyPoint {
+  const factory JourneyPoint({
+    required String name,
+    required double lat,
+    required double lon,
+
+    /// Set when the point is a stop
+    String? stopAreaId,
+  }) = _JourneyPoint;
+
+  factory JourneyPoint.fromJson(Map<String, dynamic> json) => _$JourneyPointFromJson(json);
+}
+
+@freezed
+abstract class JourneyStop with _$JourneyStop {
+  const factory JourneyStop({
+    required String name,
+    required double lat,
+    required double lon,
+    DateTime? time,
+  }) = _JourneyStop;
+
+  factory JourneyStop.fromJson(Map<String, dynamic> json) => _$JourneyStopFromJson(json);
+}
+
+@freezed
+abstract class WalkStep with _$WalkStep {
+  const factory WalkStep({
+    required String instruction,
+
+    /// Meters
+    @Default(0) int length,
+
+    /// Seconds
+    @Default(0) int duration,
+  }) = _WalkStep;
+
+  factory WalkStep.fromJson(Map<String, dynamic> json) => _$WalkStepFromJson(json);
+}
+
+enum SectionKind {
+  @JsonValue('WALK')
+  walk,
+  @JsonValue('TRANSIT')
+  transit,
+  @JsonValue('TRANSFER')
+  transfer,
+  @JsonValue('WAIT')
+  wait,
+  @JsonValue('BIKE')
+  bike,
+  @JsonValue('CAR')
+  car,
+  @JsonValue('OTHER')
+  other,
+}
+
+@freezed
+abstract class JourneySection with _$JourneySection {
+  const factory JourneySection({
+    @JsonKey(unknownEnumValue: SectionKind.other) required SectionKind kind,
+    required DateTime departure,
+    required DateTime arrival,
+
+    /// Seconds
+    required int duration,
+    JourneyPoint? from,
+    JourneyPoint? to,
+    LineSummary? line,
+    String? headsign,
+
+    /// `front`, `middle`, `back`
+    @Default([]) List<String> boardingPositions,
+
+    /// Served stops, boarding and alighting included
+    @Default([]) List<JourneyStop> stops,
+    @Default([]) List<WalkStep> steps,
+    bool? realtime,
+
+    /// Seconds late (real time only)
+    int? delay,
+
+    /// Meters
+    int? length,
+
+    /// `[lon, lat]` points
+    @Default([]) List<List<double>> shape,
+  }) = _JourneySection;
+
+  factory JourneySection.fromJson(Map<String, dynamic> json) => _$JourneySectionFromJson(json);
+}
+
+@freezed
+abstract class JourneyOption with _$JourneyOption {
+  const factory JourneyOption({
+    /// Navitia classification: `best`, `rapid`, `comfort`, `less_fallback_walk`, `non_pt_walk`…
+    String? type,
+    @Default([]) List<String> tags,
+    required DateTime departure,
+    required DateTime arrival,
+
+    /// Seconds
+    required int duration,
+    @Default(0) int transfers,
+    int? walkingDuration,
+    int? walkingDistance,
+
+    /// Grams per passenger
+    double? co2,
+
+    /// Euro cents
+    int? fare,
+    @Default([]) List<JourneySection> sections,
+  }) = _JourneyOption;
+
+  const JourneyOption._();
+
+  /// Public transport sections
+  List<JourneySection> get rides => sections.where((section) => section.kind == SectionKind.transit).toList();
+
+  factory JourneyOption.fromJson(Map<String, dynamic> json) => _$JourneyOptionFromJson(json);
+}
+
+@freezed
+abstract class PageCursor with _$PageCursor {
+  const factory PageCursor({required DateTime datetime, required bool arriveBy}) = _PageCursor;
+
+  factory PageCursor.fromJson(Map<String, dynamic> json) => _$PageCursorFromJson(json);
+}
+
+@freezed
+abstract class JourneyPlan with _$JourneyPlan {
+  const factory JourneyPlan({
+    @Default([]) List<JourneyOption> journeys,
+    PageCursor? earlier,
+    PageCursor? later,
+  }) = _JourneyPlan;
+
+  factory JourneyPlan.fromJson(Map<String, dynamic> json) => _$JourneyPlanFromJson(json);
 }

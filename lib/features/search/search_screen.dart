@@ -10,6 +10,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../journey/journey_request.dart';
 
 class _SearchQuery extends Notifier<String> {
   @override
@@ -28,8 +29,13 @@ final _searchResultsProvider = FutureProvider.autoDispose<SearchResult?>((ref) a
   return ref.watch(mobilityApiProvider).search(query);
 });
 
+/// Unified search. With [pickTitle] it chooses a journey start or end and pops a [JourneyPlace].
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.pickTitle});
+
+  final String? pickTitle;
+
+  bool get isPicking => pickTitle != null;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -70,7 +76,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   onChanged: _onChanged,
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
-                    hintText: 'Arrêt, adresse, lieu, ligne…',
+                    hintText: widget.isPicking ? '${widget.pickTitle} : arrêt, adresse, lieu…' : 'Arrêt, adresse, lieu, ligne…',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _controller.text.isEmpty
                         ? null
@@ -88,15 +94,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ],
           ),
         ),
+        if (widget.isPicking)
+          ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.my_location)),
+            title: const Text('Ma position'),
+            onTap: () => context.pop(const JourneyPlace.currentLocation()),
+          ),
         Expanded(
           child: AsyncView(
             value: results,
             onRetry: () => ref.invalidate(_searchResultsProvider),
             data: (result) => result == null
-                ? const _Hint()
+                ? (widget.isPicking ? const SizedBox.shrink() : const _Hint())
                 : result.lines.isEmpty && result.places.isEmpty
                     ? const Padding(padding: EdgeInsets.all(24), child: Text('Aucun résultat'))
-                    : _Results(result: result),
+                    : _Results(result: result, isPicking: widget.isPicking),
           ),
         ),
       ],
@@ -121,9 +133,10 @@ class _Hint extends StatelessWidget {
 }
 
 class _Results extends StatelessWidget {
-  const _Results({required this.result});
+  const _Results({required this.result, required this.isPicking});
 
   final SearchResult result;
+  final bool isPicking;
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +144,7 @@ class _Results extends StatelessWidget {
       controller: PanelScrollScope.of(context),
       padding: const EdgeInsets.only(bottom: 24),
       children: [
-        if (result.lines.isNotEmpty)
+        if (result.lines.isNotEmpty && !isPicking)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Wrap(
@@ -147,16 +160,28 @@ class _Results extends StatelessWidget {
               ],
             ),
           ),
-        for (final place in result.places) _PlaceTile(place: place),
+        for (final place in result.places) _PlaceTile(place: place, isPicking: isPicking),
       ],
     );
   }
 }
 
 class _PlaceTile extends StatelessWidget {
-  const _PlaceTile({required this.place});
+  const _PlaceTile({required this.place, required this.isPicking});
 
   final PlaceResult place;
+  final bool isPicking;
+
+  void _open(BuildContext context) {
+    if (isPicking) {
+      context.pop(JourneyPlace.fromPlace(place));
+    } else if (place.type == PlaceType.stopArea) {
+      context.push(Routes.stop(place.id));
+    } else {
+      // An address or a place: go there, like Citymapper
+      context.push(Routes.journey(JourneyRequest(from: const JourneyPlace.currentLocation(), to: JourneyPlace.fromPlace(place))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,9 +209,14 @@ class _PlaceTile extends StatelessWidget {
                 children: [for (final line in place.lines.take(12)) LineBadge(line, size: 18)],
               ),
             ),
-      onTap: () => place.type == PlaceType.stopArea
-          ? context.push(Routes.stop(place.id))
-          : context.push(Routes.around(place.lat, place.lon, place.name)),
+      onTap: () => _open(context),
+      trailing: isPicking || place.type == PlaceType.stopArea
+          ? null
+          : IconButton(
+              tooltip: 'Départs autour',
+              icon: const Icon(Icons.departure_board),
+              onPressed: () => context.push(Routes.around(place.lat, place.lon, place.name)),
+            ),
     );
   }
 }

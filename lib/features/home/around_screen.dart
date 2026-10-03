@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../journey/journey_request.dart';
 import 'nearby_departures.dart';
 
 /// Departures around a searched address or place
@@ -38,6 +40,15 @@ class AroundScreen extends ConsumerWidget {
               IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
                 child: Text(name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                icon: const Icon(Icons.directions, size: 18),
+                label: const Text('Y aller'),
+                onPressed: () => context.push(Routes.journey(JourneyRequest(
+                  from: const JourneyPlace.currentLocation(),
+                  to: JourneyPlace.point(name: name, lat: position.latitude, lon: position.longitude),
+                ))),
               ),
             ],
           ),

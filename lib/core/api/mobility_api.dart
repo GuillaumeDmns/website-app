@@ -25,6 +25,26 @@ class MobilityApi {
 
   Future<LineDetail> line(String lineId) => _get('/api/v2/lines/${Uri.encodeComponent(lineId)}', LineDetail.fromJson);
 
+  /// [from] / [to]: `lat,lon` or a stop area id. [modes]: allowed modes, all when empty.
+  Future<JourneyPlan> journeys({
+    required String from,
+    required String to,
+    DateTime? datetime,
+    bool arriveBy = false,
+    Set<TransportMode> modes = const {},
+    bool wheelchair = false,
+    String walkingSpeed = 'NORMAL',
+  }) =>
+      _get('/api/v2/journeys', JourneyPlan.fromJson, {
+        'from': from,
+        'to': to,
+        if (datetime != null) 'datetime': datetime.toUtc().toIso8601String(),
+        'arriveBy': arriveBy,
+        if (modes.isNotEmpty) 'modes': modes.map((mode) => mode.apiName).join(','),
+        'wheelchair': wheelchair,
+        'walkingSpeed': walkingSpeed,
+      });
+
   Future<SearchResult> search(String query, {int limit = 10}) =>
       _get('/api/v2/search', SearchResult.fromJson, {'q': query, 'limit': limit});
 

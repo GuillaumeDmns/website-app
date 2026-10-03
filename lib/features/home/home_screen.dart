@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,6 +49,15 @@ class HomeScreen extends ConsumerWidget {
                     if (!origin.isUser)
                       Text('Position indisponible : autour du centre de la carte',
                           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    // Settings can only be opened on phones
+                    if (!origin.isUser && !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS))
+                      if (ref.watch(locationIssueProvider) case final issue?)
+                        TextButton.icon(
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                          icon: const Icon(Icons.my_location, size: 18),
+                          label: Text(issue == LocationIssue.serviceDisabled ? 'Activer la localisation' : 'Autoriser la localisation'),
+                          onPressed: () => fixLocationIssue(ref, issue),
+                        ),
                   ],
                 ),
               ),

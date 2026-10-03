@@ -28,3 +28,15 @@ String departureLabel(Departure departure, DateTime now) {
 /// `250 m`, `1,2 km`
 String formatDistance(int meters) =>
     meters < 1000 ? '$meters m' : '${(meters / 1000).toStringAsFixed(1).replaceFirst('.', ',')} km';
+
+/// `12 min`, `1 h 05` (non-breaking spaces: never split across lines)
+String formatDuration(int seconds) {
+  final minutes = (seconds / 60).round();
+  if (minutes < 60) {
+    return '$minutes\u00a0min';
+  }
+  return '${minutes ~/ 60}\u00a0h\u00a0${(minutes % 60).toString().padLeft(2, '0')}';
+}
+
+/// `2,55 €`
+String formatFare(int cents) => '${(cents / 100).toStringAsFixed(2).replaceFirst('.', ',')}\u00a0€';
