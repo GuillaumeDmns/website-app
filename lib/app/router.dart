@@ -90,10 +90,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 
-  // The map shows the overlay of the page on top. The delegate notifies while widgets build (e.g. after a
-  // redirect), when providers can't be modified: update just after.
+  // The map shows the overlay of the page on top: `router.state` is that page, pushed ones included
+  // (`currentConfiguration.uri` stays on the page under the pushed ones). The delegate notifies while widgets build
+  // (e.g. after a redirect), when providers can't be modified: update just after.
   void updateLocation() => Future.microtask(() => ref.read(routerLocationProvider.notifier).update(
-        router.routerDelegate.currentConfiguration.uri.toString(),
+        router.state.uri.toString(),
       ));
   router.routerDelegate.addListener(updateLocation);
   ref.onDispose(() {
