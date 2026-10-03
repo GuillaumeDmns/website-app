@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/map/main_map.dart';
+import '../features/go/go_bar.dart';
 import 'routes.dart';
 
 /// Width from which the page is shown in a side panel next to the map instead of a bottom sheet
@@ -93,7 +94,14 @@ class _WideLayout extends StatelessWidget {
             ),
           ),
           VerticalDivider(width: 1, color: scheme.outline),
-          const Expanded(child: MainMap()),
+          const Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(child: MainMap()),
+                Positioned(top: 12, left: 12, right: 12, child: SafeArea(child: Center(child: SizedBox(width: 480, child: GoBar())))),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -131,6 +139,7 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
       body: Stack(
         children: [
           Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: height * _initialSize))),
+          const Positioned(top: 8, left: 12, right: 12, child: SafeArea(child: GoBar())),
           DraggableScrollableSheet(
             controller: _sheetController,
             initialChildSize: _initialSize,

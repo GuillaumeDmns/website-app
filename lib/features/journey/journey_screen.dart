@@ -124,7 +124,7 @@ class JourneyScreen extends ConsumerWidget {
                       selectedIndex: selectedIndex,
                       onSelect: (index) => ref.read(_selectedOptionProvider(request).notifier).select(index),
                       onOpen: (journey) {
-                        ref.read(selectedJourneyProvider.notifier).select(journey);
+                        ref.read(selectedJourneyProvider.notifier).select(journey, request);
                         context.push(Routes.journeyDetail);
                       },
                       onPage: (cursor) => _update(

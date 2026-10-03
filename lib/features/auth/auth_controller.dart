@@ -28,6 +28,7 @@ class AuthController extends Notifier<AuthStatus> {
     final store = ref.read(localStoreProvider);
     await store.remove('favorites');
     await store.remove('recent_searches');
+    await store.remove('go_session');
   }
 
   Future<void> signIn(String username, String password) async {

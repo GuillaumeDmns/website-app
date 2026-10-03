@@ -7,6 +7,7 @@ import '../core/map/map_overlay.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
+import '../features/go/go_screen.dart';
 import '../features/home/around_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/journey/journey_detail_screen.dart';
@@ -76,6 +77,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: Routes.journeyDetail, builder: (context, state) => const JourneyDetailScreen()),
           GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
+          GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
           GoRoute(
             path: Routes.aroundPath,
             builder: (context, state) {
