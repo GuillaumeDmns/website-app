@@ -57,7 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: Routes.home, builder: (context, state) => const HomeScreen()),
           GoRoute(
             path: Routes.search,
-            builder: (context, state) => SearchScreen(pickTitle: state.uri.queryParameters['pick']),
+            builder: (context, state) => SearchScreen(
+              pickTitle: state.uri.queryParameters['pick'],
+              allowCurrentLocation: state.uri.queryParameters['here'] != '0',
+            ),
           ),
           GoRoute(
             path: Routes.journeyPath,

@@ -401,3 +401,42 @@ abstract class JourneyPlan with _$JourneyPlan {
 
   factory JourneyPlan.fromJson(Map<String, dynamic> json) => _$JourneyPlanFromJson(json);
 }
+
+enum FavoriteKind {
+  @JsonValue('HOME')
+  home,
+  @JsonValue('WORK')
+  work,
+  @JsonValue('PLACE')
+  place,
+  @JsonValue('STOP')
+  stop,
+  @JsonValue('LINE')
+  line;
+
+  String get apiName => name.toUpperCase();
+}
+
+@freezed
+abstract class Favorite with _$Favorite {
+  const factory Favorite({
+    required int id,
+    @JsonKey(unknownEnumValue: FavoriteKind.place) required FavoriteKind kind,
+
+    /// Address, place or stop name; null for lines
+    String? label,
+    double? lat,
+    double? lon,
+
+    /// Stop favorites, and places that are stop areas
+    String? stopAreaId,
+
+    /// Stop area with its lines (stop favorites)
+    StopAreaSummary? stop,
+
+    /// Line favorites
+    LineSummary? line,
+  }) = _Favorite;
+
+  factory Favorite.fromJson(Map<String, dynamic> json) => _$FavoriteFromJson(json);
+}

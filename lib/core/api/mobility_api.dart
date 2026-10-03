@@ -48,6 +48,26 @@ class MobilityApi {
   Future<SearchResult> search(String query, {int limit = 10}) =>
       _get('/api/v2/search', SearchResult.fromJson, {'q': query, 'limit': limit});
 
+  Future<List<Favorite>> favorites() => _getList('/api/v2/me/favorites', Favorite.fromJson);
+
+  /// [body]: `kind` plus `label`/`lat`/`lon`/`stopAreaId` for places, `stopAreaId` for stops, `lineId` for lines
+  Future<Favorite> addFavorite(Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>('/api/v2/me/favorites', data: body);
+      return Favorite.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<void> deleteFavorite(int id) async {
+    try {
+      await _dio.delete<void>('/api/v2/me/favorites/$id');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<T> _get<T>(String path, T Function(Map<String, dynamic>) fromJson, [Map<String, dynamic>? query]) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(path, queryParameters: query);

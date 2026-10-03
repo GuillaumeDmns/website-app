@@ -14,7 +14,10 @@ abstract final class Routes {
   static String journey(JourneyRequest request) => Uri(path: journeyPath, queryParameters: request.toQuery()).toString();
 
   /// Search used to choose a journey start or end; pops a `JourneyPlace`
-  static String pickPlace(String title) => Uri(path: search, queryParameters: {'pick': title}).toString();
+  static String pickPlace(String title, {bool allowCurrentLocation = true}) => Uri(
+        path: search,
+        queryParameters: {'pick': title, if (!allowCurrentLocation) 'here': '0'},
+      ).toString();
 
   static String stop(String stopAreaId) => '/stops/${Uri.encodeComponent(stopAreaId)}';
 

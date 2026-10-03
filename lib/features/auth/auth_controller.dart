@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_providers.dart';
+import '../../core/storage/local_store.dart';
 
 enum AuthStatus { unknown, signedIn, signedOut }
 
@@ -22,14 +23,23 @@ class AuthController extends Notifier<AuthStatus> {
     state = tokenStore.refreshToken != null ? AuthStatus.signedIn : AuthStatus.signedOut;
   }
 
+  /// Device copies of the previous account's data (favorites, recent searches) must not show for another one
+  Future<void> _clearUserData() async {
+    final store = ref.read(localStoreProvider);
+    await store.remove('favorites');
+    await store.remove('recent_searches');
+  }
+
   Future<void> signIn(String username, String password) async {
     final tokens = await ref.read(authApiProvider).signIn(username.trim(), password);
+    await _clearUserData();
     await ref.read(tokenStoreProvider).save(tokens);
     state = AuthStatus.signedIn;
   }
 
   Future<void> signUp(String username, String email, String password) async {
     final tokens = await ref.read(authApiProvider).signUp(username.trim(), email.trim(), password);
+    await _clearUserData();
     await ref.read(tokenStoreProvider).save(tokens);
     state = AuthStatus.signedIn;
   }
@@ -41,6 +51,7 @@ class AuthController extends Notifier<AuthStatus> {
       await ref.read(authApiProvider).logout(refreshToken);
     }
     await tokenStore.clear();
+    await _clearUserData();
     state = AuthStatus.signedOut;
   }
 

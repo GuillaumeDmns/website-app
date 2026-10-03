@@ -7,6 +7,8 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../favorites/favorite_widgets.dart';
+import '../favorites/favorites_controller.dart';
 import '../journey/journey_request.dart';
 import 'nearby_departures.dart';
 
@@ -40,6 +42,18 @@ class AroundScreen extends ConsumerWidget {
               IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
                 child: Text(name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              IconButton(
+                tooltip: 'Enregistrer ce lieu',
+                icon: const Icon(Icons.bookmark_add_outlined),
+                onPressed: () => runFavoriteAction(
+                  context,
+                  () => ref.read(favoritesProvider.notifier).savePlace(
+                        FavoriteKind.place,
+                        JourneyPlace.point(name: name, lat: position.latitude, lon: position.longitude),
+                      ),
+                  success: 'Lieu enregistré',
+                ),
               ),
               FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
