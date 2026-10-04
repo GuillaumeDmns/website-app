@@ -291,23 +291,22 @@ class GoTracker {
 
   // Manual corrections
 
+  /// Waiting: the user says they boarded; otherwise the step is done
   GoProgress next(GoProgress progress) =>
       progress.phase == GoPhase.waiting ? _board(progress, null, null) : _advance(progress, null);
 
-  GoProgress previous(GoProgress progress) {
-    final step = stepOf(progress);
-    if (progress.phase == GoPhase.onBoard && step != null) {
-      return progress.copyWith(phase: GoPhase.waiting, along: 0, stopIndex: 0, issue: () => null);
+  /// The user says they are at [step] (a step of the list, or `steps.length` for the arrival)
+  GoProgress jumpTo(GoProgress progress, int step) {
+    if (step >= steps.length) {
+      return _arrive(progress, DateTime.now());
     }
-    if (progress.phase == GoPhase.arrived && steps.isNotEmpty) {
-      final last = steps.length - 1;
-      return GoProgress(step: last, phase: _phaseOf(last), shift: progress.shift, fired: progress.fired);
-    }
-    if (progress.step == 0) {
-      return progress.copyWith(along: 0, stopIndex: 0, issue: () => null);
-    }
-    final previousStep = progress.step - 1;
-    return GoProgress(step: previousStep, phase: _phaseOf(previousStep), shift: progress.shift, fired: progress.fired);
+    return GoProgress(
+      step: step,
+      phase: _phaseOf(step),
+      shift: progress.shift,
+      lastFixAt: progress.lastFixAt,
+      fired: progress.fired,
+    );
   }
 
   /// The user takes the vehicle leaving at [departure] instead of the planned one

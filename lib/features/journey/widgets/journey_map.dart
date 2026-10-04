@@ -10,20 +10,21 @@ import '../../../core/widgets/line_badge.dart';
 /// Map overlay of a journey, kept light: rides in their line color, walks dotted, the line badge where you board,
 /// a dot where you get off, start and end. Intermediate stops are left out.
 ///
-/// GO mode: sections before [currentSection] and the first [currentAlong] meters of it are greyed, and the camera
-/// follows [follow] instead of framing the journey.
+/// GO mode: sections before [currentSection] and the first [currentAlong] meters of it are faded, and the camera
+/// frames the section [fitSection] instead of the whole journey.
 MapOverlay journeyOverlay(
   BuildContext context,
   JourneyOption journey, {
   int currentSection = -1,
   double currentAlong = 0,
-  LatLng? follow,
+  int? fitSection,
 }) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
   final dots = <MapPin>[];
   final badges = <MapPin>[];
   final points = <LatLng>[];
+  var sectionPoints = const <LatLng>[];
 
   for (final (index, section) in journey.sections.indexed) {
     final shape = section.shape.isNotEmpty
@@ -36,6 +37,9 @@ MapOverlay journeyOverlay(
       continue;
     }
     points.addAll(shape);
+    if (index == fitSection) {
+      sectionPoints = shape;
+    }
 
     final ride = section.kind == SectionKind.transit;
     final color = ride ? parseHexColor(section.line?.color, scheme.primary) : scheme.onSurfaceVariant;
@@ -89,8 +93,7 @@ MapOverlay journeyOverlay(
       ...badges,
       if (end != null) MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name),
     ],
-    fit: follow == null ? points : const [],
-    follow: follow,
+    fit: sectionPoints.isNotEmpty ? sectionPoints : points,
   );
 }
 

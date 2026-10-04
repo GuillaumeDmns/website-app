@@ -73,7 +73,6 @@ class JourneyDetailScreen extends ConsumerWidget {
                 label: const Text('GO'),
                 onPressed: () {
                   ref.read(goControllerProvider.notifier).start(journey, ref.read(selectedJourneyProvider.notifier).request);
-                  ref.read(mapFollowPausedProvider.notifier).resume();
                   context.push(Routes.go);
                 },
               ),

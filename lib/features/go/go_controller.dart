@@ -144,7 +144,7 @@ class GoController extends Notifier<GoState?> {
 
   void next() => _setProgress((tracker, progress) => tracker.next(progress));
 
-  void previous() => _setProgress((tracker, progress) => tracker.previous(progress));
+  void jumpTo(int step) => _setProgress((tracker, progress) => tracker.jumpTo(progress, step));
 
   void dismissIssue() => _setProgress((tracker, progress) => tracker.dismissIssue(progress));
 

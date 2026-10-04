@@ -128,15 +128,3 @@ String _position(String position) => switch (position) {
       'back' => 'à l\'arrière',
       _ => position,
     };
-
-/// One line per step of the journey, for the step list
-String goStepLabel(GoStep step) {
-  final section = step.section;
-  return switch (section.kind) {
-    SectionKind.transit => '${_lineLabel(section.line)} → ${section.headsign ?? ''}'
-        '${section.stops.length > 1 ? ' · ${section.stops.length - 1} arrêt${section.stops.length > 2 ? 's' : ''}' : ''}',
-    SectionKind.transfer => 'Correspondance ${formatDuration(section.duration)}',
-    SectionKind.bike => 'Vélo ${formatDuration(section.duration)} jusqu\'à ${section.to?.name ?? ''}',
-    _ => 'Marche ${formatDuration(section.duration)} jusqu\'à ${section.to?.name ?? ''}',
-  };
-}

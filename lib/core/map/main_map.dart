@@ -38,29 +38,8 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
     super.dispose();
   }
 
-  LatLng? _followed;
-
   void _frame(MapOverlay overlay) {
-    if (!_ready) {
-      return;
-    }
-    final follow = overlay.follow;
-    if (follow != null) {
-      if (follow != _followed && !ref.read(mapFollowPausedProvider)) {
-        _followed = follow;
-        _controller.animatedFitCamera(
-          cameraFit: CameraFit.coordinates(
-            coordinates: [follow],
-            padding: widget.padding + const EdgeInsets.all(48),
-            maxZoom: _controller.mapController.camera.zoom.clamp(15, 18),
-            minZoom: 15,
-          ),
-        );
-      }
-      return;
-    }
-    _followed = null;
-    if (overlay.fit.isEmpty || listEquals(overlay.fit, _framedFit)) {
+    if (!_ready || overlay.fit.isEmpty || listEquals(overlay.fit, _framedFit)) {
       return;
     }
     _framedFit = overlay.fit;
@@ -76,12 +55,6 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
   }
 
   void _onMapEvent(MapEvent event) {
-    // Moved by hand: stop following
-    if (_followed != null &&
-        (event is MapEventMoveStart && (event.source == MapEventSource.dragStart || event.source == MapEventSource.multiFingerGestureStart) ||
-            event is MapEventScrollWheelZoom)) {
-      ref.read(mapFollowPausedProvider.notifier).pause();
-    }
     if (event is MapEventMoveEnd || event is MapEventFlingAnimationEnd || event is MapEventDoubleTapZoomEnd ||
         event is MapEventScrollWheelZoom) {
       _centerDebounce?.cancel();
@@ -98,16 +71,9 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
     final location = ref.watch(routerLocationProvider);
     final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
     final user = ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
-    ref.watch(mapFollowPausedProvider);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
-    // Following again: forget the last followed point so that the camera goes back to it
-    ref.listen(mapFollowPausedProvider, (previous, paused) {
-      if (!paused) {
-        _followed = null;
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
 
     // First fix: go to the user unless a page already framed something

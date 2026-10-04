@@ -46,7 +46,7 @@ class MapPath {
 
 /// What a screen shows on the map, and where the camera should go.
 class MapOverlay {
-  const MapOverlay({this.pins = const [], this.paths = const [], this.fit = const [], this.follow});
+  const MapOverlay({this.pins = const [], this.paths = const [], this.fit = const []});
 
   static const empty = MapOverlay();
 
@@ -56,21 +56,7 @@ class MapOverlay {
   /// Points to frame when the overlay is shown; empty to leave the camera where it is
   final List<LatLng> fit;
 
-  /// Point the camera follows (GO mode), instead of [fit], until the user moves the map
-  final LatLng? follow;
 }
-
-/// The user moved the map while it was following a point: following stops until [resume]
-class MapFollowPaused extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void pause() => state = true;
-
-  void resume() => state = false;
-}
-
-final mapFollowPausedProvider = NotifierProvider<MapFollowPaused, bool>(MapFollowPaused.new);
 
 /// Position shown as the user dot instead of the regular one (GO mode, more frequent fixes)
 class PreciseUserPosition extends Notifier<LatLng?> {
