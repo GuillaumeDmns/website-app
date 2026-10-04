@@ -11,9 +11,12 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/location/location_providers.dart';
 import '../favorites/favorite_widgets.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
+import 'line_vehicles.dart';
+import 'vehicle_sheet.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
@@ -32,6 +35,11 @@ class _LineScreenState extends ConsumerState<LineScreen> {
   int _direction = 0;
   int _branch = 0;
 
+  /// Measured path of each branch, computed once
+  final _paths = Expando<BranchPath>();
+
+  BranchPath _pathOf(LineBranch branch) => _paths[branch] ??= BranchPath(branch);
+
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(lineDetailProvider(widget.lineId));
@@ -46,17 +54,29 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       }
     }
 
+    // Vehicles of the direction shown, moved along between two fetches
+    final fetched = ref.watch(lineVehiclesProvider(widget.lineId)).value;
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final vehicles = [
+      if (fetched != null)
+        for (final vehicle in fetched.vehicles)
+          if (vehicle.direction == _direction.clamp(0, (value?.directions.length ?? 1) - 1))
+            (vehicle: vehicle, progress: vehicleProgress(vehicle, fetched.fetchedAt, now)),
+    ];
+
     return MapOverlayScope(
-      overlay: value == null ? MapOverlay.empty : _overlay(value.line, direction, branch),
+      overlay: value == null ? MapOverlay.empty : _overlay(value, direction, branch, vehicles, now),
       child: AsyncView(
         value: detail,
         onRetry: () => ref.invalidate(lineDetailProvider(widget.lineId)),
-        data: (detail) => _content(context, detail, direction, branch),
+        data: (detail) => _content(context, detail, direction, branch, vehicles),
       ),
     );
   }
 
-  MapOverlay _overlay(LineSummary line, LineDirection? direction, LineBranch? branch) {
+  MapOverlay _overlay(LineDetail detail, LineDirection? direction, LineBranch? branch,
+      List<({Vehicle vehicle, double progress})> vehicles, DateTime now) {
+    final line = detail.line;
     final color = parseHexColor(line.color, Colors.grey);
     List<LatLng> points(LineBranch b) => b.shape.isNotEmpty
         ? [for (final point in b.shape) LatLng(point[1], point[0])]
@@ -78,12 +98,44 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             label: stop.name,
             onTap: () => context.push(Routes.stop(stop.id)),
           ),
+        for (final (:vehicle, :progress) in vehicles)
+          if (vehicle.direction < detail.directions.length &&
+              vehicle.branch < detail.directions[vehicle.direction].branches.length)
+            if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch]).position(vehicle, progress)
+                case final point?)
+              MapPin(
+                point: point,
+                color: color,
+                label: vehicleLabel(vehicle, now),
+                onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+                childSize: const Size(24, 24),
+                child: VehicleMarker(line: line),
+              ),
       ],
       fit: selected,
     );
   }
 
-  Widget _content(BuildContext context, LineDetail detail, LineDirection? direction, LineBranch? branch) {
+  Widget _content(BuildContext context, LineDetail detail, LineDirection? direction, LineBranch? branch,
+      List<({Vehicle vehicle, double progress})> vehicles) {
+    // Vehicles on the stop list: fractional stop index in the branch shown (vehicles of other branches too, where
+    // they run on it)
+    final positions = <int, List<({double offset, Vehicle vehicle})>>{};
+    final stopIds = [for (final stop in branch?.stops ?? const <StopRef>[]) stop.id];
+    for (final (:vehicle, :progress) in vehicles) {
+      final to = stopIds.indexOf(vehicle.toStopId);
+      if (to < 0) {
+        continue;
+      }
+      final left = vehicle.fromStopId == null ? to : stopIds.lastIndexOf(vehicle.fromStopId!, to);
+      if (vehicle.fromStopId != null && left < 0 && to == 0) {
+        continue;
+      }
+      final from = left >= 0 ? left : to - 1;
+      final position = from + (to - from) * progress;
+      positions.putIfAbsent(position.round(), () => []).add((offset: position - position.round(), vehicle: vehicle));
+    }
+
     final theme = Theme.of(context);
     final line = detail.line;
     final color = parseHexColor(line.color, theme.colorScheme.primary);
@@ -156,6 +208,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               color: color,
               isFirst: i == 0,
               isLast: i == branch.stops.length - 1,
+              line: line,
+              vehicles: positions[i] ?? const [],
             ),
       ],
     );
@@ -204,12 +258,25 @@ class _LineDisruptions extends ConsumerWidget {
 
 /// Stop of the line drawn on a vertical line of the line's color
 class _StopTimelineTile extends StatelessWidget {
-  const _StopTimelineTile({required this.stop, required this.color, required this.isFirst, required this.isLast});
+  const _StopTimelineTile({
+    required this.stop,
+    required this.color,
+    required this.isFirst,
+    required this.isLast,
+    required this.line,
+    this.vehicles = const [],
+  });
+
+  static const _height = 44.0;
 
   final StopRef stop;
   final Color color;
   final bool isFirst;
   final bool isLast;
+  final LineSummary line;
+
+  /// Vehicles around this stop, offset in stops (-0.5: halfway from the previous one, 0: at the stop)
+  final List<({double offset, Vehicle vehicle})> vehicles;
 
   @override
   Widget build(BuildContext context) {
@@ -219,13 +286,14 @@ class _StopTimelineTile extends StatelessWidget {
     return InkWell(
       onTap: () => context.push(Routes.stop(stop.id)),
       child: SizedBox(
-        height: 44,
+        height: _height,
         child: Row(
           children: [
             SizedBox(
               width: 48,
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
                   Column(
                     children: [
@@ -242,6 +310,15 @@ class _StopTimelineTile extends StatelessWidget {
                       border: Border.all(color: color, width: 3),
                     ),
                   ),
+                  for (final (:offset, :vehicle) in vehicles)
+                    Positioned(
+                      top: _height / 2 + offset * _height - 10,
+                      left: 14,
+                      child: GestureDetector(
+                        onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: VehicleMarker(line: line, size: 20)),
+                      ),
+                    ),
                 ],
               ),
             ),

@@ -25,6 +25,10 @@ class MobilityApi {
 
   Future<LineDetail> line(String lineId) => _get('/api/v2/lines/${Uri.encodeComponent(lineId)}', LineDetail.fromJson);
 
+  /// Vehicles of a line, estimated from real time (empty without real time)
+  Future<List<Vehicle>> lineVehicles(String lineId) =>
+      _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/vehicles', Vehicle.fromJson);
+
   Future<List<Disruption>> lineDisruptions(String lineId) =>
       _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/disruptions', Disruption.fromJson);
 
