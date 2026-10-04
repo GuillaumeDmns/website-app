@@ -16,6 +16,7 @@ import '../favorites/favorite_widgets.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'line_vehicles.dart';
+import 'vehicle_sheet.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
@@ -106,6 +107,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                 point: point,
                 color: color,
                 label: vehicleLabel(vehicle, now),
+                onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
                 childSize: const Size(24, 24),
                 child: VehicleMarker(line: line),
               ),
@@ -118,7 +120,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       List<({Vehicle vehicle, double progress})> vehicles) {
     // Vehicles on the stop list: fractional stop index in the branch shown (vehicles of other branches too, where
     // they run on it)
-    final positions = <int, List<double>>{};
+    final positions = <int, List<({double offset, Vehicle vehicle})>>{};
     final stopIds = [for (final stop in branch?.stops ?? const <StopRef>[]) stop.id];
     for (final (:vehicle, :progress) in vehicles) {
       final to = stopIds.indexOf(vehicle.toStopId);
@@ -131,7 +133,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       }
       final from = left >= 0 ? left : to - 1;
       final position = from + (to - from) * progress;
-      positions.putIfAbsent(position.round(), () => []).add(position - position.round());
+      positions.putIfAbsent(position.round(), () => []).add((offset: position - position.round(), vehicle: vehicle));
     }
 
     final theme = Theme.of(context);
@@ -207,7 +209,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               isFirst: i == 0,
               isLast: i == branch.stops.length - 1,
               line: line,
-              vehicleOffsets: positions[i] ?? const [],
+              vehicles: positions[i] ?? const [],
             ),
       ],
     );
@@ -262,7 +264,7 @@ class _StopTimelineTile extends StatelessWidget {
     required this.isFirst,
     required this.isLast,
     required this.line,
-    this.vehicleOffsets = const [],
+    this.vehicles = const [],
   });
 
   static const _height = 44.0;
@@ -273,8 +275,8 @@ class _StopTimelineTile extends StatelessWidget {
   final bool isLast;
   final LineSummary line;
 
-  /// Vehicles around this stop, in stops (-0.5: halfway from the previous one, 0: at the stop)
-  final List<double> vehicleOffsets;
+  /// Vehicles around this stop, offset in stops (-0.5: halfway from the previous one, 0: at the stop)
+  final List<({double offset, Vehicle vehicle})> vehicles;
 
   @override
   Widget build(BuildContext context) {
@@ -308,11 +310,14 @@ class _StopTimelineTile extends StatelessWidget {
                       border: Border.all(color: color, width: 3),
                     ),
                   ),
-                  for (final offset in vehicleOffsets)
+                  for (final (:offset, :vehicle) in vehicles)
                     Positioned(
                       top: _height / 2 + offset * _height - 10,
                       left: 14,
-                      child: VehicleMarker(line: line, size: 20),
+                      child: GestureDetector(
+                        onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: VehicleMarker(line: line, size: 20)),
+                      ),
                     ),
                 ],
               ),

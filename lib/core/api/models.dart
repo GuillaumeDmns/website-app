@@ -506,6 +506,9 @@ abstract class LineTraffic with _$LineTraffic {
 abstract class Vehicle with _$Vehicle {
   const factory Vehicle({
     required String id,
+
+    /// Mission code or train number, when given (RER, Transilien)
+    String? name,
     String? destination,
     required int direction,
     required int branch,
@@ -519,7 +522,24 @@ abstract class Vehicle with _$Vehicle {
     required double progress,
     required DateTime expectedAt,
     int? delaySeconds,
+
+    /// Next stops with their times, from the next one (as far as the real time goes)
+    @Default([]) List<VehicleCall> calls,
   }) = _Vehicle;
 
   factory Vehicle.fromJson(Map<String, dynamic> json) => _$VehicleFromJson(json);
+}
+
+/// A next stop of a vehicle
+@freezed
+abstract class VehicleCall with _$VehicleCall {
+  const factory VehicleCall({
+    required String stopId,
+    String? stopName,
+    required DateTime expectedAt,
+    int? delaySeconds,
+    String? platform,
+  }) = _VehicleCall;
+
+  factory VehicleCall.fromJson(Map<String, dynamic> json) => _$VehicleCallFromJson(json);
 }
