@@ -74,8 +74,9 @@ class JourneyScreen extends ConsumerWidget {
               ],
               fit: [?point(request.from), ?point(request.to)],
             ),
+      // Not the sheet's controller: the options scroll inside the sheet, which stays low enough to see them on the
+      // map (it only moves with its handle)
       child: ListView(
-        controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 8, 16, 24),
         children: [
           _Header(
