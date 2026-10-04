@@ -500,3 +500,26 @@ abstract class LineTraffic with _$LineTraffic {
 
   factory LineTraffic.fromJson(Map<String, dynamic> json) => _$LineTrafficFromJson(json);
 }
+
+/// Vehicle of a line between two stops of one of its branches (directions/branches of [LineDetail])
+@freezed
+abstract class Vehicle with _$Vehicle {
+  const factory Vehicle({
+    required String id,
+    String? destination,
+    required int direction,
+    required int branch,
+
+    /// Stop area just left, null when waiting at the first stop of the branch
+    String? fromStopId,
+    required String toStopId,
+    String? toStopName,
+
+    /// 0 (just left) to 1 (at the next stop), when fetched
+    required double progress,
+    required DateTime expectedAt,
+    int? delaySeconds,
+  }) = _Vehicle;
+
+  factory Vehicle.fromJson(Map<String, dynamic> json) => _$VehicleFromJson(json);
+}
