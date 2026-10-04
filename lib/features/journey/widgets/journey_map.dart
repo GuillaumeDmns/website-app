@@ -4,18 +4,29 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../../core/api/models.dart';
 import '../../../core/map/map_overlay.dart';
 import '../../../core/utils/colors.dart';
+import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
 
 /// Map overlay of a journey, kept light: rides in their line color, walks dotted, the line badge where you board,
 /// a dot where you get off, start and end. Intermediate stops are left out.
-MapOverlay journeyOverlay(BuildContext context, JourneyOption journey) {
+///
+/// GO mode: sections before [currentSection] and the first [currentAlong] meters of it are faded, and the camera
+/// frames the section [fitSection] instead of the whole journey.
+MapOverlay journeyOverlay(
+  BuildContext context,
+  JourneyOption journey, {
+  int currentSection = -1,
+  double currentAlong = 0,
+  int? fitSection,
+}) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
   final dots = <MapPin>[];
   final badges = <MapPin>[];
   final points = <LatLng>[];
+  var sectionPoints = const <LatLng>[];
 
-  for (final section in journey.sections) {
+  for (final (index, section) in journey.sections.indexed) {
     final shape = section.shape.isNotEmpty
         ? [for (final point in section.shape) LatLng(point[1], point[0])]
         : [
@@ -26,10 +37,28 @@ MapOverlay journeyOverlay(BuildContext context, JourneyOption journey) {
       continue;
     }
     points.addAll(shape);
+    if (index == fitSection) {
+      sectionPoints = shape;
+    }
 
     final ride = section.kind == SectionKind.transit;
     final color = ride ? parseHexColor(section.line?.color, scheme.primary) : scheme.onSurfaceVariant;
-    paths.add(MapPath(points: shape, color: color, width: ride ? 6 : 4, dotted: !ride));
+    final width = ride ? 6.0 : 4.0;
+    // Done part: the line's color faded (plain grey looks like a road on the map)
+    final done = color.withValues(alpha: 0.3);
+    if (index < currentSection) {
+      paths.add(MapPath(points: shape, color: done, width: width, dotted: !ride));
+    } else if (index == currentSection && currentAlong > 0) {
+      final (before, after) = MeasuredPolyline(shape).split(currentAlong);
+      if (before.length >= 2) {
+        paths.add(MapPath(points: before, color: done, width: width, dotted: !ride));
+      }
+      if (after.length >= 2) {
+        paths.add(MapPath(points: after, color: color, width: width, dotted: !ride));
+      }
+    } else {
+      paths.add(MapPath(points: shape, color: color, width: width, dotted: !ride));
+    }
 
     if (ride) {
       // Get off: small dot in the line color
@@ -64,7 +93,7 @@ MapOverlay journeyOverlay(BuildContext context, JourneyOption journey) {
       ...badges,
       if (end != null) MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name),
     ],
-    fit: points,
+    fit: sectionPoints.isNotEmpty ? sectionPoints : points,
   );
 }
 

@@ -55,7 +55,18 @@ class MapOverlay {
 
   /// Points to frame when the overlay is shown; empty to leave the camera where it is
   final List<LatLng> fit;
+
 }
+
+/// Position shown as the user dot instead of the regular one (GO mode, more frequent fixes)
+class PreciseUserPosition extends Notifier<LatLng?> {
+  @override
+  LatLng? build() => null;
+
+  void set(LatLng? position) => state = position;
+}
+
+final preciseUserPositionProvider = NotifierProvider<PreciseUserPosition, LatLng?>(PreciseUserPosition.new);
 
 /// Overlays by route location: the map shows the one of the current page, so going back restores the previous one.
 class MapOverlays extends Notifier<Map<String, MapOverlay>> {

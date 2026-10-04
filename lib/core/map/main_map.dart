@@ -70,7 +70,7 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final location = ref.watch(routerLocationProvider);
     final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
-    final user = ref.watch(userLocationProvider).value;
+    final user = ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 

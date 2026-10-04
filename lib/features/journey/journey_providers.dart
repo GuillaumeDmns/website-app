@@ -46,7 +46,13 @@ class SelectedJourney extends Notifier<JourneyOption?> {
   @override
   JourneyOption? build() => null;
 
-  void select(JourneyOption journey) => state = journey;
+  /// Search the option comes from (its options are reused to recalculate in GO mode)
+  JourneyRequest? request;
+
+  void select(JourneyOption journey, JourneyRequest request) {
+    this.request = request;
+    state = journey;
+  }
 }
 
 final selectedJourneyProvider = NotifierProvider<SelectedJourney, JourneyOption?>(SelectedJourney.new);

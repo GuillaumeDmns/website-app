@@ -6,11 +6,13 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
-import '../../core/utils/colors.dart';
 import '../../core/location/location_providers.dart';
+import '../../core/utils/colors.dart';
+import '../../core/utils/text.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/departure_time.dart';
 import '../../core/widgets/line_badge.dart';
+import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
@@ -63,6 +65,16 @@ class JourneyDetailScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              FilledButton.icon(
+                // The theme makes filled buttons full width
+                style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+                icon: const Icon(Icons.navigation),
+                label: const Text('GO'),
+                onPressed: () {
+                  ref.read(goControllerProvider.notifier).start(journey, ref.read(selectedJourneyProvider.notifier).request);
+                  context.push(Routes.go);
+                },
               ),
             ],
           ),
@@ -318,17 +330,6 @@ class _NextDepartures extends ConsumerWidget {
   final String stopAreaId;
   final String lineId;
 
-  static String _normalize(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp('[éèêë]'), 'e')
-      .replaceAll(RegExp('[àâä]'), 'a')
-      .replaceAll(RegExp('[îï]'), 'i')
-      .replaceAll(RegExp('[ôö]'), 'o')
-      .replaceAll(RegExp('[ùûü]'), 'u')
-      .replaceAll('ç', 'c')
-      .replaceAll(RegExp('[^a-z0-9]+'), ' ')
-      .trim();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
@@ -342,13 +343,7 @@ class _NextDepartures extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final headsign = _normalize(section.headsign ?? '');
-    final matching = headsign.isEmpty
-        ? const <LineDepartures>[]
-        : rows.where((row) {
-            final destination = _normalize(row.destination);
-            return destination.isNotEmpty && (destination.contains(headsign) || headsign.contains(destination));
-          }).toList();
+    final matching = rows.where((row) => sameDestination(row.destination, section.headsign ?? '')).toList();
     final shown = (matching.isNotEmpty ? matching : rows).take(2).toList();
     final theme = Theme.of(context);
 
