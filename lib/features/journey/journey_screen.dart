@@ -279,6 +279,18 @@ class _TimeButton extends StatelessWidget {
   }
 }
 
+/// Phone: the sheet may have been scrolled up over the map; lower it so that the option shows on the map, and keep
+/// the tapped card in view
+void _revealOnMap(BuildContext cardContext) {
+  PanelSheetScope.showMap(cardContext);
+  Future.delayed(const Duration(milliseconds: 280), () {
+    if (cardContext.mounted) {
+      Scrollable.ensureVisible(cardContext,
+          duration: const Duration(milliseconds: 200), alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+    }
+  });
+}
+
 class _Results extends StatelessWidget {
   const _Results({
     required this.plan,
@@ -322,13 +334,22 @@ class _Results extends StatelessWidget {
           else
             const SizedBox(height: 8),
           // First tap shows the option on the map, a second one (or "Détails") opens it; hovering shows it too
-          JourneyCard(
-            journey: journey,
-            now: now,
-            selected: index == selectedIndex,
-            onTap: () => index == selectedIndex ? onOpen(journey) : onSelect(index),
-            onOpen: () => onOpen(journey),
-            onHover: () => onSelect(index),
+          Builder(
+            builder: (cardContext) => JourneyCard(
+              journey: journey,
+              now: now,
+              selected: index == selectedIndex,
+              onTap: () {
+                if (index == selectedIndex) {
+                  onOpen(journey);
+                } else {
+                  onSelect(index);
+                  _revealOnMap(cardContext);
+                }
+              },
+              onOpen: () => onOpen(journey),
+              onHover: () => onSelect(index),
+            ),
           ),
         ],
         const SizedBox(height: 12),

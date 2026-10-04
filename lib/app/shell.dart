@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/map/main_map.dart';
+import '../core/map/map_overlay.dart';
 import '../features/go/go_bar.dart';
 import 'routes.dart';
 
@@ -29,6 +30,28 @@ class PanelScrollScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(PanelScrollScope oldWidget) => oldWidget.controller != controller;
+}
+
+/// Gives the pages the bottom sheet (narrow layout) to move it, e.g. down to show the map. Null in the wide layout.
+class PanelSheetScope extends InheritedWidget {
+  const PanelSheetScope({super.key, required this.controller, required this.middle, required super.child});
+
+  final DraggableScrollableController? controller;
+
+  /// Middle size of the sheet for the current page (fraction of the screen)
+  final double middle;
+
+  /// Lowers the sheet to its middle size when it is above, so that the map shows what the page just changed
+  static void showMap(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<PanelSheetScope>();
+    final controller = scope?.controller;
+    if (controller != null && controller.isAttached && controller.size > scope!.middle + 0.05) {
+      controller.animateTo(scope.middle, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+    }
+  }
+
+  @override
+  bool updateShouldNotify(PanelSheetScope oldWidget) => oldWidget.controller != controller || oldWidget.middle != middle;
 }
 
 /// Map behind, current page in a side panel (wide) or a draggable bottom sheet (narrow), like Citymapper.
@@ -108,18 +131,26 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-class _NarrowLayout extends StatefulWidget {
+class _NarrowLayout extends ConsumerStatefulWidget {
   const _NarrowLayout({required this.child});
 
   final Widget child;
 
   @override
-  State<_NarrowLayout> createState() => _NarrowLayoutState();
+  ConsumerState<_NarrowLayout> createState() => _NarrowLayoutState();
 }
 
-class _NarrowLayoutState extends State<_NarrowLayout> {
+class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   static const _minSize = 0.12;
   static const _initialSize = 0.5;
+
+  /// GO mode: a short sheet (one step card), most of the screen for the map
+  static const _goSheetHeight = 360.0;
+
+  /// Middle size of the sheet for a page
+  static double _middleFor(String location, double screenHeight) => location.startsWith(Routes.go)
+      ? (_goSheetHeight / screenHeight).clamp(0.25, _initialSize)
+      : _initialSize;
 
   final _sheetController = DraggableScrollableController();
 
@@ -133,20 +164,34 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final height = MediaQuery.sizeOf(context).height;
+    final middle = _middleFor(ref.watch(routerLocationProvider), height);
+
+    // Entering or leaving a page with another middle size: go to it
+    ref.listen(routerLocationProvider, (previous, location) {
+      final target = _middleFor(location, height);
+      if (previous != null && target != _middleFor(previous, height)) {
+        // After the frame: the sheet is rebuilt with its new sizes first
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_sheetController.isAttached) {
+            _sheetController.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+          }
+        });
+      }
+    });
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: height * _initialSize))),
+          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: height * middle))),
           const Positioned(top: 8, left: 12, right: 12, child: SafeArea(child: GoBar())),
           DraggableScrollableSheet(
             controller: _sheetController,
-            initialChildSize: _initialSize,
+            initialChildSize: middle,
             minChildSize: _minSize,
             maxChildSize: 1,
             snap: true,
-            snapSizes: const [_minSize, _initialSize],
+            snapSizes: [_minSize, middle],
             builder: (context, scrollController) => Material(
               color: scheme.surface,
               elevation: 8,
@@ -155,12 +200,16 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
               clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
-                  _SheetHandle(controller: _sheetController),
+                  _SheetHandle(controller: _sheetController, middle: middle),
                   Expanded(
                     child: MediaQuery.removePadding(
                       context: context,
                       removeTop: true,
-                      child: PanelScrollScope(controller: scrollController, child: widget.child),
+                      child: PanelSheetScope(
+                        controller: _sheetController,
+                        middle: middle,
+                        child: PanelScrollScope(controller: scrollController, child: widget.child),
+                      ),
                     ),
                   ),
                 ],
@@ -175,9 +224,10 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
 
 /// Drag handle: moves the sheet itself, since it is outside the page's list
 class _SheetHandle extends StatelessWidget {
-  const _SheetHandle({required this.controller});
+  const _SheetHandle({required this.controller, required this.middle});
 
   final DraggableScrollableController controller;
+  final double middle;
 
   @override
   Widget build(BuildContext context) {
@@ -196,10 +246,10 @@ class _SheetHandle extends StatelessWidget {
         final size = controller.size;
         final velocity = details.primaryVelocity ?? 0;
         final target = velocity < -300
-            ? (size < _NarrowLayoutState._initialSize ? _NarrowLayoutState._initialSize : 1.0)
+            ? (size < middle ? middle : 1.0)
             : velocity > 300
-                ? (size > _NarrowLayoutState._initialSize ? _NarrowLayoutState._initialSize : _NarrowLayoutState._minSize)
-                : [_NarrowLayoutState._minSize, _NarrowLayoutState._initialSize, 1.0]
+                ? (size > middle ? middle : _NarrowLayoutState._minSize)
+                : [_NarrowLayoutState._minSize, middle, 1.0]
                     .reduce((a, b) => (a - size).abs() < (b - size).abs() ? a : b);
         controller.animateTo(target, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
       },
