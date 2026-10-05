@@ -12,7 +12,6 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
-import '../../core/utils/text.dart';
 import '../../core/utils/time_format.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
@@ -437,28 +436,27 @@ class GoController extends Notifier<GoState?> {
     }
     final progress = current.progress;
     // On board, the vehicle of the ride is known: look at the following ride
-    final from = progress.phase == GoPhase.onBoard ? progress.step + 1 : progress.step;
+    final start = progress.phase == GoPhase.onBoard ? progress.step + 1 : progress.step;
     final steps = current.tracker.steps;
-    final index = [for (var i = from; i < steps.length; i++) i].where((i) => steps[i].isRide).firstOrNull;
+    final index = [for (var i = start; i < steps.length; i++) i].where((i) => steps[i].isRide).firstOrNull;
     final ride = index == null ? null : steps[index];
-    final stopAreaId = ride?.section.from?.stopAreaId;
+    final from = ride?.section.from?.stopAreaId;
+    final to = ride?.section.to?.stopAreaId;
     final lineId = ride?.section.line?.id;
-    if (ride == null || stopAreaId == null || lineId == null || lineId.isEmpty) {
+    if (ride == null || from == null || to == null || lineId == null || lineId.isEmpty) {
       state = current.copyWith(vehicle: () => null, vehicleStep: () => null, upcoming: const []);
       return;
     }
 
     _loadingDepartures = true;
     try {
-      final departures = await ref.read(mobilityApiProvider).stopDepartures(stopAreaId, lineId: lineId, limit: 5);
+      final rides = await ref.read(mobilityApiProvider).lineRides(lineId, from: from, to: to, limit: 8);
       final latest = state;
       if (latest == null || latest.tracker != current.tracker) {
         return;
       }
-      final rows = departures.lines.where((row) => row.line.id == lineId && row.departures.isNotEmpty).toList();
-      final matching = rows.where((row) => sameDestination(row.destination, ride.section.headsign ?? '')).toList();
-      final upcoming = (matching.isNotEmpty ? matching : rows).expand((row) => row.departures).toList()
-        ..sort((a, b) => a.time.compareTo(b.time));
+      // Departures stopping where the ride gets off
+      final upcoming = [for (final option in rides) option.departure];
 
       // The planned vehicle: same scheduled time (a few minutes of tolerance)
       final planned = current.tracker.plannedDeparture(ride, latest.progress);

@@ -8,9 +8,7 @@ import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
-import '../../core/utils/text.dart';
 import '../../core/utils/time_format.dart';
-import '../../core/widgets/departure_time.dart';
 import '../../core/widgets/line_badge.dart';
 import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
@@ -18,6 +16,7 @@ import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
+import 'widgets/ride_departures.dart';
 
 /// Step by step view of a journey option.
 class JourneyDetailScreen extends ConsumerWidget {
@@ -241,8 +240,7 @@ class _RideTile extends StatelessWidget {
                   ],
                 ),
                 if (hasLine) _RideDisruptions(lineId: lineId),
-                if (hasLine && section.from?.stopAreaId != null)
-                  _NextDepartures(section: section, stopAreaId: section.from!.stopAreaId!, lineId: lineId),
+                if (hasLine) _NextDepartures(section: section, lineId: lineId),
                 if (intermediate.isNotEmpty)
                   Theme(
                     data: theme.copyWith(dividerColor: Colors.transparent),
@@ -321,65 +319,35 @@ class _RideDisruptions extends ConsumerWidget {
   }
 }
 
-/// Next departures of the line at the boarding stop, towards the ride's direction when the destinations match:
-/// what to take if the planned one is missed. Only for rides leaving within the next 90 min.
+/// Next departures of the line at the boarding stop that stop at the alighting one, with their times at both: what
+/// to take if the planned one (highlighted) is missed. Only for rides leaving within the next 90 min.
 class _NextDepartures extends ConsumerWidget {
-  const _NextDepartures({required this.section, required this.stopAreaId, required this.lineId});
+  const _NextDepartures({required this.section, required this.lineId});
 
   final JourneySection section;
-  final String stopAreaId;
   final String lineId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final minutesAway = section.departure.difference(now).inMinutes;
-    if (minutesAway > 90 || minutesAway < -5) {
+    final from = section.from?.stopAreaId;
+    final to = section.to?.stopAreaId;
+    if (minutesAway > 90 || minutesAway < -5 || from == null || to == null) {
       return const SizedBox.shrink();
     }
-    final departures = ref.watch(rideDeparturesProvider((stopAreaId: stopAreaId, lineId: lineId))).value;
-    final rows = departures?.lines.where((row) => row.departures.isNotEmpty).toList() ?? const <LineDepartures>[];
-    if (rows.isEmpty) {
+    final rides = ref.watch(rideOptionsProvider((lineId: lineId, from: from, to: to))).value ?? const <Ride>[];
+    if (rides.isEmpty) {
       return const SizedBox.shrink();
     }
-
-    final matching = rows.where((row) => sameDestination(row.destination, section.headsign ?? '')).toList();
-    final shown = (matching.isNotEmpty ? matching : rows).take(2).toList();
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Prochains départs', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            for (final row in shown)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    if (matching.isEmpty)
-                      Flexible(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: Text(row.destination, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
-                        ),
-                      ),
-                    for (final (index, departure) in row.departures.take(4).indexed) ...[
-                      if (index > 0) const SizedBox(width: 12),
-                      DepartureTime(departure, now: now, emphasized: index == 0),
-                    ],
-                  ],
-                ),
-              ),
-          ],
-        ),
+      child: RideDepartureList(
+        rides: rides,
+        now: now,
+        selected: RideDepartureList.planned(rides, section.departure),
+        onAllDepartures: () => context.push(Routes.stop(from)),
       ),
     );
   }

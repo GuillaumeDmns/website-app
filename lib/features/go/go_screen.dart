@@ -10,11 +10,11 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/geo.dart';
-import '../../core/utils/text.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
 import '../journey/journey_providers.dart';
 import '../journey/widgets/journey_map.dart';
+import '../journey/widgets/ride_departures.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'go_controller.dart';
@@ -346,7 +346,7 @@ class _StepCard extends ConsumerWidget {
         ),
         if (step.isRide && !isDone && !(isLive && progress.phase == GoPhase.onBoard)) ...[
           const SizedBox(height: 14),
-          _Departures(state: state, step: step, index: index, selectable: isLive),
+          _Departures(state: state, step: step, selectable: isLive),
           if (positions.isNotEmpty && positions.length < 3)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -378,116 +378,40 @@ class _StepCard extends ConsumerWidget {
   };
 }
 
-/// Next departures of the ride's line towards its direction; the one followed is highlighted. On the step in
-/// progress, choosing another one makes it the followed one.
+/// Next departures of the ride's line stopping where it gets off, with their times at both stops; the one followed
+/// is highlighted. On the step in progress, choosing another one makes it the followed one.
 class _Departures extends ConsumerWidget {
-  const _Departures({required this.state, required this.step, required this.index, required this.selectable});
+  const _Departures({required this.state, required this.step, required this.selectable});
 
   final GoState state;
   final GoStep step;
-  final int index;
   final bool selectable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final section = step.section;
-    final stopAreaId = section.from?.stopAreaId;
+    final from = section.from?.stopAreaId;
+    final to = section.to?.stopAreaId;
     final lineId = section.line?.id ?? '';
     final planned = state.tracker.plannedDeparture(step, state.progress);
     final now = DateTime.now();
 
-    final departures = stopAreaId == null || lineId.isEmpty
-        ? null
-        : ref.watch(rideDeparturesProvider((stopAreaId: stopAreaId, lineId: lineId))).value;
-    final rows =
-        departures?.lines.where((row) => row.line.id == lineId && row.departures.isNotEmpty).toList() ?? const [];
-    final matching = rows.where((row) => sameDestination(row.destination, section.headsign ?? '')).toList();
-    final list =
-        ((matching.isNotEmpty ? matching : rows).expand((row) => row.departures).toList()
-              ..sort((a, b) => a.time.compareTo(b.time)))
-            .where((departure) => departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
-            .take(5)
-            .toList();
+    final rides = from == null || to == null || lineId.isEmpty
+        ? const <Ride>[]
+        : (ref.watch(rideOptionsProvider((lineId: lineId, from: from, to: to))).value ?? const <Ride>[])
+              .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
+              .toList();
 
-    if (list.isEmpty) {
+    if (rides.isEmpty) {
       return Text('Départ prévu à ${formatClock(planned)}', style: theme.textTheme.titleMedium);
     }
-
-    // The followed vehicle: closest scheduled time to the planned one
-    Departure? followed;
-    var bestGap = const Duration(minutes: 4);
-    for (final departure in list) {
-      final gap = (departure.aimedTime ?? departure.time).difference(planned).abs();
-      if (gap <= bestGap) {
-        bestGap = gap;
-        followed = departure;
-      }
-    }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final departure in list)
-          _DepartureChip(
-            departure: departure,
-            now: now,
-            selected: departure == followed,
-            onTap: selectable && departure != followed && !departure.cancelled
-                ? () => ref.read(goControllerProvider.notifier).takeVehicle(departure)
-                : null,
-          ),
-      ],
-    );
-  }
-}
-
-class _DepartureChip extends StatelessWidget {
-  const _DepartureChip({required this.departure, required this.now, required this.selected, this.onTap});
-
-  final Departure departure;
-  final DateTime now;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final foreground = selected
-        ? scheme.onPrimary
-        : departure.realtime
-        ? Colors.green.shade700
-        : scheme.onSurface;
-    return Material(
-      color: selected ? scheme.primary : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (departure.realtime && !departure.cancelled) ...[
-                Icon(Icons.rss_feed, size: 13, color: foreground),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                departureLabel(departure, now),
-                style: TextStyle(
-                  color: foreground,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  decoration: departure.cancelled ? TextDecoration.lineThrough : null,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return RideDepartureList(
+      rides: rides,
+      now: now,
+      selected: RideDepartureList.planned(rides, planned),
+      onSelect: selectable ? (ride) => ref.read(goControllerProvider.notifier).takeVehicle(ride.departure) : null,
+      onAllDepartures: () => context.push(Routes.stop(from!)),
     );
   }
 }

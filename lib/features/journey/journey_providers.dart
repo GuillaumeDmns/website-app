@@ -34,11 +34,12 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
       );
 });
 
-/// Next departures of a line at a stop area (alternatives to the planned ride), refreshed every 30 s while shown
-final rideDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, ({String stopAreaId, String lineId})>((ref, key) async {
+/// Next departures of a ride's line from its boarding stop that stop at its alighting stop, with their arrival there
+/// (alternatives to the planned one), refreshed every 30 s while shown
+final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, ({String lineId, String from, String to})>((ref, key) async {
   final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
   ref.onDispose(timer.cancel);
-  return ref.watch(mobilityApiProvider).stopDepartures(key.stopAreaId, lineId: key.lineId, limit: 4);
+  return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, limit: 8);
 });
 
 /// Option opened in the detail page (kept here rather than in the URL: it is a snapshot of a search)
