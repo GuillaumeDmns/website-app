@@ -32,14 +32,17 @@ class PanelScrollScope extends InheritedWidget {
   bool updateShouldNotify(PanelScrollScope oldWidget) => oldWidget.controller != controller;
 }
 
-/// Gives the pages the bottom sheet (narrow layout) to move it, e.g. down to show the map. Null in the wide layout.
+/// Gives the pages the bottom sheet (narrow layout) to move it, e.g. down to show the map. No sheet in the wide
+/// layout: its calls do nothing.
 class PanelSheetScope extends InheritedWidget {
-  const PanelSheetScope({super.key, required this.controller, required this.middle, required super.child});
+  const PanelSheetScope({super.key, required this.controller, required this.middle, required this.onFit, required super.child});
 
   final DraggableScrollableController? controller;
 
   /// Middle size of the sheet for the current page (fraction of the screen)
   final double middle;
+
+  final void Function(double height, {required bool reset}) onFit;
 
   /// Lowers the sheet to its middle size when it is above, so that the map shows what the page just changed
   static void showMap(BuildContext context) {
@@ -49,6 +52,12 @@ class PanelSheetScope extends InheritedWidget {
       controller.animateTo(scope.middle, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
     }
   }
+
+  /// Pages sized to their content (GO mode): the sheet's middle size becomes [height] pixels (page content, its
+  /// handle aside). The sheet goes there the first time, when [reset] (another content shown), or when it was at the
+  /// previous height; a sheet the user moved elsewhere stays there.
+  static void fitContent(BuildContext context, double height, {bool reset = false}) =>
+      context.getInheritedWidgetOfExactType<PanelSheetScope>()?.onFit(height, reset: reset);
 
   @override
   bool updateShouldNotify(PanelSheetScope oldWidget) => oldWidget.controller != controller || oldWidget.middle != middle;
@@ -131,6 +140,40 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
+/// How the bottom sheet behaves on a page
+class _SheetProfile {
+  const _SheetProfile({this.peek = 110, this.middle = 0.5, this.full = false});
+
+  /// Lowest height (pixels, handle included): enough for the page's header to stay readable
+  final double peek;
+
+  /// Middle size (fraction of the screen), where the sheet opens; content-sized pages give it in pixels instead
+  final double middle;
+
+  /// At most for a content-sized middle: the map keeps a part of the screen
+  final double maxMiddle = 0.8;
+
+  /// Always at full height: nothing to see on the map (search, traffic), and room for the keyboard
+  final bool full;
+
+  static const _default = _SheetProfile();
+
+  static _SheetProfile of(String location) {
+    if (location.startsWith(Routes.search) || location.startsWith(Routes.traffic)) {
+      return const _SheetProfile(full: true);
+    }
+    if (location.startsWith(Routes.go)) {
+      // One step card, most of the screen for the map; lowered, the arrival time and buttons stay
+      return const _SheetProfile(peek: 84, middle: 0.45);
+    }
+    if (location.startsWith(Routes.journeyPath) && !location.startsWith(Routes.journeyDetail)) {
+      // Start and end fields stay
+      return const _SheetProfile(peek: 150);
+    }
+    return _default;
+  }
+}
+
 class _NarrowLayout extends ConsumerStatefulWidget {
   const _NarrowLayout({required this.child});
 
@@ -141,18 +184,17 @@ class _NarrowLayout extends ConsumerStatefulWidget {
 }
 
 class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
-  static const _minSize = 0.12;
-  static const _initialSize = 0.5;
+  static const _handleHeight = 22.0;
 
-  /// GO mode: a short sheet (one step card), most of the screen for the map
-  static const _goSheetHeight = 360.0;
-
-  /// Middle size of the sheet for a page
-  static double _middleFor(String location, double screenHeight) => location.startsWith(Routes.go)
-      ? (_goSheetHeight / screenHeight).clamp(0.25, _initialSize)
-      : _initialSize;
+  /// Pages are laid out at least this high, and clipped below when the sheet is lower, rather than overflowing
+  /// (fixed parts of a page, e.g. GO's header and dots, fit in it)
+  static const _minPageHeight = 180.0;
 
   final _sheetController = DraggableScrollableController();
+
+  /// Content height given by the page shown (pixels), see [PanelSheetScope.fitContent]
+  double? _fitted;
+  String? _fittedFor;
 
   @override
   void dispose() {
@@ -160,22 +202,68 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
     super.dispose();
   }
 
+  /// Sizes of the sheet (fractions of the screen) for [location]
+  ({double min, double middle, double max, bool locked}) _sizes(String location, Size screen, double topInset) {
+    final profile = _SheetProfile.of(location);
+    // Never under the status bar
+    final max = ((screen.height - topInset) / screen.height).clamp(0.5, 1.0);
+    if (profile.full) {
+      return (min: max, middle: max, max: max, locked: true);
+    }
+    final min = (profile.peek / screen.height).clamp(0.08, 0.4);
+    final fitted = _fittedFor == location ? _fitted : null;
+    final middle = fitted == null
+        ? profile.middle
+        : ((fitted + _handleHeight) / screen.height).clamp(min, profile.maxMiddle);
+    return (min: min, middle: middle.clamp(min, max), max: max, locked: false);
+  }
+
+  void _animateTo(double size) {
+    // After the frame: the sheet is rebuilt with its new sizes first
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_sheetController.isAttached && (_sheetController.size - size).abs() > 0.005) {
+        _sheetController.animateTo(size, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+      }
+    });
+  }
+
+  void _fit(double height, {required bool reset}) {
+    final location = ref.read(routerLocationProvider);
+    final screen = MediaQuery.sizeOf(context);
+    final topInset = MediaQuery.paddingOf(context).top;
+    final previous = _fittedFor == location ? _fitted : null;
+    if (previous != null && (previous - height).abs() < 4 && !reset) {
+      return;
+    }
+    final before = _sizes(location, screen, topInset).middle;
+    final atPrevious = _sheetController.isAttached && (_sheetController.size - before).abs() < 0.03;
+    setState(() {
+      _fitted = height;
+      _fittedFor = location;
+    });
+    if (previous == null || reset || atPrevious) {
+      _animateTo(_sizes(location, screen, topInset).middle);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final height = MediaQuery.sizeOf(context).height;
-    final middle = _middleFor(ref.watch(routerLocationProvider), height);
+    final screen = MediaQuery.sizeOf(context);
+    final topInset = MediaQuery.paddingOf(context).top;
+    final location = ref.watch(routerLocationProvider);
+    final sizes = _sizes(location, screen, topInset);
 
-    // Entering or leaving a page with another middle size: go to it
-    ref.listen(routerLocationProvider, (previous, location) {
-      final target = _middleFor(location, height);
-      if (previous != null && target != _middleFor(previous, height)) {
-        // After the frame: the sheet is rebuilt with its new sizes first
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_sheetController.isAttached) {
-            _sheetController.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
-          }
-        });
+    // Another page: to its middle size when it differs (or when the sheet is out of its bounds)
+    ref.listen(routerLocationProvider, (previous, next) {
+      if (previous == null) {
+        return;
+      }
+      final from = _sizes(previous, screen, topInset);
+      final to = _sizes(next, screen, topInset);
+      final size = _sheetController.isAttached ? _sheetController.size : from.middle;
+      if (to.middle != from.middle || to.locked != from.locked || size < to.min || size > to.max) {
+        _animateTo(to.middle);
       }
     });
 
@@ -183,32 +271,51 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: height * middle))),
+          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: screen.height * sizes.middle))),
           const Positioned(top: 8, left: 12, right: 12, child: SafeArea(child: GoBar())),
           DraggableScrollableSheet(
             controller: _sheetController,
-            initialChildSize: middle,
-            minChildSize: _minSize,
-            maxChildSize: 1,
-            snap: true,
-            snapSizes: [_minSize, middle],
+            initialChildSize: sizes.middle,
+            minChildSize: sizes.min,
+            maxChildSize: sizes.max,
+            snap: !sizes.locked,
+            snapSizes: [if (sizes.middle > sizes.min && sizes.middle < sizes.max) sizes.middle],
             builder: (context, scrollController) => Material(
               color: scheme.surface,
               elevation: 8,
               shadowColor: Colors.black45,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(sizes.locked ? 0 : 20)),
               clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
-                  _SheetHandle(controller: _sheetController, middle: middle),
+                  if (sizes.locked)
+                    const SizedBox(height: 8)
+                  else
+                    _SheetHandle(controller: _sheetController, sizes: [sizes.min, sizes.middle, sizes.max]),
                   Expanded(
                     child: MediaQuery.removePadding(
                       context: context,
                       removeTop: true,
                       child: PanelSheetScope(
                         controller: _sheetController,
-                        middle: middle,
-                        child: PanelScrollScope(controller: scrollController, child: widget.child),
+                        middle: sizes.middle,
+                        onFit: _fit,
+                        child: PanelScrollScope(
+                          controller: scrollController,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) => constraints.maxHeight >= _minPageHeight
+                                ? widget.child
+                                // Lowered sheet: the top of the page shows, the rest is cut
+                                : ClipRect(
+                                    child: OverflowBox(
+                                      alignment: Alignment.topCenter,
+                                      minHeight: _minPageHeight,
+                                      maxHeight: _minPageHeight,
+                                      child: widget.child,
+                                    ),
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -222,12 +329,13 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   }
 }
 
-/// Drag handle: moves the sheet itself, since it is outside the page's list
+/// Drag handle: moves the sheet itself, since it is outside the page's list; released, it goes to the closest of
+/// [sizes] (or the next one in the direction of a fling)
 class _SheetHandle extends StatelessWidget {
-  const _SheetHandle({required this.controller, required this.middle});
+  const _SheetHandle({required this.controller, required this.sizes});
 
   final DraggableScrollableController controller;
-  final double middle;
+  final List<double> sizes;
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +344,7 @@ class _SheetHandle extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onVerticalDragUpdate: (details) {
         if (controller.isAttached) {
-          controller.jumpTo((controller.size - details.delta.dy / height).clamp(_NarrowLayoutState._minSize, 1.0));
+          controller.jumpTo((controller.size - details.delta.dy / height).clamp(sizes.first, sizes.last));
         }
       },
       onVerticalDragEnd: (details) {
@@ -246,15 +354,14 @@ class _SheetHandle extends StatelessWidget {
         final size = controller.size;
         final velocity = details.primaryVelocity ?? 0;
         final target = velocity < -300
-            ? (size < middle ? middle : 1.0)
+            ? sizes.firstWhere((s) => s > size + 0.01, orElse: () => sizes.last)
             : velocity > 300
-                ? (size > middle ? middle : _NarrowLayoutState._minSize)
-                : [_NarrowLayoutState._minSize, middle, 1.0]
-                    .reduce((a, b) => (a - size).abs() < (b - size).abs() ? a : b);
+                ? sizes.lastWhere((s) => s < size - 0.01, orElse: () => sizes.first)
+                : sizes.reduce((a, b) => (a - size).abs() < (b - size).abs() ? a : b);
         controller.animateTo(target, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
       },
       child: SizedBox(
-        height: 22,
+        height: _NarrowLayoutState._handleHeight,
         width: double.infinity,
         child: Center(
           child: Container(

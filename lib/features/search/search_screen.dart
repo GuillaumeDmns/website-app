@@ -169,7 +169,8 @@ class _Suggestions extends ConsumerWidget {
 
     return ListView(
       controller: PanelScrollScope.of(context),
-      padding: const EdgeInsets.only(bottom: 24),
+      // The last results stay reachable above the keyboard
+      padding: EdgeInsets.only(bottom: 24 + MediaQuery.viewInsetsOf(context).bottom),
       children: [
         if (isPicking && allowCurrentLocation)
           ListTile(
@@ -253,7 +254,8 @@ class _Results extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       controller: PanelScrollScope.of(context),
-      padding: const EdgeInsets.only(bottom: 24),
+      // The last results stay reachable above the keyboard
+      padding: EdgeInsets.only(bottom: 24 + MediaQuery.viewInsetsOf(context).bottom),
       children: [
         if (result.lines.isNotEmpty && !isPicking)
           Padding(

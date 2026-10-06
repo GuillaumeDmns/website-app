@@ -309,16 +309,14 @@ class GoTracker {
     );
   }
 
-  /// The user takes the vehicle leaving at [departure] instead of the planned one
-  GoProgress takeVehicle(GoProgress progress, DateTime departure) {
-    final ride = stepOf(progress);
-    if (ride == null || !ride.isRide) {
+  /// The journey was moved to a departure chosen for the ride [step] (see [GoController.choose]): its times are
+  /// now the plan. For the ride in progress, the user waits for the new vehicle and its alerts can be given again.
+  GoProgress chosen(GoProgress progress, int step) {
+    if (step != progress.step) {
       return progress;
     }
-    final shift = departure.difference(ride.section.departure);
-    // Alerts of this ride can be given again for the new vehicle
-    final fired = {...progress.fired}..removeWhere((id) => id.endsWith('-${progress.step}'));
-    return progress.copyWith(phase: GoPhase.waiting, shift: shift, issue: () => null, fired: fired);
+    final fired = {...progress.fired}..removeWhere((id) => id.endsWith('-$step'));
+    return progress.copyWith(phase: GoPhase.waiting, shift: Duration.zero, issue: () => null, fired: fired);
   }
 
   GoProgress dismissIssue(GoProgress progress) => progress.copyWith(issue: () => null, offRouteSince: () => null);

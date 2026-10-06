@@ -94,6 +94,12 @@ abstract class Departure with _$Departure {
     String? status,
     String? platform,
     bool? atStop,
+
+    /// SNCF mission code (`POPI`)
+    String? mission,
+
+    /// SNCF train number
+    String? trainNumber,
   }) = _Departure;
 
   const Departure._();
@@ -114,6 +120,31 @@ abstract class LineDepartures with _$LineDepartures {
   }) = _LineDepartures;
 
   factory LineDepartures.fromJson(Map<String, dynamic> json) => _$LineDeparturesFromJson(json);
+}
+
+/// How a ride's arrival is known
+enum ArrivalSource {
+  /// The vehicle's real-time calls
+  realtime,
+
+  /// Its scheduled trip, shifted by its delay
+  scheduled,
+
+  /// The line's usual ride time
+  typical,
+}
+
+/// A departure of a line from a stop, with its arrival at a further stop (`/lines/{id}/rides`)
+@freezed
+abstract class Ride with _$Ride {
+  const factory Ride({
+    required Departure departure,
+    required String destination,
+    DateTime? arrivalAt,
+    @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) ArrivalSource? arrivalSource,
+  }) = _Ride;
+
+  factory Ride.fromJson(Map<String, dynamic> json) => _$RideFromJson(json);
 }
 
 @freezed

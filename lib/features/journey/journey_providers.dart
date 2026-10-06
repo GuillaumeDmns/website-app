@@ -7,6 +7,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import 'journey_request.dart';
+import 'journey_retime.dart';
 
 /// Journey options for a complete request. "Ma position" is resolved to the current user position.
 final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, JourneyRequest>((ref, request) async {
@@ -34,12 +35,23 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
       );
 });
 
-/// Next departures of a line at a stop area (alternatives to the planned ride), refreshed every 30 s while shown
-final rideDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, ({String stopAreaId, String lineId})>((ref, key) async {
+/// Next departures of a ride's line from its boarding stop that stop at its alighting stop, with their arrival there,
+/// from the time the traveller gets there (now when null), refreshed every 30 s while shown
+final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, RideKey>((ref, key) async {
   final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
   ref.onDispose(timer.cancel);
-  return ref.watch(mobilityApiProvider).stopDepartures(key.stopAreaId, lineId: key.lineId, limit: 4);
+  return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
 });
+
+/// Departures of a ride for [retimeJourney], from a widget: watched, so that the journey follows real time. Lists
+/// are only asked within the next 12 hours (the API's limit).
+RideLookup watchRides(WidgetRef ref, DateTime now) => (key) {
+      final after = key.after;
+      if (after != null && after.isAfter(now.add(const Duration(hours: 11)))) {
+        return null;
+      }
+      return ref.watch(rideOptionsProvider(key)).value;
+    };
 
 /// Option opened in the detail page (kept here rather than in the URL: it is a snapshot of a search)
 class SelectedJourney extends Notifier<JourneyOption?> {
