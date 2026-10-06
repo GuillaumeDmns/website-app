@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/widgets/line_badge.dart';
+import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import '../stops/stop_screen.dart';
 import '../traffic/disruption_widgets.dart';
@@ -130,14 +131,16 @@ class _PlaceShortcut extends ConsumerWidget {
   final String title;
   final Favorite? favorite;
 
-  void _go(BuildContext context) => context.push(Routes.journey(JourneyRequest(
+  void _go(BuildContext context, WidgetRef ref) => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
         from: const JourneyPlace.currentLocation(),
         to: favoritePlace(favorite!),
-      )));
+      ))));
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      // Above the whole app, not inside the panel or the bottom sheet
+      useRootNavigator: true,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -189,7 +192,7 @@ class _PlaceShortcut extends ConsumerWidget {
           child: Text(title, overflow: TextOverflow.ellipsis),
         ),
         tooltip: favorite!.label,
-        onPressed: () => _go(context),
+        onPressed: () => _go(context, ref),
         deleteIcon: const Icon(Icons.more_vert, size: 18),
         deleteButtonTooltipMessage: 'Modifier',
         onDeleted: () => _edit(context, ref),

@@ -29,7 +29,9 @@ class GoState {
     required this.request,
     required this.progress,
     required this.startedAt,
+    required this.plannedArrival,
     this.muted = false,
+    this.keepAwake = false,
     this.position,
     this.vehicle,
     this.vehicleStep,
@@ -46,8 +48,14 @@ class GoState {
   final GoProgress progress;
   final DateTime startedAt;
 
+  /// Arrival planned when GO was started (kept through recalculations and departures chosen), for the arrival summary
+  final DateTime plannedArrival;
+
   /// No sound nor vibration for the alerts
   final bool muted;
+
+  /// The screen stays on
+  final bool keepAwake;
 
   /// Last position fix
   final LatLng? position;
@@ -72,6 +80,7 @@ class GoState {
   GoState copyWith({
     GoProgress? progress,
     bool? muted,
+    bool? keepAwake,
     LatLng? position,
     Departure? Function()? vehicle,
     int? Function()? vehicleStep,
@@ -85,7 +94,9 @@ class GoState {
         request: request,
         progress: progress ?? this.progress,
         startedAt: startedAt,
+        plannedArrival: plannedArrival,
         muted: muted ?? this.muted,
+        keepAwake: keepAwake ?? this.keepAwake,
         position: position ?? this.position,
         vehicle: vehicle != null ? vehicle() : this.vehicle,
         vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
@@ -125,7 +136,7 @@ class GoController extends Notifier<GoState?> {
   /// Starts following [journey]; [request] gives the destination and options to recalculate
   void start(JourneyOption journey, JourneyRequest? request) {
     ref.read(liveJourneyProvider).prepare();
-    _begin(journey, _requestFor(journey, request), muted: state?.muted ?? false);
+    _begin(journey, _requestFor(journey, request), muted: state?.muted ?? false, keepAwake: state?.keepAwake ?? false);
   }
 
   void stop() {
@@ -187,12 +198,23 @@ class GoController extends Notifier<GoState?> {
       request: latest.request,
       progress: tracker.chosen(progress, step),
       startedAt: latest.startedAt,
+      plannedArrival: latest.plannedArrival,
       muted: latest.muted,
+      keepAwake: latest.keepAwake,
       position: latest.position,
     );
     _save();
     _loadDepartures();
     _update();
+  }
+
+  void toggleKeepAwake() {
+    final current = state;
+    if (current != null) {
+      state = current.copyWith(keepAwake: !current.keepAwake);
+      ref.read(liveJourneyProvider).keepScreenOn(!current.keepAwake);
+      _save();
+    }
   }
 
   void toggleMute() {
@@ -226,6 +248,7 @@ class GoController extends Notifier<GoState?> {
             modes: request.modes,
             wheelchair: request.wheelchair,
             walkingSpeed: request.walkingSpeed.apiName,
+            bikeShare: request.bikeShare,
           );
       final journey = plan.journeys.firstOrNull;
       if (journey == null) {
@@ -236,6 +259,8 @@ class GoController extends Notifier<GoState?> {
         journey,
         request.copyWith(from: JourneyPlace.point(name: 'Ma position', lat: position.latitude, lon: position.longitude)),
         muted: current.muted,
+        keepAwake: current.keepAwake,
+        plannedArrival: current.plannedArrival,
       );
     } catch (e) {
       state = state?.copyWith(recalculating: false, error: () => 'Recalcul impossible : $e');
@@ -244,15 +269,26 @@ class GoController extends Notifier<GoState?> {
 
   // Internals
 
-  void _begin(JourneyOption journey, JourneyRequest request, {required bool muted, GoProgress? progress, DateTime? startedAt}) {
+  void _begin(
+    JourneyOption journey,
+    JourneyRequest request, {
+    required bool muted,
+    bool keepAwake = false,
+    DateTime? plannedArrival,
+    GoProgress? progress,
+    DateTime? startedAt,
+  }) {
     final tracker = GoTracker(journey);
     state = GoState(
       tracker: tracker,
       request: request,
       progress: progress ?? tracker.initial(),
       startedAt: startedAt ?? DateTime.now(),
+      plannedArrival: plannedArrival ?? journey.arrival,
       muted: muted,
+      keepAwake: keepAwake,
     );
+    ref.read(liveJourneyProvider).keepScreenOn(keepAwake);
     _save();
     _startFeeds();
   }
@@ -363,11 +399,11 @@ class GoController extends Notifier<GoState?> {
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
       if (!current.muted) {
         final live = ref.read(liveJourneyProvider);
-        if (live.systemAlerts) {
-          live.alert(alert.title, alert.body ?? '', urgent: alert.urgent);
-        } else {
+        if (!live.systemAlerts) {
           _signal(alert);
         }
+        // Web: a notification when the tab is hidden
+        live.alert(alert.title, alert.body ?? '', urgent: alert.urgent);
       }
     }
     state = next;
@@ -520,7 +556,9 @@ class GoController extends Notifier<GoState?> {
       'request': current.request.toQuery(),
       'progress': current.progress.toJson(),
       'startedAt': current.startedAt.toIso8601String(),
+      'plannedArrival': current.plannedArrival.toIso8601String(),
       'muted': current.muted,
+      'keepAwake': current.keepAwake,
     });
   }
 
@@ -544,6 +582,8 @@ class GoController extends Notifier<GoState?> {
         journey,
         JourneyRequest.fromQuery((json['request'] as Map).cast<String, String>()),
         muted: json['muted'] == true,
+        keepAwake: json['keepAwake'] == true,
+        plannedArrival: DateTime.tryParse(json['plannedArrival'] as String? ?? ''),
         progress: progress,
         startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
       );

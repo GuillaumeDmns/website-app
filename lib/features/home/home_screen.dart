@@ -9,6 +9,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../auth/auth_controller.dart';
+import '../bikes/bike_widgets.dart';
 import '../favorites/favorite_widgets.dart';
 import '../traffic/traffic_screen.dart';
 import 'nearby_departures.dart';
@@ -21,10 +22,13 @@ class HomeScreen extends ConsumerWidget {
     final origin = ref.watch(nearbyOriginProvider);
     final key = nearbyKey(origin.position);
     final stops = ref.watch(nearbyDeparturesProvider(key)).value ?? const <StopDepartures>[];
+    final bikeKey = (lat: key.lat, lon: key.lon, radius: 500, limit: 10);
+    final bikes = ref.watch(nearbyBikesProvider(bikeKey)).value ?? const <BikeStation>[];
     final theme = Theme.of(context);
 
     return MapOverlayScope(
-      overlay: MapOverlay(pins: nearbyStopPins(context, stops)),
+      // Stops above the stations
+      overlay: MapOverlay(pins: [...bikeStationPins(context, bikes), ...nearbyStopPins(context, stops)]),
       child: RefreshIndicator(
         onRefresh: () => ref.refresh(nearbyDeparturesProvider(key).future),
         child: CustomScrollView(
@@ -81,8 +85,12 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               sliver: SliverToBoxAdapter(child: NearbyDeparturesList(position: key)),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              sliver: SliverToBoxAdapter(child: NearbyBikesSection(bikeKey: bikeKey)),
             ),
           ],
         ),

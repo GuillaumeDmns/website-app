@@ -14,6 +14,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../favorites/favorite_widgets.dart';
+import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -100,10 +101,10 @@ class _StopContent extends ConsumerWidget {
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Y aller'),
-                onPressed: () => context.push(Routes.journey(JourneyRequest(
+                onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
                   from: const JourneyPlace.currentLocation(),
                   to: JourneyPlace.stopArea(name: detail.name, id: detail.id, lat: detail.lat, lon: detail.lon),
-                ))),
+                )))),
               ),
             ],
           ),
@@ -121,6 +122,18 @@ class _StopContent extends ConsumerWidget {
               ],
             ),
           ),
+          if (detail.lines.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.schedule, size: 18),
+                  label: const Text('Horaires théoriques'),
+                  onPressed: () => context.push(Routes.timetable(detail.id)),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Column(

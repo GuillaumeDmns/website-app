@@ -14,6 +14,8 @@ Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, 
   final router = GoRouter.of(context);
   return showModalBottomSheet<void>(
     context: context,
+    // Above the whole app, not inside the panel or the bottom sheet
+    useRootNavigator: true,
     isScrollControlled: true,
     showDragHandle: true,
     constraints: const BoxConstraints(maxWidth: 560),

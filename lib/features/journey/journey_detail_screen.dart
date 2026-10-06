@@ -10,6 +10,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
+import '../bikes/bike_widgets.dart';
 import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -164,6 +165,8 @@ class _SectionTile extends StatelessWidget {
             child: Text('Attendre ${formatDuration(section.duration)}', style: TextStyle(color: muted)),
           ),
         );
+      case SectionKind.bike when section.from?.name.startsWith('Station Vélib') ?? false:
+        return _BikeShareTile(section: section);
       case SectionKind.walk || SectionKind.transfer || SectionKind.bike || SectionKind.car || SectionKind.other:
         final verb = switch (section.kind) {
           SectionKind.bike => 'Pédaler',
@@ -211,6 +214,61 @@ class _SectionTile extends StatelessWidget {
           ],
         );
     }
+  }
+}
+
+/// Vélib ride: the stations with their live availability (bikes where it starts, free docks where it ends)
+class _BikeShareTile extends ConsumerWidget {
+  const _BikeShareTile({required this.section});
+
+  final JourneySection section;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    BikeStation? station(JourneyPoint? point) => point == null
+        ? null
+        : ref.watch(nearbyBikesProvider((lat: point.lat, lon: point.lon, radius: 60, limit: 1))).value?.firstOrNull;
+    final take = station(section.from);
+    final leave = station(section.to);
+    final distance = section.length == null || section.length == 0 ? '' : ' (${formatDistance(section.length!)})';
+
+    Widget stationRow(JourneyPoint? point, BikeStation? live, {required bool start}) => _TimelineRow(
+          color: velibColor,
+          time: formatClock(start ? section.departure : section.arrival),
+          dot: true,
+          child: InkWell(
+            onTap: live == null ? null : () => showBikeStationSheet(context, live),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${start ? 'Prendre un vélo' : 'Déposer le vélo'} : ${point?.name.replaceFirst('Station Vélib ', '') ?? ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                if (live != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 4),
+                    child: BikeCounts(station: live, bikes: start, docks: !start),
+                  ),
+              ],
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        stationRow(section.from, take, start: true),
+        _TimelineRow(
+          color: velibColor,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('Pédaler ${formatDuration(section.duration)}$distance · durée estimée', style: TextStyle(color: muted)),
+          ),
+        ),
+        stationRow(section.to, leave, start: false),
+      ],
+    );
   }
 }
 
@@ -279,6 +337,9 @@ class _RideTile extends StatelessWidget {
                   ],
                 ),
                 if (hasLine) _RideDisruptions(lineId: lineId),
+                // Elevators matter to get on and off: those of both stops
+                for (final point in [section.from, section.to])
+                  if (point?.stopAreaId case final stopAreaId?) _StopElevators(stopAreaId: stopAreaId, name: point!.name),
                 if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   Theme(
@@ -331,6 +392,60 @@ class _RideTile extends StatelessWidget {
           _ => position,
         };
     return positions.length >= 3 ? 'Montez n\'importe où' : 'Montez ${positions.map(name).join(' ou ')}';
+  }
+}
+
+/// Elevator outages of a stop of the ride, on one line (a folding card would break the timeline's intrinsic height);
+/// tapping it shows the messages
+class _StopElevators extends ConsumerWidget {
+  const _StopElevators({required this.stopAreaId, required this.name});
+
+  final String stopAreaId;
+  final String name;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final elevators = (ref.watch(stopDisruptionsProvider(stopAreaId)).value ?? const <Disruption>[])
+        .where((disruption) => disruption.active && disruption.category == DisruptionCategory.elevator)
+        .toList();
+    if (elevators.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final color = Colors.orange.shade800;
+    final title = '${elevators.length == 1 ? '1 ascenseur en panne' : '${elevators.length} ascenseurs en panne'} à $name';
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(title),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final disruption in elevators)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text('• ${disruption.message ?? disruption.title ?? ''}'),
+                    ),
+                ],
+              ),
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer'))],
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.elevator_outlined, size: 18, color: color),
+            const SizedBox(width: 6),
+            Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+            Icon(Icons.chevron_right, size: 18, color: color),
+          ],
+        ),
+      ),
+    );
   }
 }
 

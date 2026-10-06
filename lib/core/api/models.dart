@@ -574,3 +574,72 @@ abstract class VehicleCall with _$VehicleCall {
 
   factory VehicleCall.fromJson(Map<String, dynamic> json) => _$VehicleCallFromJson(json);
 }
+
+/// Scheduled departures of a line from a stop area over a service day (`/stops/{id}/timetable`)
+@freezed
+abstract class Timetable with _$Timetable {
+  const factory Timetable({
+    required StopAreaSummary stop,
+    required LineSummary line,
+
+    /// Service day: departures after midnight belong to the day before
+    required DateTime date,
+    @Default([]) List<TimetableDirection> directions,
+  }) = _Timetable;
+
+  factory Timetable.fromJson(Map<String, dynamic> json) => _$TimetableFromJson(json);
+}
+
+@freezed
+abstract class TimetableDirection with _$TimetableDirection {
+  const factory TimetableDirection({
+    /// Main destinations, most served first
+    required String name,
+    @Default([]) List<TimetableEntry> departures,
+  }) = _TimetableDirection;
+
+  factory TimetableDirection.fromJson(Map<String, dynamic> json) => _$TimetableDirectionFromJson(json);
+}
+
+@freezed
+abstract class TimetableEntry with _$TimetableEntry {
+  const factory TimetableEntry({
+    required DateTime time,
+    required String destination,
+
+    /// SNCF mission code
+    String? mission,
+  }) = _TimetableEntry;
+
+  factory TimetableEntry.fromJson(Map<String, dynamic> json) => _$TimetableEntryFromJson(json);
+}
+
+/// A Vélib station with its availability
+@freezed
+abstract class BikeStation with _$BikeStation {
+  const factory BikeStation({
+    required String id,
+    String? code,
+    required String name,
+    required double lat,
+    required double lon,
+    @Default(0) int capacity,
+    @Default(0) int mechanical,
+    @Default(0) int electric,
+
+    /// Free docks
+    @Default(0) int docks,
+    @Default(true) bool renting,
+    @Default(true) bool returning,
+
+    /// Meters, when asked around a position
+    int? distance,
+    DateTime? reportedAt,
+  }) = _BikeStation;
+
+  const BikeStation._();
+
+  int get bikes => mechanical + electric;
+
+  factory BikeStation.fromJson(Map<String, dynamic> json) => _$BikeStationFromJson(json);
+}

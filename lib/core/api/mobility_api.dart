@@ -53,6 +53,7 @@ class MobilityApi {
     Set<TransportMode> modes = const {},
     bool wheelchair = false,
     String walkingSpeed = 'NORMAL',
+    bool bikeShare = false,
   }) =>
       _get('/api/v2/journeys', JourneyPlan.fromJson, {
         'from': from,
@@ -62,7 +63,20 @@ class MobilityApi {
         if (modes.isNotEmpty) 'modes': modes.map((mode) => mode.apiName).join(','),
         'wheelchair': wheelchair,
         'walkingSpeed': walkingSpeed,
+        if (bikeShare) 'bikeShare': true,
       });
+
+  /// Scheduled departures of [lineId] from [stopAreaId] over the service day [date] (today when null)
+  Future<Timetable> timetable(String stopAreaId, String lineId, {DateTime? date}) =>
+      _get('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/timetable', Timetable.fromJson, {
+        'lineId': lineId,
+        if (date != null)
+          'date': '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      });
+
+  /// Vélib stations around a position, closest first
+  Future<List<BikeStation>> bikesNearby(double lat, double lon, {int radius = 500, int limit = 5}) =>
+      _getList('/api/v2/bikes/nearby', BikeStation.fromJson, {'lat': lat, 'lon': lon, 'radius': radius, 'limit': limit});
 
   Future<SearchResult> search(String query, {int limit = 10}) =>
       _get('/api/v2/search', SearchResult.fromJson, {'q': query, 'limit': limit});

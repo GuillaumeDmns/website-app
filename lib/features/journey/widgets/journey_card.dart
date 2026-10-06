@@ -15,6 +15,7 @@ String journeyTypeLabel(String? type) => switch (type) {
       'less_fallback_walk' => 'Moins de marche',
       'non_pt_walk' => 'À pied',
       'non_pt_bike' || 'non_pt_bss' => 'À vélo',
+      'bike_share' => 'Vélib',
       'car' => 'En voiture',
       _ => 'Autre option',
     };

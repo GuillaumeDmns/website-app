@@ -32,6 +32,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
         modes: request.modes,
         wheelchair: request.wheelchair,
         walkingSpeed: request.walkingSpeed.apiName,
+        bikeShare: request.bikeShare,
       );
 });
 

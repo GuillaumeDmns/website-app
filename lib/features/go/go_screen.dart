@@ -210,6 +210,13 @@ class _Header extends ConsumerWidget {
             ),
           ),
           IconButton(
+            tooltip: state.keepAwake ? 'Laisser l\'écran s\'éteindre' : 'Garder l\'écran allumé',
+            isSelected: state.keepAwake,
+            icon: const Icon(Icons.light_mode_outlined),
+            selectedIcon: const Icon(Icons.light_mode),
+            onPressed: controller.toggleKeepAwake,
+          ),
+          IconButton(
             tooltip: state.muted ? 'Activer le son des alertes' : 'Couper le son des alertes',
             icon: Icon(state.muted ? Icons.volume_off_outlined : Icons.volume_up_outlined),
             onPressed: controller.toggleMute,
@@ -520,6 +527,10 @@ class _ArrivalCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text('$destination · ${formatClock(eta)}', style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
+                  if (arrived) ...[
+                    const SizedBox(height: 12),
+                    _Summary(state: state, arrivedAt: eta),
+                  ],
                 ],
               ),
             ),
@@ -540,6 +551,46 @@ class _ArrivalCard extends ConsumerWidget {
             label: 'Je suis arrivé',
             onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(state.tracker.steps.length),
           ),
+      ],
+    );
+  }
+}
+
+/// Arrival summary: real arrival compared with the plan, time taken
+class _Summary extends StatelessWidget {
+  const _Summary({required this.state, required this.arrivedAt});
+
+  final GoState state;
+  final DateTime arrivedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final late = (arrivedAt.difference(state.plannedArrival).inSeconds / 60).round();
+    final (label, color) = switch (late) {
+      0 => ('À l\'heure', Colors.green.shade700),
+      > 0 => ('$late min de retard', late >= 5 ? theme.colorScheme.error : Colors.orange.shade800),
+      _ => ('${-late} min d\'avance', Colors.green.shade700),
+    };
+    final rides = state.journey.rides.length;
+    Widget row(IconData icon, String text, {Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: color ?? theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: color == null ? null : FontWeight.w700))),
+            ],
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        row(Icons.flag_outlined, 'Arrivé à ${formatClock(arrivedAt)}, prévu à ${formatClock(state.plannedArrival)}'),
+        row(Icons.schedule, label, color: color),
+        row(Icons.timer_outlined,
+            'Trajet de ${formatDuration(arrivedAt.difference(state.startedAt).inSeconds)} depuis le départ du guidage'),
+        if (rides > 0) row(Icons.directions_transit, rides == 1 ? '1 transport' : '$rides transports'),
       ],
     );
   }

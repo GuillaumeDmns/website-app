@@ -11,6 +11,7 @@ import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../favorites/favorites_controller.dart';
+import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import 'recent_searches.dart';
 
@@ -69,7 +70,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       context.push(Routes.stop(stopAreaId));
     } else {
       // An address or a place: go there, like Citymapper
-      context.push(Routes.journey(JourneyRequest(from: const JourneyPlace.currentLocation(), to: place)));
+      context.push(Routes.journey(
+          ref.read(journeyPreferencesProvider).apply(JourneyRequest(from: const JourneyPlace.currentLocation(), to: place))));
     }
   }
 
