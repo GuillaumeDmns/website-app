@@ -75,6 +75,7 @@ class JourneyRequest {
     this.modes = const {},
     this.wheelchair = false,
     this.walkingSpeed = WalkingSpeed.normal,
+    this.bikeShare = false,
   });
 
   final JourneyPlace? from;
@@ -89,10 +90,14 @@ class JourneyRequest {
   final bool wheelchair;
   final WalkingSpeed walkingSpeed;
 
+  /// A Vélib option is added to the results
+  final bool bikeShare;
+
   bool get isComplete => from != null && to != null;
 
   /// Options other than the defaults
-  int get optionCount => (modes.isEmpty ? 0 : 1) + (wheelchair ? 1 : 0) + (walkingSpeed == WalkingSpeed.normal ? 0 : 1);
+  int get optionCount =>
+      (modes.isEmpty ? 0 : 1) + (wheelchair ? 1 : 0) + (walkingSpeed == WalkingSpeed.normal ? 0 : 1) + (bikeShare ? 1 : 0);
 
   JourneyRequest copyWith({
     JourneyPlace? from,
@@ -102,6 +107,7 @@ class JourneyRequest {
     Set<TransportMode>? modes,
     bool? wheelchair,
     WalkingSpeed? walkingSpeed,
+    bool? bikeShare,
   }) =>
       JourneyRequest(
         from: from ?? this.from,
@@ -111,6 +117,7 @@ class JourneyRequest {
         modes: modes ?? this.modes,
         wheelchair: wheelchair ?? this.wheelchair,
         walkingSpeed: walkingSpeed ?? this.walkingSpeed,
+        bikeShare: bikeShare ?? this.bikeShare,
       );
 
   JourneyRequest swapped() => JourneyRequest(
@@ -121,6 +128,7 @@ class JourneyRequest {
         modes: modes,
         wheelchair: wheelchair,
         walkingSpeed: walkingSpeed,
+        bikeShare: bikeShare,
       );
 
   Map<String, String> toQuery() => {
@@ -133,6 +141,7 @@ class JourneyRequest {
         if (modes.isNotEmpty) 'modes': modes.map((mode) => mode.apiName).join(','),
         if (wheelchair) 'wheelchair': '1',
         if (walkingSpeed != WalkingSpeed.normal) 'walk': walkingSpeed.apiName,
+        if (bikeShare) 'velib': '1',
       };
 
   factory JourneyRequest.fromQuery(Map<String, String> query) => JourneyRequest(
@@ -146,6 +155,7 @@ class JourneyRequest {
         },
         wheelchair: query['wheelchair'] == '1',
         walkingSpeed: WalkingSpeed.values.firstWhere((speed) => speed.apiName == query['walk'], orElse: () => WalkingSpeed.normal),
+        bikeShare: query['velib'] == '1',
       );
 
   @override

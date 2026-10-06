@@ -1,28 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/models.dart';
+import '../journey_preferences.dart';
 import '../journey_request.dart';
 
-/// Modes, accessibility and walking speed. Returns the updated request, null when dismissed.
+/// Modes, accessibility, Vélib and walking speed, optionally kept for the next searches. Returns the updated request, null when dismissed.
 Future<JourneyRequest?> showJourneyOptions(BuildContext context, JourneyRequest request) {
   return showModalBottomSheet<JourneyRequest>(
     context: context,
+    // Above the whole app, not inside the panel or the bottom sheet
+    useRootNavigator: true,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (context) => _JourneyOptionsSheet(request: request),
   );
 }
 
-class _JourneyOptionsSheet extends StatefulWidget {
+class _JourneyOptionsSheet extends ConsumerStatefulWidget {
   const _JourneyOptionsSheet({required this.request});
 
   final JourneyRequest request;
 
   @override
-  State<_JourneyOptionsSheet> createState() => _JourneyOptionsSheetState();
+  ConsumerState<_JourneyOptionsSheet> createState() => _JourneyOptionsSheetState();
 }
 
-class _JourneyOptionsSheetState extends State<_JourneyOptionsSheet> {
+class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
   static const _modes = [
     TransportMode.metro,
     TransportMode.rer,
@@ -34,6 +38,8 @@ class _JourneyOptionsSheetState extends State<_JourneyOptionsSheet> {
   late Set<TransportMode> _selected = widget.request.modes.isEmpty ? _modes.toSet() : {...widget.request.modes};
   late bool _wheelchair = widget.request.wheelchair;
   late WalkingSpeed _walkingSpeed = widget.request.walkingSpeed;
+  late bool _bikeShare = widget.request.bikeShare;
+  bool _remember = false;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +84,14 @@ class _JourneyOptionsSheetState extends State<_JourneyOptionsSheet> {
               value: _wheelchair,
               onChanged: (value) => setState(() => _wheelchair = value),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.pedal_bike),
+              title: const Text('Proposer un trajet en Vélib'),
+              subtitle: const Text('Stations avec vélos et places disponibles'),
+              value: _bikeShare,
+              onChanged: (value) => setState(() => _bikeShare = value),
+            ),
             const SizedBox(height: 8),
             Text('Vitesse de marche', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -87,12 +101,26 @@ class _JourneyOptionsSheetState extends State<_JourneyOptionsSheet> {
               selected: {_walkingSpeed},
               onSelectionChanged: (selection) => setState(() => _walkingSpeed = selection.first),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Garder pour mes prochains trajets'),
+              subtitle: const Text('Accessibilité, Vélib et vitesse de marche'),
+              value: _remember,
+              onChanged: (value) => setState(() => _remember = value ?? false),
+            ),
+            const SizedBox(height: 16),
             FilledButton(
               onPressed: () {
                 // Every mode selected = no filter
                 final modes = _selected.length == _modes.length ? <TransportMode>{} : _withLinkedModes(_selected);
-                Navigator.pop(context, widget.request.copyWith(modes: modes, wheelchair: _wheelchair, walkingSpeed: _walkingSpeed));
+                final request = widget.request
+                    .copyWith(modes: modes, wheelchair: _wheelchair, walkingSpeed: _walkingSpeed, bikeShare: _bikeShare);
+                if (_remember) {
+                  ref.read(journeyPreferencesProvider.notifier).save(request);
+                }
+                Navigator.pop(context, request);
               },
               child: const Text('Appliquer'),
             ),

@@ -196,6 +196,9 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   double? _fitted;
   String? _fittedFor;
 
+  /// Last move of the sheet to a content height: content growing right after (data loaded) is followed too
+  DateTime? _fittedAt;
+
   @override
   void dispose() {
     _sheetController.dispose();
@@ -237,11 +240,13 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
     }
     final before = _sizes(location, screen, topInset).middle;
     final atPrevious = _sheetController.isAttached && (_sheetController.size - before).abs() < 0.03;
+    final justFitted = _fittedAt != null && DateTime.now().difference(_fittedAt!) < const Duration(seconds: 2);
     setState(() {
       _fitted = height;
       _fittedFor = location;
     });
-    if (previous == null || reset || atPrevious) {
+    if (previous == null || reset || atPrevious || justFitted) {
+      _fittedAt = DateTime.now();
       _animateTo(_sizes(location, screen, topInset).middle);
     }
   }

@@ -4,10 +4,11 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../../core/api/models.dart';
 import '../../../core/map/map_overlay.dart';
 import '../../../core/utils/colors.dart';
+import '../../bikes/bike_widgets.dart';
 import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
 
-/// Map overlay of a journey, kept light: rides in their line color, walks dotted, the line badge where you board,
+/// Map overlay of a journey, kept light: rides in their line color, bikes green, walks dotted, the line badge where you board,
 /// a dot where you get off, start and end. Intermediate stops are left out.
 ///
 /// GO mode: sections before [currentSection] and the first [currentAlong] meters of it are faded, and the camera
@@ -42,22 +43,29 @@ MapOverlay journeyOverlay(
     }
 
     final ride = section.kind == SectionKind.transit;
-    final color = ride ? parseHexColor(section.line?.color, scheme.primary) : scheme.onSurfaceVariant;
-    final width = ride ? 6.0 : 4.0;
+    final bike = section.kind == SectionKind.bike;
+    final color = ride
+        ? parseHexColor(section.line?.color, scheme.primary)
+        : bike
+            ? velibColor
+            : scheme.onSurfaceVariant;
+    final width = ride ? 6.0 : bike ? 5.0 : 4.0;
+    // Walks dotted, rides and bikes solid
+    final dotted = !ride && !bike;
     // Done part: the line's color faded (plain grey looks like a road on the map)
     final done = color.withValues(alpha: 0.3);
     if (index < currentSection) {
-      paths.add(MapPath(points: shape, color: done, width: width, dotted: !ride));
+      paths.add(MapPath(points: shape, color: done, width: width, dotted: dotted));
     } else if (index == currentSection && currentAlong > 0) {
       final (before, after) = MeasuredPolyline(shape).split(currentAlong);
       if (before.length >= 2) {
-        paths.add(MapPath(points: before, color: done, width: width, dotted: !ride));
+        paths.add(MapPath(points: before, color: done, width: width, dotted: dotted));
       }
       if (after.length >= 2) {
-        paths.add(MapPath(points: after, color: color, width: width, dotted: !ride));
+        paths.add(MapPath(points: after, color: color, width: width, dotted: dotted));
       }
     } else {
-      paths.add(MapPath(points: shape, color: color, width: width, dotted: !ride));
+      paths.add(MapPath(points: shape, color: color, width: width, dotted: dotted));
     }
 
     if (ride) {

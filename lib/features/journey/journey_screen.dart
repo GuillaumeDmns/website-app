@@ -92,6 +92,21 @@ class JourneyScreen extends ConsumerWidget {
               children: [
                 _TimeButton(request: request, onChanged: (next) => _update(context, next)),
                 const Spacer(),
+                // Step-free journeys in one tap
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: request.wheelchair
+                      ? IconButton.filled(
+                          tooltip: 'Trajets accessibles en fauteuil roulant : activé',
+                          icon: const Icon(Icons.accessible),
+                          onPressed: () => _update(context, request.copyWith(wheelchair: false)),
+                        )
+                      : IconButton.outlined(
+                          tooltip: 'Trajets accessibles en fauteuil roulant',
+                          icon: const Icon(Icons.accessible),
+                          onPressed: () => _update(context, request.copyWith(wheelchair: true)),
+                        ),
+                ),
                 Badge(
                   isLabelVisible: request.optionCount > 0,
                   label: Text('${request.optionCount}'),

@@ -24,6 +24,16 @@ abstract final class Routes {
 
   static String stop(String stopAreaId) => '/stops/${Uri.encodeComponent(stopAreaId)}';
 
+  /// Scheduled timetable of a stop area: [lineId] (the first line of the stop when null) on [date] (today when null)
+  static String timetable(String stopAreaId, {String? lineId, DateTime? date}) => Uri(
+        path: '/stops/${Uri.encodeComponent(stopAreaId)}/timetable',
+        queryParameters: {
+          'line': ?lineId,
+          if (date != null)
+            'date': '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+        },
+      ).toString();
+
   static String line(String lineId) => '/lines/${Uri.encodeComponent(lineId)}';
 
   static String around(double lat, double lon, String name) =>

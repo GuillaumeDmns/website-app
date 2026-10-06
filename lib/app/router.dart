@@ -18,6 +18,7 @@ import '../features/onboarding/onboarding.dart';
 import '../features/onboarding/welcome_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/stops/stop_screen.dart';
+import '../features/stops/timetable_screen.dart';
 import '../features/traffic/traffic_screen.dart';
 import 'routes.dart';
 import 'shell.dart';
@@ -91,6 +92,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/stops/:stopAreaId',
             builder: (context, state) => StopScreen(stopAreaId: state.pathParameters['stopAreaId']!),
+          ),
+          GoRoute(
+            path: '/stops/:stopAreaId/timetable',
+            builder: (context, state) => TimetableScreen(
+              stopAreaId: state.pathParameters['stopAreaId']!,
+              lineId: state.uri.queryParameters['line'],
+              date: DateTime.tryParse(state.uri.queryParameters['date'] ?? ''),
+            ),
           ),
           GoRoute(
             path: '/lines/:lineId',

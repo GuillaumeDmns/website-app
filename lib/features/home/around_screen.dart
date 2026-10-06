@@ -9,6 +9,7 @@ import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
+import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import 'nearby_departures.dart';
 
@@ -59,10 +60,10 @@ class AroundScreen extends ConsumerWidget {
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Y aller'),
-                onPressed: () => context.push(Routes.journey(JourneyRequest(
+                onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
                   from: const JourneyPlace.currentLocation(),
                   to: JourneyPlace.point(name: name, lat: position.latitude, lon: position.longitude),
-                ))),
+                )))),
               ),
             ],
           ),
