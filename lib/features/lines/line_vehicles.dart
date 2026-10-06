@@ -11,9 +11,10 @@ import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
 
-/// Vehicles of a line and when they were fetched, refreshed every 30 s while shown
+/// Vehicles of a line and when they were fetched, refreshed every minute while shown (the backend keeps them a
+/// minute: the estimated-timetable quota is small)
 final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> vehicles, DateTime fetchedAt}), String>((ref, lineId) async {
-  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
+  final timer = Timer(const Duration(seconds: 60), ref.invalidateSelf);
   ref.onDispose(timer.cancel);
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());

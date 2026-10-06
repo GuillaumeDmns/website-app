@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/map/main_map.dart';
 import '../core/map/map_overlay.dart';
+import '../core/offline/offline_banner.dart';
 import '../features/go/go_bar.dart';
 import 'routes.dart';
 
@@ -130,7 +131,19 @@ class _WideLayout extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned.fill(child: MainMap()),
-                Positioned(top: 12, left: 12, right: 12, child: SafeArea(child: Center(child: SizedBox(width: 480, child: GoBar())))),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  right: 12,
+                  child: SafeArea(
+                    child: Center(
+                      child: SizedBox(
+                        width: 480,
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner()]),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -277,7 +290,14 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
       body: Stack(
         children: [
           Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: screen.height * sizes.middle))),
-          const Positioned(top: 8, left: 12, right: 12, child: SafeArea(child: GoBar())),
+          const Positioned(
+            top: 8,
+            left: 12,
+            right: 12,
+            child: SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner()]),
+            ),
+          ),
           DraggableScrollableSheet(
             controller: _sheetController,
             initialChildSize: sizes.middle,

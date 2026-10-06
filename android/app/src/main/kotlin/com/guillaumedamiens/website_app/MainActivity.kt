@@ -3,6 +3,7 @@ package com.guillaumedamiens.website_app
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
+import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Build
@@ -83,6 +84,15 @@ class MainActivity: FlutterFragmentActivity() {
                         ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
                     }
+                    result.success(null)
+                }
+                "share" -> {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, call.argument<String>("title"))
+                        putExtra(Intent.EXTRA_TEXT, call.argument<String>("text"))
+                    }
+                    startActivity(Intent.createChooser(send, call.argument<String>("title")))
                     result.success(null)
                 }
                 "keepScreenOn" -> {

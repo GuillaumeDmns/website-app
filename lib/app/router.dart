@@ -76,7 +76,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.journeyPath,
             builder: (context, state) => JourneyScreen(request: JourneyRequest.fromQuery(state.uri.queryParameters)),
           ),
-          GoRoute(path: Routes.journeyDetail, builder: (context, state) => const JourneyDetailScreen()),
+          GoRoute(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
           GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
           GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
           GoRoute(

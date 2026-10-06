@@ -11,6 +11,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/share.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../favorites/favorite_widgets.dart';
@@ -122,18 +123,25 @@ class _StopContent extends ConsumerWidget {
               ],
             ),
           ),
-          if (detail.lines.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.schedule, size: 18),
-                  label: const Text('Horaires théoriques'),
-                  onPressed: () => context.push(Routes.timetable(detail.id)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
+            child: Row(
+              children: [
+                if (detail.lines.isNotEmpty)
+                  TextButton.icon(
+                    icon: const Icon(Icons.schedule, size: 18),
+                    label: const Text('Horaires théoriques'),
+                    onPressed: () => context.push(Routes.timetable(detail.id)),
+                  ),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('Partager'),
+                  onPressed: () => shareLink(context, title: detail.name, location: Routes.stop(detail.id)),
                 ),
-              ),
+              ],
             ),
+          ),
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Column(

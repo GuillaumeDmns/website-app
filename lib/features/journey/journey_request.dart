@@ -120,6 +120,18 @@ class JourneyRequest {
         bikeShare: bikeShare ?? this.bikeShare,
       );
 
+  /// For a link to [journey]: "Ma position" becomes where the journey starts or ends, which is what the
+  /// recipient needs (their own position would give another journey)
+  JourneyRequest forSharing(JourneyOption journey) {
+    JourneyPlace fixed(JourneyPlace? place, JourneyPoint? point) => place != null && place.isCurrentLocation && point != null
+        ? JourneyPlace.point(name: point.name, lat: point.lat, lon: point.lon)
+        : place ?? const JourneyPlace.currentLocation();
+    return copyWith(
+      from: fixed(from, journey.sections.firstOrNull?.from),
+      to: fixed(to, journey.sections.lastOrNull?.to),
+    );
+  }
+
   JourneyRequest swapped() => JourneyRequest(
         from: to,
         to: from,

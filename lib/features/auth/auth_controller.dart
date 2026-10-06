@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_providers.dart';
+import '../../core/offline/offline_cache.dart';
 import '../../core/storage/local_store.dart';
 
 enum AuthStatus { unknown, signedIn, signedOut }
@@ -29,6 +30,8 @@ class AuthController extends Notifier<AuthStatus> {
     await store.remove('favorites');
     await store.remove('recent_searches');
     await store.remove('go_session');
+    await store.remove('journey_preferences');
+    await OfflineCacheInterceptor.clear(store);
   }
 
   Future<void> signIn(String username, String password) async {

@@ -8,6 +8,7 @@ import '../../app/shell.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/share.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
@@ -161,6 +162,11 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               ),
             ),
             FavoriteLineButton(lineId: line.id),
+            IconButton(
+              tooltip: 'Partager',
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => shareLink(context, title: '${line.mode.label} ${line.name ?? ''}'.trim(), location: Routes.line(line.id)),
+            ),
           ],
         ),
         const SizedBox(height: 12),

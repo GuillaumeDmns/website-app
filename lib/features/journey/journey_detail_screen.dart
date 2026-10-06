@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/share.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
@@ -15,6 +16,7 @@ import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
+import 'journey_request.dart';
 import 'journey_retime.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
@@ -23,7 +25,11 @@ import 'widgets/ride_departures.dart';
 /// Step by step view of a journey option. Each ride lists its departures; choosing another one moves the journey
 /// to it, the following connections included (see [retimeJourney]).
 class JourneyDetailScreen extends ConsumerStatefulWidget {
-  const JourneyDetailScreen({super.key});
+  const JourneyDetailScreen({super.key, this.query = ''});
+
+  /// Search, departure time and lines of the option (`Routes.journeyDetailOf`): the option is found again from them
+  /// when it is not in memory (web reload, shared link)
+  final String query;
 
   @override
   ConsumerState<JourneyDetailScreen> createState() => _JourneyDetailScreenState();
@@ -45,17 +51,38 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final planned = ref.watch(selectedJourneyProvider);
+    final params = Uri.splitQueryString(widget.query);
+    final departure = DateTime.tryParse(params['dep'] ?? '');
+    final selected = ref.watch(selectedJourneyProvider);
+    // The option in memory when it is the one of the URL
+    final inMemory = selected != null && (departure == null || selected.departure.isAtSameMomentAs(departure));
+    final shared = inMemory || departure == null ? null : ref.watch(sharedJourneyProvider(widget.query));
+    final planned = inMemory ? selected : shared?.value;
+    final request = inMemory ? ref.read(selectedJourneyProvider.notifier).request : JourneyRequest.fromQuery(params);
     final theme = Theme.of(context);
 
-    void back() => context.canPop() ? context.pop() : context.go(Routes.home);
+    void back() => context.canPop() ? context.pop() : context.go(request == null ? Routes.home : Routes.journey(request));
 
     if (planned == null) {
-      // Reloaded page (web): the option was only in memory
       return Column(
         children: [
           Align(alignment: Alignment.centerLeft, child: IconButton(icon: const Icon(Icons.arrow_back), onPressed: back)),
-          const Padding(padding: EdgeInsets.all(24), child: Text('Itinéraire expiré, relancez la recherche')),
+          if (shared != null && shared.isLoading)
+            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+          else
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  const Text('Itinéraire introuvable ou passé', textAlign: TextAlign.center),
+                  if (request != null && request.isComplete)
+                    TextButton(
+                      onPressed: () => context.go(Routes.journey(request.copyWith(datetime: () => null))),
+                      child: const Text('Chercher à nouveau'),
+                    ),
+                ],
+              ),
+            ),
         ],
       );
     }
@@ -94,13 +121,22 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                   ],
                 ),
               ),
+              IconButton(
+                tooltip: 'Partager',
+                icon: const Icon(Icons.share_outlined),
+                onPressed: () => shareLink(
+                  context,
+                  title: 'Itinéraire ${journey.sections.firstOrNull?.from?.name ?? ''} → ${journey.sections.lastOrNull?.to?.name ?? ''}',
+                  location: Routes.journeyDetailOf((request ?? const JourneyRequest()).forSharing(planned), planned),
+                ),
+              ),
               FilledButton.icon(
                 // The theme makes filled buttons full width
                 style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
                 icon: const Icon(Icons.navigation),
                 label: const Text('GO'),
                 onPressed: () {
-                  ref.read(goControllerProvider.notifier).start(journey, ref.read(selectedJourneyProvider.notifier).request);
+                  ref.read(goControllerProvider.notifier).start(journey, request);
                   context.push(Routes.go);
                 },
               ),

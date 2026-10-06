@@ -30,7 +30,8 @@ class AuthInterceptor extends QueuedInterceptor {
           handler.reject(DioException(requestOptions: options, response: Response(requestOptions: options, statusCode: 401)));
           return;
         case _RefreshResult.unreachable:
-          handler.reject(DioException.connectionError(requestOptions: options, reason: 'Token refresh failed'));
+          // The next interceptors still see it (offline cache)
+          handler.reject(DioException.connectionError(requestOptions: options, reason: 'Token refresh failed'), true);
           return;
       }
     }
