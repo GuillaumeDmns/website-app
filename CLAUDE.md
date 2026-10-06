@@ -36,7 +36,7 @@ flutter run -d <linux|chrome|device-id> --dart-define=API_BASE_URL=http://localh
 - `core/storage/local_store.dart`: small JSON documents in `SharedPreferencesAsync` (favorites copy, recent searches), cleared at sign-in/sign-out so that another account never sees them.
 - `main.dart` waits (≤ 3 s) for the Inter font fetched by google_fonts: chips keep sizes measured with the fallback font otherwise.
 - `core/widgets/`: `LineBadge` (IDFM look per mode), `DepartureTime`, `AsyncView`.
-- Android native code kept for later phases: `MainActivity.kt` (live notification channel) and the `NextDepartures.kt` home widget (needs the `home_widget` package).
+- **Home screen widget** (Android, `features/home_widget/home_widget_sync.dart` + `NextDepartures.kt`): next departures (clock times) of the first favorite stop, else the closest one, written by `HomeWidgetSync` on the home page (at most once a minute); its refresh button runs `homeWidgetBackgroundCallback` in a background isolate (renews the access token from the stored refresh token, which the app re-reads before each renewal since the rotation revokes reused ones). `MainActivity.kt` also holds the live notification, share and keep-screen-on channel.
 
 ## Conventions
 

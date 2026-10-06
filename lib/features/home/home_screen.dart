@@ -11,6 +11,7 @@ import '../../core/map/map_overlay.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
 import '../favorites/favorite_widgets.dart';
+import '../home_widget/home_widget_sync.dart';
 import '../traffic/traffic_screen.dart';
 import 'nearby_departures.dart';
 
@@ -92,6 +93,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
               sliver: SliverToBoxAdapter(child: NearbyBikesSection(bikeKey: bikeKey)),
             ),
+            SliverToBoxAdapter(child: HomeWidgetSync(closest: stops.firstOrNull)),
           ],
         ),
       ),

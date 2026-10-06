@@ -57,6 +57,9 @@ class AuthInterceptor extends QueuedInterceptor {
   }
 
   Future<_RefreshResult> _refresh() async {
+    // The latest one stored: the home screen widget may have renewed it in the background (a used one revokes the
+    // session)
+    await tokenStore.load();
     final refreshToken = tokenStore.refreshToken;
     if (refreshToken == null) {
       onSessionLost();
