@@ -26,8 +26,10 @@ class MobilityApi {
   Future<LineDetail> line(String lineId) => _get('/api/v2/lines/${Uri.encodeComponent(lineId)}', LineDetail.fromJson);
 
   /// Next departures of a line from [from] stopping at [to], with their arrival there
-  Future<List<Ride>> lineRides(String lineId, {required String from, required String to, int limit = 6}) =>
-      _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides', Ride.fromJson, {'from': from, 'to': to, 'limit': limit});
+  /// ([after]: from then on, e.g. arrival at a connection, instead of now)
+  Future<List<Ride>> lineRides(String lineId, {required String from, required String to, DateTime? after, int limit = 6}) =>
+      _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides', Ride.fromJson,
+          {'from': from, 'to': to, 'after': ?after?.toUtc().toIso8601String(), 'limit': limit});
 
   /// Vehicles of a line, estimated from real time (empty without real time)
   Future<List<Vehicle>> lineVehicles(String lineId) =>

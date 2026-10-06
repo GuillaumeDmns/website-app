@@ -14,22 +14,42 @@ import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
+import 'journey_retime.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/ride_departures.dart';
 
-/// Step by step view of a journey option.
-class JourneyDetailScreen extends ConsumerWidget {
+/// Step by step view of a journey option. Each ride lists its departures; choosing another one moves the journey
+/// to it, the following connections included (see [retimeJourney]).
+class JourneyDetailScreen extends ConsumerStatefulWidget {
   const JourneyDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final journey = ref.watch(selectedJourneyProvider);
+  ConsumerState<JourneyDetailScreen> createState() => _JourneyDetailScreenState();
+}
+
+class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
+  /// Departures chosen by section index, for [_choicesOf]
+  Map<int, Ride> _choices = const {};
+  JourneyOption? _choicesOf;
+
+  void _choose(int index, Ride ride) => setState(() {
+        // The following rides go back to the first departure they can catch
+        _choices = {
+          for (final entry in _choices.entries)
+            if (entry.key < index) entry.key: entry.value,
+          index: ride,
+        };
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final planned = ref.watch(selectedJourneyProvider);
     final theme = Theme.of(context);
 
     void back() => context.canPop() ? context.pop() : context.go(Routes.home);
 
-    if (journey == null) {
+    if (planned == null) {
       // Reloaded page (web): the option was only in memory
       return Column(
         children: [
@@ -38,6 +58,14 @@ class JourneyDetailScreen extends ConsumerWidget {
         ],
       );
     }
+
+    if (_choicesOf != planned) {
+      _choicesOf = planned;
+      _choices = const {};
+    }
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final retimed = retimeJourney(planned, lookup: watchRides(ref, now), now: now, choices: _choices);
+    final journey = retimed.journey;
 
     return MapOverlayScope(
       overlay: journeyOverlay(context, journey),
@@ -84,7 +112,12 @@ class JourneyDetailScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (index, section) in journey.sections.indexed)
-                  _SectionTile(section: section, isFirst: index == 0),
+                  _SectionTile(
+                    section: section,
+                    isFirst: index == 0,
+                    ride: retimed.rides[index],
+                    onChoose: (ride) => _choose(index, ride),
+                  ),
                 if (journey.sections.lastOrNull?.to case final end?)
                   _TimelineRow(
                     color: theme.colorScheme.error,
@@ -103,9 +136,13 @@ class JourneyDetailScreen extends ConsumerWidget {
 }
 
 class _SectionTile extends StatelessWidget {
-  const _SectionTile({required this.section, required this.isFirst});
+  const _SectionTile({required this.section, required this.isFirst, this.ride, required this.onChoose});
 
   final JourneySection section;
+
+  /// A ride's departures and the one taken
+  final RidePlan? ride;
+  final ValueChanged<Ride> onChoose;
 
   /// Only the first section shows where it starts: the others start where the previous one ended
   final bool isFirst;
@@ -117,7 +154,7 @@ class _SectionTile extends StatelessWidget {
 
     switch (section.kind) {
       case SectionKind.transit:
-        return _RideTile(section: section);
+        return _RideTile(section: section, plan: ride, onChoose: onChoose);
       case SectionKind.wait:
         return _TimelineRow(
           color: muted,
@@ -178,9 +215,11 @@ class _SectionTile extends StatelessWidget {
 }
 
 class _RideTile extends StatelessWidget {
-  const _RideTile({required this.section});
+  const _RideTile({required this.section, required this.plan, required this.onChoose});
 
   final JourneySection section;
+  final RidePlan? plan;
+  final ValueChanged<Ride> onChoose;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +279,7 @@ class _RideTile extends StatelessWidget {
                   ],
                 ),
                 if (hasLine) _RideDisruptions(lineId: lineId),
-                if (hasLine) _NextDepartures(section: section, lineId: lineId),
+                if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   Theme(
                     data: theme.copyWith(dividerColor: Colors.transparent),
@@ -319,35 +358,30 @@ class _RideDisruptions extends ConsumerWidget {
   }
 }
 
-/// Next departures of the line at the boarding stop that stop at the alighting one, with their times at both: what
-/// to take if the planned one (highlighted) is missed. Only for rides leaving within the next 90 min.
-class _NextDepartures extends ConsumerWidget {
-  const _NextDepartures({required this.section, required this.lineId});
+/// Departures of the ride's line at the boarding stop that stop at the alighting one, from when the traveller can
+/// be there: the one taken is highlighted, choosing another one moves the journey to it.
+class _Departures extends ConsumerWidget {
+  const _Departures({required this.plan, required this.onChoose});
 
-  final JourneySection section;
-  final String lineId;
+  final RidePlan plan;
+  final ValueChanged<Ride> onChoose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
-    final minutesAway = section.departure.difference(now).inMinutes;
-    final from = section.from?.stopAreaId;
-    final to = section.to?.stopAreaId;
-    if (minutesAway > 90 || minutesAway < -5 || from == null || to == null) {
-      return const SizedBox.shrink();
-    }
-    final rides = ref.watch(rideOptionsProvider((lineId: lineId, from: from, to: to))).value ?? const <Ride>[];
+    final rides = ref.watch(rideOptionsProvider(plan.key)).value ?? const <Ride>[];
     if (rides.isEmpty) {
       return const SizedBox.shrink();
     }
-
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: RideDepartureList(
         rides: rides,
         now: now,
-        selected: RideDepartureList.planned(rides, section.departure),
-        onAllDepartures: () => context.push(Routes.stop(from)),
+        selected: plan.ride,
+        earliest: plan.earliest,
+        onSelect: onChoose,
+        onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
       ),
     );
   }

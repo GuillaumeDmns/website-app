@@ -8,11 +8,14 @@ import 'package:go_router/go_router.dart';
 import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
+import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/size_reporter.dart';
 import '../journey/journey_providers.dart';
+import '../journey/journey_retime.dart';
 import '../journey/widgets/journey_map.dart';
 import '../journey/widgets/ride_departures.dart';
 import '../traffic/disruption_widgets.dart';
@@ -37,6 +40,21 @@ class _GoScreenState extends ConsumerState<GoScreen> {
 
   /// Step in progress when the page last followed it
   int? _followed;
+
+  /// Heights of the parts of the page, to fit the bottom sheet to the card shown
+  double _top = 0;
+  double _bottom = 0;
+  final _cards = <int, double>{};
+  bool _newCard = true;
+
+  void _fitSheet() {
+    final card = _cards[_shown];
+    if (card == null || !mounted) {
+      return;
+    }
+    PanelSheetScope.fitContent(context, _top + card + _bottom, reset: _newCard);
+    _newCard = false;
+  }
 
   @override
   void dispose() {
@@ -95,8 +113,18 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       ),
       child: Column(
         children: [
-          _Header(state: state, onBack: back),
-          if (progress.issue != null) _IssueBanner(state: state),
+          SizeReporter(
+            onSize: (size) {
+              _top = size.height;
+              _fitSheet();
+            },
+            child: Column(
+              children: [
+                _Header(state: state, onBack: back),
+                if (progress.issue != null) _IssueBanner(state: state),
+              ],
+            ),
+          ),
           Expanded(
             // Swipe with a mouse or a trackpad too (desktop, web)
             child: ScrollConfiguration(
@@ -104,7 +132,11 @@ class _GoScreenState extends ConsumerState<GoScreen> {
               child: PageView.builder(
                 controller: _pages,
                 itemCount: pageCount,
-                onPageChanged: (page) => setState(() => _shown = page),
+                onPageChanged: (page) {
+                  setState(() => _shown = page);
+                  _newCard = true;
+                  _fitSheet();
+                },
                 itemBuilder: (context, page) {
                   final Widget card = page < tracker.steps.length
                       ? _StepCard(state: state, index: page)
@@ -113,13 +145,27 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                     // The bottom sheet is dragged by the list of the page shown only
                     controller: page == _shown ? PanelScrollScope.of(context) : null,
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: card,
+                    child: SizeReporter(
+                      onSize: (size) {
+                        _cards[page] = size.height + 16;
+                        if (page == _shown) {
+                          _fitSheet();
+                        }
+                      },
+                      child: card,
+                    ),
                   );
                 },
               ),
             ),
           ),
-          _Dots(count: pageCount, shown: _shown, live: live, onTap: _show),
+          SizeReporter(
+            onSize: (size) {
+              _bottom = size.height;
+              _fitSheet();
+            },
+            child: _Dots(count: pageCount, shown: _shown, live: live, onTap: _show),
+          ),
         ],
       ),
     );
@@ -346,7 +392,7 @@ class _StepCard extends ConsumerWidget {
         ),
         if (step.isRide && !isDone && !(isLive && progress.phase == GoPhase.onBoard)) ...[
           const SizedBox(height: 14),
-          _Departures(state: state, step: step, selectable: isLive),
+          _Departures(state: state, step: step, index: index),
           if (positions.isNotEmpty && positions.length < 3)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -378,28 +424,28 @@ class _StepCard extends ConsumerWidget {
   };
 }
 
-/// Next departures of the ride's line stopping where it gets off, with their times at both stops; the one followed
-/// is highlighted. On the step in progress, choosing another one makes it the followed one.
+/// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their
+/// times at both stops; the one followed is highlighted. Choosing another one moves the journey to it.
 class _Departures extends ConsumerWidget {
-  const _Departures({required this.state, required this.step, required this.selectable});
+  const _Departures({required this.state, required this.step, required this.index});
 
   final GoState state;
   final GoStep step;
-  final bool selectable;
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final section = step.section;
-    final from = section.from?.stopAreaId;
-    final to = section.to?.stopAreaId;
-    final lineId = section.line?.id ?? '';
-    final planned = state.tracker.plannedDeparture(step, state.progress);
-    final now = DateTime.now();
+    final progress = state.progress;
+    final planned = state.tracker.plannedDeparture(step, progress);
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    // At the stop already for the step in progress; else after the steps before it
+    final earliest = index == progress.step ? now : earliestBoarding(state.journey, step.sectionIndex, now).add(progress.shift);
+    final key = rideKey(step.section, earliest, now);
 
-    final rides = from == null || to == null || lineId.isEmpty
+    final rides = key == null
         ? const <Ride>[]
-        : (ref.watch(rideOptionsProvider((lineId: lineId, from: from, to: to))).value ?? const <Ride>[])
+        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
               .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
               .toList();
 
@@ -409,9 +455,10 @@ class _Departures extends ConsumerWidget {
     return RideDepartureList(
       rides: rides,
       now: now,
-      selected: RideDepartureList.planned(rides, planned),
-      onSelect: selectable ? (ride) => ref.read(goControllerProvider.notifier).takeVehicle(ride.departure) : null,
-      onAllDepartures: () => context.push(Routes.stop(from!)),
+      selected: plannedRide(rides, planned),
+      earliest: earliest,
+      onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
+      onAllDepartures: () => context.push(Routes.stop(key!.from)),
     );
   }
 }
@@ -526,7 +573,8 @@ class _Dots extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 12),
+      // Above the system navigation bar
+      padding: EdgeInsets.only(top: 4, bottom: 12 + MediaQuery.paddingOf(context).bottom),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

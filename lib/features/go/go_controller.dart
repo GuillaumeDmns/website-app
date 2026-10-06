@@ -15,6 +15,7 @@ import '../../core/storage/local_store.dart';
 import '../../core/utils/time_format.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
+import '../journey/journey_retime.dart';
 import 'go_instruction.dart';
 import 'go_tracker.dart';
 
@@ -32,7 +33,6 @@ class GoState {
     this.position,
     this.vehicle,
     this.vehicleStep,
-    this.upcoming = const [],
     this.alert,
     this.alertAt,
     this.recalculating = false,
@@ -56,9 +56,6 @@ class GoState {
   final Departure? vehicle;
   final int? vehicleStep;
 
-  /// Next departures of that ride's line towards its direction (to take another one)
-  final List<Departure> upcoming;
-
   /// Last alert given, and when
   final GoAlert? alert;
   final DateTime? alertAt;
@@ -78,7 +75,6 @@ class GoState {
     LatLng? position,
     Departure? Function()? vehicle,
     int? Function()? vehicleStep,
-    List<Departure>? upcoming,
     GoAlert? alert,
     DateTime? alertAt,
     bool? recalculating,
@@ -93,7 +89,6 @@ class GoState {
         position: position ?? this.position,
         vehicle: vehicle != null ? vehicle() : this.vehicle,
         vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
-        upcoming: upcoming ?? this.upcoming,
         alert: alert ?? this.alert,
         alertAt: alertAt ?? this.alertAt,
         recalculating: recalculating ?? this.recalculating,
@@ -147,10 +142,57 @@ class GoController extends Notifier<GoState?> {
 
   void dismissIssue() => _setProgress((tracker, progress) => tracker.dismissIssue(progress));
 
-  /// Takes the vehicle leaving at [departure] instead of the planned one (missed or cancelled)
-  void takeVehicle(Departure departure) {
-    _setProgress((tracker, progress) => tracker.takeVehicle(progress, departure.aimedTime ?? departure.time));
+  /// Takes [ride] for the ride [step] (in progress or to come) instead of the planned departure (missed, cancelled,
+  /// or another one preferred): the journey moves to it from there, the following connections included.
+  Future<void> choose(int step, Ride ride) async {
+    final current = state;
+    if (current == null || step < current.progress.step || step >= current.tracker.steps.length) {
+      return;
+    }
+    final sectionIndex = current.tracker.steps[step].sectionIndex;
+    final api = ref.read(mobilityApiProvider);
+    final now = DateTime.now();
+
+    // Departures of the following rides, fetched as the retiming asks for them
+    final known = <RideKey, List<Ride>>{};
+    var retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
+    for (var round = 0; round < 6; round++) {
+      final missing = retimed.rides.values.map((plan) => plan.key).where((key) => !known.containsKey(key)).toList();
+      if (missing.isEmpty) {
+        break;
+      }
+      for (final key in missing) {
+        try {
+          known[key] = await api.lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
+        } catch (e) {
+          known[key] = const [];
+        }
+      }
+      retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
+    }
+
+    final latest = state;
+    if (latest == null || latest.tracker != current.tracker) {
+      return;
+    }
+    var journey = retimed.journey;
+    final progress = latest.progress;
+    if (step > progress.step && progress.shift != Duration.zero) {
+      // The current ride's lateness still applies to what follows it: the chosen times are kept as they are
+      journey = shiftJourney(journey, from: sectionIndex, by: -progress.shift);
+    }
+    final tracker = GoTracker(journey);
+    state = GoState(
+      tracker: tracker,
+      request: latest.request,
+      progress: tracker.chosen(progress, step),
+      startedAt: latest.startedAt,
+      muted: latest.muted,
+      position: latest.position,
+    );
+    _save();
     _loadDepartures();
+    _update();
   }
 
   void toggleMute() {
@@ -444,32 +486,23 @@ class GoController extends Notifier<GoState?> {
     final to = ride?.section.to?.stopAreaId;
     final lineId = ride?.section.line?.id;
     if (ride == null || from == null || to == null || lineId == null || lineId.isEmpty) {
-      state = current.copyWith(vehicle: () => null, vehicleStep: () => null, upcoming: const []);
+      state = current.copyWith(vehicle: () => null, vehicleStep: () => null);
       return;
     }
 
     _loadingDepartures = true;
     try {
-      final rides = await ref.read(mobilityApiProvider).lineRides(lineId, from: from, to: to, limit: 8);
+      final now = DateTime.now();
+      final earliest = index == progress.step ? now : earliestBoarding(current.journey, ride.sectionIndex, now).add(progress.shift);
+      final key = rideKey(ride.section, earliest, now)!;
+      final rides = await ref.read(mobilityApiProvider).lineRides(lineId, from: from, to: to, after: key.after, limit: 8);
       final latest = state;
       if (latest == null || latest.tracker != current.tracker) {
         return;
       }
-      // Departures stopping where the ride gets off
-      final upcoming = [for (final option in rides) option.departure];
-
       // The planned vehicle: same scheduled time (a few minutes of tolerance)
-      final planned = current.tracker.plannedDeparture(ride, latest.progress);
-      Departure? vehicle;
-      var bestGap = const Duration(minutes: 4);
-      for (final departure in upcoming) {
-        final gap = (departure.aimedTime ?? departure.time).difference(planned).abs();
-        if (gap <= bestGap) {
-          bestGap = gap;
-          vehicle = departure;
-        }
-      }
-      state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => index, upcoming: upcoming);
+      final vehicle = plannedRide(rides, current.tracker.plannedDeparture(ride, latest.progress))?.departure;
+      state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => index);
     } catch (e) {
       debugPrint('GO departures unavailable: $e');
     } finally {

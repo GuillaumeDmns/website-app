@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
+import '../journey_retime.dart';
 
 /// Next departures for a ride, like Citymapper: one row per departure with its times at both stops, mission code,
 /// destination and platform. The [selected] one is raised and scrolled into view when it changes.
@@ -12,6 +13,7 @@ class RideDepartureList extends StatefulWidget {
     required this.rides,
     required this.now,
     this.selected,
+    this.earliest,
     this.onSelect,
     this.onAllDepartures,
   });
@@ -20,25 +22,14 @@ class RideDepartureList extends StatefulWidget {
   final DateTime now;
   final Ride? selected;
 
+  /// When the traveller can be at the stop: departures before are faded
+  final DateTime? earliest;
+
   /// Choosing another departure; rows are not tappable without it
   final ValueChanged<Ride>? onSelect;
 
   /// Opens the boarding stop's departures
   final VoidCallback? onAllDepartures;
-
-  /// The departure planned at [planned]: closest scheduled time, a few minutes off at most
-  static Ride? planned(List<Ride> rides, DateTime planned) {
-    Ride? best;
-    var bestGap = const Duration(minutes: 4);
-    for (final ride in rides) {
-      final gap = (ride.departure.aimedTime ?? ride.departure.time).difference(planned).abs();
-      if (gap <= bestGap) {
-        bestGap = gap;
-        best = ride;
-      }
-    }
-    return best;
-  }
 
   @override
   State<RideDepartureList> createState() => _RideDepartureListState();
@@ -53,9 +44,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
   final _scroll = ScrollController();
 
   /// Selection last scrolled to, so that refreshes don't move the list under the user's finger
-  Object? _scrolledTo;
-
-  static Object _key(Ride ride) => ride.departure.trainNumber ?? ride.departure.aimedTime ?? ride.departure.time;
+  Ride? _scrolledTo;
 
   @override
   void initState() {
@@ -77,14 +66,15 @@ class _RideDepartureListState extends State<RideDepartureList> {
 
   void _scrollToSelected({required bool animate}) {
     final selected = widget.selected;
-    if (!mounted || selected == null || !_scroll.hasClients || _key(selected) == _scrolledTo) {
+    final last = _scrolledTo;
+    if (!mounted || selected == null || !_scroll.hasClients || (last != null && sameRide(last, selected))) {
       return;
     }
-    final index = widget.rides.indexWhere((ride) => _key(ride) == _key(selected));
+    final index = widget.rides.indexWhere((ride) => sameRide(ride, selected));
     if (index < 0) {
       return;
     }
-    _scrolledTo = _key(selected);
+    _scrolledTo = selected;
     // The row before stays visible: the departure just missed
     final offset = ((index - 1) * _rowHeight).clamp(0.0, _scroll.position.maxScrollExtent);
     if (animate) {
@@ -121,11 +111,13 @@ class _RideDepartureListState extends State<RideDepartureList> {
               itemCount: rides.length,
               itemBuilder: (context, i) {
                 final ride = rides[i];
-                final isSelected = selected != null && _key(ride) == _key(selected);
+                final isSelected = selected != null && sameRide(ride, selected);
+                final earliest = widget.earliest;
                 return _RideRow(
                   ride: ride,
                   now: widget.now,
                   selected: isSelected,
+                  tooEarly: earliest != null && ride.departure.time.isBefore(earliest.subtract(const Duration(minutes: 1))),
                   onTap: widget.onSelect == null || isSelected || ride.departure.cancelled
                       ? null
                       : () => widget.onSelect!(ride),
@@ -156,11 +148,14 @@ class _RideDepartureListState extends State<RideDepartureList> {
 
 /// `20:56 → 21:03 (6 min)` / `PEBU Paris Saint-Lazare`, time until it leaves and platform on the right
 class _RideRow extends StatelessWidget {
-  const _RideRow({required this.ride, required this.now, required this.selected, this.onTap});
+  const _RideRow({required this.ride, required this.now, required this.selected, required this.tooEarly, this.onTap});
 
   final Ride ride;
   final DateTime now;
   final bool selected;
+
+  /// Leaves before the traveller can be at the stop
+  final bool tooEarly;
   final VoidCallback? onTap;
 
   @override
@@ -273,7 +268,7 @@ class _RideRow extends StatelessWidget {
           side: selected ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)) : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: onTap, child: content),
+        child: InkWell(onTap: onTap, child: tooEarly && !selected ? Opacity(opacity: 0.45, child: content) : content),
       ),
     );
   }
