@@ -177,9 +177,16 @@ class _PinView extends StatelessWidget {
 
     final marker = pin.child ?? dot;
     final child = Center(child: pin.label == null ? marker : Tooltip(message: pin.label!, child: marker));
-    return pin.onTap == null
-        ? child
-        : MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: pin.onTap, child: child));
+    if (pin.onTap == null) {
+      return child;
+    }
+    // A button for screen readers, named by the label
+    return Semantics(
+      button: true,
+      label: pin.label,
+      excludeSemantics: pin.label != null,
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: pin.onTap, child: child)),
+    );
   }
 }
 

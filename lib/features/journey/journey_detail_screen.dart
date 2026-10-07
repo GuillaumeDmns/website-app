@@ -42,13 +42,13 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   JourneyOption? _choicesOf;
 
   void _choose(int index, Ride ride) => setState(() {
-        // The following rides go back to the first departure they can catch
-        _choices = {
-          for (final entry in _choices.entries)
-            if (entry.key < index) entry.key: entry.value,
-          index: ride,
-        };
-      });
+    // The following rides go back to the first departure they can catch
+    _choices = {
+      for (final entry in _choices.entries)
+        if (entry.key < index) entry.key: entry.value,
+      index: ride,
+    };
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +62,21 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     final request = inMemory ? ref.read(selectedJourneyProvider.notifier).request : JourneyRequest.fromQuery(params);
     final theme = Theme.of(context);
 
-    void back() => context.canPop() ? context.pop() : context.go(request == null ? Routes.home : Routes.journey(request));
+    void back() =>
+        context.canPop() ? context.pop() : context.go(request == null ? Routes.home : Routes.journey(request));
 
     if (planned == null) {
       return Column(
         children: [
-          Align(alignment: Alignment.centerLeft, child: IconButton(icon: const Icon(Icons.arrow_back), onPressed: back)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: back),
+          ),
           if (shared != null && shared.isLoading)
-            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
             Padding(
               padding: const EdgeInsets.all(24),
@@ -109,7 +116,10 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      formatDuration(journey.duration),
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    ),
                     Text(
                       [
                         '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
@@ -128,7 +138,9 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                 onPressed: () => shareLink(
                   context,
                   title: context.l10n.journeyShareTitle(
-                      journey.sections.firstOrNull?.from?.name ?? '', journey.sections.lastOrNull?.to?.name ?? ''),
+                    journey.sections.firstOrNull?.from?.name ?? '',
+                    journey.sections.lastOrNull?.to?.name ?? '',
+                  ),
                   location: Routes.journeyDetailOf((request ?? const JourneyRequest()).forSharing(planned), planned),
                 ),
               ),
@@ -236,7 +248,10 @@ class _SectionTile extends StatelessWidget {
                       child: ExpansionTile(
                         tilePadding: EdgeInsets.zero,
                         dense: true,
-                        title: Text('$verb ${formatDuration(section.duration)}$distance', style: TextStyle(color: muted)),
+                        title: Text(
+                          '$verb ${formatDuration(section.duration)}$distance',
+                          style: TextStyle(color: muted),
+                        ),
                         children: [
                           for (final step in section.steps)
                             ListTile(
@@ -273,25 +288,29 @@ class _BikeShareTile extends ConsumerWidget {
     final distance = section.length == null || section.length == 0 ? '' : ' (${formatDistance(section.length!)})';
 
     Widget stationRow(JourneyPoint? point, BikeStation? live, {required bool start}) => _TimelineRow(
-          color: velibColor,
-          time: formatClock(start ? section.departure : section.arrival),
-          dot: true,
-          child: InkWell(
-            onTap: live == null ? null : () => showBikeStationSheet(context, live),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text((start ? context.l10n.bikePickUp : context.l10n.bikeDropOff)(point?.name.replaceFirst('Station Vélib ', '') ?? ''),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                if (live != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2, bottom: 4),
-                    child: BikeCounts(station: live, bikes: start, docks: !start),
-                  ),
-              ],
+      color: velibColor,
+      time: formatClock(start ? section.departure : section.arrival),
+      dot: true,
+      child: InkWell(
+        onTap: live == null ? null : () => showBikeStationSheet(context, live),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              (start ? context.l10n.bikePickUp : context.l10n.bikeDropOff)(
+                point?.name.replaceFirst('Station Vélib ', '') ?? '',
+              ),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-          ),
-        );
+            if (live != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 4),
+                child: BikeCounts(station: live, bikes: start, docks: !start),
+              ),
+          ],
+        ),
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -301,7 +320,10 @@ class _BikeShareTile extends ConsumerWidget {
           color: velibColor,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(context.l10n.bikeRideEstimated(formatDuration(section.duration), distance), style: TextStyle(color: muted)),
+            child: Text(
+              context.l10n.bikeRideEstimated(formatDuration(section.duration), distance),
+              style: TextStyle(color: muted),
+            ),
           ),
         ),
         stationRow(section.to, leave, start: false),
@@ -324,7 +346,9 @@ class _RideTile extends StatelessWidget {
     final theme = Theme.of(context);
     final line = section.line;
     final color = parseHexColor(line?.color, theme.colorScheme.primary);
-    final intermediate = section.stops.length > 2 ? section.stops.sublist(1, section.stops.length - 1) : const <JourneyStop>[];
+    final intermediate = section.stops.length > 2
+        ? section.stops.sublist(1, section.stops.length - 1)
+        : const <JourneyStop>[];
     final delay = section.delay ?? 0;
 
     return Column(
@@ -355,7 +379,10 @@ class _RideTile extends StatelessWidget {
                       ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(context.l10n.direction(section.headsign ?? ''), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        context.l10n.direction(section.headsign ?? ''),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -371,13 +398,18 @@ class _RideTile extends StatelessWidget {
                         text: delay >= 60 ? context.l10n.delayMinutes((delay / 60).round()) : context.l10n.realtime,
                       ),
                     if (section.boardingPositions.isNotEmpty)
-                      _Tag(icon: Icons.train, color: theme.colorScheme.primary, text: _boardingLabel(section.boardingPositions)),
+                      _Tag(
+                        icon: Icons.train,
+                        color: theme.colorScheme.primary,
+                        text: _boardingLabel(section.boardingPositions),
+                      ),
                   ],
                 ),
                 if (hasLine) _RideDisruptions(lineId: lineId),
                 // Elevators matter to get on and off: those of both stops
                 for (final point in [section.from, section.to])
-                  if (point?.stopAreaId case final stopAreaId?) _StopElevators(stopAreaId: stopAreaId, name: point!.name),
+                  if (point?.stopAreaId case final stopAreaId?)
+                    _StopElevators(stopAreaId: stopAreaId, name: point!.name),
                 if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   Theme(
@@ -403,7 +435,10 @@ class _RideTile extends StatelessWidget {
                 else
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text(formatDuration(section.duration), style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                    child: Text(
+                      formatDuration(section.duration),
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
                   ),
               ],
             ),
@@ -415,7 +450,10 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.to?.stopAreaId == null ? null : () => context.push(Routes.stop(section.to!.stopAreaId!)),
-            child: Text(context.l10n.getOffAt(section.to?.name ?? ''), style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              context.l10n.getOffAt(section.to?.name ?? ''),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ),
       ],
@@ -424,11 +462,11 @@ class _RideTile extends StatelessWidget {
 
   static String _boardingLabel(List<String> positions) {
     String name(String position) => switch (position) {
-          'front' => currentL10n.boardFront,
-          'middle' => currentL10n.boardMiddle,
-          'back' => currentL10n.boardBack,
-          _ => position,
-        };
+      'front' => currentL10n.boardFront,
+      'middle' => currentL10n.boardMiddle,
+      'back' => currentL10n.boardBack,
+      _ => position,
+    };
     return positions.length >= 3
         ? currentL10n.boardAnywhere
         : currentL10n.boardAt(positions.map(name).join(' ${currentL10n.or} '));
@@ -480,7 +518,12 @@ class _StopElevators extends ConsumerWidget {
           children: [
             Icon(Icons.elevator_outlined, size: 18, color: color),
             const SizedBox(width: 6),
-            Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
             Icon(Icons.chevron_right, size: 18, color: color),
           ],
         ),
@@ -559,7 +602,10 @@ class _Tag extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            text,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
@@ -568,7 +614,14 @@ class _Tag extends StatelessWidget {
 
 /// Row of the timeline: time on the left, a vertical line (solid or dotted) with an optional stop dot, content
 class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({required this.color, required this.child, this.time, this.dot = false, this.dotted = false, this.isLast = false});
+  const _TimelineRow({
+    required this.color,
+    required this.child,
+    this.time,
+    this.dot = false,
+    this.dotted = false,
+    this.isLast = false,
+  });
 
   final Color color;
   final Widget child;
@@ -585,12 +638,16 @@ class _TimelineRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 44,
+            // Room for "09:15" at the user's text size
+            width: MediaQuery.textScalerOf(context).scale(44),
             child: time == null
                 ? null
                 : Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(time!, style: theme.textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                    child: Text(
+                      time!,
+                      style: theme.textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                    ),
                   ),
           ),
           SizedBox(
@@ -602,9 +659,7 @@ class _TimelineRow extends StatelessWidget {
                   Positioned.fill(
                     top: dot ? 8 : 0,
                     child: Center(
-                      child: dotted
-                          ? _DottedLine(color: color)
-                          : Container(width: 5, color: color),
+                      child: dotted ? _DottedLine(color: color) : Container(width: 5, color: color),
                     ),
                   ),
                 if (dot)
@@ -622,7 +677,9 @@ class _TimelineRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 4), child: child)),
+          Expanded(
+            child: Padding(padding: const EdgeInsets.only(bottom: 4), child: child),
+          ),
         ],
       ),
     );

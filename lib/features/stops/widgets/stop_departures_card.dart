@@ -38,28 +38,40 @@ class StopDeparturesCard extends StatelessWidget {
                     child: Text(stop.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   ),
                   if (stop.distance != null)
-                    Text(formatDistance(stop.distance!), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    Text(
+                      formatDistance(stop.distance!),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
                 ],
               ),
               if (!departures.realtimeAvailable)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text(context.l10n.realtimeUnavailable,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700)),
+                  child: Text(
+                    context.l10n.realtimeUnavailable,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                  ),
                 ),
               const SizedBox(height: 8),
               if (rows.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(context.l10n.noDepartureTwoHours,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  child: Text(
+                    context.l10n.noDepartureTwoHours,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
                 ),
               for (final row in rows.take(maxRows)) LineDeparturesRow(row: row, now: now),
               if (hidden > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Text(context.l10n.otherDirections(hidden),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    context.l10n.otherDirections(hidden),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -80,6 +92,13 @@ class LineDeparturesRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final departures = row.departures;
+    // Large text: fewer times, so that the destination stays readable
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final more = textScale >= 1.6
+        ? 0
+        : textScale >= 1.25
+        ? 1
+        : 2;
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -87,12 +106,16 @@ class LineDeparturesRow extends StatelessWidget {
           LineBadge(row.line, size: 26),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(row.destination, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500)),
+            child: Text(
+              row.destination,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
           ),
           const SizedBox(width: 8),
           if (departures.isNotEmpty) DepartureTime(departures.first, now: now, emphasized: true),
-          for (final departure in departures.skip(1).take(2)) ...[
+          for (final departure in departures.skip(1).take(more)) ...[
             const SizedBox(width: 10),
             DepartureTime(departure, now: now),
           ],

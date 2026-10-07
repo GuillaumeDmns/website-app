@@ -80,6 +80,18 @@ class _StopContent extends ConsumerWidget {
     final theme = Theme.of(context);
     final departures = ref.watch(stopDeparturesProvider(detail.id));
     final now = ref.watch(nowProvider).value ?? DateTime.now();
+    void goThere() => context.push(
+      Routes.journey(
+        ref
+            .read(journeyPreferencesProvider)
+            .apply(
+              JourneyRequest(
+                from: const JourneyPlace.currentLocation(),
+                to: JourneyPlace.stopArea(name: detail.name, id: detail.id, lat: detail.lat, lon: detail.lon),
+              ),
+            ),
+      ),
+    );
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(stopDeparturesProvider(detail.id).future),
@@ -89,7 +101,11 @@ class _StopContent extends ConsumerWidget {
         children: [
           Row(
             children: [
-              IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+              IconButton(
+                tooltip: context.l10n.back,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
               Expanded(
                 child: Text(detail.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
               ),
@@ -99,15 +115,20 @@ class _StopContent extends ConsumerWidget {
                   child: Icon(Icons.accessible, color: theme.colorScheme.primary),
                 ),
               FavoriteStopButton(stopAreaId: detail.id),
-              FilledButton.tonalIcon(
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-                icon: const Icon(Icons.directions, size: 18),
-                label: Text(context.l10n.goThere),
-                onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
-                  from: const JourneyPlace.currentLocation(),
-                  to: JourneyPlace.stopArea(name: detail.name, id: detail.id, lat: detail.lat, lon: detail.lon),
-                )))),
-              ),
+              // Large text: the icon only, so that the name keeps the room
+              if (MediaQuery.textScalerOf(context).scale(1) >= 1.3)
+                IconButton.filledTonal(
+                  tooltip: context.l10n.goThere,
+                  icon: const Icon(Icons.directions),
+                  onPressed: goThere,
+                )
+              else
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                  icon: const Icon(Icons.directions, size: 18),
+                  label: Text(context.l10n.goThere),
+                  onPressed: goThere,
+                ),
             ],
           ),
           Padding(
@@ -117,16 +138,14 @@ class _StopContent extends ConsumerWidget {
               runSpacing: 6,
               children: [
                 for (final line in detail.lines)
-                  InkWell(
-                    onTap: () => context.push(Routes.line(line.id)),
-                    child: LineBadge(line, size: 28),
-                  ),
+                  InkWell(onTap: () => context.push(Routes.line(line.id)), child: LineBadge(line, size: 28)),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
-            child: Row(
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 if (detail.lines.isNotEmpty)
                   TextButton.icon(
@@ -134,7 +153,6 @@ class _StopContent extends ConsumerWidget {
                     label: Text(context.l10n.scheduledTimetable),
                     onPressed: () => context.push(Routes.timetable(detail.id)),
                   ),
-                const Spacer(),
                 TextButton.icon(
                   icon: const Icon(Icons.share_outlined, size: 18),
                   label: Text(context.l10n.share),
@@ -149,7 +167,10 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StopDisruptions(detail: detail),
-                Text(context.l10n.nextDepartures, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  context.l10n.nextDepartures,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 8),
                 AsyncView(
                   value: departures,
@@ -158,7 +179,10 @@ class _StopContent extends ConsumerWidget {
                 ),
                 if (detail.connections.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  Text(context.l10n.walkingConnections, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    context.l10n.walkingConnections,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 4),
                   for (final connection in detail.connections)
                     ListTile(

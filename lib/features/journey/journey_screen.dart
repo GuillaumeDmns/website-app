@@ -30,7 +30,9 @@ class _SelectedOption extends Notifier<int> {
   void select(int index) => state = index;
 }
 
-final _selectedOptionProvider = NotifierProvider.autoDispose.family<_SelectedOption, int, JourneyRequest>(_SelectedOption.new);
+final _selectedOptionProvider = NotifierProvider.autoDispose.family<_SelectedOption, int, JourneyRequest>(
+  _SelectedOption.new,
+);
 
 /// Journey search: from / to, time, options, and the resulting options.
 class JourneyScreen extends ConsumerWidget {
@@ -43,7 +45,9 @@ class JourneyScreen extends ConsumerWidget {
   Future<void> _pickPlace(BuildContext context, {required bool from}) async {
     // Not the context after the await: this page may have been rebuilt while the search was shown
     final router = GoRouter.of(context);
-    final place = await router.push<JourneyPlace>(Routes.pickPlace(from ? currentL10n.journeyFrom : currentL10n.journeyTo));
+    final place = await router.push<JourneyPlace>(
+      Routes.pickPlace(from ? currentL10n.journeyFrom : currentL10n.journeyTo),
+    );
     if (place != null) {
       router.replace(Routes.journey(from ? request.copyWith(from: place) : request.copyWith(to: place)));
     }
@@ -58,12 +62,14 @@ class JourneyScreen extends ConsumerWidget {
     LatLng? point(JourneyPlace? place) => place == null
         ? null
         : place.isCurrentLocation
-            ? user
-            : place.lat != null
-                ? LatLng(place.lat!, place.lon!)
-                : null;
+        ? user
+        : place.lat != null
+        ? LatLng(place.lat!, place.lon!)
+        : null;
     final journeys = plan?.value?.journeys ?? const <JourneyOption>[];
-    final selectedIndex = ref.watch(_selectedOptionProvider(request)).clamp(0, journeys.isEmpty ? 0 : journeys.length - 1);
+    final selectedIndex = ref
+        .watch(_selectedOptionProvider(request))
+        .clamp(0, journeys.isEmpty ? 0 : journeys.length - 1);
     final selectedJourney = journeys.isEmpty ? null : journeys[selectedIndex];
 
     return MapOverlayScope(
@@ -72,7 +78,8 @@ class JourneyScreen extends ConsumerWidget {
           : MapOverlay(
               pins: [
                 if (point(request.from) case final from?) MapPin(point: from, color: Colors.green.shade600, size: 16),
-                if (point(request.to) case final to?) MapPin(point: to, color: Theme.of(context).colorScheme.error, icon: Icons.place, size: 24),
+                if (point(request.to) case final to?)
+                  MapPin(point: to, color: Theme.of(context).colorScheme.error, icon: Icons.place, size: 24),
               ],
               fit: [?point(request.from), ?point(request.to)],
             ),
@@ -90,40 +97,43 @@ class JourneyScreen extends ConsumerWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 0, 8),
-            child: Row(
-              children: [
-                _TimeButton(request: request, onChanged: (next) => _update(context, next)),
-                const Spacer(),
-                // Step-free journeys in one tap
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: request.wheelchair
-                      ? IconButton.filled(
-                          tooltip: context.l10n.wheelchairJourneysOn,
-                          icon: const Icon(Icons.accessible),
-                          onPressed: () => _update(context, request.copyWith(wheelchair: false)),
-                        )
-                      : IconButton.outlined(
-                          tooltip: context.l10n.wheelchairJourneys,
-                          icon: const Icon(Icons.accessible),
-                          onPressed: () => _update(context, request.copyWith(wheelchair: true)),
-                        ),
-                ),
-                Badge(
-                  isLabelVisible: request.optionCount > 0,
-                  label: Text('${request.optionCount}'),
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: Text(context.l10n.options),
-                    onPressed: () async {
-                      final next = await showJourneyOptions(context, request);
-                      if (next != null && context.mounted) {
-                        _update(context, next);
-                      }
-                    },
+            child: _Toolbar(
+              time: _TimeButton(request: request, onChanged: (next) => _update(context, next)),
+              actions: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Step-free journeys in one tap
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: request.wheelchair
+                        ? IconButton.filled(
+                            tooltip: context.l10n.wheelchairJourneysOn,
+                            icon: const Icon(Icons.accessible),
+                            onPressed: () => _update(context, request.copyWith(wheelchair: false)),
+                          )
+                        : IconButton.outlined(
+                            tooltip: context.l10n.wheelchairJourneys,
+                            icon: const Icon(Icons.accessible),
+                            onPressed: () => _update(context, request.copyWith(wheelchair: true)),
+                          ),
                   ),
-                ),
-              ],
+                  Badge(
+                    isLabelVisible: request.optionCount > 0,
+                    label: Text('${request.optionCount}'),
+                    child: OutlinedButton.icon(
+                      style: _compact,
+                      icon: const Icon(Icons.tune, size: 18),
+                      label: Text(context.l10n.options),
+                      onPressed: () async {
+                        final next = await showJourneyOptions(context, request);
+                        if (next != null && context.mounted) {
+                          _update(context, next);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Padding(
@@ -181,9 +191,21 @@ class _Header extends StatelessWidget {
         Expanded(
           child: Column(
             children: [
-              _PlaceField(label: context.l10n.journeyFrom, place: request.from, icon: Icons.trip_origin, color: Colors.green.shade600, onTap: onPickFrom),
+              _PlaceField(
+                label: context.l10n.journeyFrom,
+                place: request.from,
+                icon: Icons.trip_origin,
+                color: Colors.green.shade600,
+                onTap: onPickFrom,
+              ),
               const SizedBox(height: 8),
-              _PlaceField(label: context.l10n.journeyTo, place: request.to, icon: Icons.place, color: Theme.of(context).colorScheme.error, onTap: onPickTo),
+              _PlaceField(
+                label: context.l10n.journeyTo,
+                place: request.to,
+                icon: Icons.place,
+                color: Theme.of(context).colorScheme.error,
+                onTap: onPickTo,
+              ),
             ],
           ),
         ),
@@ -194,7 +216,13 @@ class _Header extends StatelessWidget {
 }
 
 class _PlaceField extends StatelessWidget {
-  const _PlaceField({required this.label, required this.place, required this.icon, required this.color, required this.onTap});
+  const _PlaceField({
+    required this.label,
+    required this.place,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   final String label;
   final JourneyPlace? place;
@@ -234,6 +262,32 @@ class _PlaceField extends StatelessWidget {
 }
 
 enum _TimeChoice { now, departAt, arriveBy }
+
+/// Narrower than the theme's outlined buttons: the time and the options fit on a phone
+final _compact = OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12));
+
+/// Time on the left, options on the right; on two lines with a large text size
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({required this.time, required this.actions});
+
+  final Widget time;
+  final Widget actions;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.textScalerOf(context).scale(1) >= 1.3) {
+      return Wrap(runSpacing: 8, children: [time, actions]);
+    }
+    return Row(
+      children: [
+        Expanded(
+          child: Align(alignment: Alignment.centerLeft, child: time),
+        ),
+        actions,
+      ],
+    );
+  }
+}
 
 class _TimeButton extends StatelessWidget {
   const _TimeButton({required this.request, required this.onChanged});
@@ -282,8 +336,9 @@ class _TimeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MenuAnchor(
       builder: (context, controller, child) => OutlinedButton.icon(
+        style: _compact,
         icon: const Icon(Icons.schedule, size: 18),
-        label: Text(_label),
+        label: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis),
         onPressed: () => controller.isOpen ? controller.close() : controller.open(),
       ),
       menuChildren: [
@@ -304,8 +359,11 @@ void _revealOnMap(BuildContext cardContext) {
   PanelSheetScope.showMap(cardContext);
   Future.delayed(const Duration(milliseconds: 280), () {
     if (cardContext.mounted) {
-      Scrollable.ensureVisible(cardContext,
-          duration: const Duration(milliseconds: 200), alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+      Scrollable.ensureVisible(
+        cardContext,
+        duration: const Duration(milliseconds: 200),
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
     }
   });
 }
@@ -347,8 +405,13 @@ class _Results extends StatelessWidget {
           if (index == 0 || journeyTypeLabel(plan.journeys[index - 1].type) != journeyTypeLabel(journey.type))
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 6),
-              child: Text(journeyTypeLabel(journey.type),
-                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
+              child: Text(
+                journeyTypeLabel(journey.type),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             )
           else
             const SizedBox(height: 8),

@@ -295,5 +295,6 @@
   "widgetNoDeparture": "No upcoming departure",
   "widgetUpdated": "Updated {time}",
   "widgetUpdateFailed": "Updated {time} (failed)",
-  "widgetOpenApp": "Open the app to choose a stop"
+  "widgetOpenApp": "Open the app to choose a stop",
+  "bikePinLabel": "{name} · {count, plural, =0{no bikes} =1{1 bike} other{{count} bikes}}"
 }

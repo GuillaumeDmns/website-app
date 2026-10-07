@@ -32,7 +32,7 @@ List<MapPin> bikeStationPins(BuildContext context, List<BikeStation> stations) =
         MapPin(
           point: LatLng(station.lat, station.lon),
           color: velibColor,
-          label: station.name,
+          label: context.l10n.bikePinLabel(station.name, station.bikes),
           childSize: const Size(44, 24),
           onTap: () => showBikeStationSheet(context, station),
           child: _BikePin(station: station),

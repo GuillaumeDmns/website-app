@@ -922,5 +922,16 @@
       }
     }
   },
-  "widgetOpenApp": "Ouvrez l'app pour choisir un arrêt"
+  "widgetOpenApp": "Ouvrez l'app pour choisir un arrêt",
+  "bikePinLabel": "{name} · {count, plural, =0{aucun vélo} =1{1 vélo} other{{count} vélos}}",
+  "@bikePinLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

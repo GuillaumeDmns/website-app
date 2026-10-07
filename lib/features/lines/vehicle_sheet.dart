@@ -99,11 +99,15 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(context.l10n.towards(_vehicle.destination ?? '?'),
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          context.l10n.towards(_vehicle.destination ?? '?'),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         Row(
                           children: [
-                            Flexible(child: Text(subtitle, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                            Flexible(
+                              child: Text(subtitle, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                            ),
                             if (_DelayLabel.shown(_vehicle.delaySeconds)) ...[
                               const SizedBox(width: 8),
                               _DelayLabel(_vehicle.delaySeconds!),
@@ -113,7 +117,11 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                       ],
                     ),
                   ),
-                  IconButton(tooltip: context.l10n.close, icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  IconButton(
+                    tooltip: context.l10n.close,
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
             ),
@@ -183,13 +191,14 @@ class _CallRow extends StatelessWidget {
     final until = seconds <= 30
         ? context.l10n.vehicleAtStop
         : seconds < 3600
-            ? context.l10n.minutesShort((seconds / 60).ceil())
-            : null;
+        ? context.l10n.minutesShort((seconds / 60).ceil())
+        : null;
 
     return InkWell(
       onTap: onTap,
       child: SizedBox(
-        height: _height,
+        // Taller with a larger text size
+        height: MediaQuery.textScalerOf(context).scale(_height),
         child: Row(
           children: [
             SizedBox(
@@ -200,8 +209,10 @@ class _CallRow extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatClock(call.expectedAt),
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
+                    Text(
+                      formatClock(call.expectedAt),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
+                    ),
                     if (until != null)
                       Text(until, style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
                   ],
@@ -233,13 +244,14 @@ class _CallRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(call.stopName ?? call.stopId, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400)),
+              child: Text(
+                call.stopName ?? call.stopId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400),
+              ),
             ),
-            if (_DelayLabel.shown(call.delaySeconds)) ...[
-              _DelayLabel(call.delaySeconds!),
-              const SizedBox(width: 8),
-            ],
+            if (_DelayLabel.shown(call.delaySeconds)) ...[_DelayLabel(call.delaySeconds!), const SizedBox(width: 8)],
             if (call.platform != null)
               Padding(
                 padding: const EdgeInsets.only(right: 16),
