@@ -5,7 +5,6 @@
     <string name="widget_refresh">Actualiser</string>
     <string name="widget_loading">Chargement…</string>
     <string name="widget_last_updated_placeholder">Mis à jour : --:--</string>
-    <string name="widget_open">Ouvrir</string>
     <string name="widget_no_stop">Aucune station</string>
     <string name="widget_tap_to_load">Appuyez pour charger</string>
     <string name="widget_no_departure">Aucun départ</string>

@@ -34,9 +34,17 @@ Future<void> pushDeparturesToWidget(StopDepartures departures) async {
         (line: line.line, destination: line.destination, departure: departure),
   ]..sort((a, b) => a.departure.time.compareTo(b.departure.time));
   // Clock times rather than "3 min": the widget is not refreshed every minute
+  // `line|background|text color|time|destination` (see NextDepartures.kt)
+  String field(String? value) => (value ?? '').replaceAll('|', '/');
   final json = rows
       .take(_rows)
-      .map((row) => '${row.line.name ?? ''}  ${formatClock(row.departure.time)}|${row.destination}'.replaceAll('||', ''))
+      .map((row) => [
+            field(row.line.name),
+            field(row.line.color),
+            field(row.line.textColor),
+            formatClock(row.departure.time),
+            field(row.destination),
+          ].join('|'))
       .join('||');
   try {
     await Future.wait([

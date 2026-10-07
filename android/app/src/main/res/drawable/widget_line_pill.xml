@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Line badge background, tinted with the line's color -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#0DFFFFFF" />
-    <corners android:radius="12dp" />
+    <solid android:color="#FFFFFF" />
+    <corners android:radius="4dp" />
 </shape>
