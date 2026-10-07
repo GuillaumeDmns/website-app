@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,6 +11,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
+import '../../l10n/l10n.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'widgets/journey_card.dart';
@@ -41,7 +43,7 @@ class JourneyScreen extends ConsumerWidget {
   Future<void> _pickPlace(BuildContext context, {required bool from}) async {
     // Not the context after the await: this page may have been rebuilt while the search was shown
     final router = GoRouter.of(context);
-    final place = await router.push<JourneyPlace>(Routes.pickPlace(from ? 'Départ' : 'Arrivée'));
+    final place = await router.push<JourneyPlace>(Routes.pickPlace(from ? currentL10n.journeyFrom : currentL10n.journeyTo));
     if (place != null) {
       router.replace(Routes.journey(from ? request.copyWith(from: place) : request.copyWith(to: place)));
     }
@@ -97,12 +99,12 @@ class JourneyScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(right: 8),
                   child: request.wheelchair
                       ? IconButton.filled(
-                          tooltip: 'Trajets accessibles en fauteuil roulant : activé',
+                          tooltip: context.l10n.wheelchairJourneysOn,
                           icon: const Icon(Icons.accessible),
                           onPressed: () => _update(context, request.copyWith(wheelchair: false)),
                         )
                       : IconButton.outlined(
-                          tooltip: 'Trajets accessibles en fauteuil roulant',
+                          tooltip: context.l10n.wheelchairJourneys,
                           icon: const Icon(Icons.accessible),
                           onPressed: () => _update(context, request.copyWith(wheelchair: true)),
                         ),
@@ -112,7 +114,7 @@ class JourneyScreen extends ConsumerWidget {
                   label: Text('${request.optionCount}'),
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.tune, size: 18),
-                    label: const Text('Options'),
+                    label: Text(context.l10n.options),
                     onPressed: () async {
                       final next = await showJourneyOptions(context, request);
                       if (next != null && context.mounted) {
@@ -127,9 +129,9 @@ class JourneyScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: plan == null
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Choisissez un départ et une arrivée', textAlign: TextAlign.center),
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(context.l10n.chooseFromTo, textAlign: TextAlign.center),
                   )
                 : AsyncView(
                     value: plan,
@@ -175,17 +177,17 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: onBack),
+        IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: onBack),
         Expanded(
           child: Column(
             children: [
-              _PlaceField(label: 'Départ', place: request.from, icon: Icons.trip_origin, color: Colors.green.shade600, onTap: onPickFrom),
+              _PlaceField(label: context.l10n.journeyFrom, place: request.from, icon: Icons.trip_origin, color: Colors.green.shade600, onTap: onPickFrom),
               const SizedBox(height: 8),
-              _PlaceField(label: 'Arrivée', place: request.to, icon: Icons.place, color: Theme.of(context).colorScheme.error, onTap: onPickTo),
+              _PlaceField(label: context.l10n.journeyTo, place: request.to, icon: Icons.place, color: Theme.of(context).colorScheme.error, onTap: onPickTo),
             ],
           ),
         ),
-        IconButton(tooltip: 'Inverser', icon: const Icon(Icons.swap_vert), onPressed: onSwap),
+        IconButton(tooltip: context.l10n.swap, icon: const Icon(Icons.swap_vert), onPressed: onSwap),
       ],
     );
   }
@@ -242,13 +244,14 @@ class _TimeButton extends StatelessWidget {
   String get _label {
     final datetime = request.datetime;
     if (datetime == null) {
-      return 'Partir maintenant';
+      return currentL10n.leaveNow;
     }
     final local = datetime.toLocal();
     final now = DateTime.now();
     final sameDay = local.year == now.year && local.month == now.month && local.day == now.day;
-    final day = sameDay ? '' : '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')} ';
-    return '${request.arriveBy ? 'Arriver à' : 'Partir à'} $day${formatClock(datetime)}';
+    final day = sameDay ? '' : '${DateFormat.Md(currentL10n.localeName).format(local)} ';
+    final time = '$day${formatClock(datetime)}';
+    return request.arriveBy ? currentL10n.arriveByTime(time) : currentL10n.leaveAtTime(time);
   }
 
   Future<void> _choose(BuildContext context, _TimeChoice choice) async {
@@ -284,10 +287,10 @@ class _TimeButton extends StatelessWidget {
         onPressed: () => controller.isOpen ? controller.close() : controller.open(),
       ),
       menuChildren: [
-        for (final (choice, label) in const [
-          (_TimeChoice.now, 'Partir maintenant'),
-          (_TimeChoice.departAt, 'Partir à…'),
-          (_TimeChoice.arriveBy, 'Arriver à…'),
+        for (final (choice, label) in [
+          (_TimeChoice.now, context.l10n.leaveNow),
+          (_TimeChoice.departAt, context.l10n.leaveAtMenu),
+          (_TimeChoice.arriveBy, context.l10n.arriveByMenu),
         ])
           MenuItemButton(onPressed: () => _choose(context, choice), child: Text(label)),
       ],
@@ -330,9 +333,9 @@ class _Results extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (plan.journeys.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Text('Aucun itinéraire trouvé à cette heure', textAlign: TextAlign.center),
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(context.l10n.noJourneyFound, textAlign: TextAlign.center),
       );
     }
 
@@ -374,14 +377,14 @@ class _Results extends StatelessWidget {
             if (plan.earlier != null)
               TextButton.icon(
                 icon: const Icon(Icons.keyboard_arrow_up),
-                label: const Text('Plus tôt'),
+                label: Text(context.l10n.earlier),
                 onPressed: () => onPage(plan.earlier!),
               ),
             const Spacer(),
             if (plan.later != null)
               TextButton.icon(
                 icon: const Icon(Icons.keyboard_arrow_down),
-                label: const Text('Plus tard'),
+                label: Text(context.l10n.later),
                 onPressed: () => onPage(plan.later!),
               ),
           ],

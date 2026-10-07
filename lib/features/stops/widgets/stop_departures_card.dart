@@ -6,6 +6,7 @@ import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../../l10n/l10n.dart';
 
 /// Next departures of a stop area, one row per line and destination (Citymapper "nearby" card).
 class StopDeparturesCard extends StatelessWidget {
@@ -43,21 +44,21 @@ class StopDeparturesCard extends StatelessWidget {
               if (!departures.realtimeAvailable)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text('Temps réel indisponible, horaires prévus',
+                  child: Text(context.l10n.realtimeUnavailable,
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700)),
                 ),
               const SizedBox(height: 8),
               if (rows.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('Aucun départ dans les 2 prochaines heures',
+                  child: Text(context.l10n.noDepartureTwoHours,
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 ),
               for (final row in rows.take(maxRows)) LineDeparturesRow(row: row, now: now),
               if (hidden > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Text('+ $hidden autres directions',
+                  child: Text(context.l10n.otherDirections(hidden),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600)),
                 ),
             ],

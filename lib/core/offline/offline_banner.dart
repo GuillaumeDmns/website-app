@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../location/location_providers.dart';
 import '../utils/time_format.dart';
 import 'offline_cache.dart';
@@ -33,7 +34,7 @@ class OfflineBanner extends ConsumerWidget {
             children: [
               Icon(Icons.cloud_off, size: 18, color: scheme.onInverseSurface),
               const SizedBox(width: 8),
-              Text('Hors ligne · données du $when', style: TextStyle(color: scheme.onInverseSurface, fontWeight: FontWeight.w600)),
+              Text(context.l10n.offlineSince(when), style: TextStyle(color: scheme.onInverseSurface, fontWeight: FontWeight.w600)),
             ],
           ),
         ),

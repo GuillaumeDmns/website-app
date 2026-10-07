@@ -44,7 +44,7 @@ class MainActivity: FlutterFragmentActivity() {
                 "updateJourney" -> {
                     val notification = LiveJourneyNotification.journey(
                         this,
-                        title = call.argument<String>("title") ?: "Trajet en cours",
+                        title = call.argument<String>("title") ?: getString(R.string.journey_channel),
                         status = call.argument<String>("status") ?: "",
                         progress = call.argument<Int>("progress") ?: 0,
                         currentMode = call.argument<String>("currentMode") ?: "walk",

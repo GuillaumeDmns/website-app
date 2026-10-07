@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../l10n/l10n.dart';
+
 part 'models.freezed.dart';
 part 'models.g.dart';
 
@@ -25,7 +27,7 @@ enum TransportMode {
   String get apiName => name.toUpperCase();
 
   String get label => switch (this) {
-        metro => 'Métro',
+        metro => currentL10n.modeMetro,
         rer => 'RER',
         transilien => 'Transilien',
         ter => 'TER',

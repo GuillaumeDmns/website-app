@@ -10,6 +10,7 @@ import '../../core/api/mobility_api.dart';
 import '../../core/auth/token_store.dart';
 import '../../core/config.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../stops/stop_screen.dart';
 
@@ -42,8 +43,8 @@ Future<void> pushDeparturesToWidget(StopDepartures departures) async {
       HomeWidget.saveWidgetData<String>('stop_id', departures.stop.id),
       HomeWidget.saveWidgetData<String>('stop_name', departures.stop.name),
       HomeWidget.saveWidgetData<String>('departures_json', rows.isEmpty ? null : json),
-      HomeWidget.saveWidgetData<String>('departures_list', rows.isEmpty ? 'Aucun départ prochainement' : null),
-      HomeWidget.saveWidgetData<String>('last_updated', formatClock(DateTime.now())),
+      HomeWidget.saveWidgetData<String>('departures_list', rows.isEmpty ? currentL10n.widgetNoDeparture : null),
+      HomeWidget.saveWidgetData<String>('last_updated', currentL10n.widgetUpdated(formatClock(DateTime.now()))),
     ]);
     await HomeWidget.updateWidget(androidName: _androidName);
   } catch (e) {
@@ -58,12 +59,14 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   if (uri?.host != 'refreshdepartures') {
     return;
   }
+  // Another isolate: the app's language is read again
+  await loadLocale();
   final stopId = await HomeWidget.getWidgetData<String>('stop_id');
   final tokens = TokenStore();
   await tokens.load();
   final refreshToken = tokens.refreshToken;
   if (stopId == null || refreshToken == null) {
-    await HomeWidget.saveWidgetData<String>('departures_list', 'Ouvrez l\'app pour choisir un arrêt');
+    await HomeWidget.saveWidgetData<String>('departures_list', currentL10n.widgetOpenApp);
     await HomeWidget.updateWidget(androidName: _androidName);
     return;
   }
@@ -74,7 +77,7 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
     await pushDeparturesToWidget(await MobilityApi(dio).stopDepartures(stopId, limit: 3));
   } catch (e) {
     debugPrint('Home widget refresh failed: $e');
-    await HomeWidget.saveWidgetData<String>('last_updated', '${formatClock(DateTime.now())} (échec)');
+    await HomeWidget.saveWidgetData<String>('last_updated', currentL10n.widgetUpdateFailed(formatClock(DateTime.now())));
     await HomeWidget.updateWidget(androidName: _androidName);
   }
 }
@@ -88,7 +91,7 @@ Future<void> clearHomeWidget() async {
     for (final key in ['stop_id', 'stop_name', 'departures_json', 'last_updated']) {
       await HomeWidget.saveWidgetData<String>(key, null);
     }
-    await HomeWidget.saveWidgetData<String>('departures_list', 'Ouvrez l\'app pour choisir un arrêt');
+    await HomeWidget.saveWidgetData<String>('departures_list', currentL10n.widgetOpenApp);
     await HomeWidget.updateWidget(androidName: _androidName);
   } catch (e) {
     debugPrint('Home widget reset failed: $e');

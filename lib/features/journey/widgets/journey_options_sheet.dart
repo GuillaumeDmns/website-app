@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/models.dart';
+import '../../../l10n/l10n.dart';
 import '../journey_preferences.dart';
 import '../journey_request.dart';
 
@@ -52,9 +53,9 @@ class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Options', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text(context.l10n.options, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            Text('Modes de transport', style: theme.textTheme.titleSmall),
+            Text(context.l10n.transportModes, style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -79,21 +80,21 @@ class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.accessible),
-              title: const Text('Accessible en fauteuil roulant'),
-              subtitle: const Text('Sans marches ni escaliers'),
+              title: Text(context.l10n.wheelchairOption),
+              subtitle: Text(context.l10n.wheelchairOptionHint),
               value: _wheelchair,
               onChanged: (value) => setState(() => _wheelchair = value),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.pedal_bike),
-              title: const Text('Proposer un trajet en Vélib'),
-              subtitle: const Text('Stations avec vélos et places disponibles'),
+              title: Text(context.l10n.bikeShareOption),
+              subtitle: Text(context.l10n.bikeShareOptionHint),
               value: _bikeShare,
               onChanged: (value) => setState(() => _bikeShare = value),
             ),
             const SizedBox(height: 8),
-            Text('Vitesse de marche', style: theme.textTheme.titleSmall),
+            Text(context.l10n.walkingSpeed, style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             SegmentedButton<WalkingSpeed>(
               showSelectedIcon: false,
@@ -105,8 +106,8 @@ class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
-              title: const Text('Garder pour mes prochains trajets'),
-              subtitle: const Text('Accessibilité, Vélib et vitesse de marche'),
+              title: Text(context.l10n.rememberOptions),
+              subtitle: Text(context.l10n.rememberOptionsHint),
               value: _remember,
               onChanged: (value) => setState(() => _remember = value ?? false),
             ),
@@ -122,7 +123,7 @@ class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
                 }
                 Navigator.pop(context, request);
               },
-              child: const Text('Appliquer'),
+              child: Text(context.l10n.apply),
             ),
           ],
         ),

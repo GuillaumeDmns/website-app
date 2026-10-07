@@ -7,6 +7,7 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import '../journey/journey_preferences.dart';
@@ -40,12 +41,12 @@ class AroundScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+              IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
                 child: Text(name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
               ),
               IconButton(
-                tooltip: 'Enregistrer ce lieu',
+                tooltip: context.l10n.savePlace,
                 icon: const Icon(Icons.bookmark_add_outlined),
                 onPressed: () => runFavoriteAction(
                   context,
@@ -53,13 +54,13 @@ class AroundScreen extends ConsumerWidget {
                         FavoriteKind.place,
                         JourneyPlace.point(name: name, lat: position.latitude, lon: position.longitude),
                       ),
-                  success: 'Lieu enregistré',
+                  success: context.l10n.placeSaved,
                 ),
               ),
               FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                 icon: const Icon(Icons.directions, size: 18),
-                label: const Text('Y aller'),
+                label: Text(context.l10n.goThere),
                 onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
                   from: const JourneyPlace.currentLocation(),
                   to: JourneyPlace.point(name: name, lat: position.latitude, lon: position.longitude),
@@ -69,7 +70,7 @@ class AroundScreen extends ConsumerWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 0, 12),
-            child: Text('Départs à proximité', style: theme.textTheme.titleSmall),
+            child: Text(context.l10n.departuresNearby, style: theme.textTheme.titleSmall),
           ),
           Padding(
             padding: const EdgeInsets.only(left: 12),

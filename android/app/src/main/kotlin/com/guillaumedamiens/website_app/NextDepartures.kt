@@ -43,9 +43,9 @@ class NextDepartures : HomeWidgetProvider() {
     ) {
         appWidgetIds.forEach { widgetId ->
             val views = RemoteViews(context.packageName, R.layout.next_departures).apply {
-                val stationName = widgetData.getString("stop_name", "Aucune station")
+                val stationName = widgetData.getString("stop_name", null) ?: context.getString(R.string.widget_no_stop)
                 val departuresJson = widgetData.getString("departures_json", null)
-                val statusMessage = widgetData.getString("departures_list", "Appuyez pour charger")
+                val statusMessage = widgetData.getString("departures_list", null)
                 val lastUpdated = widgetData.getString("last_updated", null)
 
                 // Set station name
@@ -53,7 +53,8 @@ class NextDepartures : HomeWidgetProvider() {
 
                 // Set last updated
                 if (lastUpdated != null) {
-                    setTextViewText(R.id.tv_last_updated, "Mis à jour : $lastUpdated")
+                    // Written by the app in its language ("Mis à jour : 08:05")
+                    setTextViewText(R.id.tv_last_updated, lastUpdated)
                 } else {
                     setTextViewText(R.id.tv_last_updated, "")
                 }
@@ -80,10 +81,10 @@ class NextDepartures : HomeWidgetProvider() {
                             }
                         }
                     } else {
-                        showStatusMessage(this, statusMessage ?: "Aucun départ")
+                        showStatusMessage(this, statusMessage ?: context.getString(R.string.widget_no_departure))
                     }
                 } else {
-                    showStatusMessage(this, statusMessage ?: "Appuyez pour charger")
+                    showStatusMessage(this, statusMessage ?: context.getString(R.string.widget_tap_to_load))
                 }
 
                 // PendingIntent.FLAG_IMMUTABLE est OBLIGATOIRE sur Android 12+ sinon ça crash

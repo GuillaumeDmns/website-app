@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Centered card used by the sign-in and sign-up pages
-class AuthFormLayout extends StatelessWidget {
+import '../../l10n/l10n.dart';
+
+/// Centered card used by the sign-in and sign-up pages, with the language switch in a corner
+class AuthFormLayout extends ConsumerWidget {
   const AuthFormLayout({super.key, required this.title, required this.subtitle, required this.children});
 
   final String title;
@@ -9,31 +12,52 @@ class AuthFormLayout extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: AutofillGroup(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Icon(Icons.directions_transit_filled, size: 56, color: theme.colorScheme.primary),
-                    const SizedBox(height: 16),
-                    Text(title, textAlign: TextAlign.center, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(subtitle, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 32),
-                    ...children,
-                  ],
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(Icons.directions_transit_filled, size: 56, color: theme.colorScheme.primary),
+                        const SizedBox(height: 16),
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 32),
+                        ...children,
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: TextButton.icon(
+                icon: const Icon(Icons.translate, size: 18),
+                label: Text(context.l10n.otherLanguage),
+                onPressed: () => ref.read(localeProvider.notifier).toggle(),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -52,7 +76,11 @@ class FormErrorText extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Text(message!, style: TextStyle(color: Theme.of(context).colorScheme.error), textAlign: TextAlign.center),
+      child: Text(
+        message!,
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }

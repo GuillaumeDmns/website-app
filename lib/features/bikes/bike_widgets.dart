@@ -10,6 +10,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 
@@ -92,16 +93,16 @@ class BikeCounts extends StatelessWidget {
         );
 
     if (!station.renting && !station.returning) {
-      return Text('Station fermée', style: TextStyle(color: Theme.of(context).colorScheme.error));
+      return Text(context.l10n.bikeStationClosed, style: TextStyle(color: Theme.of(context).colorScheme.error));
     }
     return Wrap(
       spacing: 12,
       children: [
         if (bikes) ...[
-          count(Icons.pedal_bike, station.mechanical, 'Vélos mécaniques', velibColor),
-          count(Icons.electric_bike, station.electric, 'Vélos électriques', Colors.blue.shade600),
+          count(Icons.pedal_bike, station.mechanical, context.l10n.bikesMechanical, velibColor),
+          count(Icons.electric_bike, station.electric, context.l10n.bikesElectric, Colors.blue.shade600),
         ],
-        if (docks) count(Icons.local_parking, station.docks, 'Places libres', Colors.indigo.shade400),
+        if (docks) count(Icons.local_parking, station.docks, context.l10n.bikeDocksFree, Colors.indigo.shade400),
       ],
     );
   }
@@ -167,39 +168,39 @@ Future<void> showBikeStationSheet(BuildContext context, BikeStation station) {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Station Vélib', style: theme.textTheme.labelLarge?.copyWith(color: velibColor)),
+                Text(context.l10n.bikeStation, style: theme.textTheme.labelLarge?.copyWith(color: velibColor)),
                 Text(station.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                _SheetCount(icon: Icons.pedal_bike, color: velibColor, value: station.mechanical, label: 'vélos mécaniques'),
-                _SheetCount(icon: Icons.electric_bike, color: Colors.blue.shade600, value: station.electric, label: 'vélos électriques'),
-                _SheetCount(icon: Icons.local_parking, color: Colors.indigo.shade400, value: station.docks, label: 'places libres'),
+                _SheetCount(icon: Icons.pedal_bike, color: velibColor, value: station.mechanical, label: context.l10n.bikesMechanicalCount(station.mechanical)),
+                _SheetCount(icon: Icons.electric_bike, color: Colors.blue.shade600, value: station.electric, label: context.l10n.bikesElectricCount(station.electric)),
+                _SheetCount(icon: Icons.local_parking, color: Colors.indigo.shade400, value: station.docks, label: context.l10n.bikeDocksCount(station.docks)),
                 if (!station.renting || !station.returning)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       !station.renting && !station.returning
-                          ? 'Station fermée'
+                          ? context.l10n.bikeStationClosed
                           : !station.renting
-                              ? 'Location impossible pour le moment'
-                              : 'Retour impossible pour le moment',
+                              ? context.l10n.bikeNoRenting
+                              : context.l10n.bikeNoReturning,
                       style: TextStyle(color: theme.colorScheme.error),
                     ),
                   ),
                 if (station.reportedAt != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text('Mis à jour à ${formatClock(station.reportedAt!)}',
+                    child: Text(context.l10n.updatedAt(formatClock(station.reportedAt!)),
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   icon: const Icon(Icons.directions),
-                  label: const Text('Y aller'),
+                  label: Text(context.l10n.goThere),
                   onPressed: () {
                     Navigator.pop(context);
                     router.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
                       from: const JourneyPlace.currentLocation(),
-                      to: JourneyPlace.point(name: 'Station Vélib ${station.name}', lat: station.lat, lon: station.lon),
+                      to: JourneyPlace.point(name: context.l10n.bikeStationNamed(station.name), lat: station.lat, lon: station.lon),
                     ))));
                   },
                 ),

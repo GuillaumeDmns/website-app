@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../l10n/l10n.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
 
@@ -19,7 +20,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
     final position = ref.read(userLocationProvider).value ??
         await ref.read(userLocationProvider.future).timeout(const Duration(seconds: 8), onTimeout: () => null);
     if (position == null) {
-      throw const ApiException('Position indisponible : choisissez un point de départ');
+      throw ApiException(currentL10n.locationUnavailableChooseStart);
     }
     return '${position.latitude},${position.longitude}';
   }

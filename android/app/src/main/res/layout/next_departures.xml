@@ -41,7 +41,7 @@
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.02"
             android:maxLines="1"
-            android:text="Station"
+            android:text="@string/widget_stop_placeholder"
             android:textColor="#F0F0F5"
             android:textSize="14sp" />
 
@@ -54,14 +54,14 @@
             android:layout_centerVertical="true"
             android:background="@drawable/widget_refresh_btn_bg"
             android:clickable="true"
-            android:contentDescription="Actualiser"
+            android:contentDescription="@string/widget_refresh"
             android:focusable="true"
             android:padding="6dp">
 
             <ImageView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:contentDescription="Actualiser"
+                android:contentDescription="@string/widget_refresh"
                 android:src="@drawable/ic_refresh" />
         </FrameLayout>
     </RelativeLayout>
@@ -303,7 +303,7 @@
             android:gravity="center"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
-            android:text="Chargement..."
+            android:text="@string/widget_loading"
             android:textColor="#8888A0"
             android:textSize="12sp"
             android:visibility="visible" />
@@ -327,7 +327,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="sans-serif"
-            android:text="Mis à jour : --:--"
+            android:text="@string/widget_last_updated_placeholder"
             android:textColor="#55556B"
             android:textSize="9sp" />
 
@@ -350,7 +350,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:text="Ouvrir"
+                android:text="@string/widget_open"
                 android:textColor="#FFFFFF"
                 android:textSize="10sp" />
 

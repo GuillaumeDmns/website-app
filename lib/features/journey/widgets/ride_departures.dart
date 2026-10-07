@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
+import '../../../l10n/l10n.dart';
 import '../journey_retime.dart';
 
 /// Next departures for a ride, like Citymapper: one row per departure with its times at both stops, mission code,
@@ -133,7 +134,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
                 padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                 child: Row(
                   children: [
-                    Expanded(child: Text('Tous les départs', style: theme.textTheme.labelLarge)),
+                    Expanded(child: Text(context.l10n.allDepartures, style: theme.textTheme.labelLarge)),
                     Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
                   ],
                 ),
@@ -213,7 +214,7 @@ class _RideRow extends StatelessWidget {
                         Flexible(
                           child: Padding(
                             padding: const EdgeInsets.only(left: 6),
-                            child: Text('$minutes\u00a0min',
+                            child: Text(context.l10n.minutesShort(minutes).replaceAll(' ', '\u00a0'),
                                 maxLines: 1,
                                 overflow: TextOverflow.fade,
                                 softWrap: false,
@@ -248,7 +249,7 @@ class _RideRow extends StatelessWidget {
             children: [
               DepartureTime(departure, now: now, emphasized: true),
               if (departure.platform != null)
-                Text('Voie ${departure.platform}', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                Text(context.l10n.platform(departure.platform!), style: theme.textTheme.bodySmall?.copyWith(color: muted)),
             ],
           ),
         ],

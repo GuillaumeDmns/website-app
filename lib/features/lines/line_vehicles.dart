@@ -10,6 +10,7 @@ import '../../core/api/models.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 
 /// Vehicles of a line and when they were fetched, refreshed every minute while shown (the backend keeps them a
 /// minute: the estimated-timetable quota is small)
@@ -102,6 +103,10 @@ class VehicleMarker extends StatelessWidget {
 String vehicleLabel(Vehicle vehicle, DateTime now) {
   final minutes = vehicle.expectedAt.difference(now).inSeconds / 60;
   final next = vehicle.toStopName ?? '';
-  final when = minutes < 0.5 ? 'à quai' : minutes < 60 ? 'dans ${minutes.ceil()} min' : formatClock(vehicle.expectedAt);
+  final when = minutes < 0.5
+      ? currentL10n.vehicleAtStop
+      : minutes < 60
+          ? currentL10n.inMinutes(minutes.ceil())
+          : formatClock(vehicle.expectedAt);
   return '→ ${vehicle.destination ?? ''} · $next $when';
 }

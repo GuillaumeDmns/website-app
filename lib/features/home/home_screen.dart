@@ -8,6 +8,7 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
+import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
 import '../favorites/favorite_widgets.dart';
@@ -68,9 +69,9 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('À proximité', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(context.l10n.homeNearby, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                     if (!origin.isUser)
-                      Text('Position indisponible : autour du centre de la carte',
+                      Text(context.l10n.homeNoPosition,
                           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                     // Settings can only be opened on phones
                     if (!origin.isUser && !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS))
@@ -78,7 +79,7 @@ class HomeScreen extends ConsumerWidget {
                         TextButton.icon(
                           style: TextButton.styleFrom(padding: EdgeInsets.zero),
                           icon: const Icon(Icons.my_location, size: 18),
-                          label: Text(issue == LocationIssue.serviceDisabled ? 'Activer la localisation' : 'Autoriser la localisation'),
+                          label: Text(issue == LocationIssue.serviceDisabled ? context.l10n.locationTurnOn : context.l10n.locationAllow),
                           onPressed: () => fixLocationIssue(ref, issue),
                         ),
                   ],
@@ -121,7 +122,7 @@ class _SearchBox extends StatelessWidget {
             children: [
               Icon(Icons.search, color: scheme.onSurfaceVariant),
               const SizedBox(width: 12),
-              Text('Où allez-vous ?', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16)),
+              Text(context.l10n.homeSearchHint, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16)),
             ],
           ),
         ),
@@ -135,13 +136,18 @@ class _AccountMenu extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return PopupMenuButton<void>(
-      tooltip: 'Compte',
+      tooltip: l10n.account,
       icon: const Icon(Icons.account_circle_outlined),
       itemBuilder: (context) => [
         PopupMenuItem(
+          onTap: () => ref.read(localeProvider.notifier).toggle(),
+          child: ListTile(leading: const Icon(Icons.translate), title: Text(l10n.otherLanguage), contentPadding: EdgeInsets.zero),
+        ),
+        PopupMenuItem(
           onTap: () => ref.read(authControllerProvider.notifier).signOut(),
-          child: const ListTile(leading: Icon(Icons.logout), title: Text('Se déconnecter'), contentPadding: EdgeInsets.zero),
+          child: ListTile(leading: const Icon(Icons.logout), title: Text(l10n.signOut), contentPadding: EdgeInsets.zero),
         ),
       ],
     );

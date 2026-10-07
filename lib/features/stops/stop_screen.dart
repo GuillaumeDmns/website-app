@@ -14,6 +14,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/platform/share.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
@@ -88,20 +89,20 @@ class _StopContent extends ConsumerWidget {
         children: [
           Row(
             children: [
-              IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+              IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
                 child: Text(detail.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
               ),
               if (detail.wheelchairBoarding == 1)
                 Tooltip(
-                  message: 'Accessible en fauteuil roulant',
+                  message: context.l10n.wheelchairAccessible,
                   child: Icon(Icons.accessible, color: theme.colorScheme.primary),
                 ),
               FavoriteStopButton(stopAreaId: detail.id),
               FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                 icon: const Icon(Icons.directions, size: 18),
-                label: const Text('Y aller'),
+                label: Text(context.l10n.goThere),
                 onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
                   from: const JourneyPlace.currentLocation(),
                   to: JourneyPlace.stopArea(name: detail.name, id: detail.id, lat: detail.lat, lon: detail.lon),
@@ -130,13 +131,13 @@ class _StopContent extends ConsumerWidget {
                 if (detail.lines.isNotEmpty)
                   TextButton.icon(
                     icon: const Icon(Icons.schedule, size: 18),
-                    label: const Text('Horaires théoriques'),
+                    label: Text(context.l10n.scheduledTimetable),
                     onPressed: () => context.push(Routes.timetable(detail.id)),
                   ),
                 const Spacer(),
                 TextButton.icon(
                   icon: const Icon(Icons.share_outlined, size: 18),
-                  label: const Text('Partager'),
+                  label: Text(context.l10n.share),
                   onPressed: () => shareLink(context, title: detail.name, location: Routes.stop(detail.id)),
                 ),
               ],
@@ -148,7 +149,7 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StopDisruptions(detail: detail),
-                Text('Prochains départs', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(context.l10n.nextDepartures, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 AsyncView(
                   value: departures,
@@ -157,7 +158,7 @@ class _StopContent extends ConsumerWidget {
                 ),
                 if (detail.connections.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  Text('Correspondances à pied', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(context.l10n.walkingConnections, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   for (final connection in detail.connections)
                     ListTile(
@@ -166,7 +167,7 @@ class _StopContent extends ConsumerWidget {
                       title: Text(connection.name),
                       trailing: connection.minTransferSeconds == null
                           ? null
-                          : Text('${(connection.minTransferSeconds! / 60).ceil()} min'),
+                          : Text(context.l10n.minutesShort((connection.minTransferSeconds! / 60).ceil())),
                       onTap: () => context.push(Routes.stop(connection.id)),
                     ),
                 ],
@@ -226,10 +227,10 @@ class _DepartureList extends StatelessWidget {
         if (!departures.realtimeAvailable)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Temps réel indisponible, horaires prévus', style: TextStyle(color: Colors.orange.shade700)),
+            child: Text(context.l10n.realtimeUnavailable, style: TextStyle(color: Colors.orange.shade700)),
           ),
         if (rows.isEmpty)
-          Text('Aucun départ dans les 2 prochaines heures', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+          Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
         for (final row in rows) ...[
           LineDeparturesRow(row: row, now: now, onTap: () => context.push(Routes.line(row.line.id))),
           const Divider(height: 1),

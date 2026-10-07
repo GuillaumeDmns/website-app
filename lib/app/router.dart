@@ -20,6 +20,7 @@ import '../features/search/search_screen.dart';
 import '../features/stops/stop_screen.dart';
 import '../features/stops/timetable_screen.dart';
 import '../features/traffic/traffic_screen.dart';
+import '../l10n/l10n.dart';
 import 'routes.dart';
 import 'shell.dart';
 
@@ -85,7 +86,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final query = state.uri.queryParameters;
               return AroundScreen(
                 position: LatLng(double.tryParse(query['lat'] ?? '') ?? 0, double.tryParse(query['lon'] ?? '') ?? 0),
-                name: query['name'] ?? 'Lieu',
+                name: query['name'] ?? currentL10n.place,
               );
             },
           ),

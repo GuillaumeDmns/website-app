@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../l10n/l10n.dart';
 import 'api_exception.dart';
 import 'models.dart';
 
@@ -34,7 +35,7 @@ class AuthApi {
       final data = e.response?.data;
       // Sign-in/up errors are meaningful to the user (wrong password, username taken…)
       if (e.response?.statusCode == 401 && path == '/api/signin') {
-        throw const ApiException('Identifiant ou mot de passe incorrect', statusCode: 401);
+        throw ApiException(currentL10n.authWrongCredentials, statusCode: 401);
       }
       if (data is Map && data['detail'] is String && (e.response?.statusCode ?? 0) < 500) {
         throw ApiException(_translate(data['detail'] as String), statusCode: e.response?.statusCode);
@@ -44,13 +45,12 @@ class AuthApi {
   }
 
   static String _translate(String detail) => switch (detail) {
-        'Username already used' => 'Ce nom d\'utilisateur est déjà pris',
-        'Email already used' => 'Cet email est déjà utilisé',
-        'Invalid email' => 'Email invalide',
-        'Password is too long' => 'Mot de passe trop long',
-        final d when d.startsWith('Password must be at least') => 'Le mot de passe doit faire au moins 8 caractères',
-        final d when d.startsWith('Username must be') =>
-          'Nom d\'utilisateur : 3 à 50 lettres, chiffres, « . », « _ » ou « - »',
+        'Username already used' => currentL10n.authUsernameTaken,
+        'Email already used' => currentL10n.authEmailTaken,
+        'Invalid email' => currentL10n.authInvalidEmail,
+        'Password is too long' => currentL10n.authPasswordTooLong,
+        final d when d.startsWith('Password must be at least') => currentL10n.authPasswordTooShort,
+        final d when d.startsWith('Username must be') => currentL10n.authUsernameInvalid(currentL10n.authUsernameRule),
         _ => detail,
       };
 }

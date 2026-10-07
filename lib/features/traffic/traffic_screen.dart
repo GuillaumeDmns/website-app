@@ -7,6 +7,7 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../l10n/l10n.dart';
 import 'disruption_widgets.dart';
 import 'traffic_providers.dart';
 
@@ -31,11 +32,11 @@ class TrafficScreen extends ConsumerWidget {
           Row(
             children: [
               IconButton(
-                tooltip: 'Retour',
+                tooltip: context.l10n.back,
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
               ),
-              Expanded(child: Text('Info trafic', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
+              Expanded(child: Text(context.l10n.trafficTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
             ],
           ),
           Padding(
@@ -60,7 +61,7 @@ class TrafficScreen extends ConsumerWidget {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(severityIcon(null), color: severityColor(null, theme.colorScheme)),
-                        title: const Text('Trafic normal sur les métros, RER, trains et trams'),
+                        title: Text(context.l10n.trafficAllNormal),
                       ),
                     for (final line in main) _LineTrafficTile(traffic: line),
                     if (others.isNotEmpty)
@@ -68,7 +69,7 @@ class TrafficScreen extends ConsumerWidget {
                         data: theme.copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           tilePadding: EdgeInsets.zero,
-                          title: Text('${others.length} lignes de bus perturbées',
+                          title: Text(context.l10n.disruptedBusLines(others.length),
                               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                           children: [for (final line in others) _LineTrafficTile(traffic: line)],
                         ),
@@ -78,7 +79,7 @@ class TrafficScreen extends ConsumerWidget {
                         data: theme.copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           tilePadding: EdgeInsets.zero,
-                          title: Text('${informations.length} ligne${informations.length > 1 ? 's' : ''} avec une information',
+                          title: Text(context.l10n.linesWithInformation(informations.length),
                               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                           children: [for (final line in informations) _LineTrafficTile(traffic: line)],
                         ),
@@ -116,7 +117,7 @@ class _ModeGrid extends StatelessWidget {
             children: [
               for (final line in lines)
                 Tooltip(
-                  message: '${line.line.mode.label} ${line.line.name ?? ''} : ${severityLabel(line.severity).toLowerCase()}',
+                  message: context.l10n.lineSeverity('${line.line.mode.label} ${line.line.name ?? ''}', severityLabel(line.severity).toLowerCase()),
                   child: InkWell(
                     onTap: () => context.push(Routes.line(line.line.id)),
                     child: WithSeverity(severity: line.severity, child: LineBadge(line.line, size: 32)),
@@ -207,13 +208,13 @@ class TrafficSummaryCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Info trafic', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(context.l10n.trafficTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                     Text(
                       traffic == null
-                          ? 'Métros, RER, trains et trams'
+                          ? context.l10n.trafficMainModes
                           : disrupted.isEmpty
-                              ? 'Trafic normal sur les lignes principales'
-                              : '${disrupted.length} ligne${disrupted.length > 1 ? 's' : ''} perturbée${disrupted.length > 1 ? 's' : ''}',
+                              ? context.l10n.trafficMainNormal
+                              : context.l10n.disruptedLines(disrupted.length),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],

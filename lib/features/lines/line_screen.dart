@@ -13,6 +13,7 @@ import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/location/location_providers.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -147,7 +148,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       children: [
         Row(
           children: [
-            IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+            IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
             LineBadge(line, size: 34),
             const SizedBox(width: 12),
             Expanded(
@@ -163,7 +164,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             ),
             FavoriteLineButton(lineId: line.id),
             IconButton(
-              tooltip: 'Partager',
+              tooltip: context.l10n.share,
               icon: const Icon(Icons.share_outlined),
               onPressed: () => shareLink(context, title: '${line.mode.label} ${line.name ?? ''}'.trim(), location: Routes.line(line.id)),
             ),
@@ -223,7 +224,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
   static String _directionLabel(LineDirection direction) {
     final termini = direction.branches.map((branch) => branch.headsign).toSet();
-    return 'Vers ${termini.take(3).join(' / ')}${termini.length > 3 ? '…' : ''}';
+    return currentL10n.towards('${termini.take(3).join(' / ')}${termini.length > 3 ? '…' : ''}');
   }
 
   static String _branchLabel(LineBranch branch) =>
@@ -256,7 +257,7 @@ class _LineDisruptions extends ConsumerWidget {
           ],
         ),
       AsyncValue(:final value?) => DisruptionList(disruptions: value),
-      AsyncValue(:final error?) => Text('Info trafic indisponible ($error)', style: theme.textTheme.bodySmall),
+      AsyncValue(:final error?) => Text(context.l10n.trafficUnavailable('$error'), style: theme.textTheme.bodySmall),
       _ => const LinearProgressIndicator(),
     };
   }

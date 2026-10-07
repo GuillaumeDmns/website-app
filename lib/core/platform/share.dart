@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/routes.dart';
+import '../../l10n/l10n.dart';
 import 'browser_stub.dart' if (dart.library.js_interop) 'browser_web.dart' as browser;
 
 const _channel = MethodChannel('com.guillaumedamiens.live_notification/bridge');
@@ -28,7 +29,7 @@ Future<void> shareLink(BuildContext context, {required String title, required St
   }
   try {
     await Clipboard.setData(ClipboardData(text: url));
-    messenger?.showSnackBar(const SnackBar(content: Text('Lien copié')));
+    messenger?.showSnackBar(SnackBar(content: Text(currentL10n.linkCopied)));
   } catch (e) {
     // Clipboard refused (some browsers): the link to select by hand
     if (context.mounted) {
@@ -37,7 +38,7 @@ Future<void> shareLink(BuildContext context, {required String title, required St
         builder: (context) => AlertDialog(
           title: Text(title),
           content: SelectableText(url),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer'))],
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close))],
         ),
       );
     }

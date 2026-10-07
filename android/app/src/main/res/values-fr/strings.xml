@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_widget_description">Prochains départs de transport en commun en temps réel</string>
+    <string name="widget_stop_placeholder">Station</string>
+    <string name="widget_refresh">Actualiser</string>
+    <string name="widget_loading">Chargement…</string>
+    <string name="widget_last_updated_placeholder">Mis à jour : --:--</string>
+    <string name="widget_open">Ouvrir</string>
+    <string name="widget_no_stop">Aucune station</string>
+    <string name="widget_tap_to_load">Appuyez pour charger</string>
+    <string name="widget_no_departure">Aucun départ</string>
+    <string name="journey_channel">Trajet en cours</string>
+    <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
+    <string name="alert_channel">Alertes de trajet</string>
+    <string name="alert_channel_description">Descendre, véhicule qui arrive, retard ou suppression</string>
+</resources>

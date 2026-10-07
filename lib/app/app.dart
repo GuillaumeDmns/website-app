@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/location/location_providers.dart';
+import '../l10n/l10n.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -30,16 +31,19 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
   @override
   Widget build(BuildContext context) {
     _lifecycle;
+    final locale = ref.watch(localeProvider);
     return MaterialApp.router(
-      title: 'Mobilités',
+      onGenerateTitle: (context) => context.l10n.appTitle,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       routerConfig: ref.watch(routerProvider),
-      locale: const Locale('fr'),
-      supportedLocales: const [Locale('fr')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      locale: locale,
+      supportedLocales: supportedLocales,
+      localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
+      // Rebuilt from scratch when the language changes: texts formatted outside widgets (currentL10n) follow
+      builder: (context, child) => KeyedSubtree(key: ValueKey(locale), child: child!),
     );
   }
 }

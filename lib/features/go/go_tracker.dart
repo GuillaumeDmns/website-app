@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 
 /// Step followed in GO mode: a ride (wait at the stop, then on board) or a move (walk, transfer, bike…).
 class GoStep {
@@ -349,7 +350,7 @@ class GoTracker {
       current = _arrive(current, input.now);
     }
     if (current.phase == GoPhase.arrived && !current.fired.contains('arrived')) {
-      alerts.add(GoAlert(id: 'arrived', title: 'Vous êtes arrivé', body: journey.sections.lastOrNull?.to?.name));
+      alerts.add(GoAlert(id: 'arrived', title: currentL10n.goArrived, body: journey.sections.lastOrNull?.to?.name));
     }
 
     final fresh = alerts.where((alert) => !current.fired.contains(alert.id)).toList();
@@ -389,8 +390,8 @@ class GoTracker {
           if (input.now.difference(since) >= const Duration(minutes: 1) && current.issue == null &&
               !current.fired.contains('offroute-${current.step}')) {
             current = current.copyWith(issue: () => GoIssue.offRoute);
-            alerts.add(GoAlert(id: 'offroute-${current.step}', title: 'Vous vous êtes écarté du trajet',
-                body: 'Recalculez l\'itinéraire depuis votre position'));
+            alerts.add(GoAlert(id: 'offroute-${current.step}', title: currentL10n.goOffRoute,
+                body: currentL10n.alertOffRouteBody));
           }
         } else if (projection.distance < 80) {
           current = current.copyWith(offRouteSince: () => null, issue: () => current.issue == GoIssue.offRoute ? null : current.issue);
@@ -414,9 +415,9 @@ class GoTracker {
           final line = nextStep.section.line;
           alerts.add(GoAlert(
             id: 'hurry-${current.step}',
-            title: 'Pressez le pas',
-            body: '${line?.mode.label ?? ''} ${line?.name ?? ''} dans ${(margin / 60).ceil()} min, '
-                'encore ${metersLeft(current).round()} m',
+            title: currentL10n.alertHurry,
+            body: currentL10n.alertHurryBody(
+                '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim(), (margin / 60).ceil(), metersLeft(current).round()),
           ));
         }
       }
@@ -439,7 +440,7 @@ class GoTracker {
 
     if (vehicle?.cancelled == true && current.issue == null) {
       current = current.copyWith(issue: () => GoIssue.cancelled);
-      alerts.add(GoAlert(id: 'cancel-${current.step}', title: '$lineLabel supprimé', body: 'Prenez le suivant ou recalculez', urgent: true));
+      alerts.add(GoAlert(id: 'cancel-${current.step}', title: currentL10n.alertCancelled(lineLabel), body: currentL10n.alertTakeNextOrRecalculate, urgent: true));
       return current;
     }
 
@@ -447,16 +448,19 @@ class GoTracker {
     if (vehicle != null && vehicle.time.difference(plannedDeparture(ride, current)) >= const Duration(minutes: 3)) {
       alerts.add(GoAlert(
         id: 'delay-${current.step}',
-        title: '$lineLabel en retard',
-        body: 'Départ prévu à ${formatClock(vehicle.time)}${vehicle.platform != null ? ', voie ${vehicle.platform}' : ''}',
+        title: currentL10n.alertLate(lineLabel),
+        body: [
+          currentL10n.goPlannedDeparture(formatClock(vehicle.time)),
+          if (vehicle.platform != null) currentL10n.goPlatform(vehicle.platform!),
+        ].join(', '),
       ));
     }
 
     if (untilDeparture > Duration.zero && untilDeparture <= const Duration(minutes: 2)) {
       alerts.add(GoAlert(
         id: 'soon-${current.step}',
-        title: '$lineLabel dans ${math.max(1, untilDeparture.inSeconds ~/ 60)} min',
-        body: 'Direction ${ride.section.headsign ?? ''}',
+        title: currentL10n.alertSoon(lineLabel, math.max(1, untilDeparture.inSeconds ~/ 60)),
+        body: currentL10n.direction(ride.section.headsign ?? ''),
       ));
     }
 
@@ -474,8 +478,8 @@ class GoTracker {
       if (stillAtStop) {
         if (current.issue == null && !current.fired.contains('missed-${current.step}')) {
           current = current.copyWith(issue: () => GoIssue.missed);
-          alerts.add(GoAlert(id: 'missed-${current.step}', title: '$lineLabel manqué',
-              body: 'Prenez le suivant ou recalculez l\'itinéraire'));
+          alerts.add(GoAlert(id: 'missed-${current.step}', title: currentL10n.alertMissed(lineLabel),
+              body: currentL10n.alertMissedBody));
         }
         return current;
       }
@@ -540,10 +544,10 @@ class GoTracker {
     final left = stops.isEmpty ? (reachedEnd ? 0 : 1) : last - current.stopIndex;
     final untilArrival = ride.section.arrival.add(current.shift).difference(input.now);
     if (left == 1 || (left == 2 && untilArrival <= const Duration(minutes: 2))) {
-      alerts.add(GoAlert(id: 'prepare-${current.step}', title: 'Préparez-vous à descendre', body: 'Prochain arrêt : $alightName'));
+      alerts.add(GoAlert(id: 'prepare-${current.step}', title: currentL10n.alertPrepare, body: currentL10n.goNextStop(alightName)));
     }
     if (left <= 0 || reachedEnd) {
-      alerts.add(GoAlert(id: 'alight-${current.step}', title: 'Descendez maintenant', body: alightName, urgent: true));
+      alerts.add(GoAlert(id: 'alight-${current.step}', title: currentL10n.alertGetOffNow, body: alightName, urgent: true));
       return _advance(current.copyWith(stopIndex: last), input.now);
     }
     return current;

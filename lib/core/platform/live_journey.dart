@@ -31,7 +31,7 @@ class LiveJourneyUpdate {
   /// Seconds done along the segments
   final int progress;
 
-  /// Icon of the current step: `Métro`, `RER`, `Train Transilien`, `TER`, `Tramway`, `Bus`, `transfer` or `walk`
+  /// Icon of the current step: `metro`, `train`, `tram`, `bus`, `transfer` or `walk`
   final String mode;
 
   /// Short status chip (`3 arrêts`, `2 min`)

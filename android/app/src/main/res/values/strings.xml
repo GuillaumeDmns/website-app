@@ -2,5 +2,17 @@
 <resources>
     <string name="appwidget_text">EXAMPLE</string>
     <string name="add_widget">Add widget</string>
-    <string name="app_widget_description">Prochains départs de transport en commun en temps réel</string>
+    <string name="app_widget_description">Real-time next public transport departures</string>
+    <string name="widget_stop_placeholder">Stop</string>
+    <string name="widget_refresh">Refresh</string>
+    <string name="widget_loading">Loading…</string>
+    <string name="widget_last_updated_placeholder">Updated --:--</string>
+    <string name="widget_open">Open</string>
+    <string name="widget_no_stop">No stop</string>
+    <string name="widget_tap_to_load">Tap to load</string>
+    <string name="widget_no_departure">No departure</string>
+    <string name="journey_channel">Journey in progress</string>
+    <string name="journey_channel_description">Progress of the journey followed in GO mode</string>
+    <string name="alert_channel">Journey alerts</string>
+    <string name="alert_channel_description">Get off, vehicle arriving, delay or cancellation</string>
 </resources>

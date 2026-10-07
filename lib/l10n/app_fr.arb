@@ -1,0 +1,926 @@
+{
+  "@@locale": "fr",
+  "appTitle": "Mobilités",
+  "@appTitle": {
+    "description": "Name of the app"
+  },
+  "departureCancelled": "Supprimé",
+  "departureAtStop": "À quai",
+  "@departureAtStop": {
+    "description": "The vehicle is at the stop"
+  },
+  "departureUnderOneMinute": "< 1 min",
+  "minutesShort": "{minutes} min",
+  "@minutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "today": "aujourd'hui",
+  "tomorrow": "demain",
+  "errorServerUnreachable": "Connexion au serveur impossible",
+  "errorSessionExpired": "Session expirée, reconnectez-vous",
+  "errorNotFound": "Introuvable",
+  "errorTooManyRequests": "Trop de requêtes, réessayez dans un instant",
+  "errorServer": "Le serveur rencontre un problème",
+  "errorUnexpected": "Erreur inattendue",
+  "retry": "Réessayer",
+  "homeSearchHint": "Où allez-vous ?",
+  "homeNearby": "À proximité",
+  "homeNoPosition": "Position indisponible : autour du centre de la carte",
+  "locationTurnOn": "Activer la localisation",
+  "locationAllow": "Autoriser la localisation",
+  "account": "Compte",
+  "signOut": "Se déconnecter",
+  "otherLanguage": "English",
+  "@otherLanguage": {
+    "description": "Menu item switching to the other language, written in that language"
+  },
+  "nearbyNoStop": "Aucun arrêt à moins de 500 m",
+  "back": "Retour",
+  "savePlace": "Enregistrer ce lieu",
+  "placeSaved": "Lieu enregistré",
+  "goThere": "Y aller",
+  "departuresNearby": "Départs à proximité",
+  "modeMetro": "Métro",
+  "searchPickHint": "{title} : arrêt, adresse, lieu…",
+  "@searchPickHint": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "searchHint": "Arrêt, adresse, lieu, ligne…",
+  "clear": "Effacer",
+  "noResults": "Aucun résultat",
+  "myLocation": "Ma position",
+  "home": "Maison",
+  "work": "Travail",
+  "recent": "Récents",
+  "searchExamples": "Exemples : « Châtelet », « 10 rue de Rivoli », « Tour Eiffel », « RER B », « 38 »",
+  "departuresAround": "Départs autour",
+  "favoriteNotSaved": "Favori non enregistré : {error}",
+  "@favoriteNotSaved": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "favoriteRemove": "Retirer des favoris",
+  "favoriteAdd": "Ajouter aux favoris",
+  "favoritePlace": "Lieu favori",
+  "favoriteSaved": "{title} enregistré",
+  "@favoriteSaved": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "place": "Lieu",
+  "favoritePlaceAdd": "Ajouter un lieu favori",
+  "editAddress": "Modifier l'adresse",
+  "delete": "Supprimer",
+  "addPlace": "Ajouter {title}",
+  "@addPlace": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "edit": "Modifier",
+  "myStops": "Mes arrêts",
+  "myLines": "Mes lignes",
+  "authWrongCredentials": "Identifiant ou mot de passe incorrect",
+  "authUsernameTaken": "Ce nom d'utilisateur est déjà pris",
+  "authEmailTaken": "Cet email est déjà utilisé",
+  "authInvalidEmail": "Email invalide",
+  "authPasswordTooLong": "Mot de passe trop long",
+  "authPasswordTooShort": "Le mot de passe doit faire au moins 8 caractères",
+  "authUsernameRule": "3 à 50 lettres, chiffres, « . », « _ » ou « - »",
+  "authUsernameInvalid": "Nom d'utilisateur : {rule}",
+  "@authUsernameInvalid": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "authMissingFields": "Renseignez votre identifiant et votre mot de passe",
+  "signIn": "Connexion",
+  "signInSubtitle": "Horaires en temps réel et itinéraires en Île-de-France",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "passwordShow": "Afficher",
+  "passwordHide": "Masquer",
+  "signInAction": "Se connecter",
+  "noAccountSignUp": "Pas de compte ? Créer un compte",
+  "signUp": "Créer un compte",
+  "signUpSubtitle": "Gratuit, pour accéder au temps réel et sauvegarder vos favoris",
+  "email": "Email",
+  "passwordMinLength": "8 caractères minimum",
+  "signUpAction": "Créer mon compte",
+  "haveAccountSignIn": "Déjà un compte ? Se connecter",
+  "linkCopied": "Lien copié",
+  "close": "Fermer",
+  "offlineSince": "Hors ligne · données du {when}",
+  "@offlineSince": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "skip": "Passer",
+  "letsGo": "C'est parti",
+  "next": "Suivant",
+  "welcomeTitle": "Bienvenue",
+  "welcomeText": "Tous les transports d'Île-de-France, en temps réel.",
+  "welcomeNearbyTitle": "Autour de vous",
+  "welcomeNearbyText": "Les prochains passages aux arrêts proches, sans rien chercher.",
+  "welcomeJourneysTitle": "Itinéraires",
+  "welcomeJourneysText": "Métro, RER, train, tram et bus, avec les horaires en temps réel.",
+  "welcomeTrafficTitle": "Info trafic",
+  "welcomeTrafficText": "Perturbations, travaux et ascenseurs en panne sur vos lignes.",
+  "welcomeFavoritesTitle": "Favoris",
+  "welcomeFavoritesText": "Vos lieux, arrêts et lignes, sur tous vos appareils.",
+  "welcomeLocationTitle": "Votre position",
+  "welcomeLocationText": "Elle sert à afficher les départs autour de vous et à partir de là où vous êtes. Elle n'est envoyée que pour trouver les arrêts proches et calculer vos trajets.",
+  "locationFound": "Position trouvée",
+  "welcomeLocationUnavailable": "Position indisponible : vous pourrez toujours choisir un point de départ.",
+  "addAddress": "Ajouter une adresse",
+  "welcomePlacesTitle": "Maison et travail",
+  "welcomePlacesText": "Pour y aller en un geste depuis l'accueil. Vous pourrez les changer plus tard.",
+  "wheelchairAccessible": "Accessible en fauteuil roulant",
+  "scheduledTimetable": "Horaires théoriques",
+  "share": "Partager",
+  "nextDepartures": "Prochains départs",
+  "walkingConnections": "Correspondances à pied",
+  "realtimeUnavailable": "Temps réel indisponible, horaires prévus",
+  "noDepartureTwoHours": "Aucun départ dans les 2 prochaines heures",
+  "otherDirections": "{count, plural, =1{+ 1 autre direction} other{+ {count} autres directions}}",
+  "@otherDirections": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noLineAtStop": "Aucune ligne à cet arrêt",
+  "todayChip": "Aujourd'hui",
+  "tomorrowChip": "Demain",
+  "otherDate": "Autre date",
+  "noDepartureThatDay": "Aucun départ prévu ce jour-là",
+  "towards": "Vers {destination}",
+  "@towards": {
+    "placeholders": {
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableCount": "{count, plural, =0{Aucun départ} =1{1 départ} other{{count} départs}} · {day}",
+  "@timetableCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableHour": "{hour} h",
+  "@timetableHour": {
+    "placeholders": {
+      "hour": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableNoLetter": "Sans lettre : vers {destination}",
+  "@timetableNoLetter": {
+    "placeholders": {
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableLetter": "{letter} : vers {destination}",
+  "@timetableLetter": {
+    "placeholders": {
+      "letter": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableNotice": "Horaires prévus, hors travaux et perturbations du jour : le temps réel est sur la fiche de l'arrêt.",
+  "timeTowards": "{time} vers {destination}",
+  "@timeTowards": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "trafficUnavailable": "Info trafic indisponible ({error})",
+  "@trafficUnavailable": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "vehicleAtStop": "à quai",
+  "inMinutes": "dans {minutes} min",
+  "@inMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "nextStopsUnavailable": "Prochains arrêts indisponibles",
+  "vehicleTimesNotice": "Horaires estimés d'après le temps réel, jusqu'où il est connu",
+  "platform": "Voie {platform}",
+  "@platform": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "severityBlocking": "Trafic interrompu",
+  "severityDisrupted": "Trafic perturbé",
+  "severityInfo": "Information",
+  "severityNormal": "Trafic normal",
+  "upcomingDisruptions": "{count, plural, =1{1 perturbation à venir} other{{count} perturbations à venir}}",
+  "@upcomingDisruptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fromDate": "À partir de {when}",
+  "@fromDate": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "untilDate": "Jusqu'à {when}",
+  "@untilDate": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "brokenElevators": "{count, plural, =1{1 ascenseur en panne} other{{count} ascenseurs en panne}}",
+  "@brokenElevators": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trafficTitle": "Info trafic",
+  "trafficAllNormal": "Trafic normal sur les métros, RER, trains et trams",
+  "disruptedBusLines": "{count, plural, =1{1 ligne de bus perturbée} other{{count} lignes de bus perturbées}}",
+  "@disruptedBusLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linesWithInformation": "{count, plural, =1{1 ligne avec une information} other{{count} lignes avec une information}}",
+  "@linesWithInformation": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lineSeverity": "{line} : {severity}",
+  "@lineSeverity": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "severity": {
+        "type": "String"
+      }
+    }
+  },
+  "trafficMainModes": "Métros, RER, trains et trams",
+  "trafficMainNormal": "Trafic normal sur les lignes principales",
+  "disruptedLines": "{count, plural, =1{1 ligne perturbée} other{{count} lignes perturbées}}",
+  "@disruptedLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bikeStationClosed": "Station fermée",
+  "bikesMechanical": "Vélos mécaniques",
+  "bikesElectric": "Vélos électriques",
+  "bikeDocksFree": "Places libres",
+  "bikeStation": "Station Vélib",
+  "bikesMechanicalCount": "{count, plural, =1{vélo mécanique} other{vélos mécaniques}}",
+  "@bikesMechanicalCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bikesElectricCount": "{count, plural, =1{vélo électrique} other{vélos électriques}}",
+  "@bikesElectricCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bikeDocksCount": "{count, plural, =1{place libre} other{places libres}}",
+  "@bikeDocksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bikeNoRenting": "Location impossible pour le moment",
+  "bikeNoReturning": "Retour impossible pour le moment",
+  "updatedAt": "Mis à jour à {time}",
+  "@updatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "bikeStationNamed": "Station Vélib {name}",
+  "@bikeStationNamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "journeyNotFound": "Itinéraire introuvable ou passé",
+  "searchAgain": "Chercher à nouveau",
+  "co2": "{grams} g CO₂",
+  "@co2": {
+    "placeholders": {
+      "grams": {
+        "type": "int"
+      }
+    }
+  },
+  "journeyShareTitle": "Itinéraire {from} → {to}",
+  "@journeyShareTitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "go": "GO",
+  "waitFor": "Attendre {duration}",
+  "@waitFor": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionBike": "Pédaler",
+  "sectionCar": "Rouler",
+  "sectionTransfer": "Correspondance à pied",
+  "sectionWalk": "Marcher",
+  "bikePickUp": "Prendre un vélo : {station}",
+  "@bikePickUp": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "bikeDropOff": "Déposer le vélo : {station}",
+  "@bikeDropOff": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "bikeRideEstimated": "Pédaler {duration}{distance} · durée estimée",
+  "@bikeRideEstimated": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "direction": "Direction {headsign}",
+  "@direction": {
+    "placeholders": {
+      "headsign": {
+        "type": "String"
+      }
+    }
+  },
+  "delayMinutes": "Retard {minutes} min",
+  "@delayMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "realtime": "Temps réel",
+  "stopsCount": "{count, plural, =1{1 arrêt} other{{count} arrêts}}",
+  "@stopsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "getOffAt": "Descendre à {stop}",
+  "@getOffAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "boardFront": "à l'avant",
+  "boardMiddle": "au milieu",
+  "boardBack": "à l'arrière",
+  "boardAnywhere": "Montez n'importe où",
+  "boardAt": "Montez {positions}",
+  "@boardAt": {
+    "placeholders": {
+      "positions": {
+        "type": "String"
+      }
+    }
+  },
+  "or": "ou",
+  "brokenElevatorsAt": "{count, plural, =1{1 ascenseur en panne} other{{count} ascenseurs en panne}} à {stop}",
+  "@brokenElevatorsAt": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "pointOnMap": "Point sur la carte",
+  "walkingSlow": "Lente",
+  "walkingNormal": "Normale",
+  "walkingFast": "Rapide",
+  "journeyFrom": "Départ",
+  "journeyTo": "Arrivée",
+  "wheelchairJourneysOn": "Trajets accessibles en fauteuil roulant : activé",
+  "wheelchairJourneys": "Trajets accessibles en fauteuil roulant",
+  "options": "Options",
+  "chooseFromTo": "Choisissez un départ et une arrivée",
+  "swap": "Inverser",
+  "leaveNow": "Partir maintenant",
+  "leaveAtTime": "Partir à {time}",
+  "@leaveAtTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "arriveByTime": "Arriver à {time}",
+  "@arriveByTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "leaveAtMenu": "Partir à…",
+  "arriveByMenu": "Arriver à…",
+  "noJourneyFound": "Aucun itinéraire trouvé à cette heure",
+  "earlier": "Plus tôt",
+  "later": "Plus tard",
+  "journeyBest": "Suggéré",
+  "journeyRapid": "Le plus rapide",
+  "journeyComfort": "Moins de correspondances",
+  "journeyLessWalk": "Moins de marche",
+  "journeyWalk": "À pied",
+  "journeyBike": "À vélo",
+  "journeyBikeShare": "Vélib",
+  "journeyCar": "En voiture",
+  "journeyOther": "Autre option",
+  "transfersShort": "{count, plural, =1{1 corresp.} other{{count} corresp.}}",
+  "@transfersShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "walkingDuration": "{duration} à pied",
+  "@walkingDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "details": "Détails",
+  "leaveNowShort": "Partez maintenant",
+  "leaveIn": "Partez dans {duration}",
+  "@leaveIn": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "firstRide": "{line} à {time} de {stop}",
+  "@firstRide": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "transportModes": "Modes de transport",
+  "wheelchairOption": "Accessible en fauteuil roulant",
+  "wheelchairOptionHint": "Sans marches ni escaliers",
+  "bikeShareOption": "Proposer un trajet en Vélib",
+  "bikeShareOptionHint": "Stations avec vélos et places disponibles",
+  "walkingSpeed": "Vitesse de marche",
+  "rememberOptions": "Garder pour mes prochains trajets",
+  "rememberOptionsHint": "Accessibilité, Vélib et vitesse de marche",
+  "apply": "Appliquer",
+  "locationUnavailableChooseStart": "Position indisponible : choisissez un point de départ",
+  "allDepartures": "Tous les départs",
+  "now": "maintenant",
+  "goArrived": "Vous êtes arrivé",
+  "goArrivedAt": "À {time}",
+  "@goArrivedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goPlannedSuffix": " (prévu {time})",
+  "@goPlannedSuffix": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goAsPlannedSuffix": ", comme prévu",
+  "goTake": "Prenez le {line}",
+  "@goTake": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "goLeftAt": "Parti à {time}",
+  "@goLeftAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goDeparture": "Départ {when} ({time})",
+  "@goDeparture": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goScheduled": "horaire prévu",
+  "goPlatform": "voie {platform}",
+  "@goPlatform": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "goBoard": "montez {positions}",
+  "@goBoard": {
+    "placeholders": {
+      "positions": {
+        "type": "String"
+      }
+    }
+  },
+  "goGetOffNext": "Descendez au prochain arrêt",
+  "goStayOnBoard": "Restez à bord",
+  "goGetOffInAt": "Descendez dans {count} arrêts à {stop}",
+  "@goGetOffInAt": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "goNextStop": "Prochain arrêt : {stop}",
+  "@goNextStop": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "goArrivalAround": "Arrivée vers {time}",
+  "@goArrivalAround": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goVerbBike": "Pédalez",
+  "goVerbCar": "Roulez",
+  "goVerbTransferWalk": "Correspondance : marchez",
+  "goVerbWalk": "Marchez",
+  "goVerbTo": "{verb} jusqu'à {place}",
+  "@goVerbTo": {
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "goTransferTo": "Correspondance vers {place}",
+  "@goTransferTo": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "goChipGetOff": "Descendez",
+  "goArrival": "Arrivée {time}",
+  "@goArrival": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goNoJourney": "Aucun trajet en cours",
+  "goFinished": "Trajet terminé",
+  "goLetScreenSleep": "Laisser l'écran s'éteindre",
+  "goKeepScreenOn": "Garder l'écran allumé",
+  "goUnmute": "Activer le son des alertes",
+  "goMute": "Couper le son des alertes",
+  "goStop": "Terminer le trajet",
+  "goStopQuestion": "Terminer le trajet ?",
+  "goStopText": "Le guidage et les alertes s'arrêtent.",
+  "continueAction": "Continuer",
+  "finish": "Terminer",
+  "goOffRoute": "Vous vous êtes écarté du trajet",
+  "goMissedChoose": "{line} manqué : choisissez un autre passage",
+  "@goMissedChoose": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "goCancelledChoose": "{line} supprimé : choisissez un autre passage",
+  "@goCancelledChoose": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "recalculate": "Recalculer",
+  "dismiss": "Ignorer",
+  "goGetOffIn": "Descendez dans {count} arrêts",
+  "@goGetOffIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "goAtStop": "à {stop}",
+  "@goAtStop": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "goNextShort": "prochain : {stop}",
+  "@goNextShort": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "goFromTo": "De {from} à {to}",
+  "@goFromTo": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "goVerbTransfer": "Correspondance",
+  "goImOnBoard": "Je suis à bord",
+  "goImAtThisStep": "Je suis à cette étape",
+  "goPlannedDeparture": "Départ prévu à {time}",
+  "@goPlannedDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "goArrivalTitle": "Arrivée",
+  "goImArrived": "Je suis arrivé",
+  "goOnTime": "À l'heure",
+  "goMinutesLate": "{minutes} min de retard",
+  "@goMinutesLate": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "goMinutesEarly": "{minutes} min d'avance",
+  "@goMinutesEarly": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "goArrivedVsPlanned": "Arrivé à {time}, prévu à {planned}",
+  "@goArrivedVsPlanned": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "planned": {
+        "type": "String"
+      }
+    }
+  },
+  "goTripDuration": "Trajet de {duration} depuis le départ du guidage",
+  "@goTripDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "goRides": "{count, plural, =1{1 transport} other{{count} transports}}",
+  "@goRides": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "goLocationUnavailable": "Position indisponible",
+  "goRecalculateFailed": "Recalcul impossible : {error}",
+  "@goRecalculateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "alertHurry": "Pressez le pas",
+  "alertHurryBody": "{line} dans {minutes} min, encore {meters} m",
+  "@alertHurryBody": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      },
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "alertOffRouteBody": "Recalculez l'itinéraire depuis votre position",
+  "alertCancelled": "{line} supprimé",
+  "@alertCancelled": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "alertTakeNextOrRecalculate": "Prenez le suivant ou recalculez",
+  "alertLate": "{line} en retard",
+  "@alertLate": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "alertSoon": "{line} dans {minutes} min",
+  "@alertSoon": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "alertMissed": "{line} manqué",
+  "@alertMissed": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "alertMissedBody": "Prenez le suivant ou recalculez l'itinéraire",
+  "alertPrepare": "Préparez-vous à descendre",
+  "alertGetOffNow": "Descendez maintenant",
+  "goNoJourneyFound": "Aucun itinéraire trouvé",
+  "widgetNoDeparture": "Aucun départ prochainement",
+  "widgetUpdated": "Mis à jour : {time}",
+  "@widgetUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "widgetUpdateFailed": "Mis à jour : {time} (échec)",
+  "@widgetUpdateFailed": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "widgetOpenApp": "Ouvrez l'app pour choisir un arrêt"
+}
