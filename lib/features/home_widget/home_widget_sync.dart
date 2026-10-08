@@ -19,7 +19,8 @@ import '../stops/stop_screen.dart';
 /// ([homeWidgetBackgroundCallback]).
 bool get homeWidgetSupported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-const _androidName = 'NextDepartures';
+/// The widget's class: its package is the app's namespace, not the dev flavor's application id
+const _qualifiedAndroidName = 'com.guillaumedamiens.app.NextDepartures';
 
 /// Departures shown at most, as on the widget
 const _rows = 4;
@@ -54,7 +55,7 @@ Future<void> pushDeparturesToWidget(StopDepartures departures) async {
       HomeWidget.saveWidgetData<String>('departures_list', rows.isEmpty ? currentL10n.widgetNoDeparture : null),
       HomeWidget.saveWidgetData<String>('last_updated', currentL10n.widgetUpdated(formatClock(DateTime.now()))),
     ]);
-    await HomeWidget.updateWidget(androidName: _androidName);
+    await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedAndroidName);
   } catch (e) {
     debugPrint('Home widget update failed: $e');
   }
@@ -72,7 +73,7 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   final stopId = await HomeWidget.getWidgetData<String>('stop_id');
   if (stopId == null) {
     await HomeWidget.saveWidgetData<String>('departures_list', currentL10n.widgetOpenApp);
-    await HomeWidget.updateWidget(androidName: _androidName);
+    await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedAndroidName);
     return;
   }
   final tokens = TokenStore();
@@ -90,7 +91,7 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   } catch (e) {
     debugPrint('Home widget refresh failed: $e');
     await HomeWidget.saveWidgetData<String>('last_updated', currentL10n.widgetUpdateFailed(formatClock(DateTime.now())));
-    await HomeWidget.updateWidget(androidName: _androidName);
+    await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedAndroidName);
   }
 }
 
@@ -104,7 +105,7 @@ Future<void> clearHomeWidget() async {
       await HomeWidget.saveWidgetData<String>(key, null);
     }
     await HomeWidget.saveWidgetData<String>('departures_list', currentL10n.widgetOpenApp);
-    await HomeWidget.updateWidget(androidName: _androidName);
+    await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedAndroidName);
   } catch (e) {
     debugPrint('Home widget reset failed: $e');
   }

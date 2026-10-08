@@ -1,16 +1,40 @@
-# website_app
+# App mobilité Île-de-France (Flutter)
 
-Guillaume Damiens mobile application
+Android, web et desktop (iOS et macOS en usage personnel). Architecture et conventions : `CLAUDE.md`.
 
-## Getting Started
+## Deux environnements qui ne se mélangent pas
 
-This project is a starting point for a Flutter application.
+| | Dev (chez toi) | Prod |
+|---|---|---|
+| Backend | `website-back` lancé sur ta machine (`./mvnw spring-boot:run`) : `http://localhost:8080`, base PostgreSQL locale | `https://guillaumedamiens.com` (VPS, base sur le VPS) |
+| App Android | **Guillaume Dev**, `com.guillaumedamiens.app.dev`, icône orange « DEV » | **Guillaume**, `com.guillaumedamiens.app` |
+| Web | `http://localhost:5000` | `https://app.guillaumedamiens.com` |
+| Repère | bandeau « DEV » en haut à droite | aucun |
 
-A few resources to get you started if this is your first Flutter project:
+Les deux apps Android s'installent côte à côte. Une build de dev garde ses jetons et ses données à part (clés préfixées `dev.` sur desktop, autre app sur Android, autre site sur le web).
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Développer
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+En dev, l'app appelle toujours `http://localhost:8080`. `flutter run` sans option lance l'app de dev (`default-flavor: dev`).
+
+```bash
+flutter run -d <device>                      # Android (téléphone ou émulateur), après adb reverse ci-dessous
+flutter run -d chrome --web-port 5000
+flutter run -d linux
+```
+
+Sur un téléphone ou un émulateur Android, `localhost` est l'appareil lui-même : rediriger le port vers ta machine (à refaire à chaque branchement) :
+
+```bash
+adb reverse tcp:8080 tcp:8080
+```
+
+## Builds de production
+
+```bash
+flutter build apk --flavor prod              # ou appbundle (Play Store)
+flutter build web --dart-define=APP_ENV=prod # servie depuis app.guillaumedamiens.com, elle serait prod de toute façon
+flutter build linux --flavor prod --dart-define=APP_ENV=prod
+```
+
+La variante `prod` (ou `APP_ENV=prod`) ne connaît que `guillaumedamiens.com`.

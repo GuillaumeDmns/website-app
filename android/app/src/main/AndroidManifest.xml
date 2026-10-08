@@ -29,7 +29,7 @@
     <application
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:label="Guillaume">
+        android:label="@string/app_name">
         <!-- GO mode: keeps the journey followed with the screen off (started from the app, while in use) -->
         <service
             android:name=".GoService"
@@ -81,13 +81,7 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Links to the web app open the app (verified with web/.well-known/assetlinks.json); go_router takes the path -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="app.guillaumedamiens.com" />
-            </intent-filter>
+            <!-- Links to the web app: prod flavor only (src/prod/AndroidManifest.xml) -->
         </activity>
         <!--
  Don't delete the meta-data below.

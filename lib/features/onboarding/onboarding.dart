@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _key = 'onboarding_done';
+import '../../core/config.dart';
+
+final _key = '${AppConfig.storagePrefix}onboarding_done';
 
 /// Whether the welcome pages were already shown on this device. Read before the app starts (see [loadOnboardingDone])
 /// so that the router can decide synchronously.

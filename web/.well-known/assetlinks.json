@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.guillaumedamiens.website_app",
+      "package_name": "com.guillaumedamiens.app",
       "sha256_cert_fingerprints": [
         "8E:45:FC:BD:C8:D2:62:B3:61:A1:C4:69:FD:90:62:BF:17:46:1C:FB:A4:80:50:EE:C7:39:70:0D:9E:BF:92:F1"
       ]

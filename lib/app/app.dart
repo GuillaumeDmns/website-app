@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/config.dart';
 import '../core/location/location_providers.dart';
 import '../l10n/l10n.dart';
 import 'router.dart';
@@ -43,7 +44,13 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
       supportedLocales: supportedLocales,
       localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
       // Rebuilt from scratch when the language changes: texts formatted outside widgets (currentL10n) follow
-      builder: (context, child) => KeyedSubtree(key: ValueKey(locale), child: child!),
+      builder: (context, child) {
+        final app = KeyedSubtree(key: ValueKey(locale), child: child!);
+        // Never mistaken for the production app
+        return AppConfig.isDev
+            ? Banner(message: 'DEV', location: BannerLocation.topEnd, color: Colors.orange.shade800, child: app)
+            : app;
+      },
     );
   }
 }

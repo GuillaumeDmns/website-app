@@ -77,6 +77,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Android flavor when none is given (flutter run, the IDE): the dev app, on the development backend
+  default-flavor: dev
+
   # Translations from lib/l10n (see l10n.yaml)
   generate: true
 

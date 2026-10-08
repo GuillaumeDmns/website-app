@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/models.dart';
+import '../config.dart';
 
 /// Holds the current tokens. Signed in: the access token stays in memory (a restarted app gets a new one from the
 /// persisted refresh token). Without account: the device's guest token is persisted, so that it keeps its daily
@@ -8,9 +9,10 @@ import '../api/models.dart';
 class TokenStore {
   TokenStore([FlutterSecureStorage? storage]) : _storage = storage ?? const FlutterSecureStorage();
 
-  static const _refreshTokenKey = 'refresh_token';
-  static const _guestTokenKey = 'guest_token';
-  static const _guestExpiryKey = 'guest_token_expiry';
+  // A dev build keeps its own tokens (they come from another backend)
+  static final _refreshTokenKey = '${AppConfig.storagePrefix}refresh_token';
+  static final _guestTokenKey = '${AppConfig.storagePrefix}guest_token';
+  static final _guestExpiryKey = '${AppConfig.storagePrefix}guest_token_expiry';
 
   /// Renew this long before the access token expires
   static const _expiryMargin = Duration(seconds: 30);

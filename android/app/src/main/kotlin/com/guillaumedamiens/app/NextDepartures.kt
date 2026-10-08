@@ -1,4 +1,4 @@
-package com.guillaumedamiens.website_app
+package com.guillaumedamiens.app
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

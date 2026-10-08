@@ -1,4 +1,4 @@
-package com.guillaumedamiens.website_app
+package com.guillaumedamiens.app
 
 import android.Manifest
 import android.app.Activity
