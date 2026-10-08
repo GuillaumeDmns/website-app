@@ -45,7 +45,7 @@ class OfflineCacheInterceptor extends Interceptor {
   /// Bigger answers are not kept (localStorage holds about 5 MB on the web)
   static const _maxLength = 300000;
 
-  static final _excluded = RegExp(r'/(vehicles|rides|bikes|search)\b');
+  static final _excluded = RegExp(r'/(vehicles|rides|bikes|search)\b|^/api/v2/me(/export)?$');
 
   static bool _cacheable(RequestOptions options) =>
       options.method == 'GET' && options.path.startsWith('/api/v2/') && !_excluded.hasMatch(options.path);

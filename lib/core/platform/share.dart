@@ -44,3 +44,22 @@ Future<void> shareLink(BuildContext context, {required String title, required St
     }
   }
 }
+
+/// Hands [text] to the user as a file: the browser's download on the web, the share sheet on Android (to save it or
+/// send it), else the clipboard
+Future<void> exportText(BuildContext context, {required String title, required String fileName, required String text}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (kIsWeb && browser.download(fileName, text)) {
+    return;
+  }
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await _channel.invokeMethod<void>('share', {'title': title, 'text': text});
+      return;
+    } catch (e) {
+      debugPrint('Share failed: $e');
+    }
+  }
+  await Clipboard.setData(ClipboardData(text: text));
+  messenger?.showSnackBar(SnackBar(content: Text(currentL10n.exportCopied)));
+}

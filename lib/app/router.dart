@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/map/map_overlay.dart';
+import '../features/about/about_screen.dart';
+import '../features/auth/account_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
@@ -80,6 +82,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
           GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
+          GoRoute(path: Routes.about, builder: (context, state) => const AboutScreen()),
+          GoRoute(path: Routes.account, builder: (context, state) => const AccountScreen()),
           GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
           GoRoute(
             path: Routes.aroundPath,

@@ -19,6 +19,9 @@ class AuthApi {
   /// Rotates the refresh token: the given one is no longer valid afterwards
   Future<AuthTokens> refresh(String refreshToken) => _tokens('/api/token/refresh', {'refreshToken': refreshToken});
 
+  /// Exchanges a Google ID token for the account's tokens (account created at the first sign-in)
+  Future<AuthTokens> google(String idToken) => _tokens('/api/auth/google', {'idToken': idToken});
+
   /// Token of a device used without account (capped usage, about 30 days, no refresh token)
   Future<AuthTokens> guest() => _tokens('/api/auth/guest', const {});
 
@@ -39,6 +42,9 @@ class AuthApi {
       // Sign-in/up errors are meaningful to the user (wrong password, username taken…)
       if (e.response?.statusCode == 401 && path == '/api/signin') {
         throw ApiException(currentL10n.authWrongCredentials, statusCode: 401);
+      }
+      if (path == '/api/auth/google' && e.response != null) {
+        throw ApiException(currentL10n.googleSignInFailed, statusCode: e.response?.statusCode);
       }
       if (data is Map && data['detail'] is String && (e.response?.statusCode ?? 0) < 500) {
         throw ApiException(_translate(data['detail'] as String), statusCode: e.response?.statusCode);

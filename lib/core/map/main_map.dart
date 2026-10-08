@@ -108,7 +108,7 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
           urlTemplate: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
               '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM'
               '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png',
-          userAgentPackageName: 'com.guillaumedamiens.website_app',
+          userAgentPackageName: 'com.guillaumedamiens.app',
           maxNativeZoom: 19,
           tileBuilder: dark ? darkModeTileBuilder : null,
         ),
@@ -146,8 +146,11 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
         ),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
+          // Full credits on the About page
           attributions: [
             TextSourceAttribution('IGN – Plan IGN', onTap: null),
+            TextSourceAttribution('Île-de-France Mobilités', onTap: null),
+            TextSourceAttribution('© contributeurs OpenStreetMap', onTap: null),
           ],
         ),
       ],

@@ -146,6 +146,15 @@ class _AccountMenu extends ConsumerWidget {
           onTap: () => ref.read(localeProvider.notifier).toggle(),
           child: ListTile(leading: const Icon(Icons.translate), title: Text(l10n.otherLanguage), contentPadding: EdgeInsets.zero),
         ),
+        PopupMenuItem(
+          onTap: () => context.push(Routes.about),
+          child: ListTile(leading: const Icon(Icons.info_outline), title: Text(l10n.about), contentPadding: EdgeInsets.zero),
+        ),
+        if (signedIn)
+          PopupMenuItem(
+            onTap: () => context.push(Routes.account),
+            child: ListTile(leading: const Icon(Icons.manage_accounts_outlined), title: Text(l10n.accountTitle), contentPadding: EdgeInsets.zero),
+          ),
         if (signedIn)
           PopupMenuItem(
             onTap: () => ref.read(authControllerProvider.notifier).signOut(),

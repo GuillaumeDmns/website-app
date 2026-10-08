@@ -52,6 +52,8 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   cupertino_icons: ^2.0.0
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,6 +78,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Inter, bundled: no request to Google's servers at startup (google_fonts finds the files by name)
+  assets:
+    - assets/google_fonts/
+
+  # Android flavor when none is given (flutter run, the IDE): the dev app, on the development backend
+  default-flavor: dev
 
   # Translations from lib/l10n (see l10n.yaml)
   generate: true

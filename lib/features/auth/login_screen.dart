@@ -7,6 +7,8 @@ import '../../app/routes.dart';
 import '../../l10n/l10n.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
+import 'google/google_auth.dart';
+import 'google/google_sign_in_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -43,6 +45,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle(String idToken) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithGoogle(idToken);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (_username.text.trim().isEmpty || _password.text.isEmpty) {
       setState(() => _error = context.l10n.authMissingFields);
@@ -71,6 +91,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       title: context.l10n.signIn,
       subtitle: context.l10n.signInSubtitle,
       children: [
+        if (googleSignInAvailable) ...[
+          GoogleSignInButton(onIdToken: _signInWithGoogle, enabled: !_loading),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(context.l10n.or, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+              const Expanded(child: Divider()),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
         TextField(
           controller: _username,
           decoration: InputDecoration(labelText: context.l10n.username, prefixIcon: const Icon(Icons.person_outline)),
