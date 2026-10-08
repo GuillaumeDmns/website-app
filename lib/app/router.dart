@@ -48,13 +48,14 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       return switch (status) {
         AuthStatus.unknown => location == Routes.splash ? null : withFrom(Routes.splash),
-        AuthStatus.signedOut => onAuthPage ? null : withFrom(Routes.login),
         // Welcome pages once per device (a restored session may skip the splash page, so from any page). The search
-        // stays reachable: the welcome pages use it to choose home and work.
-        AuthStatus.signedIn when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search =>
+        // and the sign-in pages stay reachable: the welcome pages use them.
+        _ when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search && !onAuthPage =>
           Uri(path: Routes.welcome, queryParameters: {'from': waiting ? (from ?? Routes.home) : state.uri.toString()}).toString(),
-        AuthStatus.signedIn when waiting => from ?? Routes.home,
-        AuthStatus.signedIn => null,
+        _ when location == Routes.splash => from ?? Routes.home,
+        // Signed in: back to the page that asked for it
+        AuthStatus.signedIn when onAuthPage => from ?? Routes.home,
+        _ => null,
       };
     },
     routes: [

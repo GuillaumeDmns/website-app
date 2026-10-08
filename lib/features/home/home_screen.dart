@@ -137,18 +137,30 @@ class _AccountMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final signedIn = ref.watch(authControllerProvider) == AuthStatus.signedIn;
     return PopupMenuButton<void>(
       tooltip: l10n.account,
-      icon: const Icon(Icons.account_circle_outlined),
+      icon: Icon(signedIn ? Icons.account_circle : Icons.account_circle_outlined),
       itemBuilder: (context) => [
         PopupMenuItem(
           onTap: () => ref.read(localeProvider.notifier).toggle(),
           child: ListTile(leading: const Icon(Icons.translate), title: Text(l10n.otherLanguage), contentPadding: EdgeInsets.zero),
         ),
-        PopupMenuItem(
-          onTap: () => ref.read(authControllerProvider.notifier).signOut(),
-          child: ListTile(leading: const Icon(Icons.logout), title: Text(l10n.signOut), contentPadding: EdgeInsets.zero),
-        ),
+        if (signedIn)
+          PopupMenuItem(
+            onTap: () => ref.read(authControllerProvider.notifier).signOut(),
+            child: ListTile(leading: const Icon(Icons.logout), title: Text(l10n.signOut), contentPadding: EdgeInsets.zero),
+          )
+        else
+          PopupMenuItem(
+            onTap: () => context.go(Routes.signIn(Routes.home)),
+            child: ListTile(
+              leading: const Icon(Icons.login),
+              title: Text(l10n.signInAction),
+              subtitle: Text(l10n.guestModeHint),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
       ],
     );
   }

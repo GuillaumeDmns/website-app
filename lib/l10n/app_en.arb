@@ -296,5 +296,12 @@
   "widgetUpdated": "Updated {time}",
   "widgetUpdateFailed": "Updated {time} (failed)",
   "widgetOpenApp": "Open the app to choose a stop",
-  "bikePinLabel": "{name} · {count, plural, =0{no bikes} =1{1 bike} other{{count} bikes}}"
+  "bikePinLabel": "{name} · {count, plural, =0{no bikes} =1{1 bike} other{{count} bikes}}",
+  "errorGuestJourneyLimit": "You have reached today's journey limit without an account. Sign in to keep going.",
+  "errorGuestQuota": "The app without an account is very busy right now. Sign in to keep going.",
+  "errorJourneyLimit": "Too many journey searches, try again in a moment.",
+  "guestModeHint": "Favorites on all your devices, no limits",
+  "continueAsGuest": "Continue without an account",
+  "welcomeAccountTitle": "An account, if you like",
+  "welcomeAccountText": "Without an account, everything works with a few limits: a number of journeys a day, and favorites kept on this device. With an account, your favorites follow you on all your devices."
 }

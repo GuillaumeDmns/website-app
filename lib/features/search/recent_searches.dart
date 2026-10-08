@@ -35,7 +35,7 @@ class RecentSearches extends AsyncNotifier<List<RecentSearch>> {
 
   @override
   Future<List<RecentSearch>> build() async {
-    // Reloaded when the account changes (the device copy is cleared at sign-in / sign-out)
+    // Reloaded when the session changes (the device copy is cleared at sign-out, kept from a guest at sign-in)
     ref.watch(authControllerProvider);
     final json = await ref.read(localStoreProvider).readJson(_key);
     if (json is! List) {

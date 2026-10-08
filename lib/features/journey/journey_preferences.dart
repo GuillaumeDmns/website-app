@@ -31,7 +31,7 @@ class JourneyPreferencesController extends Notifier<JourneyPreferences> {
 
   @override
   JourneyPreferences build() {
-    // Reloaded when the account changes (the device copy is cleared at sign-in / sign-out)
+    // Reloaded when the session changes (the device copy is cleared at sign-out, kept from a guest at sign-in)
     ref.watch(authControllerProvider);
     _load();
     return const JourneyPreferences();

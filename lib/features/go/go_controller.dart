@@ -124,7 +124,8 @@ class GoController extends Notifier<GoState?> {
   @override
   GoState? build() {
     ref.listen(authControllerProvider, (previous, status) {
-      if (status == AuthStatus.signedOut) {
+      // Signed out: the followed journey was the account's
+      if (previous == AuthStatus.signedIn && status == AuthStatus.guest) {
         _stopFeeds();
         state = null;
       }

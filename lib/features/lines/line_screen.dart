@@ -179,7 +179,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                 ],
               ),
             ),
-            FavoriteLineButton(lineId: line.id),
+            FavoriteLineButton(line: line),
             IconButton(
               tooltip: context.l10n.share,
               icon: const Icon(Icons.share_outlined),

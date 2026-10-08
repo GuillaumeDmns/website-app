@@ -32,38 +32,38 @@ Future<void> _runFavoriteAction(ScaffoldMessengerState messenger, Future<void> F
   }
 }
 
-/// Star toggling a stop area in the favorites
+/// Star toggling a stop area in the favorites (a guest's keeps the stop's name and lines on the device)
 class FavoriteStopButton extends ConsumerWidget {
-  const FavoriteStopButton({super.key, required this.stopAreaId});
+  const FavoriteStopButton({super.key, required this.stop});
 
-  final String stopAreaId;
+  final StopAreaSummary stop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(favoritesProvider);
-    final saved = ref.read(favoritesProvider.notifier).stopFavorite(stopAreaId) != null;
+    final saved = ref.read(favoritesProvider.notifier).stopFavorite(stop.id) != null;
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
-      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stopAreaId)),
+      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stop)),
     );
   }
 }
 
 /// Star toggling a line in the favorites
 class FavoriteLineButton extends ConsumerWidget {
-  const FavoriteLineButton({super.key, required this.lineId});
+  const FavoriteLineButton({super.key, required this.line});
 
-  final String lineId;
+  final LineSummary line;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(favoritesProvider);
-    final saved = ref.read(favoritesProvider.notifier).lineFavorite(lineId) != null;
+    final saved = ref.read(favoritesProvider.notifier).lineFavorite(line.id) != null;
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
-      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(lineId)),
+      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(line)),
     );
   }
 }

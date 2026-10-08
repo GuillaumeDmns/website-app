@@ -1,13 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_providers.dart';
+import '../../core/api/models.dart';
 import '../../core/offline/offline_cache.dart';
 import '../../core/storage/local_store.dart';
 import '../home_widget/home_widget_sync.dart';
 
-enum AuthStatus { unknown, signedIn, signedOut }
+/// [guest]: the app is used without account (guest token, capped usage, data on the device only)
+enum AuthStatus { unknown, guest, signedIn }
 
-/// Session state. Signed in as long as a refresh token is stored; the interceptor reports when it is rejected.
+/// Session state. Signed in as long as a refresh token is stored, a guest otherwise; the interceptor reports when the
+/// refresh token is rejected.
 class AuthController extends Notifier<AuthStatus> {
   @override
   AuthStatus build() {
@@ -20,12 +23,12 @@ class AuthController extends Notifier<AuthStatus> {
     try {
       await tokenStore.load();
     } catch (_) {
-      // Unreadable storage (e.g. keyring locked): sign in again
+      // Unreadable storage (e.g. keyring locked): carry on as a guest
     }
-    state = tokenStore.refreshToken != null ? AuthStatus.signedIn : AuthStatus.signedOut;
+    state = tokenStore.signedIn ? AuthStatus.signedIn : AuthStatus.guest;
   }
 
-  /// Device copies of the previous account's data (favorites, recent searches) must not show for another one
+  /// The account's copies on the device (favorites, recent searches…) must not stay once it is gone
   Future<void> _clearUserData() async {
     final store = ref.read(localStoreProvider);
     await store.remove('favorites');
@@ -36,16 +39,19 @@ class AuthController extends Notifier<AuthStatus> {
     await clearHomeWidget();
   }
 
+  /// What was saved as a guest stays: the favorites join the account (see `FavoritesController`)
   Future<void> signIn(String username, String password) async {
     final tokens = await ref.read(authApiProvider).signIn(username.trim(), password);
-    await _clearUserData();
-    await ref.read(tokenStoreProvider).save(tokens);
-    state = AuthStatus.signedIn;
+    await _signedIn(tokens);
   }
 
   Future<void> signUp(String username, String email, String password) async {
     final tokens = await ref.read(authApiProvider).signUp(username.trim(), email.trim(), password);
-    await _clearUserData();
+    await _signedIn(tokens);
+  }
+
+  Future<void> _signedIn(AuthTokens tokens) async {
+    await OfflineCacheInterceptor.clear(ref.read(localStoreProvider));
     await ref.read(tokenStoreProvider).save(tokens);
     state = AuthStatus.signedIn;
   }
@@ -58,11 +64,13 @@ class AuthController extends Notifier<AuthStatus> {
     }
     await tokenStore.clear();
     await _clearUserData();
-    state = AuthStatus.signedOut;
+    state = AuthStatus.guest;
   }
 
-  void onSessionLost() {
-    state = AuthStatus.signedOut;
+  /// The refresh token was rejected: the app carries on as a guest
+  Future<void> onSessionLost() async {
+    await _clearUserData();
+    state = AuthStatus.guest;
   }
 }
 
