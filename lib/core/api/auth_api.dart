@@ -19,6 +19,9 @@ class AuthApi {
   /// Rotates the refresh token: the given one is no longer valid afterwards
   Future<AuthTokens> refresh(String refreshToken) => _tokens('/api/token/refresh', {'refreshToken': refreshToken});
 
+  /// Token of a device used without account (capped usage, about 30 days, no refresh token)
+  Future<AuthTokens> guest() => _tokens('/api/auth/guest', const {});
+
   Future<void> logout(String refreshToken) async {
     try {
       await _dio.post<void>('/api/logout', data: {'refreshToken': refreshToken});

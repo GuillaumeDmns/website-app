@@ -108,6 +108,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onPressed: _loading ? null : () => context.go(Uri(path: Routes.signup, queryParameters: GoRouterState.of(context).uri.queryParameters).toString()),
           child: Text(context.l10n.noAccountSignUp),
         ),
+        TextButton(
+          onPressed: _loading ? null : () => context.go(GoRouterState.of(context).uri.queryParameters['from'] ?? Routes.home),
+          child: Text(context.l10n.continueAsGuest),
+        ),
       ],
     );
   }

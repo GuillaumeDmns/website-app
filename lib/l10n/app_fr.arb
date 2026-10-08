@@ -933,5 +933,12 @@
         "type": "int"
       }
     }
-  }
+  },
+  "errorGuestJourneyLimit": "Vous avez atteint la limite d'itinéraires sans compte pour aujourd'hui. Connectez-vous pour continuer.",
+  "errorGuestQuota": "L'appli sans compte est très demandée en ce moment. Connectez-vous pour continuer.",
+  "errorJourneyLimit": "Trop de recherches d'itinéraires, réessayez dans un moment.",
+  "guestModeHint": "Favoris sur tous vos appareils, sans limite",
+  "continueAsGuest": "Continuer sans compte",
+  "welcomeAccountTitle": "Un compte, si vous voulez",
+  "welcomeAccountText": "Sans compte, tout fonctionne avec quelques limites : un nombre d'itinéraires par jour, et des favoris gardés sur cet appareil. Avec un compte, vos favoris vous suivent sur tous vos appareils."
 }

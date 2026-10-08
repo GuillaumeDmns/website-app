@@ -60,8 +60,8 @@ Future<void> pushDeparturesToWidget(StopDepartures departures) async {
   }
 }
 
-/// Refresh button of the widget, run in a background isolate (the app may be closed): renews the access token
-/// from the stored refresh token, then fetches the stop's departures
+/// Refresh button of the widget, run in a background isolate (the app may be closed): renews the account's access
+/// token from the stored refresh token (or takes the device's guest token), then fetches the stop's departures
 @pragma('vm:entry-point')
 Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   if (uri?.host != 'refreshdepartures') {
@@ -70,17 +70,21 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   // Another isolate: the app's language is read again
   await loadLocale();
   final stopId = await HomeWidget.getWidgetData<String>('stop_id');
-  final tokens = TokenStore();
-  await tokens.load();
-  final refreshToken = tokens.refreshToken;
-  if (stopId == null || refreshToken == null) {
+  if (stopId == null) {
     await HomeWidget.saveWidgetData<String>('departures_list', currentL10n.widgetOpenApp);
     await HomeWidget.updateWidget(androidName: _androidName);
     return;
   }
+  final tokens = TokenStore();
+  await tokens.load();
   try {
     final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl, connectTimeout: const Duration(seconds: 10)));
-    await tokens.save(await AuthApi(dio).refresh(refreshToken));
+    final authApi = AuthApi(dio);
+    if (tokens.signedIn) {
+      await tokens.save(await authApi.refresh(tokens.refreshToken!));
+    } else if (!tokens.hasValidAccessToken) {
+      await tokens.saveGuest(await authApi.guest());
+    }
     dio.options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
     await pushDeparturesToWidget(await MobilityApi(dio).stopDepartures(stopId, limit: 3));
   } catch (e) {

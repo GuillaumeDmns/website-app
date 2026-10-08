@@ -16,6 +16,9 @@ abstract final class Routes {
   static const go = '/go';
   static const welcome = '/welcome';
 
+  /// Sign-in page, back to [from] (a location of the app) once signed in
+  static String signIn(String from) => Uri(path: login, queryParameters: {'from': from}).toString();
+
   static String journey(JourneyRequest request) => Uri(path: journeyPath, queryParameters: request.toQuery()).toString();
 
   /// Detail of [option], found again from the search when the page is reloaded or opened from a link: the search,

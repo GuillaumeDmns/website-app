@@ -7,11 +7,13 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../l10n/l10n.dart';
+import '../auth/auth_controller.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import 'onboarding.dart';
 
-/// Shown once per device after signing in: what the app does, the location permission, home and work.
+/// Shown once per device at the first start: what the app does, the location permission, home and work, then (without
+/// account) what an account adds.
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key, this.from});
 
@@ -23,8 +25,6 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  static const _pageCount = 3;
-
   final _pages = PageController();
   int _page = 0;
 
@@ -34,10 +34,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     super.dispose();
   }
 
-  Future<void> _finish() async {
+  int get _pageCount => ref.read(authControllerProvider) == AuthStatus.signedIn ? 3 : 4;
+
+  /// [signIn]: to the sign-in page, back to [WelcomeScreen.from] afterwards
+  Future<void> _finish({bool signIn = false}) async {
     final router = GoRouter.of(context);
     await ref.read(onboardingDoneProvider.notifier).complete();
-    router.go(widget.from ?? Routes.home);
+    final from = widget.from ?? Routes.home;
+    router.go(signIn ? Routes.signIn(from) : from);
   }
 
   void _next() => _page == _pageCount - 1
@@ -47,6 +51,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    ref.watch(authControllerProvider);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -62,7 +67,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   child: PageView(
                     controller: _pages,
                     onPageChanged: (page) => setState(() => _page = page),
-                    children: const [_IntroPage(), _LocationPage(), _PlacesPage()],
+                    children: [
+                      const _IntroPage(),
+                      const _LocationPage(),
+                      const _PlacesPage(),
+                      if (_pageCount == 4) _AccountPage(onSignIn: () => _finish(signIn: true)),
+                    ],
                   ),
                 ),
                 Padding(
@@ -219,6 +229,26 @@ class _PlacesPage extends ConsumerWidget {
       children: [
         place(FavoriteKind.home, Icons.home_outlined, context.l10n.home),
         place(FavoriteKind.work, Icons.work_outline, context.l10n.work),
+      ],
+    );
+  }
+}
+
+/// Without account: the limits, and what signing in adds
+class _AccountPage extends StatelessWidget {
+  const _AccountPage({required this.onSignIn});
+
+  final VoidCallback onSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return _Page(
+      icon: Icons.account_circle_outlined,
+      title: l10n.welcomeAccountTitle,
+      text: l10n.welcomeAccountText,
+      children: [
+        FilledButton.tonalIcon(icon: const Icon(Icons.login), label: Text(l10n.signInAction), onPressed: onSignIn),
       ],
     );
   }

@@ -114,7 +114,9 @@ class _StopContent extends ConsumerWidget {
                   message: context.l10n.wheelchairAccessible,
                   child: Icon(Icons.accessible, color: theme.colorScheme.primary),
                 ),
-              FavoriteStopButton(stopAreaId: detail.id),
+              FavoriteStopButton(
+                stop: StopAreaSummary(id: detail.id, name: detail.name, lat: detail.lat, lon: detail.lon, lines: detail.lines),
+              ),
               // Large text: the icon only, so that the name keeps the room
               if (MediaQuery.textScalerOf(context).scale(1) >= 1.3)
                 IconButton.filledTonal(
