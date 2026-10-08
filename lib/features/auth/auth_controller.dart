@@ -67,6 +67,14 @@ class AuthController extends Notifier<AuthStatus> {
     state = AuthStatus.guest;
   }
 
+  /// Deletes the account on the server, then forgets it here: the app carries on as a guest
+  Future<void> deleteAccount() async {
+    await ref.read(mobilityApiProvider).deleteAccount();
+    await ref.read(tokenStoreProvider).clear();
+    await _clearUserData();
+    state = AuthStatus.guest;
+  }
+
   /// The refresh token was rejected: the app carries on as a guest
   Future<void> onSessionLost() async {
     await _clearUserData();

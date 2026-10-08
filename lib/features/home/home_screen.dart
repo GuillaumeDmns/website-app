@@ -152,6 +152,11 @@ class _AccountMenu extends ConsumerWidget {
         ),
         if (signedIn)
           PopupMenuItem(
+            onTap: () => context.push(Routes.account),
+            child: ListTile(leading: const Icon(Icons.manage_accounts_outlined), title: Text(l10n.accountTitle), contentPadding: EdgeInsets.zero),
+          ),
+        if (signedIn)
+          PopupMenuItem(
             onTap: () => ref.read(authControllerProvider.notifier).signOut(),
             child: ListTile(leading: const Icon(Icons.logout), title: Text(l10n.signOut), contentPadding: EdgeInsets.zero),
           )

@@ -954,5 +954,16 @@
   "creditOsmTitle": "© contributeurs OpenStreetMap",
   "creditOsm": "Tracés des lignes (fournis par IDFM avec le GTFS), sous licence ODbL",
   "creditVelibTitle": "Vélib' Métropole",
-  "creditVelib": "Disponibilité des stations en temps réel (open data GBFS)"
+  "creditVelib": "Disponibilité des stations en temps réel (open data GBFS)",
+  "accountTitle": "Mon compte",
+  "accountGuest": "Vous utilisez l'app sans compte : vos favoris restent sur cet appareil.",
+  "accountDataHint": "Le serveur garde votre email, votre prénom et vos favoris (dont Maison et Travail).",
+  "accountExport": "Exporter mes données",
+  "exportCopied": "Données copiées dans le presse-papiers",
+  "accountDangerZone": "Suppression",
+  "accountDelete": "Supprimer mon compte",
+  "accountDeleteQuestion": "Supprimer votre compte ?",
+  "accountDeleteText": "Votre compte et vos favoris seront supprimés définitivement du serveur, sur tous vos appareils. Vous pourrez continuer à utiliser l'app sans compte.",
+  "accountDeleteConfirm": "Supprimer",
+  "accountDeleted": "Compte supprimé"
 }

@@ -645,3 +645,19 @@ abstract class BikeStation with _$BikeStation {
 
   factory BikeStation.fromJson(Map<String, dynamic> json) => _$BikeStationFromJson(json);
 }
+
+/// The signed-in user's account (`/api/v2/me`)
+@freezed
+abstract class Account with _$Account {
+  const factory Account({
+    String? email,
+
+    /// First name given by Google, null for a password account
+    String? firstName,
+    required String role,
+    @Default(false) bool google,
+    DateTime? createdAt,
+  }) = _Account;
+
+  factory Account.fromJson(Map<String, dynamic> json) => _$AccountFromJson(json);
+}

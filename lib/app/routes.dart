@@ -16,6 +16,7 @@ abstract final class Routes {
   static const go = '/go';
   static const welcome = '/welcome';
   static const about = '/about';
+  static const account = '/account';
 
   /// Sign-in page, back to [from] (a location of the app) once signed in
   static String signIn(String from) => Uri(path: login, queryParameters: {'from': from}).toString();

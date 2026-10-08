@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import 'api_exception.dart';
@@ -96,6 +98,27 @@ class MobilityApi {
   Future<void> deleteFavorite(int id) async {
     try {
       await _dio.delete<void>('/api/v2/me/favorites/$id');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<Account> account() => _get('/api/v2/me', Account.fromJson);
+
+  /// Everything the server keeps about the account (GDPR), as indented JSON
+  Future<String> exportAccount() async {
+    try {
+      final response = await _dio.get<Object>('/api/v2/me/export');
+      return const JsonEncoder.withIndent('  ').convert(response.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// Deletes the account for good, with its favorites and sessions
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete<void>('/api/v2/me');
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

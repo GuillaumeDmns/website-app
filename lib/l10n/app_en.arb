@@ -317,5 +317,16 @@
   "creditOsmTitle": "© OpenStreetMap contributors",
   "creditOsm": "Line paths (provided by IDFM with the GTFS), under the ODbL",
   "creditVelibTitle": "Vélib' Métropole",
-  "creditVelib": "Real-time station availability (GBFS open data)"
+  "creditVelib": "Real-time station availability (GBFS open data)",
+  "accountTitle": "My account",
+  "accountGuest": "You use the app without an account: your favorites stay on this device.",
+  "accountDataHint": "The server keeps your email, first name and favorites (Home and Work included).",
+  "accountExport": "Export my data",
+  "exportCopied": "Data copied to the clipboard",
+  "accountDangerZone": "Deletion",
+  "accountDelete": "Delete my account",
+  "accountDeleteQuestion": "Delete your account?",
+  "accountDeleteText": "Your account and favorites will be deleted from the server for good, on all your devices. You can keep using the app without an account.",
+  "accountDeleteConfirm": "Delete",
+  "accountDeleted": "Account deleted"
 }

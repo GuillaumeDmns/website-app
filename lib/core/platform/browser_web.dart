@@ -121,3 +121,22 @@ Future<bool> share(String title, String url) async {
     return e.toString().contains('AbortError');
   }
 }
+
+/// Saves [content] as a file named [fileName] (the browser's download); false when it failed
+bool download(String fileName, String content, {String type = 'application/json'}) {
+  try {
+    final blob = globalContext['Blob'] as JSFunction;
+    final file = blob.callAsConstructor<JSObject>([content.toJS].toJS, {'type': type}.jsify());
+    final urls = globalContext['URL'] as JSObject;
+    final url = urls.callMethod<JSString>('createObjectURL'.toJS, file);
+    final link = (globalContext['document'] as JSObject).callMethod<JSObject>('createElement'.toJS, 'a'.toJS);
+    link['href'] = url;
+    link['download'] = fileName.toJS;
+    link.callMethod<JSAny?>('click'.toJS);
+    urls.callMethod<JSAny?>('revokeObjectURL'.toJS, url);
+    return true;
+  } catch (e) {
+    debugPrint('Download failed: $e');
+    return false;
+  }
+}
