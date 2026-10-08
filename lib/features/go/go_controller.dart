@@ -13,6 +13,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
@@ -235,7 +236,7 @@ class GoController extends Notifier<GoState?> {
     final position = current.position ?? ref.read(userLocationProvider).value;
     final to = current.request.to;
     if (position == null || to == null) {
-      state = current.copyWith(error: () => 'Position indisponible');
+      state = current.copyWith(error: () => currentL10n.goLocationUnavailable);
       return;
     }
 
@@ -252,18 +253,18 @@ class GoController extends Notifier<GoState?> {
           );
       final journey = plan.journeys.firstOrNull;
       if (journey == null) {
-        state = state?.copyWith(recalculating: false, error: () => 'Aucun itinéraire trouvé');
+        state = state?.copyWith(recalculating: false, error: () => currentL10n.goNoJourneyFound);
         return;
       }
       _begin(
         journey,
-        request.copyWith(from: JourneyPlace.point(name: 'Ma position', lat: position.latitude, lon: position.longitude)),
+        request.copyWith(from: JourneyPlace.point(name: currentL10n.myLocation, lat: position.latitude, lon: position.longitude)),
         muted: current.muted,
         keepAwake: current.keepAwake,
         plannedArrival: current.plannedArrival,
       );
     } catch (e) {
-      state = state?.copyWith(recalculating: false, error: () => 'Recalcul impossible : $e');
+      state = state?.copyWith(recalculating: false, error: () => currentL10n.goRecalculateFailed('$e'));
     }
   }
 
@@ -450,12 +451,14 @@ class GoController extends Notifier<GoState?> {
     }
 
     final chip = switch (progress.phase) {
-      GoPhase.onBoard => tracker.stopsLeft(progress) <= 1 ? 'Descendez' : '${tracker.stopsLeft(progress)} arrêts',
+      GoPhase.onBoard =>
+        tracker.stopsLeft(progress) <= 1 ? currentL10n.goChipGetOff : currentL10n.stopsCount(tracker.stopsLeft(progress)),
       GoPhase.waiting when step != null =>
-        '${(tracker.expectedDeparture(step, progress, state.currentVehicle).difference(now).inSeconds / 60).ceil().clamp(0, 999)} min',
-      _ => '${(tracker.metersLeft(progress) / 1.2 / 60).ceil()} min',
+        currentL10n.minutesShort(
+            (tracker.expectedDeparture(step, progress, state.currentVehicle).difference(now).inSeconds / 60).ceil().clamp(0, 999)),
+      _ => currentL10n.minutesShort((tracker.metersLeft(progress) / 1.2 / 60).ceil()),
     };
-    final info = 'Arrivée ${formatClock(tracker.eta(progress, state.currentVehicle))}';
+    final info = currentL10n.goArrival(formatClock(tracker.eta(progress, state.currentVehicle)));
     final key = '${instruction.title}|${instruction.subtitle}|$chip|$info|${progress.step}';
     if (key == _lastLive && (done - _lastLiveProgress).abs() < 15) {
       return;
@@ -468,12 +471,10 @@ class GoController extends Notifier<GoState?> {
         ? 'walk'
         : section.kind == SectionKind.transit
             ? switch (section.line?.mode) {
-                TransportMode.metro => 'Métro',
-                TransportMode.rer => 'RER',
-                TransportMode.transilien => 'Train Transilien',
-                TransportMode.ter => 'TER',
-                TransportMode.tram => 'Tramway',
-                _ => 'Bus',
+                TransportMode.metro => 'metro',
+                TransportMode.rer || TransportMode.transilien || TransportMode.ter => 'train',
+                TransportMode.tram => 'tram',
+                _ => 'bus',
               }
             : section.kind == SectionKind.transfer
                 ? 'transfer'

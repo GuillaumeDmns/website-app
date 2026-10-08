@@ -11,6 +11,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/widgets/async_view.dart';
+import '../../l10n/l10n.dart';
 import '../stops/widgets/stop_departures_card.dart';
 
 typedef NearbyKey = ({double lat, double lon});
@@ -56,9 +57,9 @@ class NearbyDeparturesList extends ConsumerWidget {
       value: nearby,
       onRetry: () => ref.invalidate(nearbyDeparturesProvider(position)),
       data: (stops) => stops.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Aucun arrêt à moins de 500 m', textAlign: TextAlign.center),
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(context.l10n.nearbyNoStop, textAlign: TextAlign.center),
             )
           : Column(
               children: [

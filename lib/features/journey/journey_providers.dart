@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../l10n/l10n.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
 
@@ -19,7 +20,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
     final position = ref.read(userLocationProvider).value ??
         await ref.read(userLocationProvider.future).timeout(const Duration(seconds: 8), onTimeout: () => null);
     if (position == null) {
-      throw const ApiException('Position indisponible : choisissez un point de départ');
+      throw ApiException(currentL10n.locationUnavailableChooseStart);
     }
     return '${position.latitude},${position.longitude}';
   }
@@ -53,6 +54,30 @@ RideLookup watchRides(WidgetRef ref, DateTime now) => (key) {
       }
       return ref.watch(rideOptionsProvider(key)).value;
     };
+
+/// A journey option found again from a detail link (`Routes.journeyDetailOf`): the search run at the option's
+/// departure time, then the option with the same lines leaving closest to it. Null when none is found.
+final sharedJourneyProvider = FutureProvider.autoDispose.family<JourneyOption?, String>((ref, query) async {
+  final params = Uri.splitQueryString(query);
+  final departure = DateTime.tryParse(params['dep'] ?? '');
+  final request = JourneyRequest.fromQuery(params);
+  if (departure == null || !request.isComplete) {
+    return null;
+  }
+  final plan = await ref.watch(journeyPlanProvider(request.copyWith(datetime: () => departure, arriveBy: false)).future);
+  final lines = params['lines'] ?? '';
+  JourneyOption? best;
+  for (final option in plan.journeys) {
+    final sameLines = option.rides.map((ride) => ride.line?.id ?? '').join(',') == lines;
+    final bestSameLines = best != null && best.rides.map((ride) => ride.line?.id ?? '').join(',') == lines;
+    final closer = best == null ||
+        option.departure.difference(departure).abs() < best.departure.difference(departure).abs();
+    if (best == null || (sameLines && !bestSameLines) || (sameLines == bestSameLines && closer)) {
+      best = option;
+    }
+  }
+  return best;
+});
 
 /// Option opened in the detail page (kept here rather than in the URL: it is a snapshot of a search)
 class SelectedJourney extends Notifier<JourneyOption?> {

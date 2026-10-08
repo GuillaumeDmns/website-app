@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/api/models.dart';
+import '../../l10n/l10n.dart';
 
 /// Start or end of a journey: the user position, a stop area or a point.
 @immutable
 class JourneyPlace {
-  const JourneyPlace._({required this.name, this.lat, this.lon, this.stopAreaId, this.isCurrentLocation = false});
+  const JourneyPlace._({this._name = '', this.lat, this.lon, this.stopAreaId, this.isCurrentLocation = false});
 
-  const JourneyPlace.currentLocation() : this._(name: 'Ma position', isCurrentLocation: true);
+  const JourneyPlace.currentLocation() : this._(isCurrentLocation: true);
 
   const JourneyPlace.point({required String name, required double lat, required double lon})
       : this._(name: name, lat: lat, lon: lon);
@@ -19,11 +20,14 @@ class JourneyPlace {
       ? JourneyPlace.stopArea(name: place.name, id: place.id, lat: place.lat, lon: place.lon)
       : JourneyPlace.point(name: place.name, lat: place.lat, lon: place.lon);
 
-  final String name;
+  final String _name;
   final double? lat;
   final double? lon;
   final String? stopAreaId;
   final bool isCurrentLocation;
+
+  /// Shown to the user ("Ma position" in the app's language for the user position)
+  String get name => isCurrentLocation ? currentL10n.myLocation : _name;
 
   /// Value of the `from` / `to` URL parameter: `here`, a stop area id or `lat,lon`
   String get param => isCurrentLocation ? 'here' : stopAreaId ?? '${lat!.toStringAsFixed(6)},${lon!.toStringAsFixed(6)}';
@@ -42,7 +46,7 @@ class JourneyPlace {
     final parts = param.split(',');
     final lat = parts.length == 2 ? double.tryParse(parts[0]) : null;
     final lon = parts.length == 2 ? double.tryParse(parts[1]) : null;
-    return lat == null || lon == null ? null : JourneyPlace.point(name: name ?? 'Point sur la carte', lat: lat, lon: lon);
+    return lat == null || lon == null ? null : JourneyPlace.point(name: name ?? currentL10n.pointOnMap, lat: lat, lon: lon);
   }
 
   @override
@@ -53,13 +57,15 @@ class JourneyPlace {
 }
 
 enum WalkingSpeed {
-  slow('Lente'),
-  normal('Normale'),
-  fast('Rapide');
+  slow,
+  normal,
+  fast;
 
-  const WalkingSpeed(this.label);
-
-  final String label;
+  String get label => switch (this) {
+        slow => currentL10n.walkingSlow,
+        normal => currentL10n.walkingNormal,
+        fast => currentL10n.walkingFast,
+      };
 
   String get apiName => name.toUpperCase();
 }
@@ -119,6 +125,18 @@ class JourneyRequest {
         walkingSpeed: walkingSpeed ?? this.walkingSpeed,
         bikeShare: bikeShare ?? this.bikeShare,
       );
+
+  /// For a link to [journey]: "Ma position" becomes where the journey starts or ends, which is what the
+  /// recipient needs (their own position would give another journey)
+  JourneyRequest forSharing(JourneyOption journey) {
+    JourneyPlace fixed(JourneyPlace? place, JourneyPoint? point) => place != null && place.isCurrentLocation && point != null
+        ? JourneyPlace.point(name: point.name, lat: point.lat, lon: point.lon)
+        : place ?? const JourneyPlace.currentLocation();
+    return copyWith(
+      from: fixed(from, journey.sections.firstOrNull?.from),
+      to: fixed(to, journey.sections.lastOrNull?.to),
+    );
+  }
 
   JourneyRequest swapped() => JourneyRequest(
         from: to,

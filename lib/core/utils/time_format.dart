@@ -1,3 +1,6 @@
+import 'package:intl/intl.dart';
+
+import '../../l10n/l10n.dart';
 import '../api/models.dart';
 
 /// `08:05` in local time
@@ -8,26 +11,27 @@ String formatClock(DateTime time) {
 
 /// Short label of a departure as shown in lists: `À quai`, `3 min`, `14:52`, `Supprimé`.
 String departureLabel(Departure departure, DateTime now) {
+  final l10n = currentL10n;
   if (departure.cancelled) {
-    return 'Supprimé';
+    return l10n.departureCancelled;
   }
   final seconds = departure.time.difference(now).inSeconds;
   if (departure.atStop == true || seconds <= 30) {
-    return 'À quai';
+    return l10n.departureAtStop;
   }
   final minutes = seconds ~/ 60;
   if (minutes < 1) {
-    return '< 1 min';
+    return l10n.departureUnderOneMinute;
   }
   if (minutes < 60) {
-    return '$minutes min';
+    return l10n.minutesShort(minutes);
   }
   return formatClock(departure.time);
 }
 
-/// `250 m`, `1,2 km`
+/// `250 m`, `1,2 km` (`1.2 km` in English)
 String formatDistance(int meters) =>
-    meters < 1000 ? '$meters m' : '${(meters / 1000).toStringAsFixed(1).replaceFirst('.', ',')} km';
+    meters < 1000 ? '$meters m' : '${NumberFormat('0.0', currentL10n.localeName).format(meters / 1000)} km';
 
 /// `12 min`, `1 h 05` (non-breaking spaces: never split across lines)
 String formatDuration(int seconds) {
@@ -38,20 +42,18 @@ String formatDuration(int seconds) {
   return '${minutes ~/ 60}\u00a0h\u00a0${(minutes % 60).toString().padLeft(2, '0')}';
 }
 
-/// `2,55 €`
-String formatFare(int cents) => '${(cents / 100).toStringAsFixed(2).replaceFirst('.', ',')}\u00a0€';
+/// `2,55 €` (`€2.55` in English)
+String formatFare(int cents) =>
+    NumberFormat.currency(locale: currentL10n.localeName, symbol: '€', decimalDigits: 2).format(cents / 100);
 
-const _weekdays = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
-const _months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-
-/// `sam. 3 oct.`, or `aujourd'hui` / `demain`
+/// `sam. 3 oct.` (`Sat, Oct 3`), or `aujourd'hui` / `demain`
 String formatDay(DateTime time, DateTime now) {
   final local = time.toLocal();
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(local.year, local.month, local.day);
   return switch (day.difference(today).inDays) {
-    0 => 'aujourd\'hui',
-    1 => 'demain',
-    _ => '${_weekdays[local.weekday - 1]} ${local.day} ${_months[local.month - 1]}',
+    0 => currentL10n.today,
+    1 => currentL10n.tomorrow,
+    _ => DateFormat.MMMEd(currentL10n.localeName).format(local),
   };
 }

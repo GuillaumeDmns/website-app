@@ -4,20 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../../l10n/l10n.dart';
 import '../../traffic/disruption_widgets.dart';
 import '../../traffic/traffic_providers.dart';
 
 /// User-facing name of a Navitia journey type
 String journeyTypeLabel(String? type) => switch (type) {
-      'best' => 'Suggéré',
-      'rapid' => 'Le plus rapide',
-      'comfort' => 'Moins de correspondances',
-      'less_fallback_walk' => 'Moins de marche',
-      'non_pt_walk' => 'À pied',
-      'non_pt_bike' || 'non_pt_bss' => 'À vélo',
-      'bike_share' => 'Vélib',
-      'car' => 'En voiture',
-      _ => 'Autre option',
+      'best' => currentL10n.journeyBest,
+      'rapid' => currentL10n.journeyRapid,
+      'comfort' => currentL10n.journeyComfort,
+      'less_fallback_walk' => currentL10n.journeyLessWalk,
+      'non_pt_walk' => currentL10n.journeyWalk,
+      'non_pt_bike' || 'non_pt_bss' => currentL10n.journeyBike,
+      'bike_share' => currentL10n.journeyBikeShare,
+      'car' => currentL10n.journeyCar,
+      _ => currentL10n.journeyOther,
     };
 
 /// Result row: duration, the chain of lines, times, and when to leave.
@@ -54,8 +55,8 @@ class JourneyCard extends StatelessWidget {
 
     final details = [
       '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
-      if (journey.transfers > 0) '${journey.transfers} corresp.',
-      if ((journey.walkingDuration ?? 0) >= 60) '${formatDuration(journey.walkingDuration!)} à pied',
+      if (journey.transfers > 0) context.l10n.transfersShort(journey.transfers),
+      if ((journey.walkingDuration ?? 0) >= 60) context.l10n.walkingDuration(formatDuration(journey.walkingDuration!)),
       if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
     ].join(' · ');
 
@@ -80,7 +81,7 @@ class JourneyCard extends StatelessWidget {
                       style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   if (onOpen != null)
                     IconButton(
-                      tooltip: 'Détails',
+                      tooltip: context.l10n.details,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.chevron_right),
                       onPressed: onOpen,
@@ -100,8 +101,8 @@ class JourneyCard extends StatelessWidget {
                       ),
                     Expanded(
                       child: Text(
-                        '${leaveIn.inMinutes <= 0 ? 'Partez maintenant' : 'Partez dans ${formatDuration(leaveIn.inSeconds)}'}'
-                        ' · ${firstRide.line?.name ?? ''} à ${formatClock(firstRide.departure)} de ${firstRide.from?.name ?? ''}',
+                        '${leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds))}'
+                        ' · ${context.l10n.firstRide(firstRide.line?.name ?? '', formatClock(firstRide.departure), firstRide.from?.name ?? '')}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(

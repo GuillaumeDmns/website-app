@@ -8,10 +8,12 @@ import '../../app/shell.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/share.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/location/location_providers.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -74,8 +76,13 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     );
   }
 
-  MapOverlay _overlay(LineDetail detail, LineDirection? direction, LineBranch? branch,
-      List<({Vehicle vehicle, double progress})> vehicles, DateTime now) {
+  MapOverlay _overlay(
+    LineDetail detail,
+    LineDirection? direction,
+    LineBranch? branch,
+    List<({Vehicle vehicle, double progress})> vehicles,
+    DateTime now,
+  ) {
     final line = detail.line;
     final color = parseHexColor(line.color, Colors.grey);
     List<LatLng> points(LineBranch b) => b.shape.isNotEmpty
@@ -116,8 +123,13 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     );
   }
 
-  Widget _content(BuildContext context, LineDetail detail, LineDirection? direction, LineBranch? branch,
-      List<({Vehicle vehicle, double progress})> vehicles) {
+  Widget _content(
+    BuildContext context,
+    LineDetail detail,
+    LineDirection? direction,
+    LineBranch? branch,
+    List<({Vehicle vehicle, double progress})> vehicles,
+  ) {
     // Vehicles on the stop list: fractional stop index in the branch shown (vehicles of other branches too, where
     // they run on it)
     final positions = <int, List<({double offset, Vehicle vehicle})>>{};
@@ -146,21 +158,37 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       children: [
         Row(
           children: [
-            IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+            IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
             LineBadge(line, size: 34),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${line.mode.label} ${line.name ?? ''}',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    '${line.mode.label} ${line.name ?? ''}',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   if (line.longName != null && line.longName != line.name)
-                    Text(line.longName!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                    Text(
+                      line.longName!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
                 ],
               ),
             ),
             FavoriteLineButton(lineId: line.id),
+            IconButton(
+              tooltip: context.l10n.share,
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => shareLink(
+                context,
+                title: '${line.mode.label} ${line.name ?? ''}'.trim(),
+                location: Routes.line(line.id),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -175,7 +203,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               showSelectedIcon: false,
               segments: [
                 for (var i = 0; i < detail.directions.length; i++)
-                  ButtonSegment(value: i, label: Text(_directionLabel(detail.directions[i]), maxLines: 2, textAlign: TextAlign.center)),
+                  ButtonSegment(
+                    value: i,
+                    label: Text(_directionLabel(detail.directions[i]), maxLines: 2, textAlign: TextAlign.center),
+                  ),
               ],
               selected: {_direction.clamp(0, detail.directions.length - 1)},
               onSelectionChanged: (selection) => setState(() {
@@ -217,7 +248,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
   static String _directionLabel(LineDirection direction) {
     final termini = direction.branches.map((branch) => branch.headsign).toSet();
-    return 'Vers ${termini.take(3).join(' / ')}${termini.length > 3 ? '…' : ''}';
+    return currentL10n.towards('${termini.take(3).join(' / ')}${termini.length > 3 ? '…' : ''}');
   }
 
   static String _branchLabel(LineBranch branch) =>
@@ -237,20 +268,23 @@ class _LineDisruptions extends ConsumerWidget {
     // Disruptions are a bonus: a failure only shows a short line
     return switch (disruptions) {
       AsyncValue(:final value?) when value.where((d) => d.active).isEmpty => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(severityIcon(null), size: 18, color: severityColor(null, theme.colorScheme)),
-                const SizedBox(width: 6),
-                Text(severityLabel(null), style: TextStyle(color: severityColor(null, theme.colorScheme), fontWeight: FontWeight.w600)),
-              ],
-            ),
-            if (value.isNotEmpty) DisruptionList(disruptions: value),
-          ],
-        ),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(severityIcon(null), size: 18, color: severityColor(null, theme.colorScheme)),
+              const SizedBox(width: 6),
+              Text(
+                severityLabel(null),
+                style: TextStyle(color: severityColor(null, theme.colorScheme), fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          if (value.isNotEmpty) DisruptionList(disruptions: value),
+        ],
+      ),
       AsyncValue(:final value?) => DisruptionList(disruptions: value),
-      AsyncValue(:final error?) => Text('Info trafic indisponible ($error)', style: theme.textTheme.bodySmall),
+      AsyncValue(:final error?) => Text(context.l10n.trafficUnavailable('$error'), style: theme.textTheme.bodySmall),
       _ => const LinearProgressIndicator(),
     };
   }
@@ -282,11 +316,13 @@ class _StopTimelineTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final terminus = isFirst || isLast;
     final theme = Theme.of(context);
+    // Taller with a larger text size
+    final height = MediaQuery.textScalerOf(context).scale(_height);
 
     return InkWell(
       onTap: () => context.push(Routes.stop(stop.id)),
       child: SizedBox(
-        height: _height,
+        height: height,
         child: Row(
           children: [
             SizedBox(
@@ -312,11 +348,14 @@ class _StopTimelineTile extends StatelessWidget {
                   ),
                   for (final (:offset, :vehicle) in vehicles)
                     Positioned(
-                      top: _height / 2 + offset * _height - 10,
+                      top: height / 2 + offset * height - 10,
                       left: 14,
                       child: GestureDetector(
                         onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
-                        child: MouseRegion(cursor: SystemMouseCursors.click, child: VehicleMarker(line: line, size: 20)),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: VehicleMarker(line: line, size: 20),
+                        ),
                       ),
                     ),
                 ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 
 Color severityColor(DisruptionSeverity? severity, ColorScheme scheme) => switch (severity) {
       DisruptionSeverity.blocking => scheme.error,
@@ -18,10 +19,10 @@ IconData severityIcon(DisruptionSeverity? severity) => switch (severity) {
     };
 
 String severityLabel(DisruptionSeverity? severity) => switch (severity) {
-      DisruptionSeverity.blocking => 'Trafic interrompu',
-      DisruptionSeverity.disrupted => 'Trafic perturbé',
-      DisruptionSeverity.info => 'Information',
-      null => 'Trafic normal',
+      DisruptionSeverity.blocking => currentL10n.severityBlocking,
+      DisruptionSeverity.disrupted => currentL10n.severityDisrupted,
+      DisruptionSeverity.info => currentL10n.severityInfo,
+      null => currentL10n.severityNormal,
     };
 
 /// Small round severity marker, drawn on a corner of a line badge
@@ -101,7 +102,7 @@ class DisruptionList extends StatelessWidget {
             data: theme.copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-              title: Text('${upcoming.length} perturbation${upcoming.length > 1 ? 's' : ''} à venir',
+              title: Text(context.l10n.upcomingDisruptions(upcoming.length),
                   style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
               children: [
                 for (final disruption in upcoming) DisruptionCard(disruption: disruption, leading: leading?.call(disruption)),
@@ -156,11 +157,11 @@ class DisruptionCard extends StatelessWidget {
     final start = disruption.start;
     final end = disruption.end;
     if (!disruption.active && start != null) {
-      return 'À partir de ${formatDay(start, now)} ${formatClock(start)}';
+      return currentL10n.fromDate('${formatDay(start, now)} ${formatClock(start)}');
     }
     // Far away ends (works planned for months, placeholder years) say nothing useful
     if (end != null && end.difference(now).inDays < 60) {
-      return 'Jusqu\'à ${formatDay(end, now)} ${formatClock(end)}';
+      return currentL10n.untilDate('${formatDay(end, now)} ${formatClock(end)}');
     }
     return null;
   }
@@ -190,7 +191,7 @@ class DisruptionLine extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(child: SelectableText(disruption.message ?? '')),
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer'))],
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close))],
         ),
       ),
       child: Padding(
@@ -235,7 +236,7 @@ class _ElevatorCard extends StatelessWidget {
           expandedAlignment: Alignment.topLeft,
           leading: Icon(Icons.elevator_outlined, color: color),
           title: Text(
-            disruptions.length == 1 ? '1 ascenseur en panne' : '${disruptions.length} ascenseurs en panne',
+            context.l10n.brokenElevators(disruptions.length),
             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           children: [

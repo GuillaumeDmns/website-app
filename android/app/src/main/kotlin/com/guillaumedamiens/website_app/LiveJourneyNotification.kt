@@ -25,14 +25,14 @@ object LiveJourneyNotification {
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(JOURNEY_CHANNEL_ID, "Trajet en cours", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Progression du trajet suivi en mode GO"
+            NotificationChannel(JOURNEY_CHANNEL_ID, context.getString(R.string.journey_channel), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.journey_channel_description)
                 setShowBadge(false)
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL_ID, "Alertes de trajet", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Descendre, véhicule qui arrive, retard ou suppression"
+            NotificationChannel(ALERT_CHANNEL_ID, context.getString(R.string.alert_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.alert_channel_description)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 400, 200, 400)
             }
@@ -42,7 +42,7 @@ object LiveJourneyNotification {
     fun placeholder(context: Context): Notification =
         NotificationCompat.Builder(context, JOURNEY_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_walk)
-            .setContentTitle("Trajet en cours")
+            .setContentTitle(context.getString(R.string.journey_channel))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(context))
@@ -78,10 +78,10 @@ object LiveJourneyNotification {
         }
 
         val trackerIcon = IconCompat.createWithResource(context, when (currentMode) {
-            "RER", "Train Transilien", "TER" -> R.drawable.ic_train
-            "Métro" -> R.drawable.ic_subway
-            "Tramway" -> R.drawable.ic_tram
-            "Bus" -> R.drawable.ic_bus
+            "train" -> R.drawable.ic_train
+            "metro" -> R.drawable.ic_subway
+            "tram" -> R.drawable.ic_tram
+            "bus" -> R.drawable.ic_bus
             "transfer" -> R.drawable.ic_transfer_within_a_station
             else -> R.drawable.ic_walk
         })

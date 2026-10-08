@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import 'onboarding.dart';
@@ -55,7 +56,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               children: [
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(onPressed: _finish, child: const Text('Passer')),
+                  child: TextButton(onPressed: _finish, child: Text(context.l10n.skip)),
                 ),
                 Expanded(
                   child: PageView(
@@ -84,7 +85,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                         // The theme makes filled buttons full width
                         style: FilledButton.styleFrom(minimumSize: const Size(140, 48)),
                         onPressed: _next,
-                        child: Text(_page == _pageCount - 1 ? 'C\'est parti' : 'Suivant'),
+                        child: Text(_page == _pageCount - 1 ? context.l10n.letsGo : context.l10n.next),
                       ),
                     ],
                   ),
@@ -138,15 +139,16 @@ class _IntroPage extends StatelessWidget {
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(text),
         );
+    final l10n = context.l10n;
     return _Page(
       icon: Icons.directions_transit_filled,
-      title: 'Bienvenue',
-      text: 'Tous les transports d\'Île-de-France, en temps réel.',
+      title: l10n.welcomeTitle,
+      text: l10n.welcomeText,
       children: [
-        feature(Icons.near_me_outlined, 'Autour de vous', 'Les prochains passages aux arrêts proches, sans rien chercher.'),
-        feature(Icons.alt_route, 'Itinéraires', 'Métro, RER, train, tram et bus, avec les horaires en temps réel.'),
-        feature(Icons.traffic_outlined, 'Info trafic', 'Perturbations, travaux et ascenseurs en panne sur vos lignes.'),
-        feature(Icons.star_outline, 'Favoris', 'Vos lieux, arrêts et lignes, sur tous vos appareils.'),
+        feature(Icons.near_me_outlined, l10n.welcomeNearbyTitle, l10n.welcomeNearbyText),
+        feature(Icons.alt_route, l10n.welcomeJourneysTitle, l10n.welcomeJourneysText),
+        feature(Icons.traffic_outlined, l10n.welcomeTrafficTitle, l10n.welcomeTrafficText),
+        feature(Icons.star_outline, l10n.welcomeFavoritesTitle, l10n.welcomeFavoritesText),
       ],
     );
   }
@@ -164,23 +166,22 @@ class _LocationPage extends ConsumerWidget {
 
     return _Page(
       icon: Icons.my_location,
-      title: 'Votre position',
-      text: 'Elle sert à afficher les départs autour de vous et à partir de là où vous êtes. Elle n\'est envoyée que '
-          'pour trouver les arrêts proches et calculer vos trajets.',
+      title: context.l10n.welcomeLocationTitle,
+      text: context.l10n.welcomeLocationText,
       children: [
         switch (position) {
           AsyncValue(value: _?) => ListTile(
               leading: Icon(Icons.check_circle, color: Colors.green.shade600),
-              title: const Text('Position trouvée'),
+              title: Text(context.l10n.locationFound),
             ),
           AsyncValue(isLoading: true) => const Center(child: CircularProgressIndicator()),
           _ when issue != null && mobile => FilledButton.tonalIcon(
               icon: const Icon(Icons.my_location),
-              label: Text(issue == LocationIssue.serviceDisabled ? 'Activer la localisation' : 'Autoriser la localisation'),
+              label: Text(issue == LocationIssue.serviceDisabled ? context.l10n.locationTurnOn : context.l10n.locationAllow),
               onPressed: () => fixLocationIssue(ref, issue),
             ),
           _ => Text(
-              'Position indisponible : vous pourrez toujours choisir un point de départ.',
+              context.l10n.welcomeLocationUnavailable,
               textAlign: TextAlign.center,
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
@@ -204,7 +205,7 @@ class _PlacesPage extends ConsumerWidget {
         child: ListTile(
           leading: Icon(icon),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(favorite?.label ?? 'Ajouter une adresse', maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(favorite?.label ?? context.l10n.addAddress, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Icon(favorite == null ? Icons.add : Icons.edit_outlined),
           onTap: () => chooseFavoritePlace(context, ref, kind),
         ),
@@ -213,11 +214,11 @@ class _PlacesPage extends ConsumerWidget {
 
     return _Page(
       icon: Icons.home_work_outlined,
-      title: 'Maison et travail',
-      text: 'Pour y aller en un geste depuis l\'accueil. Vous pourrez les changer plus tard.',
+      title: context.l10n.welcomePlacesTitle,
+      text: context.l10n.welcomePlacesText,
       children: [
-        place(FavoriteKind.home, Icons.home_outlined, 'Maison'),
-        place(FavoriteKind.work, Icons.work_outline, 'Travail'),
+        place(FavoriteKind.home, Icons.home_outlined, context.l10n.home),
+        place(FavoriteKind.work, Icons.work_outline, context.l10n.work),
       ],
     );
   }

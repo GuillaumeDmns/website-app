@@ -12,6 +12,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../l10n/l10n.dart';
 import 'stop_screen.dart';
 
 typedef TimetableKey = ({String stopAreaId, String lineId, DateTime date});
@@ -97,7 +98,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    tooltip: 'Retour',
+                    tooltip: context.l10n.back,
                     icon: const Icon(Icons.arrow_back),
                     onPressed: () => context.canPop() ? context.pop() : context.go(Routes.stop(widget.stopAreaId)),
                   ),
@@ -106,7 +107,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Horaires théoriques',
+                          context.l10n.scheduledTimetable,
                           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         Text(
@@ -129,8 +130,8 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               ),
             )
           else if (line == null)
-            const SliverToBoxAdapter(
-              child: Padding(padding: EdgeInsets.all(24), child: Text('Aucune ligne à cet arrêt')),
+            SliverToBoxAdapter(
+              child: Padding(padding: const EdgeInsets.all(24), child: Text(context.l10n.noLineAtStop)),
             )
           else ...[
             // Line and day
@@ -172,12 +173,12 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   runSpacing: 8,
                   children: [
                     ChoiceChip(
-                      label: const Text('Aujourd\'hui'),
+                      label: Text(context.l10n.todayChip),
                       selected: date == today,
                       onSelected: (_) => _open(date: today),
                     ),
                     ChoiceChip(
-                      label: const Text('Demain'),
+                      label: Text(context.l10n.tomorrowChip),
                       selected: date == today.add(const Duration(days: 1)),
                       onSelected: (_) => _open(date: today.add(const Duration(days: 1))),
                     ),
@@ -185,7 +186,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       avatar: const Icon(Icons.calendar_today, size: 16),
                       label: Text(
                         date == today || date == today.add(const Duration(days: 1))
-                            ? 'Autre date'
+                            ? context.l10n.otherDate
                             : formatDay(date, today),
                       ),
                       onPressed: () => _pickDate(date),
@@ -254,8 +255,8 @@ class _TimetableBody extends ConsumerWidget {
       );
     }
     if (data.directions.isEmpty) {
-      return const SliverToBoxAdapter(
-        child: Padding(padding: EdgeInsets.all(24), child: Text('Aucun départ prévu ce jour-là')),
+      return SliverToBoxAdapter(
+        child: Padding(padding: const EdgeInsets.all(24), child: Text(context.l10n.noDepartureThatDay)),
       );
     }
     onLoaded();
@@ -301,7 +302,7 @@ class _TimetableBody extends ConsumerWidget {
                   children: [
                     for (final (index, option) in data.directions.indexed)
                       ChoiceChip(
-                        label: Text('Vers ${option.name}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                        label: Text(context.l10n.towards(option.name), maxLines: 2, overflow: TextOverflow.ellipsis),
                         selected: option == shown,
                         onSelected: (_) => onDirection(index),
                       ),
@@ -309,7 +310,7 @@ class _TimetableBody extends ConsumerWidget {
                 ),
               ),
             Text(
-              '${shown.departures.length} départs · ${formatDay(timetableKey.date, DateTime(now.year, now.month, now.day))}',
+              context.l10n.timetableCount(shown.departures.length, formatDay(timetableKey.date, DateTime(now.year, now.month, now.day))),
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
@@ -326,7 +327,7 @@ class _TimetableBody extends ConsumerWidget {
                     SizedBox(
                       width: 40,
                       child: Text(
-                        '${(hour % 24).toString().padLeft(2, '0')} h',
+                        context.l10n.timetableHour((hour % 24).toString().padLeft(2, '0')),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: currentHour != null && hour < currentHour ? theme.colorScheme.onSurfaceVariant : null,
@@ -353,13 +354,13 @@ class _TimetableBody extends ConsumerWidget {
               ),
             if (byFrequency.length > 1) ...[
               const SizedBox(height: 12),
-              Text('Sans lettre : vers ${byFrequency.first}', style: theme.textTheme.bodySmall),
+              Text(context.l10n.timetableNoLetter(byFrequency.first), style: theme.textTheme.bodySmall),
               for (final MapEntry(key: destination, value: letter) in letters.entries)
-                Text('$letter : vers $destination', style: theme.textTheme.bodySmall),
+                Text(context.l10n.timetableLetter(letter, destination), style: theme.textTheme.bodySmall),
             ],
             const SizedBox(height: 12),
             Text(
-              'Horaires prévus, hors travaux et perturbations du jour : le temps réel est sur la fiche de l\'arrêt.',
+              context.l10n.timetableNotice,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
@@ -405,7 +406,7 @@ class _Minute extends StatelessWidget {
     );
     return Tooltip(
       message:
-          '${formatClock(entry.time)} vers ${entry.destination}${entry.mission == null ? '' : ' (${entry.mission})'}',
+          '${context.l10n.timeTowards(formatClock(entry.time), entry.destination)}${entry.mission == null ? '' : ' (${entry.mission})'}',
       child: next
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 4),

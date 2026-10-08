@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
+
 /// Renders an [AsyncValue]: spinner while loading the first time, error with retry, then [data]. Keeps showing the
 /// previous data while refreshing.
 class AsyncView<T> extends StatelessWidget {
@@ -43,7 +45,7 @@ class ErrorMessage extends StatelessWidget {
           Text(message, textAlign: TextAlign.center),
           if (onRetry != null) ...[
             const SizedBox(height: 8),
-            TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+            TextButton(onPressed: onRetry, child: Text(context.l10n.retry)),
           ],
         ],
       ),

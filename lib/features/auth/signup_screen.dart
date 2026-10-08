@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
+import '../../l10n/l10n.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
 
@@ -57,8 +58,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthFormLayout(
-      title: 'Créer un compte',
-      subtitle: 'Gratuit, pour accéder au temps réel et sauvegarder vos favoris',
+      title: context.l10n.signUp,
+      subtitle: context.l10n.signUpSubtitle,
       children: [
         Form(
           key: _formKey,
@@ -67,33 +68,33 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             children: [
               TextFormField(
                 controller: _username,
-                decoration: const InputDecoration(labelText: 'Nom d\'utilisateur', prefixIcon: Icon(Icons.person_outline)),
+                decoration: InputDecoration(labelText: context.l10n.username, prefixIcon: const Icon(Icons.person_outline)),
                 autofillHints: const [AutofillHints.newUsername],
                 textInputAction: TextInputAction.next,
                 enabled: !_loading,
                 validator: (value) => _usernamePattern.hasMatch(value?.trim() ?? '')
                     ? null
-                    : '3 à 50 lettres, chiffres, « . », « _ » ou « - »',
+                    : context.l10n.authUsernameRule,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _email,
-                decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline)),
+                decoration: InputDecoration(labelText: context.l10n.email, prefixIcon: const Icon(Icons.mail_outline)),
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
                 textInputAction: TextInputAction.next,
                 enabled: !_loading,
-                validator: (value) => _emailPattern.hasMatch(value?.trim() ?? '') ? null : 'Email invalide',
+                validator: (value) => _emailPattern.hasMatch(value?.trim() ?? '') ? null : context.l10n.authInvalidEmail,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _password,
                 decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                  helperText: '8 caractères minimum',
+                  labelText: context.l10n.password,
+                  helperText: context.l10n.passwordMinLength,
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
-                    tooltip: _obscure ? 'Afficher' : 'Masquer',
+                    tooltip: _obscure ? context.l10n.passwordShow : context.l10n.passwordHide,
                     icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
@@ -102,7 +103,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 autofillHints: const [AutofillHints.newPassword],
                 onFieldSubmitted: (_) => _submit(),
                 enabled: !_loading,
-                validator: (value) => (value?.length ?? 0) >= 8 ? null : '8 caractères minimum',
+                validator: (value) => (value?.length ?? 0) >= 8 ? null : context.l10n.passwordMinLength,
               ),
             ],
           ),
@@ -113,12 +114,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           onPressed: _loading ? null : _submit,
           child: _loading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Créer mon compte'),
+              : Text(context.l10n.signUpAction),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: _loading ? null : () => context.go(Uri(path: Routes.login, queryParameters: GoRouterState.of(context).uri.queryParameters).toString()),
-          child: const Text('Déjà un compte ? Se connecter'),
+          child: Text(context.l10n.haveAccountSignIn),
         ),
       ],
     );

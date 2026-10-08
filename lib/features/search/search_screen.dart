@@ -10,6 +10,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
@@ -90,7 +91,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
           child: Row(
             children: [
-              IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+              IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
                 child: TextField(
                   controller: _controller,
@@ -98,12 +99,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   onChanged: _onChanged,
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
-                    hintText: widget.isPicking ? '${widget.pickTitle} : arrêt, adresse, lieu…' : 'Arrêt, adresse, lieu, ligne…',
+                    hintText: widget.isPicking ? context.l10n.searchPickHint(widget.pickTitle!) : context.l10n.searchHint,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _controller.text.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: 'Effacer',
+                            tooltip: context.l10n.clear,
                             icon: const Icon(Icons.close),
                             onPressed: () {
                               _controller.clear();
@@ -123,7 +124,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   value: ref.watch(_searchResultsProvider(_query)),
                   onRetry: () => ref.invalidate(_searchResultsProvider(_query)),
                   data: (result) => result.lines.isEmpty && result.places.isEmpty
-                      ? const Padding(padding: EdgeInsets.all(24), child: Text('Aucun résultat'))
+                      ? Padding(padding: const EdgeInsets.all(24), child: Text(context.l10n.noResults))
                       : _Results(result: result, isPicking: widget.isPicking, onPlace: _openPlace, onLine: _openLine),
                 )
               : _Suggestions(
@@ -177,7 +178,7 @@ class _Suggestions extends ConsumerWidget {
         if (isPicking && allowCurrentLocation)
           ListTile(
             leading: const CircleAvatar(child: Icon(Icons.my_location)),
-            title: const Text('Ma position'),
+            title: Text(context.l10n.myLocation),
             onTap: onCurrentLocation,
           ),
         for (final favorite in places)
@@ -192,8 +193,8 @@ class _Suggestions extends ConsumerWidget {
               }),
             ),
             title: Text(switch (favorite.kind) {
-              FavoriteKind.home => 'Maison',
-              FavoriteKind.work => 'Travail',
+              FavoriteKind.home => context.l10n.home,
+              FavoriteKind.work => context.l10n.work,
               _ => favorite.label ?? '',
             }),
             subtitle: favorite.kind == FavoriteKind.place ? null : Text(favorite.label ?? ''),
@@ -204,10 +205,10 @@ class _Suggestions extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
             child: Row(
               children: [
-                Expanded(child: Text('Récents', style: theme.textTheme.titleSmall)),
+                Expanded(child: Text(context.l10n.recent, style: theme.textTheme.titleSmall)),
                 TextButton(
                   onPressed: () => ref.read(recentSearchesProvider.notifier).clear(),
-                  child: const Text('Effacer'),
+                  child: Text(context.l10n.clear),
                 ),
               ],
             ),
@@ -236,7 +237,7 @@ class _Hint extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Text(
-        'Exemples : « Châtelet », « 10 rue de Rivoli », « Tour Eiffel », « RER B », « 38 »',
+        context.l10n.searchExamples,
         textAlign: TextAlign.center,
         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
@@ -321,7 +322,7 @@ class _PlaceTile extends StatelessWidget {
       trailing: isPicking || place.type == PlaceType.stopArea
           ? null
           : IconButton(
-              tooltip: 'Départs autour',
+              tooltip: context.l10n.departuresAround,
               icon: const Icon(Icons.departure_board),
               onPressed: () => context.push(Routes.around(place.lat, place.lon, place.name)),
             ),

@@ -10,10 +10,12 @@ import '../../core/api/models.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 
-/// Vehicles of a line and when they were fetched, refreshed every 30 s while shown
+/// Vehicles of a line and when they were fetched, refreshed every minute while shown (the backend keeps them a
+/// minute: the estimated-timetable quota is small)
 final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> vehicles, DateTime fetchedAt}), String>((ref, lineId) async {
-  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
+  final timer = Timer(const Duration(seconds: 60), ref.invalidateSelf);
   ref.onDispose(timer.cancel);
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());
@@ -101,6 +103,10 @@ class VehicleMarker extends StatelessWidget {
 String vehicleLabel(Vehicle vehicle, DateTime now) {
   final minutes = vehicle.expectedAt.difference(now).inSeconds / 60;
   final next = vehicle.toStopName ?? '';
-  final when = minutes < 0.5 ? 'à quai' : minutes < 60 ? 'dans ${minutes.ceil()} min' : formatClock(vehicle.expectedAt);
+  final when = minutes < 0.5
+      ? currentL10n.vehicleAtStop
+      : minutes < 60
+          ? currentL10n.inMinutes(minutes.ceil())
+          : formatClock(vehicle.expectedAt);
   return '→ ${vehicle.destination ?? ''} · $next $when';
 }

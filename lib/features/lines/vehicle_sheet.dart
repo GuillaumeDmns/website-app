@@ -7,6 +7,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 import 'line_vehicles.dart';
 
 /// Mission of a vehicle: its next stops with their times, kept up to date while open
@@ -98,11 +99,15 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Vers ${_vehicle.destination ?? '?'}',
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          context.l10n.towards(_vehicle.destination ?? '?'),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         Row(
                           children: [
-                            Flexible(child: Text(subtitle, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+                            Flexible(
+                              child: Text(subtitle, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                            ),
                             if (_DelayLabel.shown(_vehicle.delaySeconds)) ...[
                               const SizedBox(width: 8),
                               _DelayLabel(_vehicle.delaySeconds!),
@@ -112,7 +117,11 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                       ],
                     ),
                   ),
-                  IconButton(tooltip: 'Fermer', icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  IconButton(
+                    tooltip: context.l10n.close,
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
             ),
@@ -120,7 +129,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
             if (calls.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(20),
-                child: Text('Prochains arrêts indisponibles', style: theme.textTheme.bodyMedium),
+                child: Text(context.l10n.nextStopsUnavailable, style: theme.textTheme.bodyMedium),
               )
             else
               Flexible(
@@ -144,7 +153,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Text(
-                'Horaires estimés d\'après le temps réel, jusqu\'où il est connu',
+                context.l10n.vehicleTimesNotice,
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
@@ -179,12 +188,17 @@ class _CallRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final seconds = call.expectedAt.difference(now).inSeconds;
-    final until = seconds <= 30 ? 'à quai' : seconds < 3600 ? '${(seconds / 60).ceil()} min' : null;
+    final until = seconds <= 30
+        ? context.l10n.vehicleAtStop
+        : seconds < 3600
+        ? context.l10n.minutesShort((seconds / 60).ceil())
+        : null;
 
     return InkWell(
       onTap: onTap,
       child: SizedBox(
-        height: _height,
+        // Taller with a larger text size
+        height: MediaQuery.textScalerOf(context).scale(_height),
         child: Row(
           children: [
             SizedBox(
@@ -195,8 +209,10 @@ class _CallRow extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatClock(call.expectedAt),
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
+                    Text(
+                      formatClock(call.expectedAt),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
+                    ),
                     if (until != null)
                       Text(until, style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
                   ],
@@ -228,17 +244,18 @@ class _CallRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(call.stopName ?? call.stopId, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400)),
+              child: Text(
+                call.stopName ?? call.stopId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400),
+              ),
             ),
-            if (_DelayLabel.shown(call.delaySeconds)) ...[
-              _DelayLabel(call.delaySeconds!),
-              const SizedBox(width: 8),
-            ],
+            if (_DelayLabel.shown(call.delaySeconds)) ...[_DelayLabel(call.delaySeconds!), const SizedBox(width: 8)],
             if (call.platform != null)
               Padding(
                 padding: const EdgeInsets.only(right: 16),
-                child: Text('Voie ${call.platform}', style: theme.textTheme.bodySmall),
+                child: Text(context.l10n.platform(call.platform!), style: theme.textTheme.bodySmall),
               )
             else
               const SizedBox(width: 16),
@@ -261,7 +278,7 @@ class _DelayLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final minutes = (seconds / 60).round();
     return Text(
-      minutes > 0 ? '+$minutes min' : '$minutes min',
+      minutes > 0 ? '+${context.l10n.minutesShort(minutes)}' : context.l10n.minutesShort(minutes),
       style: TextStyle(
         color: minutes > 0 ? Colors.orange.shade800 : Colors.blue.shade700,
         fontWeight: FontWeight.w600,

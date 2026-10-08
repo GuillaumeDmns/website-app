@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import '../stops/stop_screen.dart';
@@ -27,7 +28,7 @@ Future<void> _runFavoriteAction(ScaffoldMessengerState messenger, Future<void> F
     }
   } catch (e, stackTrace) {
     debugPrint('Favorite action failed: $e\n$stackTrace');
-    messenger.showSnackBar(SnackBar(content: Text('Favori non enregistré : $e')));
+    messenger.showSnackBar(SnackBar(content: Text(currentL10n.favoriteNotSaved('$e'))));
   }
 }
 
@@ -42,7 +43,7 @@ class FavoriteStopButton extends ConsumerWidget {
     ref.watch(favoritesProvider);
     final saved = ref.read(favoritesProvider.notifier).stopFavorite(stopAreaId) != null;
     return IconButton(
-      tooltip: saved ? 'Retirer des favoris' : 'Ajouter aux favoris',
+      tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
       onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stopAreaId)),
     );
@@ -60,7 +61,7 @@ class FavoriteLineButton extends ConsumerWidget {
     ref.watch(favoritesProvider);
     final saved = ref.read(favoritesProvider.notifier).lineFavorite(lineId) != null;
     return IconButton(
-      tooltip: saved ? 'Retirer des favoris' : 'Ajouter aux favoris',
+      tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
       onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(lineId)),
     );
@@ -73,9 +74,9 @@ class FavoriteLineButton extends ConsumerWidget {
 /// rebuilt or disposed while the search is shown, and saving does not depend on it.
 Future<void> chooseFavoritePlace(BuildContext context, WidgetRef ref, FavoriteKind kind) async {
   final title = switch (kind) {
-    FavoriteKind.home => 'Maison',
-    FavoriteKind.work => 'Travail',
-    _ => 'Lieu favori',
+    FavoriteKind.home => context.l10n.home,
+    FavoriteKind.work => context.l10n.work,
+    _ => context.l10n.favoritePlace,
   };
   final favorites = ref.read(favoritesProvider.notifier);
   final messenger = ScaffoldMessenger.of(context);
@@ -86,7 +87,7 @@ Future<void> chooseFavoritePlace(BuildContext context, WidgetRef ref, FavoriteKi
   if (place == null) {
     return;
   }
-  await _runFavoriteAction(messenger, () => favorites.savePlace(kind, place), success: '$title enregistré');
+  await _runFavoriteAction(messenger, () => favorites.savePlace(kind, place), success: currentL10n.favoriteSaved(title));
 }
 
 /// Home, work and saved places as shortcuts: tap to go there, long press (or the menu) to change them.
@@ -103,9 +104,9 @@ class FavoriteShortcuts extends ConsumerWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_outlined, title: 'Maison', favorite: find(FavoriteKind.home)),
+          _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_outlined, title: context.l10n.home, favorite: find(FavoriteKind.home)),
           const SizedBox(width: 8),
-          _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_outline, title: 'Travail', favorite: find(FavoriteKind.work)),
+          _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_outline, title: context.l10n.work, favorite: find(FavoriteKind.work)),
           for (final place in places) ...[
             const SizedBox(width: 8),
             _PlaceShortcut(kind: FavoriteKind.place, icon: Icons.star_outline, title: place.label ?? '', favorite: place),
@@ -113,8 +114,8 @@ class FavoriteShortcuts extends ConsumerWidget {
           const SizedBox(width: 8),
           ActionChip(
             avatar: const Icon(Icons.add, size: 18),
-            label: const Text('Lieu'),
-            tooltip: 'Ajouter un lieu favori',
+            label: Text(context.l10n.place),
+            tooltip: context.l10n.favoritePlaceAdd,
             onPressed: () => chooseFavoritePlace(context, ref, FavoriteKind.place),
           ),
         ],
@@ -150,12 +151,12 @@ class _PlaceShortcut extends ConsumerWidget {
             if (kind != FavoriteKind.place)
               ListTile(
                 leading: const Icon(Icons.edit_location_alt_outlined),
-                title: const Text('Modifier l\'adresse'),
+                title: Text(context.l10n.editAddress),
                 onTap: () => Navigator.pop(context, 'edit'),
               ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Supprimer'),
+              title: Text(context.l10n.delete),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -178,7 +179,7 @@ class _PlaceShortcut extends ConsumerWidget {
     if (favorite == null) {
       return ActionChip(
         avatar: Icon(icon, size: 18),
-        label: Text('Ajouter $title'),
+        label: Text(context.l10n.addPlace(title)),
         onPressed: () => chooseFavoritePlace(context, ref, kind),
       );
     }
@@ -194,7 +195,7 @@ class _PlaceShortcut extends ConsumerWidget {
         tooltip: favorite!.label,
         onPressed: () => _go(context, ref),
         deleteIcon: const Icon(Icons.more_vert, size: 18),
-        deleteButtonTooltipMessage: 'Modifier',
+        deleteButtonTooltipMessage: context.l10n.edit,
         onDeleted: () => _edit(context, ref),
       ),
     );
@@ -218,7 +219,7 @@ class FavoriteStopsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Mes arrêts', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        Text(context.l10n.myStops, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         for (final stop in stops)
           Padding(
@@ -258,7 +259,7 @@ class FavoriteLinesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Mes lignes', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        Text(context.l10n.myLines, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

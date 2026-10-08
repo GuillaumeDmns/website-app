@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
+import '../../l10n/l10n.dart';
 import 'go_controller.dart';
 import 'go_tracker.dart';
 
@@ -28,7 +29,7 @@ String _lineLabel(LineSummary? line) => '${line?.mode.label ?? ''} ${line?.name 
 
 String _minutes(Duration duration) {
   final minutes = (duration.inSeconds / 60).ceil();
-  return minutes <= 0 ? 'maintenant' : 'dans $minutes min';
+  return minutes <= 0 ? currentL10n.now : currentL10n.inMinutes(minutes);
 }
 
 GoInstruction goInstruction(GoState state, DateTime now) {
@@ -41,10 +42,10 @@ GoInstruction goInstruction(GoState state, DateTime now) {
     final late = arrivedAt.difference(state.journey.arrival).inMinutes;
     return GoInstruction(
       icon: Icons.flag,
-      title: 'Vous êtes arrivé',
+      title: currentL10n.goArrived,
       subtitle: state.journey.sections.lastOrNull?.to?.name,
-      detail: 'À ${formatClock(arrivedAt)}'
-          '${late.abs() >= 1 ? ' (prévu ${formatClock(state.journey.arrival)})' : ', comme prévu'}',
+      detail: currentL10n.goArrivedAt(formatClock(arrivedAt)) +
+          (late.abs() >= 1 ? currentL10n.goPlannedSuffix(formatClock(state.journey.arrival)) : currentL10n.goAsPlannedSuffix),
     );
   }
 
@@ -58,15 +59,15 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       return GoInstruction(
         line: section.line,
         icon: Icons.directions_transit,
-        title: 'Prenez le ${_lineLabel(section.line)}',
-        subtitle: 'Direction ${section.headsign ?? ''}',
+        title: currentL10n.goTake(_lineLabel(section.line)),
+        subtitle: currentL10n.direction(section.headsign ?? ''),
         detail: [
           departure.isBefore(now.subtract(const Duration(seconds: 30)))
-              ? 'Parti à ${formatClock(departure)}'
-              : 'Départ ${_minutes(departure.difference(now))} (${formatClock(departure)})',
-          if (vehicle == null) 'horaire prévu',
-          if (platform != null && platform.isNotEmpty) 'voie $platform',
-          if (boarding.isNotEmpty && boarding.length < 3) 'montez ${boarding.map(_position).join(' ou ')}',
+              ? currentL10n.goLeftAt(formatClock(departure))
+              : currentL10n.goDeparture(_minutes(departure.difference(now)), formatClock(departure)),
+          if (vehicle == null) currentL10n.goScheduled,
+          if (platform != null && platform.isNotEmpty) currentL10n.goPlatform(platform),
+          if (boarding.isNotEmpty && boarding.length < 3) currentL10n.goBoard(boardingPositions(boarding)),
         ].join(' · '),
         urgent: departure.difference(now) <= const Duration(minutes: 1),
       );
@@ -79,13 +80,13 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       return GoInstruction(
         line: section.line,
         icon: Icons.directions_transit,
-        title: left <= 1 ? 'Descendez au prochain arrêt' : 'Restez à bord',
+        title: left <= 1 ? currentL10n.goGetOffNext : currentL10n.goStayOnBoard,
         subtitle: left <= 1
             ? section.to?.name
-            : 'Descendez dans $left arrêts à ${section.to?.name ?? ''}',
+            : currentL10n.goGetOffInAt(left, section.to?.name ?? ''),
         detail: [
-          if (nextStop != null && left > 1) 'Prochain arrêt : $nextStop',
-          'Arrivée vers ${formatClock(arrival)}',
+          if (nextStop != null && left > 1) currentL10n.goNextStop(nextStop),
+          currentL10n.goArrivalAround(formatClock(arrival)),
         ].join(' · '),
         urgent: left <= 1,
       );
@@ -99,10 +100,10 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       final nextStep = progress.step + 1 < tracker.steps.length ? tracker.steps[progress.step + 1] : null;
       final walkMinutes = math.max(1, (meters / 1.2 / 60).ceil());
       final verb = switch (section.kind) {
-        SectionKind.bike => 'Pédalez',
-        SectionKind.car => 'Roulez',
-        SectionKind.transfer => 'Correspondance : marchez',
-        _ => 'Marchez',
+        SectionKind.bike => currentL10n.goVerbBike,
+        SectionKind.car => currentL10n.goVerbCar,
+        SectionKind.transfer => currentL10n.goVerbTransferWalk,
+        _ => currentL10n.goVerbWalk,
       };
       String? detail;
       if (nextStep != null && nextStep.isRide) {
@@ -112,8 +113,8 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       }
       return GoInstruction(
         icon: section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
-        title: '$verb jusqu\'à ${section.to?.name ?? ''}',
-        subtitle: meters >= 1 ? '${formatDistance(meters.round())} · $walkMinutes min' : null,
+        title: currentL10n.goVerbTo(verb, section.to?.name ?? ''),
+        subtitle: meters >= 1 ? '${formatDistance(meters.round())} · ${currentL10n.minutesShort(walkMinutes)}' : null,
         detail: detail,
       );
 
@@ -122,9 +123,12 @@ GoInstruction goInstruction(GoState state, DateTime now) {
   }
 }
 
-String _position(String position) => switch (position) {
-      'front' => 'à l\'avant',
-      'middle' => 'au milieu',
-      'back' => 'à l\'arrière',
-      _ => position,
-    };
+/// `à l'avant ou au milieu`: where to board along the train
+String boardingPositions(List<String> positions) => positions
+    .map((position) => switch (position) {
+          'front' => currentL10n.boardFront,
+          'middle' => currentL10n.boardMiddle,
+          'back' => currentL10n.boardBack,
+          _ => position,
+        })
+    .join(' ${currentL10n.or} ');

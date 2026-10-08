@@ -14,6 +14,7 @@ import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/size_reporter.dart';
+import '../../l10n/l10n.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_retime.dart';
 import '../journey/widgets/journey_map.dart';
@@ -21,6 +22,7 @@ import '../journey/widgets/ride_departures.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'go_controller.dart';
+import 'go_instruction.dart';
 import 'go_tracker.dart';
 
 /// GO mode, like Citymapper: one card per step, swiped horizontally, dots telling where you are. The page follows
@@ -77,9 +79,9 @@ class _GoScreenState extends ConsumerState<GoScreen> {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: IconButton(icon: const Icon(Icons.arrow_back), onPressed: back),
+            child: IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: back),
           ),
-          const Padding(padding: EdgeInsets.all(24), child: Text('Aucun trajet en cours')),
+          Padding(padding: const EdgeInsets.all(24), child: Text(context.l10n.goNoJourney)),
         ],
       );
     }
@@ -190,15 +192,15 @@ class _Header extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
       child: Row(
         children: [
-          IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back), onPressed: onBack),
+          IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: onBack),
           Expanded(
             child: Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(text: arrived ? 'Trajet terminé' : 'Arrivée ${formatClock(eta)}'),
+                  TextSpan(text: arrived ? context.l10n.goFinished : context.l10n.goArrival(formatClock(eta))),
                   if (!arrived && late.abs() >= 1)
                     TextSpan(
-                      text: late > 0 ? '  +$late min' : '  $late min',
+                      text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
                       style: TextStyle(
                         fontSize: 14,
                         color: late >= 3 ? Colors.orange.shade700 : theme.colorScheme.onSurfaceVariant,
@@ -210,19 +212,19 @@ class _Header extends ConsumerWidget {
             ),
           ),
           IconButton(
-            tooltip: state.keepAwake ? 'Laisser l\'écran s\'éteindre' : 'Garder l\'écran allumé',
+            tooltip: state.keepAwake ? context.l10n.goLetScreenSleep : context.l10n.goKeepScreenOn,
             isSelected: state.keepAwake,
             icon: const Icon(Icons.light_mode_outlined),
             selectedIcon: const Icon(Icons.light_mode),
             onPressed: controller.toggleKeepAwake,
           ),
           IconButton(
-            tooltip: state.muted ? 'Activer le son des alertes' : 'Couper le son des alertes',
+            tooltip: state.muted ? context.l10n.goUnmute : context.l10n.goMute,
             icon: Icon(state.muted ? Icons.volume_off_outlined : Icons.volume_up_outlined),
             onPressed: controller.toggleMute,
           ),
           IconButton(
-            tooltip: 'Terminer le trajet',
+            tooltip: context.l10n.goStop,
             icon: const Icon(Icons.close),
             onPressed: () => _confirmStop(context, ref),
           ),
@@ -236,11 +238,11 @@ class _Header extends ConsumerWidget {
     final stop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Terminer le trajet ?'),
-        content: const Text('Le guidage et les alertes s\'arrêtent.'),
+        title: Text(context.l10n.goStopQuestion),
+        content: Text(context.l10n.goStopText),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Continuer')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Terminer')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.continueAction)),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(context.l10n.finish)),
         ],
       ),
     );
@@ -264,9 +266,9 @@ class _IssueBanner extends ConsumerWidget {
     final line = state.tracker.stepOf(state.progress)?.section.line;
     final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
     final text = switch (state.progress.issue!) {
-      GoIssue.offRoute => 'Vous vous êtes écarté du trajet',
-      GoIssue.missed => '$lineLabel manqué : choisissez un autre passage',
-      GoIssue.cancelled => '$lineLabel supprimé : choisissez un autre passage',
+      GoIssue.offRoute => context.l10n.goOffRoute,
+      GoIssue.missed => context.l10n.goMissedChoose(lineLabel),
+      GoIssue.cancelled => context.l10n.goCancelledChoose(lineLabel),
     };
 
     return Container(
@@ -285,8 +287,8 @@ class _IssueBanner extends ConsumerWidget {
                   padding: EdgeInsets.all(12),
                   child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                 )
-              : TextButton(onPressed: controller.recalculate, child: const Text('Recalculer')),
-          IconButton(tooltip: 'Ignorer', icon: const Icon(Icons.close, size: 18), onPressed: controller.dismissIssue),
+              : TextButton(onPressed: controller.recalculate, child: Text(context.l10n.recalculate)),
+          IconButton(tooltip: context.l10n.dismiss, icon: const Icon(Icons.close, size: 18), onPressed: controller.dismissIssue),
         ],
       ),
     );
@@ -319,25 +321,29 @@ class _StepCard extends ConsumerWidget {
         final left = tracker.stopsLeft(progress);
         final stops = section.stops;
         final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
-        title = left <= 1 ? 'Descendez au prochain arrêt' : 'Descendez dans $left arrêts';
-        detail = ['à ${section.to?.name ?? ''}', if (left > 1 && nextStop != null) 'prochain : $nextStop'].join(' · ');
+        title = left <= 1 ? context.l10n.goGetOffNext : context.l10n.goGetOffIn(left);
+        detail = [
+          context.l10n.goAtStop(section.to?.name ?? ''),
+          if (left > 1 && nextStop != null) context.l10n.goNextShort(nextStop),
+        ].join(' · ');
       } else {
         final stopCount = math.max(0, section.stops.length - 1);
         title = '$lineLabel → ${section.headsign ?? ''}';
-        detail =
-            'De ${section.from?.name ?? ''} à ${section.to?.name ?? ''}'
-            '${stopCount > 0 ? ' · $stopCount arrêt${stopCount > 1 ? 's' : ''}' : ''}';
+        detail = [
+          context.l10n.goFromTo(section.from?.name ?? '', section.to?.name ?? ''),
+          if (stopCount > 0) context.l10n.stopsCount(stopCount),
+        ].join(' · ');
       }
     } else {
       final verb = switch (section.kind) {
-        SectionKind.bike => 'Pédalez',
-        SectionKind.car => 'Roulez',
-        SectionKind.transfer => 'Correspondance',
-        _ => 'Marchez',
+        SectionKind.bike => context.l10n.goVerbBike,
+        SectionKind.car => context.l10n.goVerbCar,
+        SectionKind.transfer => context.l10n.goVerbTransfer,
+        _ => context.l10n.goVerbWalk,
       };
       title = section.kind == SectionKind.transfer
-          ? 'Correspondance vers ${section.to?.name ?? ''}'
-          : '$verb jusqu\'à ${section.to?.name ?? ''}';
+          ? context.l10n.goTransferTo(section.to?.name ?? '')
+          : context.l10n.goVerbTo(verb, section.to?.name ?? '');
       if (isLive) {
         // Away from the path: at least the straight distance to the end
         final end = step.end;
@@ -346,7 +352,7 @@ class _StepCard extends ConsumerWidget {
           tracker.metersLeft(progress),
           end == null || position == null ? 0.0 : metersBetween(position, end),
         );
-        detail = '${formatDistance(meters.round())} · ${math.max(1, (meters / 1.2 / 60).ceil())} min';
+        detail = '${formatDistance(meters.round())} · ${context.l10n.minutesShort(math.max(1, (meters / 1.2 / 60).ceil()))}';
       } else {
         detail = [
           formatDuration(section.duration),
@@ -404,7 +410,7 @@ class _StepCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Montez ${positions.map(_position).join(' ou ')}',
+                context.l10n.boardAt(boardingPositions(positions)),
                 style: theme.textTheme.bodyMedium?.copyWith(color: muted),
               ),
             ),
@@ -413,22 +419,15 @@ class _StepCard extends ConsumerWidget {
         const SizedBox(height: 8),
         // Manual corrections, kept discreet
         if (isLive && progress.phase == GoPhase.waiting)
-          _SmallAction(label: 'Je suis à bord', onPressed: () => ref.read(goControllerProvider.notifier).next())
+          _SmallAction(label: context.l10n.goImOnBoard, onPressed: () => ref.read(goControllerProvider.notifier).next())
         else if (!isLive)
           _SmallAction(
-            label: 'Je suis à cette étape',
+            label: context.l10n.goImAtThisStep,
             onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index),
           ),
       ],
     );
   }
-
-  static String _position(String position) => switch (position) {
-    'front' => 'à l\'avant',
-    'middle' => 'au milieu',
-    'back' => 'à l\'arrière',
-    _ => position,
-  };
 }
 
 /// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their
@@ -457,7 +456,7 @@ class _Departures extends ConsumerWidget {
               .toList();
 
     if (rides.isEmpty) {
-      return Text('Départ prévu à ${formatClock(planned)}', style: theme.textTheme.titleMedium);
+      return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: theme.textTheme.titleMedium);
     }
     return RideDepartureList(
       rides: rides,
@@ -522,7 +521,7 @@ class _ArrivalCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    arrived ? 'Vous êtes arrivé' : 'Arrivée',
+                    arrived ? context.l10n.goArrived : context.l10n.goArrivalTitle,
                     style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 2),
@@ -544,11 +543,11 @@ class _ArrivalCard extends ConsumerWidget {
               ref.read(goControllerProvider.notifier).stop();
               context.go(Routes.home);
             },
-            child: const Text('Terminer'),
+            child: Text(context.l10n.finish),
           )
         else
           _SmallAction(
-            label: 'Je suis arrivé',
+            label: context.l10n.goImArrived,
             onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(state.tracker.steps.length),
           ),
       ],
@@ -568,9 +567,9 @@ class _Summary extends StatelessWidget {
     final theme = Theme.of(context);
     final late = (arrivedAt.difference(state.plannedArrival).inSeconds / 60).round();
     final (label, color) = switch (late) {
-      0 => ('À l\'heure', Colors.green.shade700),
-      > 0 => ('$late min de retard', late >= 5 ? theme.colorScheme.error : Colors.orange.shade800),
-      _ => ('${-late} min d\'avance', Colors.green.shade700),
+      0 => (context.l10n.goOnTime, Colors.green.shade700),
+      > 0 => (context.l10n.goMinutesLate(late), late >= 5 ? theme.colorScheme.error : Colors.orange.shade800),
+      _ => (context.l10n.goMinutesEarly(-late), Colors.green.shade700),
     };
     final rides = state.journey.rides.length;
     Widget row(IconData icon, String text, {Color? color}) => Padding(
@@ -586,11 +585,11 @@ class _Summary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        row(Icons.flag_outlined, 'Arrivé à ${formatClock(arrivedAt)}, prévu à ${formatClock(state.plannedArrival)}'),
+        row(Icons.flag_outlined, context.l10n.goArrivedVsPlanned(formatClock(arrivedAt), formatClock(state.plannedArrival))),
         row(Icons.schedule, label, color: color),
         row(Icons.timer_outlined,
-            'Trajet de ${formatDuration(arrivedAt.difference(state.startedAt).inSeconds)} depuis le départ du guidage'),
-        if (rides > 0) row(Icons.directions_transit, rides == 1 ? '1 transport' : '$rides transports'),
+            context.l10n.goTripDuration(formatDuration(arrivedAt.difference(state.startedAt).inSeconds))),
+        if (rides > 0) row(Icons.directions_transit, context.l10n.goRides(rides)),
       ],
     );
   }

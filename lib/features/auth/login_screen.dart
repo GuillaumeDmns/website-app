@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
+import '../../l10n/l10n.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
 
@@ -44,7 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (_username.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = 'Renseignez votre identifiant et votre mot de passe');
+      setState(() => _error = context.l10n.authMissingFields);
       return;
     }
     setState(() {
@@ -67,12 +68,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthFormLayout(
-      title: 'Connexion',
-      subtitle: 'Horaires en temps réel et itinéraires en Île-de-France',
+      title: context.l10n.signIn,
+      subtitle: context.l10n.signInSubtitle,
       children: [
         TextField(
           controller: _username,
-          decoration: const InputDecoration(labelText: 'Nom d\'utilisateur', prefixIcon: Icon(Icons.person_outline)),
+          decoration: InputDecoration(labelText: context.l10n.username, prefixIcon: const Icon(Icons.person_outline)),
           autofillHints: const [AutofillHints.username],
           textInputAction: TextInputAction.next,
           enabled: !_loading,
@@ -81,10 +82,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _password,
           decoration: InputDecoration(
-            labelText: 'Mot de passe',
+            labelText: context.l10n.password,
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
-              tooltip: _obscure ? 'Afficher' : 'Masquer',
+              tooltip: _obscure ? context.l10n.passwordShow : context.l10n.passwordHide,
               icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
@@ -100,12 +101,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onPressed: _loading ? null : _submit,
           child: _loading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Se connecter'),
+              : Text(context.l10n.signInAction),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: _loading ? null : () => context.go(Uri(path: Routes.signup, queryParameters: GoRouterState.of(context).uri.queryParameters).toString()),
-          child: const Text('Pas de compte ? Créer un compte'),
+          child: Text(context.l10n.noAccountSignUp),
         ),
       ],
     );

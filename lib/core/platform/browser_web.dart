@@ -103,3 +103,21 @@ Future<void> _request() async {
     debugPrint('Wake lock refused: $e');
   }
 }
+
+extension type _ShareData._(JSObject _) implements JSObject {
+  external factory _ShareData({String title, String url});
+}
+
+/// System share sheet of the browser (phones, some desktops); false when there is none or it failed
+Future<bool> share(String title, String url) async {
+  if (!_navigator.has('share')) {
+    return false;
+  }
+  try {
+    await _navigator.callMethod<JSPromise<JSAny?>>('share'.toJS, _ShareData(title: title, url: url)).toDart;
+    return true;
+  } catch (e) {
+    // Cancelled by the user counts as done
+    return e.toString().contains('AbortError');
+  }
+}

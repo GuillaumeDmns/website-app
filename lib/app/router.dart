@@ -20,6 +20,7 @@ import '../features/search/search_screen.dart';
 import '../features/stops/stop_screen.dart';
 import '../features/stops/timetable_screen.dart';
 import '../features/traffic/traffic_screen.dart';
+import '../l10n/l10n.dart';
 import 'routes.dart';
 import 'shell.dart';
 
@@ -76,7 +77,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.journeyPath,
             builder: (context, state) => JourneyScreen(request: JourneyRequest.fromQuery(state.uri.queryParameters)),
           ),
-          GoRoute(path: Routes.journeyDetail, builder: (context, state) => const JourneyDetailScreen()),
+          GoRoute(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
           GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
           GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
           GoRoute(
@@ -85,7 +86,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final query = state.uri.queryParameters;
               return AroundScreen(
                 position: LatLng(double.tryParse(query['lat'] ?? '') ?? 0, double.tryParse(query['lon'] ?? '') ?? 0),
-                name: query['name'] ?? 'Lieu',
+                name: query['name'] ?? currentL10n.place,
               );
             },
           ),
