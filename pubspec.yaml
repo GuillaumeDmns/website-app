@@ -77,6 +77,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Inter, bundled: no request to Google's servers at startup (google_fonts finds the files by name)
+  assets:
+    - assets/google_fonts/
+
   # Android flavor when none is given (flutter run, the IDE): the dev app, on the development backend
   default-flavor: dev
 

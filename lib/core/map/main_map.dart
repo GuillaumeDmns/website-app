@@ -146,8 +146,11 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
         ),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
+          // Full credits on the About page
           attributions: [
             TextSourceAttribution('IGN – Plan IGN', onTap: null),
+            TextSourceAttribution('Île-de-France Mobilités', onTap: null),
+            TextSourceAttribution('© contributeurs OpenStreetMap', onTap: null),
           ],
         ),
       ],

@@ -18,6 +18,19 @@ flutter build apk --flavor prod  # production (web: --dart-define=APP_ENV=prod; 
 - The router keeps the requested page in `from` through the splash, welcome and sign-in pages, so deep links survive them; a signed-in user leaves the sign-in pages for `from` (`Routes.signIn(from)`).
 - `--route` is ignored on Linux desktop; on the web the routes are real URLs (`/stops/IDFM:71264`, `/lines/C01743`).
 
+## Product identity
+
+Application id `com.guillaumedamiens.app` everywhere (Android namespace and prod `applicationId`, dev `.dev`; iOS and macOS bundle ids; Linux `APPLICATION_ID`); it can't change once published. The display name "Guillaume" is provisional; to rename the app, change it in all these places (one commit):
+- Android: `resValue "string", "app_name"` of both flavors in `android/app/build.gradle` (`Guillaume` / `Guillaume Dev`);
+- iOS: `CFBundleDisplayName` and `CFBundleName` in `ios/Runner/Info.plist`; macOS: the same keys in `macos/Runner/Info.plist` (the bundle stays `website_app.app`, `PRODUCT_NAME`, to keep the Xcode project references);
+- Windows: `windows/runner/Runner.rc` (`FileDescription`, `ProductName`) and the window title in `windows/runner/main.cpp`; Linux: the titles in `linux/runner/my_application.cc` (the binary stays `website_app`);
+- web: `name` / `short_name` in `web/manifest.json`, `<title>` and `apple-mobile-web-app-title` in `web/index.html`;
+- Dart: `appTitle` in `lib/l10n/app_fr.arb` and `app_en.arb` (window / tab title, About page).
+
+Icons: Android launcher (`android/app/src/main/res/mipmap-*`, adaptive: photo foreground on a blue background; orange variant in `src/dev/res`), and derived from `android/app/src/main/play_store_512.png`: web (`web/icons`, maskable from the adaptive layers), macOS `AppIcon.appiconset`, Windows `app_icon.ico`. iOS keeps its own photo icon. Inter is bundled in `assets/google_fonts/` (400, 500, 600; `GoogleFonts.config.allowRuntimeFetching = false`, OFL licence registered in `main.dart`): don't request another weight without adding its file. Web production builds use `--no-web-resources-cdn` (CanvasKit served by us, not `www.gstatic.com`); the engine still fetches its Roboto fallback from `fonts.gstatic.com`.
+
+Release signing: `android/key.properties` (not committed: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`), else the debug key. R8 and resource shrinking come with Flutter's release builds. Data credits: map attribution (`main_map.dart`) and `features/about/about_screen.dart` (`/about`, account menu; open source licences through `LicensePage`).
+
 ## Do not read
 
 - `build/`, `.dart_tool/`, `.idea/`, `doc/api/`, `pubspec.lock`, `.flutter-plugins-dependencies`, `.metadata`, `*.iml`, `*.freezed.dart`, `*.g.dart`

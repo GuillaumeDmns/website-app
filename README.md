@@ -33,7 +33,7 @@ adb reverse tcp:8080 tcp:8080
 
 ```bash
 flutter build apk --flavor prod              # ou appbundle (Play Store)
-flutter build web --dart-define=APP_ENV=prod # servie depuis app.guillaumedamiens.com, elle serait prod de toute façon
+flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn   # CanvasKit servi par nous, pas par Google
 flutter build linux --flavor prod --dart-define=APP_ENV=prod
 ```
 

@@ -1,6 +1,6 @@
 {
   "@@locale": "fr",
-  "appTitle": "Mobilités",
+  "appTitle": "Guillaume",
   "@appTitle": {
     "description": "Name of the app"
   },
@@ -940,5 +940,19 @@
   "guestModeHint": "Favoris sur tous vos appareils, sans limite",
   "continueAsGuest": "Continuer sans compte",
   "welcomeAccountTitle": "Un compte, si vous voulez",
-  "welcomeAccountText": "Sans compte, tout fonctionne avec quelques limites : un nombre d'itinéraires par jour, et des favoris gardés sur cet appareil. Avec un compte, vos favoris vous suivent sur tous vos appareils."
+  "welcomeAccountText": "Sans compte, tout fonctionne avec quelques limites : un nombre d'itinéraires par jour, et des favoris gardés sur cet appareil. Avec un compte, vos favoris vous suivent sur tous vos appareils.",
+  "about": "À propos",
+  "aboutTitle": "À propos",
+  "aboutData": "Données",
+  "aboutLicenses": "Licences open source",
+  "creditIdfmTitle": "Île-de-France Mobilités",
+  "creditIdfm": "Horaires, temps réel et info trafic, via la plateforme PRIM, sous Licence Mobilités",
+  "creditNavitiaTitle": "Navitia (Hove)",
+  "creditNavitia": "Calcul des itinéraires, via PRIM",
+  "creditIgnTitle": "IGN",
+  "creditIgn": "Fond de carte Plan IGN, sous Licence Ouverte (Etalab)",
+  "creditOsmTitle": "© contributeurs OpenStreetMap",
+  "creditOsm": "Tracés des lignes (fournis par IDFM avec le GTFS), sous licence ODbL",
+  "creditVelibTitle": "Vélib' Métropole",
+  "creditVelib": "Disponibilité des stations en temps réel (open data GBFS)"
 }
