@@ -1,0 +1,37 @@
+name: Build
+# Every push: analysis and the production builds (web, Android). No tests (see CLAUDE.md).
+on: ["push"]
+jobs:
+  build:
+    name: Analyze and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: 🛠 Set up Java 21 (Android build)
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      - name: Analyze
+        run: flutter analyze
+      - name: Web (prod)
+        run: flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
+      # Signed with the debug key here: the upload key stays off GitHub until the Play Store (android/key.properties)
+      - name: Android (prod)
+        run: flutter build apk --flavor prod --build-number=${{ github.run_number }}
+      - uses: actions/upload-artifact@v5
+        with:
+          name: app-prod-${{ github.run_number }}
+          path: |
+            build/app/outputs/flutter-apk/app-prod-release.apk
+          retention-days: 14
