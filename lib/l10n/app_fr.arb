@@ -965,5 +965,7 @@
   "accountDeleteQuestion": "Supprimer votre compte ?",
   "accountDeleteText": "Votre compte et vos favoris seront supprimés définitivement du serveur, sur tous vos appareils. Vous pourrez continuer à utiliser l'app sans compte.",
   "accountDeleteConfirm": "Supprimer",
-  "accountDeleted": "Compte supprimé"
+  "accountDeleted": "Compte supprimé",
+  "continueWithGoogle": "Continuer avec Google",
+  "googleSignInFailed": "Connexion avec Google impossible"
 }

@@ -5,6 +5,7 @@ import '../../core/api/models.dart';
 import '../../core/offline/offline_cache.dart';
 import '../../core/storage/local_store.dart';
 import '../home_widget/home_widget_sync.dart';
+import 'google/google_auth.dart';
 
 /// [guest]: the app is used without account (guest token, capped usage, data on the device only)
 enum AuthStatus { unknown, guest, signedIn }
@@ -50,6 +51,11 @@ class AuthController extends Notifier<AuthStatus> {
     await _signedIn(tokens);
   }
 
+  Future<void> signInWithGoogle(String idToken) async {
+    final tokens = await ref.read(authApiProvider).google(idToken);
+    await _signedIn(tokens);
+  }
+
   Future<void> _signedIn(AuthTokens tokens) async {
     await OfflineCacheInterceptor.clear(ref.read(localStoreProvider));
     await ref.read(tokenStoreProvider).save(tokens);
@@ -64,6 +70,7 @@ class AuthController extends Notifier<AuthStatus> {
     }
     await tokenStore.clear();
     await _clearUserData();
+    await signOutOfGoogle();
     state = AuthStatus.guest;
   }
 
@@ -72,6 +79,7 @@ class AuthController extends Notifier<AuthStatus> {
     await ref.read(mobilityApiProvider).deleteAccount();
     await ref.read(tokenStoreProvider).clear();
     await _clearUserData();
+    await signOutOfGoogle();
     state = AuthStatus.guest;
   }
 

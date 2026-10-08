@@ -17,6 +17,10 @@ abstract final class AppConfig {
   /// Forces the web app root used in shared links
   static const _webAppUrl = String.fromEnvironment('WEB_APP_URL');
 
+  /// OAuth client "Guillaume web" of the Google Cloud project: Google ID tokens are issued for it (web, and Android
+  /// as `serverClientId`), the backend accepts it (`application.google.client-ids`). Not a secret.
+  static const googleWebClientId = '98249637445-ok2b6a7v9eckahd9mdcmbqqcthfo2rjp.apps.googleusercontent.com';
+
   static const prodApiUrl = 'https://guillaumedamiens.com';
   static const prodWebAppUrl = 'https://app.guillaumedamiens.com';
   static const devApiUrl = 'http://localhost:8080';
