@@ -29,6 +29,11 @@ Sur un téléphone ou un émulateur Android, `localhost` est l'appareil lui-mêm
 adb reverse tcp:8080 tcp:8080
 ```
 
+## CI
+
+- Chaque push : analyse et builds de prod (web, APK Android en artefact).
+- Tag `v*` (ou lancement à la main) : l'app web de prod est publiée sur le VPS (`/var/www/guillaumedamiens-app`, lien `current`). Secrets GitHub du dépôt : `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, les mêmes que ceux de `website-back`.
+
 ## Builds de production
 
 ```bash

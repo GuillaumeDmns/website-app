@@ -1,0 +1,55 @@
+name: Deploy web app
+# Tag a commit of master (git tag v1.2.3 && git push origin v1.2.3), or run it by hand: builds the production web app
+# and publishes it on the VPS (served by nginx as app.guillaumedamiens.com, see website-back/deploy/nginx).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+concurrency: deploy-web
+jobs:
+  deploy:
+    name: Deploy to the VPS
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Build
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+          flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
+      # Secrets (same as website-back): DEPLOY_HOST, DEPLOY_SSH_KEY (private key of the deploy user), DEPLOY_KNOWN_HOSTS
+      # The deploy user owns /var/www/guillaumedamiens-app (website-back/deploy/migrate-server.sh)
+      - name: Upload and activate
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          release="web-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
+          tar -C build/web -czf web.tar.gz .
+          scp -i ~/.ssh/deploy_key web.tar.gz "deploy@$DEPLOY_HOST:/var/www/guillaumedamiens-app/releases/$release.tar.gz"
+          # Unpack, switch the "current" link atomically, keep the 5 latest releases
+          ssh -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" bash -s -- "$release" <<'SCRIPT'
+          set -euo pipefail
+          cd /var/www/guillaumedamiens-app
+          mkdir "releases/$1"
+          tar -xzf "releases/$1.tar.gz" -C "releases/$1"
+          rm "releases/$1.tar.gz"
+          # tar gives the folder the build's date: date it now, the pruning below sorts by date
+          touch "releases/$1"
+          ln -sfn "releases/$1" current.new
+          mv -T current.new current
+          ls -1dt releases/*/ | tail -n +6 | grep -vx "releases/$1/" | xargs -r rm -rf
+          echo "Web app now serves releases/$1"
+          SCRIPT
