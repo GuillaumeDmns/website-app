@@ -1,11 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.guillaumedamiens.app",
       "sha256_cert_fingerprints": [
-        "8E:45:FC:BD:C8:D2:62:B3:61:A1:C4:69:FD:90:62:BF:17:46:1C:FB:A4:80:50:EE:C7:39:70:0D:9E:BF:92:F1"
+        "16:D9:55:5D:93:60:5B:CC:BD:F3:5A:3A:87:B3:67:F9:CA:28:8B:80:A8:CC:1A:15:FF:C3:59:1E:2E:8C:72:98"
       ]
     }
   }
