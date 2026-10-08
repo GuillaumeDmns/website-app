@@ -32,7 +32,7 @@ adb reverse tcp:8080 tcp:8080
 ## CI
 
 - Chaque push : analyse et builds de prod (web, APK Android en artefact).
-- Tag `v*` (ou lancement à la main) : l'app web de prod est publiée sur le VPS (`/var/www/guillaumedamiens-app`, lien `current`). Secrets GitHub du dépôt : `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, les mêmes que ceux de `website-back`.
+- Tag `v*` (ou lancement à la main sur un tag) : l'app web de prod est publiée dans la release GitHub du tag, puis le VPS la télécharge (`/var/www/guillaumedamiens-app`, lien `current`). Secrets GitHub du dépôt : `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, les mêmes que ceux de `website-back`.
 
 ## Builds de production
 

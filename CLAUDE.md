@@ -68,7 +68,7 @@ Release signing: `android/key.properties` (not committed: `storeFile`, `storePas
 ## CI (GitHub Actions)
 
 - `.github/workflows/build.yml`, every push: `pub get`, `build_runner`, `flutter analyze`, production builds (web with `--no-web-resources-cdn`, Android APK `--flavor prod`, build number = run number, APK kept 14 days as an artifact). Flutter pinned to the local version (3.47.6): update both together.
-- `.github/workflows/deploy-web.yml`, tag `v*` or by hand: builds the production web app and publishes it on the VPS as the `deploy` user (secrets `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, the same as website-back's): `/var/www/guillaumedamiens-app/releases/web-<tag>-<sha>`, then the `current` link nginx serves is switched atomically; the 5 latest releases stay (roll back by pointing `current` to an older one).
+- `.github/workflows/deploy-web.yml`, tag `v*` (or by hand on a tag): builds the production web app, publishes the archive in the tag's GitHub release, and the VPS downloads it as the `deploy` user (uploads from GitHub's runners to the VPS crawl at ~20 KB/s) and checks its SHA-256 (secrets `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, the same as website-back's): `/var/www/guillaumedamiens-app/releases/web-<tag>-<sha>`, then the `current` link nginx serves is switched atomically; the 5 latest releases stay (roll back by pointing `current` to an older one).
 
 ## Git
 

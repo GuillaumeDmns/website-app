@@ -1,17 +1,26 @@
 name: Deploy web app
-# Tag a commit of master (git tag v1.2.3 && git push origin v1.2.3), or run it by hand: builds the production web app
-# and publishes it on the VPS (served by nginx as app.guillaumedamiens.com, see website-back/deploy/nginx).
+# Tag a commit of master (git tag v1.2.3 && git push origin v1.2.3), or run it by hand on a tag: builds the production
+# web app, publishes it as an asset of the tag's GitHub release, and the VPS downloads it (uploads from GitHub's runners
+# to the VPS crawl, about 20 KB/s; downloads from GitHub are fast). Served by nginx as app.guillaumedamiens.com, see
+# website-back/deploy/nginx.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 concurrency: deploy-web
+permissions:
+  contents: write
 jobs:
   deploy:
     name: Deploy to the VPS
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Tags only
+        if: github.ref_type != 'tag'
+        run: |
+          echo "Run this workflow on a tag (v1.2.3): the web app is published in the tag's release" >&2
+          exit 1
       - uses: actions/checkout@v6
       - name: 🛠 Set up Flutter
         uses: subosito/flutter-action@v2
@@ -24,25 +33,43 @@ jobs:
           flutter pub get
           dart run build_runner build -d
           flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
+      - name: Publish the archive in the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name="web-${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
+          tar -C build/web -czf "$name.tar.gz" .
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$name.tar.gz" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$name.tar.gz" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$name.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$name.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       # Secrets (same as website-back): DEPLOY_HOST, DEPLOY_SSH_KEY (private key of the deploy user), DEPLOY_KNOWN_HOSTS
       # The deploy user owns /var/www/guillaumedamiens-app (website-back/deploy/migrate-server.sh)
-      - name: Upload and activate
+      - name: Download on the VPS and activate
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          NAME: ${{ steps.release.outputs.name }}
+          URL: ${{ steps.release.outputs.url }}
+          SHA256: ${{ steps.release.outputs.sha256 }}
         run: |
           install -d -m 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          release="web-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
-          tar -C build/web -czf web.tar.gz .
-          scp -i ~/.ssh/deploy_key web.tar.gz "deploy@$DEPLOY_HOST:/var/www/guillaumedamiens-app/releases/$release.tar.gz"
-          # Unpack, switch the "current" link atomically, keep the 5 latest releases
-          ssh -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" bash -s -- "$release" <<'SCRIPT'
+          # Download, check, unpack, switch the "current" link atomically, keep the 5 latest releases
+          ssh -o ConnectTimeout=20 -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" bash -s -- "$NAME" "$URL" "$SHA256" <<'SCRIPT'
           set -euo pipefail
           cd /var/www/guillaumedamiens-app
+          curl -fsSL --retry 3 --max-time 300 -o "releases/$1.tar.gz" "$2"
+          echo "$3  releases/$1.tar.gz" | sha256sum -c --quiet || { rm -f "releases/$1.tar.gz"; exit 1; }
+          rm -rf "releases/$1"
           mkdir "releases/$1"
           tar -xzf "releases/$1.tar.gz" -C "releases/$1"
           rm "releases/$1.tar.gz"
@@ -50,6 +77,6 @@ jobs:
           touch "releases/$1"
           ln -sfn "releases/$1" current.new
           mv -T current.new current
-          ls -1dt releases/*/ | tail -n +6 | grep -vx "releases/$1/" | xargs -r rm -rf
+          ls -1dt releases/*/ | tail -n +6 | { grep -vx "releases/$1/" || true; } | xargs -r rm -rf
           echo "Web app now serves releases/$1"
           SCRIPT
