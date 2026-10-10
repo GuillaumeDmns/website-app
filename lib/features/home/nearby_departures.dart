@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +8,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
 import '../stops/widgets/stop_departures_card.dart';
@@ -24,8 +23,7 @@ NearbyKey nearbyKey(LatLng position) {
 
 /// Departures around a position, refreshed every 30 s while shown
 final nearbyDeparturesProvider = FutureProvider.autoDispose.family<List<StopDepartures>, NearbyKey>((ref, key) async {
-  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(seconds: 30));
   return ref.watch(mobilityApiProvider).nearbyDepartures(key.lat, key.lon);
 });
 

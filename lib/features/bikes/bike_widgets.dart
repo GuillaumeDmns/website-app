@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +7,7 @@ import '../../app/routes.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
@@ -18,8 +17,7 @@ typedef BikeKey = ({double lat, double lon, int radius, int limit});
 
 /// Vélib stations around a position, closest first, refreshed every minute while shown (the open data's pace)
 final nearbyBikesProvider = FutureProvider.autoDispose.family<List<BikeStation>, BikeKey>((ref, key) async {
-  final timer = Timer(const Duration(seconds: 60), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(seconds: 60));
   return ref.watch(mobilityApiProvider).bikesNearby(key.lat, key.lon, radius: key.radius, limit: key.limit);
 });
 

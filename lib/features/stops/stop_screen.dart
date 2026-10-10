@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +10,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/share.dart';
+import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
@@ -28,8 +27,7 @@ final stopAreaProvider = FutureProvider.autoDispose.family<StopAreaDetail, Strin
 
 /// Departures of a stop area, refreshed every 30 s while shown
 final stopDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, String>((ref, stopAreaId) async {
-  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(seconds: 30));
   return ref.watch(mobilityApiProvider).stopDepartures(stopAreaId, limit: 3);
 });
 

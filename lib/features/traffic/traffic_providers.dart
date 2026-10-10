@@ -1,14 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
+import '../../core/utils/refresh.dart';
 
 /// Traffic state of the main lines and of every disrupted line, refreshed every 2 min while shown
 final trafficProvider = FutureProvider.autoDispose<List<LineTraffic>>((ref) async {
-  final timer = Timer(const Duration(minutes: 2), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(minutes: 2));
   return ref.watch(mobilityApiProvider).traffic();
 });
 
