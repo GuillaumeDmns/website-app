@@ -29,9 +29,18 @@ Sur un téléphone ou un émulateur Android, `localhost` est l'appareil lui-mêm
 adb reverse tcp:8080 tcp:8080
 ```
 
+## Tests
+
+```bash
+flutter test                                 # unitaires, widgets et parcours complets de l'app, une dizaine de secondes
+flutter test integration_test -d linux       # la vraie app Linux (ouvre une fenêtre)
+```
+
+Aucun test n'appelle le backend : un faux backend répond à la place de l'API (voir `test/support/`).
+
 ## CI
 
-- Chaque push : analyse et builds de prod (web, APK Android en artefact).
+- Chaque pull request et chaque push sur `master` : check « Test » (analyse, tests, tests d'intégration de l'app Linux sous écran virtuel) et check « Build » (builds de prod : web, APK Android en artefact). Les deux doivent passer pour fusionner dans `master` : sur GitHub, *Settings → Rules → Rulesets → New branch ruleset*, cible *Default branch*, cocher *Require a pull request before merging*, *Require status checks to pass* (« Test » et « Build », visibles après un premier passage) et *Block force pushes*.
 - Tag `v*` (ou lancement à la main sur un tag) : l'app web de prod est publiée dans la release GitHub du tag, puis le VPS la télécharge (`/var/www/guillaumedamiens-app`, lien `current`). Secrets GitHub du dépôt : `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, les mêmes que ceux de `website-back`.
 
 ## Builds de production
