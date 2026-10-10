@@ -1,10 +1,46 @@
 name: Build
-# Every push: analysis and the production builds (web, Android). No tests (see CLAUDE.md).
-on: ["push"]
+# Every pull request and every push to master: analysis, unit and widget tests, integration tests on the Linux app
+# (virtual screen), then the production builds (web, Android). The "Test" and "Build" checks are required to merge
+# into master (branch protection).
+on:
+  pull_request:
+  push:
+    branches: [master]
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  build:
-    name: Analyze and build
+  test:
+    name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libjsoncpp-dev xvfb
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      - name: Analyze
+        run: flutter analyze
+      - name: Unit and widget tests
+        run: flutter test
+      - name: Integration tests (Linux app)
+        run: xvfb-run -a flutter test integration_test -d linux
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - name: 🛠 Set up Java 21 (Android build)
@@ -22,8 +58,6 @@ jobs:
         run: |
           flutter pub get
           dart run build_runner build -d
-      - name: Analyze
-        run: flutter analyze
       - name: Web (prod)
         run: flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
       # Signed with the debug key here: the upload key stays off GitHub until the Play Store (android/key.properties)

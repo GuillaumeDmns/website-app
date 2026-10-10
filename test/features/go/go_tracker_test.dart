@@ -1,0 +1,174 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/go/go_tracker.dart';
+import 'package:website_app/l10n/l10n.dart';
+
+import '../../support/samples.dart';
+
+void main() {
+  setUp(() => useLocale(const Locale('fr')));
+
+  final start = DateTime.utc(2026, 10, 10, 8, 0);
+  DateTime at(int minutes, [int seconds = 0]) => start.add(Duration(minutes: minutes, seconds: seconds));
+
+  // Walk 4 min to Châtelet, metro 1 at 8:06 to Nation through Gare de Lyon (8 min), walk 3 min
+  final plan = journey([
+    walk(at(0), 240),
+    transit(at(6), 480, via: [gareDeLyon]),
+    walk(at(14), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+  ]);
+  final tracker = GoTracker(plan);
+
+  LatLng position(StopAreaSummary stop) => LatLng(stop.lat, stop.lon);
+
+  GoInput input(DateTime now, {LatLng? position, double speed = 0, Departure? vehicle, int? vehicleStep}) =>
+      GoInput(now: now, position: position, accuracy: 10, speed: speed, fixAt: now, vehicle: vehicle, vehicleStep: vehicleStep);
+
+  test('has a step per walk and ride', () {
+    expect(tracker.steps.map((step) => step.isRide), [false, true, false]);
+    expect(tracker.initial().phase, GoPhase.moving);
+    expect(tracker.steps[1].stopAlongs, hasLength(3));
+    expect(tracker.steps[1].stopTime(1), at(10));
+  });
+
+  test('waits at the stop once the walk is done', () {
+    final (progress, alerts) = tracker.update(tracker.initial(), input(at(3), position: position(chatelet)));
+
+    expect(progress.step, 1);
+    expect(progress.phase, GoPhase.waiting);
+    expect(alerts, isEmpty);
+  });
+
+  test('follows the schedule without position (underground)', () {
+    var (progress, _) = tracker.update(tracker.initial(), GoInput(now: at(5)));
+    expect(progress.phase, GoPhase.waiting);
+
+    // A minute after the departure: on board
+    (progress, _) = tracker.update(progress, GoInput(now: at(7, 1)));
+    expect(progress.phase, GoPhase.onBoard);
+
+    // Gare de Lyon reached by the stop times, Nation is the next stop: get ready
+    final List<GoAlert> alerts;
+    (progress, alerts) = tracker.update(progress, GoInput(now: at(10, 30)));
+    expect(progress.stopIndex, 1);
+    expect(alerts.map((alert) => alert.id), ['prepare-1']);
+
+    // Arrived at Nation: get off, then walk
+    final List<GoAlert> last;
+    (progress, last) = tracker.update(progress, GoInput(now: at(14, 1)));
+    expect(last.map((alert) => alert.id), ['alight-1']);
+    expect(last.single.urgent, isTrue);
+    expect(progress.step, 2);
+    expect(progress.phase, GoPhase.moving);
+  });
+
+  test('warns when the vehicle comes soon and when it is late', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+
+    final (_, soon) = tracker.update(waiting, input(at(4, 30), position: position(chatelet)));
+    expect(soon.map((alert) => alert.id), ['soon-1']);
+
+    final late = departure(at(10), aimed: at(6));
+    final (_, delayed) = tracker.update(waiting, input(at(3), position: position(chatelet), vehicle: late, vehicleStep: 1));
+    expect(delayed.map((alert) => alert.id), contains('delay-1'));
+  });
+
+  test('says when the vehicle is cancelled, once', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    final cancelled = departure(at(6), status: 'cancelled');
+
+    final (progress, alerts) = tracker.update(waiting, input(at(3), position: position(chatelet), vehicle: cancelled, vehicleStep: 1));
+    expect(progress.issue, GoIssue.cancelled);
+    expect(alerts.single.urgent, isTrue);
+
+    final (_, again) = tracker.update(progress, input(at(4), position: position(chatelet), vehicle: cancelled, vehicleStep: 1));
+    expect(again, isEmpty);
+  });
+
+  test('says when the vehicle was missed', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+
+    final (progress, alerts) = tracker.update(waiting, input(at(8), position: position(chatelet)));
+
+    expect(progress.issue, GoIssue.missed);
+    expect(progress.phase, GoPhase.waiting);
+    expect(alerts.map((alert) => alert.id), ['missed-1']);
+  });
+
+  test('detects boarding from a fast move along the line', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    final onTheWay = LatLng((chatelet.lat + gareDeLyon.lat) / 2, (chatelet.lon + gareDeLyon.lon) / 2);
+
+    final late = departure(at(8), aimed: at(6));
+
+    final (progress, _) = tracker.update(waiting, input(at(8, 30), position: onTheWay, speed: 10, vehicle: late, vehicleStep: 1));
+
+    expect(progress.phase, GoPhase.onBoard);
+    // Left two minutes late: the rest of the journey follows
+    expect(progress.shift, const Duration(minutes: 2));
+    expect(tracker.eta(progress, null), plan.arrival.add(const Duration(minutes: 2)));
+  });
+
+  test('says when the walk goes away from the path for a minute', () {
+    const elsewhere = LatLng(48.8700, 2.3000);
+    var (progress, alerts) = tracker.update(tracker.initial(), input(at(1), position: elsewhere));
+    expect(progress.issue, isNull);
+
+    (progress, alerts) = tracker.update(progress, input(at(2, 5), position: elsewhere));
+    expect(progress.issue, GoIssue.offRoute);
+    expect(alerts.map((alert) => alert.id), ['offroute-0']);
+
+    expect(tracker.dismissIssue(progress).issue, isNull);
+  });
+
+  test('arrives near the destination', () {
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+
+    final (progress, alerts) = tracker.update(lastWalk, input(at(17), position: const LatLng(48.8475, 2.4000)));
+
+    expect(progress.phase, GoPhase.arrived);
+    expect(progress.arrivedAt, at(17));
+    expect(alerts.map((alert) => alert.id), ['arrived']);
+    expect(tracker.eta(progress, null), at(17));
+  });
+
+  test('moves on when the user says so', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+
+    expect(tracker.next(waiting).phase, GoPhase.onBoard);
+    expect(tracker.next(tracker.initial()).step, 1);
+    expect(tracker.jumpTo(waiting, tracker.steps.length).phase, GoPhase.arrived);
+  });
+
+  test('waits for a newly chosen departure, whose alerts can come again', () {
+    final missed = tracker.jumpTo(tracker.initial(), 1).copyWith(issue: () => GoIssue.missed, fired: {'soon-1', 'missed-1', 'soon-0'});
+
+    final chosen = tracker.chosen(missed, 1);
+
+    expect(chosen.issue, isNull);
+    expect(chosen.fired, {'soon-0'});
+    expect(tracker.chosen(missed, 2), missed);
+  });
+
+  test('counts what is left', () {
+    final onBoard = tracker.next(tracker.jumpTo(tracker.initial(), 1));
+
+    expect(tracker.stopsLeft(onBoard), 2);
+    expect(tracker.metersLeft(tracker.initial()), greaterThan(0));
+    expect(tracker.nextRide(tracker.initial()), tracker.steps[1]);
+  });
+
+  test('keeps its progress across restarts', () {
+    final progress = tracker.jumpTo(tracker.initial(), 1).copyWith(shift: const Duration(minutes: 3), fired: {'soon-1'});
+
+    final restored = GoProgress.fromJson(progress.toJson());
+
+    expect(restored.step, 1);
+    expect(restored.phase, GoPhase.waiting);
+    expect(restored.shift, const Duration(minutes: 3));
+    expect(restored.fired, {'soon-1'});
+    expect(GoProgress.fromJson(const {}).phase, GoPhase.moving);
+  });
+}
