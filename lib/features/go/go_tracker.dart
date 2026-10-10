@@ -438,14 +438,15 @@ class GoTracker {
     final untilDeparture = departure.difference(input.now);
     var current = progress;
 
-    if (vehicle?.cancelled == true && current.issue == null) {
+    final cancelled = vehicle?.cancelled == true;
+    if (cancelled && current.issue == null) {
       current = current.copyWith(issue: () => GoIssue.cancelled);
       alerts.add(GoAlert(id: 'cancel-${current.step}', title: currentL10n.alertCancelled(lineLabel), body: currentL10n.alertTakeNextOrRecalculate, urgent: true));
       return current;
     }
 
-    // Delay of the planned vehicle
-    if (vehicle != null && vehicle.time.difference(plannedDeparture(ride, current)) >= const Duration(minutes: 3)) {
+    // Delay of the planned vehicle (a cancelled one won't come: no delay nor "soon")
+    if (!cancelled && vehicle != null && vehicle.time.difference(plannedDeparture(ride, current)) >= const Duration(minutes: 3)) {
       alerts.add(GoAlert(
         id: 'delay-${current.step}',
         title: currentL10n.alertLate(lineLabel),
@@ -456,7 +457,7 @@ class GoTracker {
       ));
     }
 
-    if (untilDeparture > Duration.zero && untilDeparture <= const Duration(minutes: 2)) {
+    if (!cancelled && untilDeparture > Duration.zero && untilDeparture <= const Duration(minutes: 2)) {
       alerts.add(GoAlert(
         id: 'soon-${current.step}',
         title: currentL10n.alertSoon(lineLabel, math.max(1, untilDeparture.inSeconds ~/ 60)),

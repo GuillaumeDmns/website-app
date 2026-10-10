@@ -25,12 +25,15 @@ Locale systemLocale() =>
 
 const _key = 'locale';
 
+/// Texts of [currentL10n] in [locale] from now on
+void useLocale(Locale locale) => _current = lookupAppLocalizations(locale);
+
 /// The language chosen on this device, or null to follow the system's
 Future<Locale?> loadLocale() async {
   final code = await LocalStore().readJson(_key);
   final locale = supportedLocales.where((locale) => locale.languageCode == code).firstOrNull;
   if (locale != null) {
-    _current = lookupAppLocalizations(locale);
+    useLocale(locale);
   }
   return locale;
 }
@@ -45,7 +48,7 @@ class LocaleController extends Notifier<Locale> {
   Locale build() => _initial ?? systemLocale();
 
   Future<void> select(Locale locale) async {
-    _current = lookupAppLocalizations(locale);
+    useLocale(locale);
     state = locale;
     await ref.read(localStoreProvider).writeJson(_key, locale.languageCode);
   }

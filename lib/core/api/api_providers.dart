@@ -12,17 +12,18 @@ import 'mobility_api.dart';
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => TokenStore());
 
-Dio _baseDio() => Dio(BaseOptions(
+/// New clients of the backend (the tests give them a fake backend)
+final dioFactoryProvider = Provider<Dio Function()>((ref) => () => Dio(BaseOptions(
       baseUrl: AppConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 20),
-    ));
+    )));
 
-final authApiProvider = Provider<AuthApi>((ref) => AuthApi(_baseDio()));
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(dioFactoryProvider)()));
 
 /// Authenticated client
 final apiDioProvider = Provider<Dio>((ref) {
-  final dio = _baseDio();
+  final dio = ref.watch(dioFactoryProvider)();
   dio.interceptors.add(AuthInterceptor(
     tokenStore: ref.watch(tokenStoreProvider),
     authApi: ref.watch(authApiProvider),

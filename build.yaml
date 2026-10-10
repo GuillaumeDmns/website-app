@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # toJson() of nested models gives maps too (device copies of favorites, recent searches)
+          explicit_to_json: true
