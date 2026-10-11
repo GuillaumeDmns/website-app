@@ -56,6 +56,15 @@ class AboutScreen extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
+                  icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                  label: Text(l10n.privacy),
+                  onPressed: () => context.push(Routes.privacy),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
                   icon: const Icon(Icons.description_outlined, size: 18),
                   label: Text(l10n.aboutLicenses),
                   // Above the whole app, not inside the panel

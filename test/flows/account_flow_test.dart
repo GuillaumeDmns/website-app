@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/app/router.dart';
+import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -106,6 +109,41 @@ void main() {
     await tapOn(tester, find.text(currentL10n.skip));
 
     expect(find.text(currentL10n.homeNearby), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('the legal notice is one tap away from About and from the sign-in page', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+
+    await tapOn(tester, find.byTooltip(currentL10n.account));
+    await tapOn(tester, find.text(currentL10n.about));
+    await tapOn(tester, find.text(currentL10n.privacy));
+    expect(find.text(currentL10n.privacyHost), findsOneWidget);
+    expect(find.text(currentL10n.privacyRights), findsOneWidget);
+    await tapOn(tester, find.byTooltip(currentL10n.back));
+    expect(find.text(currentL10n.aboutData), findsOneWidget);
+
+    await tapOn(tester, find.byTooltip(currentL10n.back));
+    await tapOn(tester, find.byTooltip(currentL10n.account));
+    await tapOn(tester, find.text(currentL10n.signInAction));
+    await tapOn(tester, find.text(currentL10n.privacy));
+    expect(find.text(currentL10n.privacyPublisher), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a link to the legal notice opens it before the welcome pages', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend, onboardingDone: false);
+    expect(find.text(currentL10n.welcomeTitle), findsOneWidget);
+
+    ProviderScope.containerOf(tester.element(find.byType(MaterialApp))).read(routerProvider).go(Routes.privacy);
+    await settle(tester);
+
+    expect(find.text(currentL10n.privacyPublisher), findsOneWidget);
+    expect(find.text(currentL10n.welcomeTitle), findsNothing);
 
     await closeApp(tester);
   });

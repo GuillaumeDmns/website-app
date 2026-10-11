@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../core/map/map_overlay.dart';
 import '../features/about/about_screen.dart';
+import '../features/about/privacy_screen.dart';
 import '../features/auth/account_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
@@ -50,8 +51,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       return switch (status) {
         AuthStatus.unknown => location == Routes.splash ? null : withFrom(Routes.splash),
         // Welcome pages once per device (a restored session may skip the splash page, so from any page). The search
-        // and the sign-in pages stay reachable: the welcome pages use them.
-        _ when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search && !onAuthPage =>
+        // and the sign-in pages stay reachable: the welcome pages use them; the legal notice too, for whoever opens its link.
+        _ when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search && !onAuthPage &&
+            location != Routes.privacy =>
           Uri(path: Routes.welcome, queryParameters: {'from': waiting ? (from ?? Routes.home) : state.uri.toString()}).toString(),
         _ when location == Routes.splash => from ?? Routes.home,
         // Signed in: back to the page that asked for it
@@ -81,6 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
           GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
           GoRoute(path: Routes.about, builder: (context, state) => const AboutScreen()),
+          GoRoute(path: Routes.privacy, builder: (context, state) => const PrivacyScreen()),
           GoRoute(path: Routes.account, builder: (context, state) => const AccountScreen()),
           GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
           GoRoute(
