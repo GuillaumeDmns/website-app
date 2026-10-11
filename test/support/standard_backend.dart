@@ -101,12 +101,14 @@ const metroStopped = Disruption(
   message: 'Trafic interrompu entre Châtelet et Nation.',
   active: true,
   lineIds: ['C01371'],
+  sections: [DisruptionSection(lineId: 'C01371', fromId: 'IDFM:70001', fromName: 'Châtelet', toId: 'IDFM:70003', toName: 'Nation')],
 );
 
 const elevatorOutage = Disruption(
   id: 'chatelet-elevator',
   severity: DisruptionSeverity.info,
   category: DisruptionCategory.elevator,
-  title: 'Châtelet : ascenseur hors service',
+  title: 'Ascenseur hors service : Ligne M1 direction Nation',
+  message: 'Niveau 0 : sortie 2, rue de Rivoli',
   active: true,
 );

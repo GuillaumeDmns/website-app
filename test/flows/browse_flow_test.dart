@@ -26,6 +26,7 @@ void main() {
     await tapOn(tester, badgeOf('C01371'));
     expect(find.text('Gare de Lyon'), findsWidgets);
     expect(find.textContaining('trafic interrompu'), findsWidgets);
+    expect(find.textContaining(currentL10n.betweenStops('Châtelet', 'Nation')), findsOneWidget);
     expect(backend.requestsTo('/api/v2/lines/C01371/vehicles'), isNotEmpty);
 
     // Saved on the device (guest)

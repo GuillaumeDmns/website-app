@@ -514,9 +514,26 @@ abstract class Disruption with _$Disruption {
 
     /// Impacted lines, empty for a stop-only disruption (elevator…)
     @Default([]) List<String> lineIds,
+
+    /// Parts of lines impacted, when IDFM says
+    @Default([]) List<DisruptionSection> sections,
   }) = _Disruption;
 
   factory Disruption.fromJson(Map<String, dynamic> json) => _$DisruptionFromJson(json);
+}
+
+/// Part of a line between two stop areas, named as in the GTFS
+@freezed
+abstract class DisruptionSection with _$DisruptionSection {
+  const factory DisruptionSection({
+    required String lineId,
+    String? fromId,
+    String? fromName,
+    String? toId,
+    String? toName,
+  }) = _DisruptionSection;
+
+  factory DisruptionSection.fromJson(Map<String, dynamic> json) => _$DisruptionSectionFromJson(json);
 }
 
 @freezed

@@ -213,5 +213,19 @@ void main() {
     });
     expect(disruption.severity, DisruptionSeverity.info);
     expect(disruption.category, DisruptionCategory.elevator);
+    expect(disruption.sections, isEmpty);
+
+    final works = Disruption.fromJson({
+      'id': 'd2',
+      'severity': 'DISRUPTED',
+      'category': 'WORKS',
+      'active': false,
+      'lineIds': ['C01727'],
+      'sections': [
+        {'lineId': 'C01727', 'fromId': 'IDFM:63244', 'fromName': 'Massy - Palaiseau', 'toId': 'IDFM:69677', 'toName': 'Thiais - Orly'},
+      ],
+    });
+    expect(works.sections.single.fromName, 'Massy - Palaiseau');
+    expect(works.sections.single.toId, 'IDFM:69677');
   });
 }
