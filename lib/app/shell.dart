@@ -177,7 +177,7 @@ class _SheetProfile {
 
   static _SheetProfile of(String location) {
     if (location.startsWith(Routes.search) || location.startsWith(Routes.traffic) || location.startsWith(Routes.about) ||
-        location.startsWith(Routes.account)) {
+        location.startsWith(Routes.privacy) || location.startsWith(Routes.account)) {
       return const _SheetProfile(full: true);
     }
     if (location.startsWith(Routes.go)) {
