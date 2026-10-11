@@ -22,11 +22,15 @@ class PanelScrollScope extends InheritedWidget {
   final ScrollController? controller;
 
   /// Only the page on top gets the controller: pages kept below in the panel's stack also build their lists, and
-  /// the sheet's controller can drive a single list.
+  /// the sheet's controller can drive a single list. A menu or a dialog over the page leaves it on top: losing the
+  /// controller would rebuild its whole list (a scroll view without controller wraps itself in a
+  /// PrimaryScrollController), and with it the state of the page.
   static ScrollController? of(BuildContext context) {
     final controller = context.dependOnInheritedWidgetOfExactType<PanelScrollScope>()?.controller;
-    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
-    return isCurrent ? controller : null;
+    final route = ModalRoute.of(context);
+    // Another page pushed over this one drives its secondary animation, a popup doesn't
+    final onTop = route == null || route.isCurrent || route.secondaryAnimation?.status == AnimationStatus.dismissed;
+    return onTop ? controller : null;
   }
 
   @override

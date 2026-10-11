@@ -53,8 +53,8 @@ abstract class AuthTokens with _$AuthTokens {
 @freezed
 abstract class LineSummary with _$LineSummary {
   const factory LineSummary({
-    /// IDFM line id, e.g. `C01371`
-    required String id,
+    /// IDFM line id, e.g. `C01371`; empty for a journey's line the GTFS doesn't know (the backend sends null)
+    @JsonKey(defaultValue: '') required String id,
     String? name,
     String? longName,
     @JsonKey(unknownEnumValue: TransportMode.bus) required TransportMode mode,

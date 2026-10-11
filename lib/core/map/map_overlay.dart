@@ -75,7 +75,12 @@ class MapOverlays extends Notifier<Map<String, MapOverlay>> {
 
   void set(String location, MapOverlay overlay) => state = {...state, location: overlay};
 
-  void remove(String location) => state = {...state}..remove(location);
+  void remove(String location) {
+    // Called after the page is gone: the whole app may be gone too
+    if (ref.mounted) {
+      state = {...state}..remove(location);
+    }
+  }
 }
 
 final mapOverlaysProvider = NotifierProvider<MapOverlays, Map<String, MapOverlay>>(MapOverlays.new);

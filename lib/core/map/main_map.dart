@@ -10,6 +10,9 @@ import 'package:latlong2/latlong.dart';
 import '../location/location_providers.dart';
 import 'map_overlay.dart';
 
+/// Background tiles of the map (Plan IGN); the tests turn them off (no network)
+final mapTilesEnabledProvider = Provider<bool>((ref) => true);
+
 /// The map behind every page. Shows the overlay of the current page and the user position, and frames the
 /// overlay's points when the page changes.
 class MainMap extends ConsumerStatefulWidget {
@@ -104,14 +107,15 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
       ),
       children: [
         // Plan IGN (Géoplateforme): free, no key, open licence; no dark style, so it is inverted in dark mode
-        TileLayer(
-          urlTemplate: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
-              '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM'
-              '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png',
-          userAgentPackageName: 'com.guillaumedamiens.app',
-          maxNativeZoom: 19,
-          tileBuilder: dark ? darkModeTileBuilder : null,
-        ),
+        if (ref.watch(mapTilesEnabledProvider))
+          TileLayer(
+            urlTemplate: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
+                '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM'
+                '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png',
+            userAgentPackageName: 'com.guillaumedamiens.app',
+            maxNativeZoom: 19,
+            tileBuilder: dark ? darkModeTileBuilder : null,
+          ),
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)

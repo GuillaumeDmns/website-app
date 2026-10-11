@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../core/utils/refresh.dart';
 import '../../l10n/l10n.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
@@ -40,8 +39,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
 /// Next departures of a ride's line from its boarding stop that stop at its alighting stop, with their arrival there,
 /// from the time the traveller gets there (now when null), refreshed every 30 s while shown
 final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, RideKey>((ref, key) async {
-  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(seconds: 30));
   return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
 });
 

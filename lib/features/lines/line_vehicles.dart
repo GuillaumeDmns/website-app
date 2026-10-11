@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,14 +8,14 @@ import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
+import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 
 /// Vehicles of a line and when they were fetched, refreshed every minute while shown (the backend keeps them a
 /// minute: the estimated-timetable quota is small)
 final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> vehicles, DateTime fetchedAt}), String>((ref, lineId) async {
-  final timer = Timer(const Duration(seconds: 60), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
+  ref.refreshEvery(const Duration(seconds: 60));
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());
 });
