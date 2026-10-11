@@ -661,3 +661,25 @@ abstract class Account with _$Account {
 
   factory Account.fromJson(Map<String, dynamic> json) => _$AccountFromJson(json);
 }
+
+/// A personal API token of an admin (Bruno, scripts), without its value
+@freezed
+abstract class ApiToken with _$ApiToken {
+  const factory ApiToken({
+    required int id,
+    required String name,
+    required DateTime createdAt,
+    required DateTime expiresAt,
+    DateTime? lastUsedAt,
+  }) = _ApiToken;
+
+  factory ApiToken.fromJson(Map<String, dynamic> json) => _$ApiTokenFromJson(json);
+}
+
+/// A token just created, with its value (only given this once)
+@freezed
+abstract class NewApiToken with _$NewApiToken {
+  const factory NewApiToken({required ApiToken apiToken, required String token}) = _NewApiToken;
+
+  factory NewApiToken.fromJson(Map<String, dynamic> json) => _$NewApiTokenFromJson(json);
+}

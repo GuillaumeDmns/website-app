@@ -10,6 +10,7 @@ import 'auth_form.dart';
 import 'google/google_auth.dart';
 import 'google/google_sign_in_button.dart';
 
+/// Sign-in: with Google only. Where it is not available yet (desktop, iOS), the app is used as a guest.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -18,32 +19,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _username = TextEditingController();
-  final _password = TextEditingController();
   bool _loading = false;
-  bool _obscure = true;
   String? _error;
-
-  /// Dev convenience: `--dart-define=DEV_USERNAME=… --dart-define=DEV_PASSWORD=…` signs in automatically (not in release builds)
-  static const _devUsername = String.fromEnvironment('DEV_USERNAME');
-  static const _devPassword = String.fromEnvironment('DEV_PASSWORD');
-
-  @override
-  void initState() {
-    super.initState();
-    if (!kReleaseMode && _devUsername.isNotEmpty && _devPassword.isNotEmpty) {
-      _username.text = _devUsername;
-      _password.text = _devPassword;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _submit());
-    }
-  }
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _password.dispose();
-    super.dispose();
-  }
 
   Future<void> _signInWithGoogle(String idToken) async {
     setState(() {
@@ -63,86 +40,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _submit() async {
-    if (_username.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = context.l10n.authMissingFields);
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await ref.read(authControllerProvider.notifier).signIn(_username.text, _password.text);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _error = e.toString());
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final available = kIsWeb || ref.watch(googleAccountChooserProvider) != null;
+    final theme = Theme.of(context);
     return AuthFormLayout(
       title: context.l10n.signIn,
       subtitle: context.l10n.signInSubtitle,
       children: [
-        if (googleSignInAvailable) ...[
-          GoogleSignInButton(onIdToken: _signInWithGoogle, enabled: !_loading),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Expanded(child: Divider()),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(context.l10n.or, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ),
-              const Expanded(child: Divider()),
-            ],
+        if (available)
+          GoogleSignInButton(onIdToken: _signInWithGoogle, enabled: !_loading)
+        else
+          Text(
+            context.l10n.googleSignInUnavailable,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
-          const SizedBox(height: 20),
+        if (_loading) ...[
+          const SizedBox(height: 16),
+          const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
         ],
-        TextField(
-          controller: _username,
-          decoration: InputDecoration(labelText: context.l10n.username, prefixIcon: const Icon(Icons.person_outline)),
-          autofillHints: const [AutofillHints.username],
-          textInputAction: TextInputAction.next,
-          enabled: !_loading,
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _password,
-          decoration: InputDecoration(
-            labelText: context.l10n.password,
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: IconButton(
-              tooltip: _obscure ? context.l10n.passwordShow : context.l10n.passwordHide,
-              icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-              onPressed: () => setState(() => _obscure = !_obscure),
-            ),
-          ),
-          obscureText: _obscure,
-          autofillHints: const [AutofillHints.password],
-          onSubmitted: (_) => _submit(),
-          enabled: !_loading,
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         FormErrorText(_error),
-        FilledButton(
-          onPressed: _loading ? null : _submit,
-          child: _loading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(context.l10n.signInAction),
-        ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: _loading ? null : () => context.go(Uri(path: Routes.signup, queryParameters: GoRouterState.of(context).uri.queryParameters).toString()),
-          child: Text(context.l10n.noAccountSignUp),
-        ),
         TextButton(
           onPressed: _loading ? null : () => context.go(GoRouterState.of(context).uri.queryParameters['from'] ?? Routes.home),
           child: Text(context.l10n.continueAsGuest),

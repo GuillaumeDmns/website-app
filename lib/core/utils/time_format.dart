@@ -57,3 +57,6 @@ String formatDay(DateTime time, DateTime now) {
     _ => DateFormat.MMMEd(currentL10n.localeName).format(local),
   };
 }
+
+/// `11 oct. 2026` (`Oct 11, 2026`), in local time
+String formatShortDate(DateTime time) => DateFormat.yMMMd(currentL10n.localeName).format(time.toLocal());

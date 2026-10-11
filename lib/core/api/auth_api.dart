@@ -10,12 +10,6 @@ class AuthApi {
 
   final Dio _dio;
 
-  Future<AuthTokens> signIn(String username, String password) =>
-      _tokens('/api/signin', {'username': username, 'password': password});
-
-  Future<AuthTokens> signUp(String username, String email, String password) =>
-      _tokens('/api/signup', {'username': username, 'email': email, 'password': password});
-
   /// Rotates the refresh token: the given one is no longer valid afterwards
   Future<AuthTokens> refresh(String refreshToken) => _tokens('/api/token/refresh', {'refreshToken': refreshToken});
 
@@ -38,28 +32,10 @@ class AuthApi {
       final response = await _dio.post<Map<String, dynamic>>(path, data: body);
       return AuthTokens.fromJson(response.data!);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      // Sign-in/up errors are meaningful to the user (wrong password, username taken…)
-      if (e.response?.statusCode == 401 && path == '/api/signin') {
-        throw ApiException(currentL10n.authWrongCredentials, statusCode: 401);
-      }
       if (path == '/api/auth/google' && e.response != null) {
         throw ApiException(currentL10n.googleSignInFailed, statusCode: e.response?.statusCode);
-      }
-      if (data is Map && data['detail'] is String && (e.response?.statusCode ?? 0) < 500) {
-        throw ApiException(_translate(data['detail'] as String), statusCode: e.response?.statusCode);
       }
       throw ApiException.fromDio(e);
     }
   }
-
-  static String _translate(String detail) => switch (detail) {
-        'Username already used' => currentL10n.authUsernameTaken,
-        'Email already used' => currentL10n.authEmailTaken,
-        'Invalid email' => currentL10n.authInvalidEmail,
-        'Password is too long' => currentL10n.authPasswordTooLong,
-        final d when d.startsWith('Password must be at least') => currentL10n.authPasswordTooShort,
-        final d when d.startsWith('Username must be') => currentL10n.authUsernameInvalid(currentL10n.authUsernameRule),
-        _ => detail,
-      };
 }

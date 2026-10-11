@@ -41,16 +41,6 @@ class AuthController extends Notifier<AuthStatus> {
   }
 
   /// What was saved as a guest stays: the favorites join the account (see `FavoritesController`)
-  Future<void> signIn(String username, String password) async {
-    final tokens = await ref.read(authApiProvider).signIn(username.trim(), password);
-    await _signedIn(tokens);
-  }
-
-  Future<void> signUp(String username, String email, String password) async {
-    final tokens = await ref.read(authApiProvider).signUp(username.trim(), email.trim(), password);
-    await _signedIn(tokens);
-  }
-
   Future<void> signInWithGoogle(String idToken) async {
     final tokens = await ref.read(authApiProvider).google(idToken);
     await _signedIn(tokens);

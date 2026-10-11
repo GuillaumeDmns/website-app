@@ -21,43 +21,9 @@ void main() {
     expect(await sessionOf(testContainer(backend, refreshToken: 'stored')), AuthStatus.signedIn);
   });
 
-  test('signs in with a password, keeping what the guest saved', () async {
+  test('signs in with Google, keeping what the guest saved', () async {
     final store = MemoryStore({'favorites': [], 'recent_searches': [], 'http_cache_index': ['http_cache:/api/v2/traffic?'], 'http_cache:/api/v2/traffic?': {}});
     final container = testContainer(backend, store: store);
-    await sessionOf(container);
-    backend.post('/api/signin', {'jwt': 'jwt', 'refreshToken': 'refresh', 'expiresIn': 3600});
-
-    await container.read(authControllerProvider.notifier).signIn(' ada ', 'secret');
-
-    expect(container.read(authControllerProvider), AuthStatus.signedIn);
-    expect(backend.requestsTo('/api/signin').single.data, {'username': 'ada', 'password': 'secret'});
-    expect(container.read(tokenStoreProvider).accessToken, 'jwt');
-    // The guest's favorites and searches stay; the cached answers of the guest go
-    expect(store.values.keys, containsAll(['favorites', 'recent_searches']));
-    expect(store.values.keys.where((key) => key.startsWith('http_cache')), isEmpty);
-  });
-
-  test('says when the password is wrong', () async {
-    final container = testContainer(backend);
-    await sessionOf(container);
-    backend.post('/api/signin', null, status: 401);
-
-    await expectLater(container.read(authControllerProvider.notifier).signIn('ada', 'wrong'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'message', currentL10n.authWrongCredentials)));
-    expect(container.read(authControllerProvider), AuthStatus.guest);
-  });
-
-  test('translates the sign-up refusals', () async {
-    final container = testContainer(backend);
-    await sessionOf(container);
-    backend.post('/api/signup', {'status': 409, 'detail': 'Username already used'}, status: 409);
-
-    await expectLater(container.read(authControllerProvider.notifier).signUp('ada', 'ada@example.com', 'correct horse'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'message', currentL10n.authUsernameTaken)));
-  });
-
-  test('signs in with Google', () async {
-    final container = testContainer(backend);
     await sessionOf(container);
     backend.post('/api/auth/google', {'jwt': 'jwt', 'refreshToken': 'refresh', 'expiresIn': 3600});
 
@@ -65,6 +31,20 @@ void main() {
 
     expect(backend.requestsTo('/api/auth/google').single.data, {'idToken': 'google-id-token'});
     expect(container.read(authControllerProvider), AuthStatus.signedIn);
+    expect(container.read(tokenStoreProvider).accessToken, 'jwt');
+    // The guest's favorites and searches stay; the cached answers of the guest go
+    expect(store.values.keys, containsAll(['favorites', 'recent_searches']));
+    expect(store.values.keys.where((key) => key.startsWith('http_cache')), isEmpty);
+  });
+
+  test('says when Google sign-in is refused', () async {
+    final container = testContainer(backend);
+    await sessionOf(container);
+    backend.post('/api/auth/google', {'status': 401, 'detail': 'Invalid Google ID token'}, status: 401);
+
+    await expectLater(container.read(authControllerProvider.notifier).signInWithGoogle('expired'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message', currentL10n.googleSignInFailed)));
+    expect(container.read(authControllerProvider), AuthStatus.guest);
   });
 
   test('signs out: the server forgets the session, the device the account', () async {

@@ -38,7 +38,7 @@ void main() {
     expect(find.text(currentL10n.errorGuestJourneyLimit), findsOneWidget);
 
     await tapOn(tester, find.text(currentL10n.signInAction));
-    expect(find.text(currentL10n.username), findsOneWidget);
+    expect(find.text(currentL10n.continueWithGoogle), findsOneWidget);
 
     await closeApp(tester);
   });

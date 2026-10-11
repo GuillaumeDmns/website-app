@@ -96,36 +96,9 @@
   "edit": "Modifier",
   "myStops": "Mes arrêts",
   "myLines": "Mes lignes",
-  "authWrongCredentials": "Identifiant ou mot de passe incorrect",
-  "authUsernameTaken": "Ce nom d'utilisateur est déjà pris",
-  "authEmailTaken": "Cet email est déjà utilisé",
-  "authInvalidEmail": "Email invalide",
-  "authPasswordTooLong": "Mot de passe trop long",
-  "authPasswordTooShort": "Le mot de passe doit faire au moins 8 caractères",
-  "authUsernameRule": "3 à 50 lettres, chiffres, « . », « _ » ou « - »",
-  "authUsernameInvalid": "Nom d'utilisateur : {rule}",
-  "@authUsernameInvalid": {
-    "placeholders": {
-      "rule": {
-        "type": "String"
-      }
-    }
-  },
-  "authMissingFields": "Renseignez votre identifiant et votre mot de passe",
   "signIn": "Connexion",
   "signInSubtitle": "Horaires en temps réel et itinéraires en Île-de-France",
-  "username": "Nom d'utilisateur",
-  "password": "Mot de passe",
-  "passwordShow": "Afficher",
-  "passwordHide": "Masquer",
   "signInAction": "Se connecter",
-  "noAccountSignUp": "Pas de compte ? Créer un compte",
-  "signUp": "Créer un compte",
-  "signUpSubtitle": "Gratuit, pour accéder au temps réel et sauvegarder vos favoris",
-  "email": "Email",
-  "passwordMinLength": "8 caractères minimum",
-  "signUpAction": "Créer mon compte",
-  "haveAccountSignIn": "Déjà un compte ? Se connecter",
   "linkCopied": "Lien copié",
   "close": "Fermer",
   "offlineSince": "Hors ligne · données du {when}",
@@ -967,5 +940,46 @@
   "accountDeleteConfirm": "Supprimer",
   "accountDeleted": "Compte supprimé",
   "continueWithGoogle": "Continuer avec Google",
-  "googleSignInFailed": "Connexion avec Google impossible"
+  "googleSignInFailed": "Connexion avec Google impossible",
+  "googleSignInUnavailable": "La connexion avec Google n'est pas encore disponible sur cet appareil : utilisez l'app Android ou l'app web pour vous connecter.",
+  "apiTokensTitle": "Jetons d'API",
+  "apiTokensHint": "Pour Bruno et les scripts : un jeton s'échange contre un accès à votre compte administrateur. Gardez-le secret.",
+  "apiTokensEmpty": "Aucun jeton.",
+  "apiTokenCreate": "Créer un jeton",
+  "apiTokenName": "Nom (par exemple « Bruno »)",
+  "apiTokenCreated": "Jeton créé",
+  "apiTokenCopyNow": "Copiez-le maintenant : il ne sera plus affiché.",
+  "apiTokenCopy": "Copier",
+  "apiTokenCopied": "Jeton copié",
+  "apiTokenRevoke": "Révoquer le jeton {name}",
+  "@apiTokenRevoke": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "apiTokenDetails": "Créé le {created} · expire le {expires} · {lastUsed}",
+  "@apiTokenDetails": {
+    "placeholders": {
+      "created": {
+        "type": "String"
+      },
+      "expires": {
+        "type": "String"
+      },
+      "lastUsed": {
+        "type": "String"
+      }
+    }
+  },
+  "apiTokenNeverUsed": "jamais utilisé",
+  "apiTokenLastUsed": "utilisé le {date}",
+  "@apiTokenLastUsed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  }
 }
