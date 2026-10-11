@@ -18,7 +18,7 @@ class PrivacyScreen extends StatelessWidget {
           padding: const EdgeInsets.only(top: 20, bottom: 6),
           child: Text(text, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
         );
-    Widget paragraph(String text) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(text));
+    Widget paragraph(String text) => Padding(padding: const EdgeInsets.only(bottom: 10), child: SelectableText(text));
 
     return ListView(
       controller: PanelScrollScope.of(context),
