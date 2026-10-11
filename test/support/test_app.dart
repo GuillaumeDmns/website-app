@@ -8,6 +8,7 @@ import 'package:website_app/core/api/api_providers.dart';
 import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/storage/local_store.dart';
+import 'package:website_app/features/auth/google/google_auth.dart';
 import 'package:website_app/features/onboarding/onboarding.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -23,6 +24,9 @@ class _TestOnboarding extends OnboardingController {
   Future<void> complete() async => state = true;
 }
 
+/// The account chooser of the tests: the user picks their Google account
+Future<String?> _testGoogleAccount() async => 'test-google-id-token';
+
 /// Châtelet
 const userPosition = LatLng(48.8584, 2.3470);
 
@@ -37,6 +41,7 @@ Future<MemoryStore> pumpApp(
   LatLng? position = userPosition,
   Locale locale = const Locale('fr'),
   Size size = const Size(412, 915),
+  Future<String?> Function()? googleAccountChooser = _testGoogleAccount,
 }) async {
   FlutterSecureStorage.setMockInitialValues({refreshTokenKey: ?refreshToken});
   useLocale(locale);
@@ -52,6 +57,7 @@ Future<MemoryStore> pumpApp(
       localeProvider.overrideWith(() => LocaleController(locale)),
       userLocationProvider.overrideWith((ref) => Stream.value(position)),
       mapTilesEnabledProvider.overrideWithValue(false),
+      googleAccountChooserProvider.overrideWithValue(googleAccountChooser),
     ],
     child: const MobilityApp(),
   ));

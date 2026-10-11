@@ -6,7 +6,6 @@ import '../features/journey/journey_request.dart';
 abstract final class Routes {
   static const splash = '/splash';
   static const login = '/login';
-  static const signup = '/signup';
   static const home = '/';
   static const search = '/search';
   static const aroundPath = '/around';

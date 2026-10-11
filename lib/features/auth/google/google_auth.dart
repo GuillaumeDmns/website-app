@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/config.dart';
@@ -8,6 +9,12 @@ import '../../../core/config.dart';
 /// ([AppConfig.googleWebClientId], `serverClientId`). Web: Google's own button (`google_button_web.dart`), which reports
 /// through [GoogleSignIn.authenticationEvents]. Elsewhere (desktop, iOS until it has its own client): not offered.
 bool get googleSignInAvailable => kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+
+/// Opens the account chooser and gives the ID token (null when cancelled), where the app does it itself (Android);
+/// null on the web (Google's own button) and where Google sign-in is not available. The tests replace it.
+final googleAccountChooserProvider = Provider<Future<String?> Function()?>(
+  (ref) => !kIsWeb && googleSignInAvailable ? requestGoogleIdToken : null,
+);
 
 Future<void>? _initialized;
 

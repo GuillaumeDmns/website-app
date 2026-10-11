@@ -27,6 +27,7 @@ FakeBackend standardBackend() {
       );
 
   backend.post('/api/auth/guest', {'jwt': 'guest-token', 'expiresIn': 2592000});
+  backend.post('/api/auth/google', {'jwt': 'google-access-token', 'refreshToken': 'google-refresh-token', 'expiresIn': 3600});
   backend.post('/api/token/refresh', {'jwt': 'access-token', 'refreshToken': 'next-refresh-token', 'expiresIn': 3600});
 
   backend.on('GET', '/api/v2/nearby/departures', (_) => FakeResponse([chateletDepartures().toJson()]));

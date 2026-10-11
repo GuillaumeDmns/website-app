@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../l10n/l10n.dart';
@@ -10,17 +11,17 @@ import 'google_button_stub.dart' if (dart.library.js_interop) 'google_button_web
 
 /// "Continuer avec Google": Google's button on the web, a button opening the account chooser on Android; [onIdToken]
 /// gets the Google ID token. Nothing where Google sign-in is not available.
-class GoogleSignInButton extends StatefulWidget {
+class GoogleSignInButton extends ConsumerStatefulWidget {
   const GoogleSignInButton({super.key, required this.onIdToken, this.enabled = true});
 
   final Future<void> Function(String idToken) onIdToken;
   final bool enabled;
 
   @override
-  State<GoogleSignInButton> createState() => _GoogleSignInButtonState();
+  ConsumerState<GoogleSignInButton> createState() => _GoogleSignInButtonState();
 }
 
-class _GoogleSignInButtonState extends State<GoogleSignInButton> {
+class _GoogleSignInButtonState extends ConsumerState<GoogleSignInButton> {
   StreamSubscription<GoogleSignInAuthenticationEvent>? _events;
   bool _ready = !kIsWeb;
   String? _error;
@@ -61,10 +62,10 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
     }
   }
 
-  Future<void> _chooseAccount() async {
+  Future<void> _chooseAccount(Future<String?> Function() chooser) async {
     setState(() => _error = null);
     try {
-      final idToken = await requestGoogleIdToken();
+      final idToken = await chooser();
       if (idToken != null) {
         await widget.onIdToken(idToken);
       }
@@ -75,7 +76,8 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (!googleSignInAvailable) {
+    final chooser = ref.watch(googleAccountChooserProvider);
+    if (!kIsWeb && chooser == null) {
       return const SizedBox.shrink();
     }
     final button = kIsWeb
@@ -84,7 +86,7 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             icon: const Icon(Icons.account_circle_outlined),
             label: Text(context.l10n.continueWithGoogle),
-            onPressed: widget.enabled ? _chooseAccount : null,
+            onPressed: widget.enabled ? () => _chooseAccount(chooser!) : null,
           );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

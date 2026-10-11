@@ -124,6 +124,26 @@ class MobilityApi {
     }
   }
 
+  /// Personal API tokens of the signed-in admin
+  Future<List<ApiToken>> apiTokens() => _getList('/api/v2/me/api-tokens', ApiToken.fromJson);
+
+  Future<NewApiToken> createApiToken(String name) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>('/api/v2/me/api-tokens', data: {'name': name});
+      return NewApiToken.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<void> deleteApiToken(int id) async {
+    try {
+      await _dio.delete<void>('/api/v2/me/api-tokens/$id');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<T> _get<T>(String path, T Function(Map<String, dynamic>) fromJson, [Map<String, dynamic>? query]) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(path, queryParameters: query);

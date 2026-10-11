@@ -8,7 +8,6 @@ import '../features/about/about_screen.dart';
 import '../features/auth/account_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
-import '../features/auth/signup_screen.dart';
 import '../features/go/go_screen.dart';
 import '../features/home/around_screen.dart';
 import '../features/home/home_screen.dart';
@@ -38,7 +37,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final status = authListenable.value;
       final location = state.matchedLocation;
-      final onAuthPage = location == Routes.login || location == Routes.signup;
+      final onAuthPage = location == Routes.login;
 
       // The requested page is kept in `from` through the splash and sign-in pages (deep links, web reloads)
       final from = state.uri.queryParameters['from'];
@@ -63,7 +62,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: Routes.splash, builder: (context, state) => const _SplashScreen()),
       GoRoute(path: Routes.login, builder: (context, state) => const LoginScreen()),
-      GoRoute(path: Routes.signup, builder: (context, state) => const SignupScreen()),
       GoRoute(path: Routes.welcome, builder: (context, state) => WelcomeScreen(from: state.uri.queryParameters['from'])),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),

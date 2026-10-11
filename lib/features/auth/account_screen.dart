@@ -9,6 +9,7 @@ import '../../core/api/models.dart';
 import '../../core/platform/share.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
+import 'api_tokens_section.dart';
 import 'auth_controller.dart';
 
 final accountProvider = FutureProvider.autoDispose<Account>((ref) => ref.watch(mobilityApiProvider).account());
@@ -179,6 +180,10 @@ class _SignedInState extends ConsumerState<_SignedIn> {
             ],
           ),
         ),
+        if (account.role == 'ROLE_ADMIN') ...[
+          const SizedBox(height: 32),
+          const ApiTokensSection(),
+        ],
         const SizedBox(height: 32),
         Text(l10n.accountDangerZone, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.error)),
         const SizedBox(height: 8),
