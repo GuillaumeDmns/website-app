@@ -28,7 +28,7 @@ final offlineProvider = NotifierProvider<OfflineState, DateTime?>(OfflineState.n
 
 /// Light offline mode: the last answers of the read endpoints (stops, lines, timetables, favorites, traffic,
 /// journeys…) are kept on the device, and served when the server can't be reached. Real-time-only endpoints
-/// (vehicles, departures of a ride, Vélib, search) are not kept: stale data there would mislead.
+/// (vehicles, departures of a ride, Vélib, search, addresses of a point) are not kept: stale data there would mislead.
 class OfflineCacheInterceptor extends Interceptor {
   OfflineCacheInterceptor({required this.store, required this.onOffline, required this.onOnline});
 
@@ -45,7 +45,7 @@ class OfflineCacheInterceptor extends Interceptor {
   /// Bigger answers are not kept (localStorage holds about 5 MB on the web)
   static const _maxLength = 300000;
 
-  static final _excluded = RegExp(r'/(vehicles|rides|bikes|search)\b|^/api/v2/me(/export|/api-tokens)?$');
+  static final _excluded = RegExp(r'/(vehicles|rides|bikes|search|reverse)\b|^/api/v2/me(/export|/api-tokens)?$');
 
   static bool _cacheable(RequestOptions options) =>
       options.method == 'GET' && options.path.startsWith('/api/v2/') && !_excluded.hasMatch(options.path);

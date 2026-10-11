@@ -7,6 +7,7 @@ import '../core/map/main_map.dart';
 import '../core/map/map_overlay.dart';
 import '../core/offline/offline_banner.dart';
 import '../features/go/go_bar.dart';
+import '../features/map_place/map_place_sheet.dart';
 import 'routes.dart';
 
 /// Width from which the page is shown in a side panel next to the map instead of a bottom sheet
@@ -134,7 +135,7 @@ class _WideLayout extends StatelessWidget {
           const Expanded(
             child: Stack(
               children: [
-                Positioned.fill(child: MainMap()),
+                Positioned.fill(child: MainMap(onLongPress: showMapPlaceSheet)),
                 Positioned(
                   top: 12,
                   left: 12,
@@ -294,7 +295,7 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: screen.height * sizes.middle))),
+          Positioned.fill(child: MainMap(padding: EdgeInsets.only(bottom: screen.height * sizes.middle), onLongPress: showMapPlaceSheet)),
           const Positioned(
             top: 8,
             left: 12,

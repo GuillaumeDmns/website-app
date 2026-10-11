@@ -485,6 +485,7 @@
       }
     }
   },
+  "leaveFromHere": "Partir d'ici",
   "pointOnMap": "Point sur la carte",
   "walkingSlow": "Lente",
   "walkingNormal": "Normale",
@@ -937,9 +938,9 @@
   "privacyDataTitle": "Vos données",
   "privacyGuest": "Sans compte, l'app utilise un identifiant anonyme propre à l'appareil, qui sert seulement à limiter l'usage. Vos favoris et recherches récentes restent sur l'appareil.",
   "privacyAccount": "Avec un compte, Google nous transmet votre identifiant Google, votre adresse e-mail et votre prénom. Ils sont gardés avec vos favoris (qui peuvent contenir des adresses, comme votre domicile) jusqu'à la suppression du compte. Aucun mot de passe n'est stocké.",
-  "privacyLocation": "Votre position est envoyée au serveur pour trouver les arrêts proches et calculer vos itinéraires (avec le calculateur d'Île-de-France Mobilités). Elle n'est pas conservée.",
+  "privacyLocation": "Votre position est envoyée au serveur pour trouver les arrêts proches, classer les résultats de recherche et calculer vos itinéraires (avec le calculateur d'Île-de-France Mobilités). Elle n'est pas conservée.",
   "privacyNoTracking": "Pas de publicité, pas de mesure d'audience, pas de traceur, et rien n'est revendu. Le serveur garde 14 jours des journaux techniques (adresse IP, heure, page demandée, sans position), pour sa sécurité.",
-  "privacyServices": "Services utilisés : Google pour la connexion, Île-de-France Mobilités pour les horaires, le temps réel et les itinéraires, l'IGN pour les fonds de carte (chargés directement par l'appareil).",
+  "privacyServices": "Services utilisés : Google pour la connexion, Île-de-France Mobilités pour les horaires, le temps réel et les itinéraires, l'IGN pour les fonds de carte (chargés directement par l'appareil) et la recherche d'adresses (avec une position arrondie à environ 1 km).",
   "privacyRightsTitle": "Vos droits",
   "privacyRights": "Depuis la page Compte, vous pouvez exporter vos données ou supprimer votre compte : la suppression est immédiate et définitive, favoris compris. Pour toute autre demande : 2a1036eab9fc0b803ed8c73eeb4b8ace-23131907@contact.gandi.net. Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).",
   "creditIdfmTitle": "Île-de-France Mobilités",

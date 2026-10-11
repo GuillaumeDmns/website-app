@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
+import 'package:website_app/features/map_place/map_place_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/standard_backend.dart';
@@ -52,6 +54,9 @@ void main() {
     await tester.enterText(find.byType(TextField), 'chat');
     await settle(tester);
     expect(backend.requestsTo('/api/v2/search').last.queryParameters['q'], 'chat');
+    // Where the user is, about 100 m: close places first
+    expect(backend.requestsTo('/api/v2/search').last.queryParameters['lat'], '48.858');
+    expect(backend.requestsTo('/api/v2/search').last.queryParameters['lon'], '2.347');
     expect(find.text('10 Rue de Rivoli (Paris)'), findsOneWidget);
 
     await tapOn(tester, find.text('Châtelet (Paris)'));
@@ -95,6 +100,43 @@ void main() {
     await tapOn(tester, find.text(currentL10n.otherLanguage));
 
     expect(find.text('Nearby'), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a long press on the map names the point and goes there', (tester) async {
+    final backend = standardBackend();
+    backend.get('/api/v2/places/reverse',
+        const PlaceResult(type: PlaceType.address, id: 'address:1', name: '2 Rue Jean Lantier 75001 Paris', lat: 48.8584, lon: 2.347).toJson());
+    await pumpApp(tester, backend);
+
+    await tester.longPressAt(const Offset(206, 200));
+    await settle(tester);
+
+    expect(backend.requestsTo('/api/v2/places/reverse'), hasLength(1));
+    final sheet = find.byType(MapPlaceSheet);
+    expect(find.descendant(of: sheet, matching: find.text('2 Rue Jean Lantier 75001 Paris')), findsOneWidget);
+    await tapOn(tester, find.descendant(of: sheet, matching: find.text(currentL10n.goThere)));
+
+    // The journey there, from the user's position
+    expect(find.byType(MapPlaceSheet), findsNothing);
+    expect(find.text('2 Rue Jean Lantier 75001 Paris'), findsWidgets);
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters['to'], startsWith('48.'));
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a point of the map without address keeps a plain name', (tester) async {
+    final backend = standardBackend();
+    backend.get('/api/v2/places/reverse', {'status': 404, 'detail': 'Not found'}, status: 404);
+    await pumpApp(tester, backend);
+
+    await tester.longPressAt(const Offset(206, 200));
+    await settle(tester);
+    await tapOn(tester, find.descendant(of: find.byType(MapPlaceSheet), matching: find.text(currentL10n.departuresAround)));
+
+    expect(find.text(currentL10n.pointOnMap), findsWidgets);
+    expect(backend.requestsTo('/api/v2/nearby/departures'), isNotEmpty);
 
     await closeApp(tester);
   });

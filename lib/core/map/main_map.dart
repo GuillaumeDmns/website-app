@@ -16,10 +16,13 @@ final mapTilesEnabledProvider = Provider<bool>((ref) => true);
 /// The map behind every page. Shows the overlay of the current page and the user position, and frames the
 /// overlay's points when the page changes.
 class MainMap extends ConsumerStatefulWidget {
-  const MainMap({super.key, this.padding = EdgeInsets.zero});
+  const MainMap({super.key, this.padding = EdgeInsets.zero, this.onLongPress});
 
   /// Part of the map hidden by the panel, kept out of the framed area
   final EdgeInsets padding;
+
+  /// Long press (right click on desktop) on a point of the map
+  final void Function(BuildContext context, LatLng position)? onLongPress;
 
   @override
   ConsumerState<MainMap> createState() => _MainMapState();
@@ -104,6 +107,8 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
           _frame(overlay);
         },
         onMapEvent: _onMapEvent,
+        onLongPress: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),
+        onSecondaryTap: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),
       ),
       children: [
         // Plan IGN (Géoplateforme): free, no key, open licence; no dark style, so it is inverted in dark mode

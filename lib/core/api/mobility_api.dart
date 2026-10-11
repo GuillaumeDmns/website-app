@@ -80,8 +80,25 @@ class MobilityApi {
   Future<List<BikeStation>> bikesNearby(double lat, double lon, {int radius = 500, int limit = 5}) =>
       _getList('/api/v2/bikes/nearby', BikeStation.fromJson, {'lat': lat, 'lon': lon, 'radius': radius, 'limit': limit});
 
-  Future<SearchResult> search(String query, {int limit = 10}) =>
-      _get('/api/v2/search', SearchResult.fromJson, {'q': query, 'limit': limit});
+  /// [lat], [lon]: where the user is (about 100 m is enough), to find what is close first
+  Future<SearchResult> search(String query, {int limit = 10, double? lat, double? lon}) =>
+      _get('/api/v2/search', SearchResult.fromJson, {
+        'q': query,
+        'limit': limit,
+        if (lat != null && lon != null) ...{'lat': lat.toStringAsFixed(3), 'lon': lon.toStringAsFixed(3)},
+      });
+
+  /// The position named after its closest address, null when there is none
+  Future<PlaceResult?> reverse(double lat, double lon) async {
+    try {
+      return await _get('/api/v2/places/reverse', PlaceResult.fromJson, {'lat': lat.toStringAsFixed(5), 'lon': lon.toStringAsFixed(5)});
+    } on ApiException catch (e) {
+      if (e.isNotFound) {
+        return null;
+      }
+      rethrow;
+    }
+  }
 
   Future<List<Favorite>> favorites() => _getList('/api/v2/me/favorites', Favorite.fromJson);
 

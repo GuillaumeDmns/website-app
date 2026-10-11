@@ -8,6 +8,7 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
+import '../../core/location/location_providers.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
@@ -17,9 +18,11 @@ import '../journey/journey_request.dart';
 import 'recent_searches.dart';
 
 /// Results of a query (keyed by the query, so that stacked search pages don't share them)
-final _searchResultsProvider = FutureProvider.autoDispose.family<SearchResult, String>(
-  (ref, query) => ref.watch(mobilityApiProvider).search(query),
-);
+final _searchResultsProvider = FutureProvider.autoDispose.family<SearchResult, String>((ref, query) {
+  // Read once: the results don't change while the map moves
+  final origin = ref.read(nearbyOriginProvider).position;
+  return ref.watch(mobilityApiProvider).search(query, lat: origin.latitude, lon: origin.longitude);
+});
 
 /// Unified search. With [pickTitle] it chooses a journey start or end and pops a [JourneyPlace].
 class SearchScreen extends ConsumerStatefulWidget {
