@@ -254,6 +254,17 @@
       }
     }
   },
+  "betweenStops": "Entre {from} et {to}",
+  "@betweenStops": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
   "untilDate": "Jusqu'à {when}",
   "@untilDate": {
     "placeholders": {

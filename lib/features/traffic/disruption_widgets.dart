@@ -125,6 +125,7 @@ class DisruptionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final color = disruption.active ? severityColor(disruption.severity, theme.colorScheme) : theme.colorScheme.onSurfaceVariant;
     final period = _period(disruption, DateTime.now());
+    final subtitle = [..._sections(disruption), ?period].join('\n');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -144,7 +145,7 @@ class DisruptionCard extends StatelessWidget {
           leading: leading ?? Icon(disruption.category == DisruptionCategory.works ? Icons.construction : severityIcon(disruption.severity), color: color),
           title: Text(disruption.title ?? severityLabel(disruption.severity),
               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          subtitle: period == null ? null : Text(period, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          subtitle: subtitle.isEmpty ? null : Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           children: [
             if (disruption.message != null) SelectableText(disruption.message!, style: theme.textTheme.bodyMedium),
           ],
@@ -152,6 +153,12 @@ class DisruptionCard extends StatelessWidget {
       ),
     );
   }
+
+  /// "Between Châtelet and Nation", for each impacted section
+  static List<String> _sections(Disruption disruption) => [
+        for (final section in disruption.sections)
+          if (section.fromName != null && section.toName != null) currentL10n.betweenStops(section.fromName!, section.toName!),
+      ];
 
   static String? _period(Disruption disruption, DateTime now) {
     final start = disruption.start;
@@ -243,7 +250,18 @@ class _ElevatorCard extends StatelessWidget {
             for (final disruption in disruptions)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text('• ${disruption.message ?? disruption.title ?? ''}', style: theme.textTheme.bodyMedium),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ${disruption.title ?? ''}', style: theme.textTheme.bodyMedium),
+                    // Where it is
+                    if (disruption.message != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Text(disruption.message!, style: theme.textTheme.bodySmall?.copyWith(color: color)),
+                      ),
+                  ],
+                ),
               ),
           ],
         ),

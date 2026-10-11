@@ -110,6 +110,7 @@
   "severityNormal": "Good service",
   "upcomingDisruptions": "{count, plural, =1{1 upcoming disruption} other{{count} upcoming disruptions}}",
   "fromDate": "From {when}",
+  "betweenStops": "Between {from} and {to}",
   "untilDate": "Until {when}",
   "brokenElevators": "{count, plural, =1{1 broken elevator} other{{count} broken elevators}}",
   "trafficTitle": "Service status",
