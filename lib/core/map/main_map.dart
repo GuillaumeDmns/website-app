@@ -68,7 +68,7 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
     _controller.animatedFitCamera(
       cameraFit: CameraFit.coordinates(
         coordinates: overlay.fit,
-        padding: widget.padding + const EdgeInsets.all(48) + overlay.fitMargin,
+        padding: widget.padding + const EdgeInsets.all(48),
         maxZoom: overlay.fit.length == 1 ? 16 : 17,
       ),
     );

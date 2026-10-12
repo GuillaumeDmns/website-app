@@ -112,7 +112,6 @@ class _GoScreenState extends ConsumerState<GoScreen> {
         currentSection: arrived ? state.journey.sections.length : tracker.stepOf(progress)?.sectionIndex ?? -1,
         currentAlong: onBoardOrMoving ? progress.along : 0,
         fitSection: shownStep?.sectionIndex,
-        focusSection: shownStep?.sectionIndex,
       ).withFollow(goFollow(state, _shown)),
       child: Column(
         children: [

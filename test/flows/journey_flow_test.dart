@@ -30,7 +30,7 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets('a ride of the detail shows its stops and times on the map', (tester) async {
+  testWidgets('a ride of the detail shows its stops between in the timeline, not on the map', (tester) async {
     final backend = standardBackend();
     backend.on('GET', '/api/v2/journeys', (_) {
       final start = DateTime.now().toUtc().add(const Duration(minutes: 2));
@@ -43,18 +43,15 @@ void main() {
     await tapOn(tester, find.text(currentL10n.goThere));
     await tapOn(tester, find.byType(JourneyCard));
 
-    // The stop between is a dot on the map, unnamed until the ride is looked at
-    expect(find.textContaining('Gare de Lyon ·'), findsNothing);
-    await tapOn(tester, find.byTooltip(currentL10n.showRideOnMap));
-    expect(find.textContaining('Gare de Lyon ·'), findsOneWidget);
-    expect(find.textContaining('Nation ·'), findsOneWidget);
-
-    await tapOn(tester, find.byTooltip(currentL10n.showWholeJourney));
-    expect(find.textContaining('Gare de Lyon ·'), findsNothing);
-
-    // Opening its list of stops looks at it too
+    // Folded: only the count
+    expect(find.text('Gare de Lyon'), findsNothing);
     await tapOn(tester, find.textContaining(currentL10n.stopsCount(1)));
-    expect(find.textContaining('Gare de Lyon ·'), findsOneWidget);
+    // One under the other with its time, like the rest of the timeline; nothing written on the map
+    expect(find.text('Gare de Lyon'), findsOneWidget);
+    expect(find.textContaining('Gare de Lyon ·'), findsNothing);
+
+    await tapOn(tester, find.textContaining(currentL10n.stopsCount(1)));
+    expect(find.text('Gare de Lyon'), findsNothing);
 
     await closeApp(tester);
   });

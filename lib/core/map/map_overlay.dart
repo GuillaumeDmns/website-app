@@ -61,7 +61,6 @@ class MapOverlay {
     this.pins = const [],
     this.paths = const [],
     this.fit = const [],
-    this.fitMargin = EdgeInsets.zero,
     this.follow,
   });
 
@@ -73,13 +72,10 @@ class MapOverlay {
   /// Points to frame when the overlay is shown; empty to leave the camera where it is
   final List<LatLng> fit;
 
-  /// Room kept around [fit] beyond the usual margin (e.g. for labels drawn beside the points)
-  final EdgeInsets fitMargin;
-
   /// Instead of framing [fit], the camera follows the user (until they move the map themselves)
   final MapFollow? follow;
 
-  MapOverlay withFollow(MapFollow? follow) => MapOverlay(pins: pins, paths: paths, fit: fit, fitMargin: fitMargin, follow: follow);
+  MapOverlay withFollow(MapFollow? follow) => MapOverlay(pins: pins, paths: paths, fit: fit, follow: follow);
 
 }
 

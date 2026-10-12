@@ -41,7 +41,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   Map<int, Ride> _choices = const {};
   JourneyOption? _choicesOf;
 
-  /// Ride looked at on the map (framed, its stops named with their times); null: the whole journey
+  /// Ride whose stops are shown in the timeline, framed on the map; null: the whole journey
   int? _focused;
 
   void _focus(int index, bool focus) => setState(() => _focused = focus ? index : (_focused == index ? null : _focused));
@@ -110,7 +110,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     final journey = retimed.journey;
 
     return MapOverlayScope(
-      overlay: journeyOverlay(context, journey, fitSection: _focused, focusSection: _focused),
+      overlay: journeyOverlay(context, journey, fitSection: _focused),
       child: ListView(
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 8, 16, 32),
@@ -213,7 +213,7 @@ class _SectionTile extends StatelessWidget {
   /// Only the first section shows where it starts: the others start where the previous one ended
   final bool isFirst;
 
-  /// Looked at on the map
+  /// Its stops shown, framed on the map
   final bool focused;
   final ValueChanged<bool> onFocus;
 
@@ -358,7 +358,7 @@ class _RideTile extends StatelessWidget {
   final RidePlan? plan;
   final ValueChanged<Ride> onChoose;
 
-  /// Framed on the map with its stops named: the map button, or opening the list of stops
+  /// Its stops shown in the timeline, and the ride framed on the map
   final bool focused;
   final ValueChanged<bool> onFocus;
 
@@ -407,13 +407,6 @@ class _RideTile extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    IconButton(
-                      tooltip: focused ? context.l10n.showWholeJourney : context.l10n.showRideOnMap,
-                      isSelected: focused,
-                      icon: const Icon(Icons.map_outlined),
-                      selectedIcon: Icon(Icons.map, color: color),
-                      onPressed: () => onFocus(!focused),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -442,30 +435,22 @@ class _RideTile extends StatelessWidget {
                     _StopElevators(stopAreaId: stopAreaId, name: point!.name),
                 if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
-                  Theme(
-                    data: theme.copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      dense: true,
-                      // Its stops on the map too
-                      onExpansionChanged: (open) {
-                        if (open) {
-                          onFocus(true);
-                        }
-                      },
-                      title: Text(
-                        '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                      children: [
-                        for (final stop in intermediate)
-                          ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(stop.name),
-                            trailing: stop.time == null ? null : Text(formatClock(stop.time!)),
+                  // The stops between, like Citymapper: below, on the line
+                  InkWell(
+                    onTap: () => onFocus(!focused),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            ),
                           ),
-                      ],
+                          Icon(focused ? Icons.expand_less : Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
                     ),
                   )
                 else
@@ -480,6 +465,17 @@ class _RideTile extends StatelessWidget {
             ),
           ),
         ),
+        if (focused)
+          for (final stop in intermediate)
+            _TimelineRow(
+              color: color,
+              time: stop.time == null ? null : formatClock(stop.time!),
+              stopDot: true,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(stop.name, style: theme.textTheme.bodyMedium),
+              ),
+            ),
         _TimelineRow(
           color: color,
           time: formatClock(section.arrival),
@@ -655,6 +651,7 @@ class _TimelineRow extends StatelessWidget {
     required this.child,
     this.time,
     this.dot = false,
+    this.stopDot = false,
     this.dotted = false,
     this.isLast = false,
   });
@@ -663,6 +660,9 @@ class _TimelineRow extends StatelessWidget {
   final Widget child;
   final String? time;
   final bool dot;
+
+  /// A stop the vehicle passes: a small dot on the line, which goes on
+  final bool stopDot;
   final bool dotted;
   final bool isLast;
 
@@ -696,6 +696,17 @@ class _TimelineRow extends StatelessWidget {
                     top: dot ? 8 : 0,
                     child: Center(
                       child: dotted ? _DottedLine(color: color) : Container(width: 5, color: color),
+                    ),
+                  ),
+                if (stopDot)
+                  Container(
+                    margin: const EdgeInsets.only(top: 5),
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: color, width: 2),
                     ),
                   ),
                 if (dot)

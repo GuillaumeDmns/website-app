@@ -6,22 +6,20 @@ import '../../../core/map/map_overlay.dart';
 import '../../../core/utils/colors.dart';
 import '../../bikes/bike_widgets.dart';
 import '../../../core/utils/geo.dart';
-import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
 
 /// Map overlay of a journey: rides in their line color, bikes green, walks dotted, the line badge where you board, a
-/// dot where you get off, small dots at the stops between, start and end.
+/// dot where you get off, small dots at the stops between (named in the sheet, not here: the map stays light), start
+/// and end.
 ///
-/// The camera frames the section [fitSection] instead of the whole journey. The ride [focusSection] (the one looked
-/// at, or followed in GO) names its stops with their times. GO mode: sections before [currentSection] and the first
-/// [currentAlong] meters of it are faded.
+/// The camera frames the section [fitSection] instead of the whole journey. GO mode: sections before [currentSection]
+/// and the first [currentAlong] meters of it are faded.
 MapOverlay journeyOverlay(
   BuildContext context,
   JourneyOption journey, {
   int currentSection = -1,
   double currentAlong = 0,
   int? fitSection,
-  int? focusSection,
 }) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
@@ -73,7 +71,6 @@ MapOverlay journeyOverlay(
     }
 
     if (ride) {
-      final focused = index == focusSection;
       final stops = section.stops;
       final stopColor = index < currentSection ? done : color;
       // Stops between: smaller dots, under everything else
@@ -81,22 +78,22 @@ MapOverlay journeyOverlay(
         if (k == 0 || k == stops.length - 1) {
           continue;
         }
-        final text = _stopText(stop.name, stop.time);
-        stopDots.add(focused
-            ? MapPin(point: LatLng(stop.lat, stop.lon), color: stopColor, childSize: _namedSize, child: _NamedStop(color: stopColor, text: text, dotSize: 9))
-            : MapPin(point: LatLng(stop.lat, stop.lon), color: stopColor, label: text, childSize: const Size(12, 12), child: _StopDot(color: stopColor, size: 9)));
+        stopDots.add(MapPin(
+          point: LatLng(stop.lat, stop.lon),
+          color: stopColor,
+          label: stop.name,
+          childSize: const Size(12, 12),
+          child: _StopDot(color: stopColor, size: 9),
+        ));
       }
       // Get off: small dot in the line color
-      final alightText = _stopText(section.to?.name ?? '', section.arrival);
-      dots.add(focused
-          ? MapPin(point: shape.last, color: color, childSize: _namedSize, child: _NamedStop(color: color, text: alightText))
-          : MapPin(
-              point: shape.last,
-              color: color,
-              label: section.to?.name,
-              childSize: const Size(16, 16),
-              child: _StopDot(color: color),
-            ));
+      dots.add(MapPin(
+        point: shape.last,
+        color: color,
+        label: section.to?.name,
+        childSize: const Size(16, 16),
+        child: _StopDot(color: color),
+      ));
       // Board: the line badge, above the stop
       if (section.line != null) {
         badges.add(MapPin(
@@ -123,15 +120,8 @@ MapOverlay journeyOverlay(
       if (end != null) MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name),
     ],
     fit: sectionPoints.isNotEmpty ? sectionPoints : points,
-    // The stops' names on the right of their dot
-    fitMargin: focusSection == null ? EdgeInsets.zero : const EdgeInsets.only(right: 150),
   );
 }
-
-String _stopText(String name, DateTime? time) => time == null ? name : '$name · ${formatClock(time)}';
-
-/// Box of a named stop: the dot in its middle, the name on its right
-const _namedSize = Size(360, 24);
 
 class _StopDot extends StatelessWidget {
   const _StopDot({required this.color, this.size = 12});
@@ -149,43 +139,6 @@ class _StopDot extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: color, width: size / 4),
       ),
-    );
-  }
-}
-
-/// A stop of the ride looked at: its dot, and its name and time on a small label beside it
-class _NamedStop extends StatelessWidget {
-  const _NamedStop({required this.color, required this.text, this.dotSize = 12});
-
-  final Color color;
-  final String text;
-  final double dotSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final labelLeft = _namedSize.width / 2 + dotSize / 2 + 4;
-    return Stack(
-      children: [
-        Center(child: _StopDot(color: color, size: dotSize)),
-        Positioned(
-          left: labelLeft,
-          top: 0,
-          bottom: 0,
-          right: 0,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
