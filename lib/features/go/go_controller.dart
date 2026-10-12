@@ -460,7 +460,13 @@ class GoController extends Notifier<GoState?> {
       _ => currentL10n.minutesShort((tracker.metersLeft(progress) / 1.2 / 60).ceil()),
     };
     final info = currentL10n.goArrival(formatClock(tracker.eta(progress, state.currentVehicle)));
-    final key = '${instruction.title}|${instruction.subtitle}|$chip|$info|${progress.step}';
+    // The platform as soon as it is known: the subtitle while waiting, the next ride's otherwise
+    final platform = goPlatformText(state);
+    final status = [
+      if (instruction.subtitle case final subtitle? when subtitle.isNotEmpty) subtitle,
+      ?platform,
+    ].join(' · ');
+    final key = '${instruction.title}|$status|$chip|$info|${progress.step}';
     if (key == _lastLive && (done - _lastLiveProgress).abs() < 15) {
       return;
     }
@@ -483,7 +489,7 @@ class GoController extends Notifier<GoState?> {
 
     ref.read(liveJourneyProvider).update(LiveJourneyUpdate(
           title: instruction.title,
-          status: instruction.subtitle ?? '',
+          status: status,
           progress: done,
           mode: mode,
           chip: chip,

@@ -636,6 +636,36 @@
       }
     }
   },
+  "goQuay": "quai {platform}",
+  "@goQuay": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "alertPlatform": "{line} : voie {platform}",
+  "@alertPlatform": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "alertPlatformChanged": "Changement de voie : {line} voie {platform}",
+  "@alertPlatformChanged": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
   "goBoard": "montez {positions}",
   "@goBoard": {
     "placeholders": {

@@ -353,11 +353,37 @@ class GoTracker {
       alerts.add(GoAlert(id: 'arrived', title: currentL10n.goArrived, body: journey.sections.lastOrNull?.to?.name));
     }
 
+    _platformAlert(current, input, alerts);
+
     final fresh = alerts.where((alert) => !current.fired.contains(alert.id)).toList();
     if (fresh.isNotEmpty) {
       current = current.copyWith(fired: {...current.fired, ...fresh.map((alert) => alert.id)});
     }
     return (current, fresh);
+  }
+
+  /// A train's platform, once announced or when it changes: for the ride waited for, or the next one (walking there,
+  /// or on board the previous ride)
+  void _platformAlert(GoProgress progress, GoInput input, List<GoAlert> alerts) {
+    final index = input.vehicleStep;
+    final platform = input.vehicle?.platform?.trim();
+    if (index == null || platform == null || platform.isEmpty || progress.phase == GoPhase.arrived || index < progress.step ||
+        index >= steps.length || !steps[index].isRide || (index == progress.step && progress.phase == GoPhase.onBoard)) {
+      return;
+    }
+    final section = steps[index].section;
+    final line = section.line;
+    if (!(line?.mode.isRail ?? false)) {
+      return;
+    }
+    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final changed = progress.fired.any((id) => id.startsWith('platform-$index-') && id != 'platform-$index-$platform');
+    alerts.add(GoAlert(
+      id: 'platform-$index-$platform',
+      title: changed ? currentL10n.alertPlatformChanged(lineLabel, platform) : currentL10n.alertPlatform(lineLabel, platform),
+      body: currentL10n.direction(section.headsign ?? ''),
+      urgent: changed,
+    ));
   }
 
   LatLng? _usableFix(GoInput input) {

@@ -26,6 +26,9 @@ enum TransportMode {
   /// Value used by the API (`METRO`…)
   String get apiName => name.toUpperCase();
 
+  /// Trains, where the platform ("voie") is announced late and may change
+  bool get isRail => this == rer || this == transilien || this == ter;
+
   String get label => switch (this) {
         metro => currentL10n.modeMetro,
         rer => 'RER',

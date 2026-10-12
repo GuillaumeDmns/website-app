@@ -171,4 +171,42 @@ void main() {
     expect(restored.fired, {'soon-1'});
     expect(GoProgress.fromJson(const {}).phase, GoPhase.moving);
   });
+
+  group('platform', () {
+    // Walk to Châtelet, RER A at 8:06 to Nation
+    final rerPlan = journey([walk(at(0), 240), transit(at(6), 480, line: rerA)]);
+    final rerTracker = GoTracker(rerPlan);
+    Departure withPlatform(String? platform) => departure(at(6)).copyWith(platform: platform);
+
+    test('a train\'s platform is announced once known, and again when it changes', () {
+      final waiting = rerTracker.jumpTo(rerTracker.initial(), 1);
+
+      var (progress, alerts) = rerTracker.update(waiting, input(at(3), position: position(chatelet), vehicle: withPlatform(null), vehicleStep: 1));
+      expect(alerts.where((alert) => alert.id.startsWith('platform')), isEmpty);
+
+      (progress, alerts) = rerTracker.update(progress, input(at(3, 30), position: position(chatelet), vehicle: withPlatform('2'), vehicleStep: 1));
+      expect(alerts.single.id, 'platform-1-2');
+      expect(alerts.single.title, currentL10n.alertPlatform('RER A', '2'));
+      expect(alerts.single.urgent, isFalse);
+
+      // Same platform: said once
+      (progress, alerts) = rerTracker.update(progress, input(at(4), position: position(chatelet), vehicle: withPlatform('2'), vehicleStep: 1));
+      expect(alerts.where((alert) => alert.id.startsWith('platform')), isEmpty);
+
+      (progress, alerts) = rerTracker.update(progress, input(at(4, 10), position: position(chatelet), vehicle: withPlatform('4'), vehicleStep: 1));
+      expect(alerts.single.title, currentL10n.alertPlatformChanged('RER A', '4'));
+      expect(alerts.single.urgent, isTrue);
+    });
+
+    test('also while walking to the station', () {
+      final (_, alerts) = rerTracker.update(rerTracker.initial(), input(at(1), vehicle: withPlatform('1'), vehicleStep: 1));
+      expect(alerts.map((alert) => alert.id), contains('platform-1-1'));
+    });
+
+    test('nothing for the metro, whose platform never changes', () {
+      final waiting = tracker.jumpTo(tracker.initial(), 1);
+      final (_, alerts) = tracker.update(waiting, input(at(3), position: position(chatelet), vehicle: withPlatform('1'), vehicleStep: 1));
+      expect(alerts.where((alert) => alert.id.startsWith('platform')), isEmpty);
+    });
+  });
 }
