@@ -129,7 +129,7 @@ class GoProgress {
   /// Meters done along the current step's path
   final double along;
 
-  /// Ride: index of the last stop reached (0 = boarding stop)
+  /// Ride: index of the last stop the vehicle has left (0 = the boarding stop); the alighting stop once there
   final int stopIndex;
 
   /// How late the user is on the schedule from the current ride on: real departure of the vehicle taken (delay,
@@ -554,46 +554,60 @@ class GoTracker {
     return progress.copyWith(phase: GoPhase.onBoard, along: 0, stopIndex: 0, shift: shift, issue: () => null);
   }
 
+  /// A stop is left once the vehicle is this far beyond it…
+  static const _leftStopMeters = 30.0;
+
+  /// …or, underground, this long after its time (the vehicle stands at the stop)
+  static const _dwell = Duration(seconds: 20);
+
+  /// The alighting stop is reached a little before it (the vehicle brakes, the doors are near)
+  static const _arrivingMeters = 40.0;
+
+  /// On board. [GoProgress.stopIndex] is the last stop the vehicle has left, so that "next stop" is only said once
+  /// it is really the next one: not while the vehicle pulls in to the one before.
   GoProgress _ride(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
     final ride = steps[progress.step];
     final stops = ride.section.stops;
+    // Without the served stops, only the end and the arrival time say where the vehicle is
+    final withStops = stops.length >= 2;
     final last = math.max(0, stops.length - 1);
+    final shiftedArrival = (withStops ? ride.stopTime(last) : ride.section.arrival).add(progress.shift);
     var current = progress;
     var index = current.stopIndex;
-    var reachedEnd = false;
+    var arrived = false;
 
     if (fix != null) {
       final projection = ride.line.project(fix, minAlong: math.max(0, current.along - 50));
       if (projection != null && projection.distance < 200) {
         current = current.copyWith(along: math.max(current.along, projection.along));
-        for (var k = index; k < ride.stopAlongs.length; k++) {
-          if (ride.stopAlongs[k] <= current.along + 40) {
+        for (var k = index; k < last; k++) {
+          if (ride.stopAlongs[k] + _leftStopMeters <= current.along) {
             index = k;
           }
         }
+        arrived = withStops && ride.stopAlongs[last] <= current.along + _arrivingMeters;
       }
       final end = ride.end;
-      reachedEnd = end != null && metersBetween(fix, end) < 60;
+      arrived = arrived || end != null && metersBetween(fix, end) < 60;
     } else if (_noFixFor(current, input.now)) {
       // Underground: stop times, shifted by the real departure
-      for (var k = index; k <= last; k++) {
-        if (!input.now.isBefore(ride.stopTime(k).add(current.shift))) {
+      for (var k = index; k < last; k++) {
+        if (!input.now.isBefore(ride.stopTime(k).add(current.shift + _dwell))) {
           index = k;
         }
       }
-      if (stops.isEmpty) {
-        reachedEnd = !input.now.isBefore(ride.section.arrival.add(current.shift));
-      }
+      arrived = !input.now.isBefore(shiftedArrival);
     }
     current = current.copyWith(stopIndex: math.max(current.stopIndex, index));
 
     final alightName = ride.section.to?.name ?? '';
-    final left = stops.isEmpty ? (reachedEnd ? 0 : 1) : last - current.stopIndex;
-    final untilArrival = ride.section.arrival.add(current.shift).difference(input.now);
-    if (left == 1 || (left == 2 && untilArrival <= const Duration(minutes: 2))) {
+    final left = withStops ? last - current.stopIndex : 1;
+    final untilArrival = shiftedArrival.difference(input.now);
+    // Get ready once the stop before has been left (without the stops: two minutes before the arrival)
+    if (!arrived && (withStops ? left == 1 : untilArrival <= const Duration(minutes: 2))) {
       alerts.add(GoAlert(id: 'prepare-${current.step}', title: currentL10n.alertPrepare, body: currentL10n.goNextStop(alightName)));
     }
-    if (left <= 0 || reachedEnd) {
+    if (arrived) {
       alerts.add(GoAlert(id: 'alight-${current.step}', title: currentL10n.alertGetOffNow, body: alightName, urgent: true));
       return _advance(current.copyWith(stopIndex: last), input.now);
     }

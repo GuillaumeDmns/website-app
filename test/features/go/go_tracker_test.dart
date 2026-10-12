@@ -64,6 +64,45 @@ void main() {
     expect(progress.phase, GoPhase.moving);
   });
 
+  test('says "next stop" only once the stop before is left, not while the vehicle pulls in to it', () {
+    final onBoard = tracker.jumpTo(tracker.initial(), 1).copyWith(phase: GoPhase.onBoard);
+    final ride = tracker.steps[1];
+    LatLng along(double meters) => ride.line.pointAt(meters);
+    final gareDeLyonAlong = ride.stopAlongs[1];
+
+    // 30 m before Gare de Lyon, then standing there: two stops to go, no alert
+    var (progress, alerts) = tracker.update(onBoard, input(at(9, 50), position: along(gareDeLyonAlong - 30), speed: 3));
+    expect(progress.stopIndex, 0);
+    expect(alerts, isEmpty);
+    (progress, alerts) = tracker.update(progress, input(at(10, 10), position: along(gareDeLyonAlong)));
+    expect(progress.stopIndex, 0);
+    expect(alerts, isEmpty);
+
+    // Gone from Gare de Lyon: Nation is the next stop
+    (progress, alerts) = tracker.update(progress, input(at(10, 40), position: along(gareDeLyonAlong + 60), speed: 10));
+    expect(progress.stopIndex, 1);
+    expect(alerts.map((alert) => alert.id), ['prepare-1']);
+    expect(alerts.single.body, currentL10n.goNextStop('Nation'));
+
+    // Pulling in to Nation: get off
+    (progress, alerts) = tracker.update(progress, input(at(13, 50), position: along(ride.stopAlongs[2] - 30), speed: 3));
+    expect(alerts.map((alert) => alert.id), ['alight-1']);
+    expect(progress.step, 2);
+  });
+
+  test('underground, a stop is left a little after its time', () {
+    final onBoard = tracker.jumpTo(tracker.initial(), 1).copyWith(phase: GoPhase.onBoard);
+
+    // The metro stands at Gare de Lyon (10:00)
+    var (progress, alerts) = tracker.update(onBoard, GoInput(now: at(10, 5)));
+    expect(progress.stopIndex, 0);
+    expect(alerts, isEmpty);
+
+    (progress, alerts) = tracker.update(progress, GoInput(now: at(10, 25)));
+    expect(progress.stopIndex, 1);
+    expect(alerts.map((alert) => alert.id), ['prepare-1']);
+  });
+
   test('warns when the vehicle comes soon and when it is late', () {
     final waiting = tracker.jumpTo(tracker.initial(), 1);
 
