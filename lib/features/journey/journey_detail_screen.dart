@@ -41,6 +41,11 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   Map<int, Ride> _choices = const {};
   JourneyOption? _choicesOf;
 
+  /// Ride whose stops are shown in the timeline, framed on the map; null: the whole journey
+  int? _focused;
+
+  void _focus(int index, bool focus) => setState(() => _focused = focus ? index : (_focused == index ? null : _focused));
+
   void _choose(int index, Ride ride) => setState(() {
     // The following rides go back to the first departure they can catch
     _choices = {
@@ -98,13 +103,14 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     if (_choicesOf != planned) {
       _choicesOf = planned;
       _choices = const {};
+      _focused = null;
     }
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final retimed = retimeJourney(planned, lookup: watchRides(ref, now), now: now, choices: _choices);
     final journey = retimed.journey;
 
     return MapOverlayScope(
-      overlay: journeyOverlay(context, journey),
+      overlay: journeyOverlay(context, journey, fitSection: _focused),
       child: ListView(
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 8, 16, 32),
@@ -168,6 +174,8 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                     isFirst: index == 0,
                     ride: retimed.rides[index],
                     onChoose: (ride) => _choose(index, ride),
+                    focused: _focused == index,
+                    onFocus: (focus) => _focus(index, focus),
                   ),
                 if (journey.sections.lastOrNull?.to case final end?)
                   _TimelineRow(
@@ -187,7 +195,14 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
 }
 
 class _SectionTile extends StatelessWidget {
-  const _SectionTile({required this.section, required this.isFirst, this.ride, required this.onChoose});
+  const _SectionTile({
+    required this.section,
+    required this.isFirst,
+    this.ride,
+    required this.onChoose,
+    required this.focused,
+    required this.onFocus,
+  });
 
   final JourneySection section;
 
@@ -198,6 +213,10 @@ class _SectionTile extends StatelessWidget {
   /// Only the first section shows where it starts: the others start where the previous one ended
   final bool isFirst;
 
+  /// Its stops shown, framed on the map
+  final bool focused;
+  final ValueChanged<bool> onFocus;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -205,7 +224,7 @@ class _SectionTile extends StatelessWidget {
 
     switch (section.kind) {
       case SectionKind.transit:
-        return _RideTile(section: section, plan: ride, onChoose: onChoose);
+        return _RideTile(section: section, plan: ride, onChoose: onChoose, focused: focused, onFocus: onFocus);
       case SectionKind.wait:
         return _TimelineRow(
           color: muted,
@@ -333,11 +352,15 @@ class _BikeShareTile extends ConsumerWidget {
 }
 
 class _RideTile extends StatelessWidget {
-  const _RideTile({required this.section, required this.plan, required this.onChoose});
+  const _RideTile({required this.section, required this.plan, required this.onChoose, required this.focused, required this.onFocus});
 
   final JourneySection section;
   final RidePlan? plan;
   final ValueChanged<Ride> onChoose;
+
+  /// Its stops shown in the timeline, and the ride framed on the map
+  final bool focused;
+  final ValueChanged<bool> onFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -412,24 +435,22 @@ class _RideTile extends StatelessWidget {
                     _StopElevators(stopAreaId: stopAreaId, name: point!.name),
                 if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
-                  Theme(
-                    data: theme.copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(
-                        '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                      children: [
-                        for (final stop in intermediate)
-                          ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(stop.name),
-                            trailing: stop.time == null ? null : Text(formatClock(stop.time!)),
+                  // The stops between, like Citymapper: below, on the line
+                  InkWell(
+                    onTap: () => onFocus(!focused),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            ),
                           ),
-                      ],
+                          Icon(focused ? Icons.expand_less : Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
                     ),
                   )
                 else
@@ -444,6 +465,17 @@ class _RideTile extends StatelessWidget {
             ),
           ),
         ),
+        if (focused)
+          for (final stop in intermediate)
+            _TimelineRow(
+              color: color,
+              time: stop.time == null ? null : formatClock(stop.time!),
+              stopDot: true,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(stop.name, style: theme.textTheme.bodyMedium),
+              ),
+            ),
         _TimelineRow(
           color: color,
           time: formatClock(section.arrival),
@@ -619,6 +651,7 @@ class _TimelineRow extends StatelessWidget {
     required this.child,
     this.time,
     this.dot = false,
+    this.stopDot = false,
     this.dotted = false,
     this.isLast = false,
   });
@@ -627,6 +660,9 @@ class _TimelineRow extends StatelessWidget {
   final Widget child;
   final String? time;
   final bool dot;
+
+  /// A stop the vehicle passes: a small dot on the line, which goes on
+  final bool stopDot;
   final bool dotted;
   final bool isLast;
 
@@ -660,6 +696,17 @@ class _TimelineRow extends StatelessWidget {
                     top: dot ? 8 : 0,
                     child: Center(
                       child: dotted ? _DottedLine(color: color) : Container(width: 5, color: color),
+                    ),
+                  ),
+                if (stopDot)
+                  Container(
+                    margin: const EdgeInsets.only(top: 5),
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: color, width: 2),
                     ),
                   ),
                 if (dot)

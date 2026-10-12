@@ -47,6 +47,26 @@ class GoStep {
 
   LatLng? get start => section.from == null ? null : LatLng(section.from!.lat, section.from!.lon);
 
+  /// Where to head from [position] on a move: the path [_aheadMeters] after where the user is along it (so a user
+  /// beside the path still heads along it, and one away from it heads back to it), else the last stretch of the path.
+  /// [along] is the progress known so far. Degrees clockwise from north.
+  double headingFrom(LatLng position, double along) {
+    if (line.points.length < 2) {
+      final end = this.end;
+      return end == null ? 0 : bearingBetween(position, end);
+    }
+    // GPS a little beside the path: where it is along it now, never back from the progress known
+    final projection = line.project(position, minAlong: math.max(0, along - 50));
+    final here = projection != null && projection.distance < 60 ? math.max(along, projection.along) : along;
+    final ahead = line.pointAt(math.min(line.length, here + _aheadMeters));
+    if (metersBetween(position, ahead) >= 5) {
+      return bearingBetween(position, ahead);
+    }
+    return bearingBetween(line.pointAt(math.max(0, line.length - 15)), line.points.last);
+  }
+
+  static const _aheadMeters = 30.0;
+
   /// Scheduled time at each stop, interpolated where the journey has none
   DateTime stopTime(int index) {
     final stops = section.stops;
@@ -353,11 +373,37 @@ class GoTracker {
       alerts.add(GoAlert(id: 'arrived', title: currentL10n.goArrived, body: journey.sections.lastOrNull?.to?.name));
     }
 
+    _platformAlert(current, input, alerts);
+
     final fresh = alerts.where((alert) => !current.fired.contains(alert.id)).toList();
     if (fresh.isNotEmpty) {
       current = current.copyWith(fired: {...current.fired, ...fresh.map((alert) => alert.id)});
     }
     return (current, fresh);
+  }
+
+  /// A train's platform, once announced or when it changes: for the ride waited for, or the next one (walking there,
+  /// or on board the previous ride)
+  void _platformAlert(GoProgress progress, GoInput input, List<GoAlert> alerts) {
+    final index = input.vehicleStep;
+    final platform = input.vehicle?.platform?.trim();
+    if (index == null || platform == null || platform.isEmpty || progress.phase == GoPhase.arrived || index < progress.step ||
+        index >= steps.length || !steps[index].isRide || (index == progress.step && progress.phase == GoPhase.onBoard)) {
+      return;
+    }
+    final section = steps[index].section;
+    final line = section.line;
+    if (!(line?.mode.isRail ?? false)) {
+      return;
+    }
+    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final changed = progress.fired.any((id) => id.startsWith('platform-$index-') && id != 'platform-$index-$platform');
+    alerts.add(GoAlert(
+      id: 'platform-$index-$platform',
+      title: changed ? currentL10n.alertPlatformChanged(lineLabel, platform) : currentL10n.alertPlatform(lineLabel, platform),
+      body: currentL10n.direction(section.headsign ?? ''),
+      urgent: changed,
+    ));
   }
 
   LatLng? _usableFix(GoInput input) {

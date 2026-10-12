@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' show Distance, LatLng;
 
+import '../../l10n/l10n.dart';
 import '../location/location_providers.dart';
 import 'map_overlay.dart';
 
@@ -37,6 +39,10 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
   bool _centeredOnUser = false;
   Timer? _centerDebounce;
 
+  /// Follow camera of the overlay (GO on foot), and whether the user moved the map away from it
+  MapFollow? _following;
+  bool _followPaused = false;
+
   @override
   void dispose() {
     _centerDebounce?.cancel();
@@ -45,6 +51,14 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
   }
 
   void _frame(MapOverlay overlay) {
+    final follow = overlay.follow;
+    if (follow != null) {
+      _follow(follow);
+      return;
+    }
+    if (_following != null) {
+      _stopFollowing();
+    }
     if (!_ready || overlay.fit.isEmpty || listEquals(overlay.fit, _framedFit)) {
       return;
     }
@@ -60,7 +74,66 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
     );
   }
 
+  /// The user low in the visible part (above the panel), the way ahead up
+  void _follow(MapFollow follow) {
+    final previous = _following;
+    _following = follow;
+    if (!_ready || _followPaused) {
+      return;
+    }
+    if (previous != null && previous.position == follow.position && (previous.bearing - follow.bearing).abs() < 2 &&
+        previous.zoom == follow.zoom && _controller.mapController.camera.zoom == follow.zoom) {
+      return;
+    }
+    final size = _controller.mapController.camera.nonRotatedSize;
+    final visibleHeight = size.height - widget.padding.bottom;
+    // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
+    // animation's own offset doesn't work with a rotation)
+    final below = visibleHeight * 0.72 - size.height / 2;
+    final metersPerPixel = 156543.03392 * math.cos(follow.position.latitudeInRad) / math.pow(2, follow.zoom);
+    final center = const Distance().offset(follow.position, below.abs() * metersPerPixel, below >= 0 ? follow.bearing : follow.bearing + 180);
+    _controller.animateTo(
+      dest: center,
+      zoom: follow.zoom,
+      rotation: _closestRotation(-follow.bearing),
+      duration: const Duration(milliseconds: 700),
+    );
+  }
+
+  void _stopFollowing() {
+    _following = null;
+    _followPaused = false;
+    // North up again, then the page's points are framed
+    _framedFit = null;
+    if (_ready) {
+      _controller.animateTo(rotation: _closestRotation(0));
+    }
+  }
+
+  /// [target] as the angle closest to the current rotation, so that the map turns the short way
+  double _closestRotation(double target) {
+    final current = _controller.mapController.camera.rotation;
+    return current + ((target - current) % 360 + 540) % 360 - 180;
+  }
+
+  void _recenter() {
+    setState(() => _followPaused = false);
+    final follow = _following;
+    if (follow != null) {
+      _following = null;
+      _follow(follow);
+    }
+  }
+
   void _onMapEvent(MapEvent event) {
+    // Moving the map by hand stops following until "Recentrer"
+    if (_following != null && !_followPaused && switch (event.source) {
+          MapEventSource.dragStart || MapEventSource.multiFingerGestureStart || MapEventSource.doubleTap ||
+          MapEventSource.scrollWheel => true,
+          _ => false,
+        }) {
+      setState(() => _followPaused = true);
+    }
     if (event is MapEventMoveEnd || event is MapEventFlingAnimationEnd || event is MapEventDoubleTapZoomEnd ||
         event is MapEventScrollWheelZoom) {
       _centerDebounce?.cancel();
@@ -76,7 +149,8 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final location = ref.watch(routerLocationProvider);
     final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
-    final user = ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
+    // Followed (GO on foot): the position the camera follows, so that both agree
+    final user = overlay.follow?.position ?? ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
@@ -85,7 +159,7 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
     // First fix: go to the user unless a page already framed something
     ref.listen(userLocationProvider, (previous, next) {
       final position = next.value;
-      if (position != null && !_centeredOnUser && _ready) {
+      if (position != null && !_centeredOnUser && _ready && overlay.follow == null) {
         _centeredOnUser = true;
         if (_framedFit == null) {
           _controller.animateTo(dest: position, zoom: 16);
@@ -135,6 +209,8 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
           ],
         ),
         MarkerLayer(
+          // Upright when the map turns (GO on foot)
+          rotate: true,
           markers: [
             for (final pin in overlay.pins)
               Marker(
@@ -147,12 +223,25 @@ class _MainMapState extends ConsumerState<MainMap> with TickerProviderStateMixin
             if (user != null)
               Marker(
                 point: user,
-                width: 22,
-                height: 22,
-                child: const _UserDot(),
+                width: 72,
+                height: 72,
+                child: _UserDot(heading: overlay.follow?.bearing),
               ),
           ],
         ),
+        if (_following != null && _followPaused)
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: EdgeInsets.only(right: 16, bottom: widget.padding.bottom + 16),
+              child: FloatingActionButton.small(
+                heroTag: null,
+                tooltip: context.l10n.recenter,
+                onPressed: _recenter,
+                child: const Icon(Icons.navigation),
+              ),
+            ),
+          ),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
           // Full credits on the About page
@@ -202,27 +291,73 @@ class _PinView extends StatelessWidget {
   }
 }
 
+/// The user's position; with a [heading] (degrees from north), a cone in that direction
 class _UserDot extends StatelessWidget {
-  const _UserDot();
+  const _UserDot({this.heading});
+
+  final double? heading;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
+    final heading = this.heading;
+    // The marker stays upright: the heading on the screen is the map's rotation plus the heading
+    final rotation = heading == null ? null : (heading + MapCamera.of(context).rotation) * math.pi / 180;
+    return Stack(
       alignment: Alignment.center,
-      child: Container(
-        width: 14,
-        height: 14,
-        decoration: BoxDecoration(
-          color: Colors.blue,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2.5),
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+      children: [
+        if (rotation != null)
+          Transform.rotate(angle: rotation, child: const CustomPaint(size: Size(72, 72), painter: _HeadingPainter())),
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: _dot(),
         ),
+      ],
+    );
+  }
+
+  Widget _dot() {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: Colors.blue,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
       ),
     );
   }
+}
+
+/// A soft cone pointing up, from the center of the box
+class _HeadingPainter extends CustomPainter {
+  const _HeadingPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final path = Path()
+      ..moveTo(center.dx, center.dy)
+      ..lineTo(center.dx - size.width * 0.3, size.height * 0.04)
+      ..quadraticBezierTo(center.dx, -size.height * 0.06, center.dx + size.width * 0.3, size.height * 0.04)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.blue.withValues(alpha: 0.8), Colors.blue.withValues(alpha: 0.05)],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, center.dy)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HeadingPainter oldDelegate) => false;
 }

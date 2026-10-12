@@ -27,6 +27,32 @@ class GoInstruction {
 
 String _lineLabel(LineSummary? line) => '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
 
+/// `voie 2` for a train, `quai B` otherwise; null when the real time doesn't say
+String? platformLabel(LineSummary? line, String? platform) {
+  final value = platform?.trim();
+  if (value == null || value.isEmpty) {
+    return null;
+  }
+  return line?.mode.isRail ?? false ? currentL10n.goPlatform(value) : currentL10n.goQuay(value);
+}
+
+/// Platform of the vehicle of the ride being waited for, or of the next ride (walking there, or on board the previous
+/// one): `voie 2`, or `RER A voie 2` when it is not the current step
+String? goPlatformText(GoState state) {
+  final index = state.vehicleStep;
+  final steps = state.tracker.steps;
+  if (index == null || index >= steps.length || index < state.progress.step) {
+    return null;
+  }
+  final line = steps[index].section.line;
+  final label = platformLabel(line, state.vehicle?.platform);
+  if (label == null) {
+    return null;
+  }
+  final waitingForIt = index == state.progress.step && state.progress.phase == GoPhase.waiting;
+  return waitingForIt ? label : '${_lineLabel(line)} $label';
+}
+
 String _minutes(Duration duration) {
   final minutes = (duration.inSeconds / 60).ceil();
   return minutes <= 0 ? currentL10n.now : currentL10n.inMinutes(minutes);
@@ -54,7 +80,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
     case GoPhase.waiting:
       final vehicle = state.currentVehicle;
       final departure = tracker.expectedDeparture(step, progress, vehicle);
-      final platform = vehicle?.platform;
+      final platform = platformLabel(section.line, vehicle?.platform);
       final boarding = section.boardingPositions;
       return GoInstruction(
         line: section.line,
@@ -66,7 +92,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
               ? currentL10n.goLeftAt(formatClock(departure))
               : currentL10n.goDeparture(_minutes(departure.difference(now)), formatClock(departure)),
           if (vehicle == null) currentL10n.goScheduled,
-          if (platform != null && platform.isNotEmpty) currentL10n.goPlatform(platform),
+          ?platform,
           if (boarding.isNotEmpty && boarding.length < 3) currentL10n.goBoard(boardingPositions(boarding)),
         ].join(' · '),
         urgent: departure.difference(now) <= const Duration(minutes: 1),
@@ -109,7 +135,11 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       if (nextStep != null && nextStep.isRide) {
         final vehicle = state.vehicleStep == progress.step + 1 ? state.vehicle : null;
         final departure = tracker.expectedDeparture(nextStep, progress, vehicle);
-        detail = '${_lineLabel(nextStep.section.line)} ${_minutes(departure.difference(now))} (${formatClock(departure)})';
+        final platform = platformLabel(nextStep.section.line, vehicle?.platform);
+        detail = [
+          '${_lineLabel(nextStep.section.line)} ${_minutes(departure.difference(now))} (${formatClock(departure)})',
+          ?platform,
+        ].join(' · ');
       }
       return GoInstruction(
         icon: section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,

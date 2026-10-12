@@ -8,11 +8,12 @@ import '../../bikes/bike_widgets.dart';
 import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
 
-/// Map overlay of a journey, kept light: rides in their line color, bikes green, walks dotted, the line badge where you board,
-/// a dot where you get off, start and end. Intermediate stops are left out.
+/// Map overlay of a journey: rides in their line color, bikes green, walks dotted, the line badge where you board, a
+/// dot where you get off, small dots at the stops between (named in the sheet, not here: the map stays light), start
+/// and end.
 ///
-/// GO mode: sections before [currentSection] and the first [currentAlong] meters of it are faded, and the camera
-/// frames the section [fitSection] instead of the whole journey.
+/// The camera frames the section [fitSection] instead of the whole journey. GO mode: sections before [currentSection]
+/// and the first [currentAlong] meters of it are faded.
 MapOverlay journeyOverlay(
   BuildContext context,
   JourneyOption journey, {
@@ -22,6 +23,7 @@ MapOverlay journeyOverlay(
 }) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
+  final stopDots = <MapPin>[];
   final dots = <MapPin>[];
   final badges = <MapPin>[];
   final points = <LatLng>[];
@@ -69,6 +71,21 @@ MapOverlay journeyOverlay(
     }
 
     if (ride) {
+      final stops = section.stops;
+      final stopColor = index < currentSection ? done : color;
+      // Stops between: smaller dots, under everything else
+      for (final (k, stop) in stops.indexed) {
+        if (k == 0 || k == stops.length - 1) {
+          continue;
+        }
+        stopDots.add(MapPin(
+          point: LatLng(stop.lat, stop.lon),
+          color: stopColor,
+          label: stop.name,
+          childSize: const Size(12, 12),
+          child: _StopDot(color: stopColor, size: 9),
+        ));
+      }
       // Get off: small dot in the line color
       dots.add(MapPin(
         point: shape.last,
@@ -96,6 +113,7 @@ MapOverlay journeyOverlay(
   return MapOverlay(
     paths: paths,
     pins: [
+      ...stopDots,
       ...dots,
       if (start != null) MapPin(point: LatLng(start.lat, start.lon), color: Colors.green.shade600, size: 16, label: start.name),
       ...badges,
@@ -106,19 +124,20 @@ MapOverlay journeyOverlay(
 }
 
 class _StopDot extends StatelessWidget {
-  const _StopDot({required this.color});
+  const _StopDot({required this.color, this.size = 12});
 
   final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 12,
-      height: 12,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         shape: BoxShape.circle,
-        border: Border.all(color: color, width: 3),
+        border: Border.all(color: color, width: size / 4),
       ),
     );
   }

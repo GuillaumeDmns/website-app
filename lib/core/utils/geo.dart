@@ -15,6 +15,16 @@ double metersBetween(LatLng a, LatLng b) {
 
 double _radians(double degrees) => degrees * math.pi / 180;
 
+/// Direction from [a] to [b], in degrees clockwise from north (0 to 360)
+double bearingBetween(LatLng a, LatLng b) {
+  final lat1 = _radians(a.latitude);
+  final lat2 = _radians(b.latitude);
+  final dLon = _radians(b.longitude - a.longitude);
+  final y = math.sin(dLon) * math.cos(lat2);
+  final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+  return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+}
+
 /// Where a point falls on a [MeasuredPolyline]
 class PolylineProjection {
   const PolylineProjection({required this.point, required this.along, required this.distance});

@@ -486,6 +486,7 @@
     }
   },
   "leaveFromHere": "Partir d'ici",
+  "recenter": "Recentrer",
   "pointOnMap": "Point sur la carte",
   "walkingSlow": "Lente",
   "walkingNormal": "Normale",
@@ -629,6 +630,36 @@
   "goPlatform": "voie {platform}",
   "@goPlatform": {
     "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "goQuay": "quai {platform}",
+  "@goQuay": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "alertPlatform": "{line} : voie {platform}",
+  "@alertPlatform": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "alertPlatformChanged": "Changement de voie : {line} voie {platform}",
+  "@alertPlatformChanged": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      },
       "platform": {
         "type": "String"
       }
