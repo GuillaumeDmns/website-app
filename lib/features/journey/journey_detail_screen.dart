@@ -41,6 +41,11 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   Map<int, Ride> _choices = const {};
   JourneyOption? _choicesOf;
 
+  /// Ride looked at on the map (framed, its stops named with their times); null: the whole journey
+  int? _focused;
+
+  void _focus(int index, bool focus) => setState(() => _focused = focus ? index : (_focused == index ? null : _focused));
+
   void _choose(int index, Ride ride) => setState(() {
     // The following rides go back to the first departure they can catch
     _choices = {
@@ -98,13 +103,14 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     if (_choicesOf != planned) {
       _choicesOf = planned;
       _choices = const {};
+      _focused = null;
     }
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final retimed = retimeJourney(planned, lookup: watchRides(ref, now), now: now, choices: _choices);
     final journey = retimed.journey;
 
     return MapOverlayScope(
-      overlay: journeyOverlay(context, journey),
+      overlay: journeyOverlay(context, journey, fitSection: _focused, focusSection: _focused),
       child: ListView(
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 8, 16, 32),
@@ -168,6 +174,8 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                     isFirst: index == 0,
                     ride: retimed.rides[index],
                     onChoose: (ride) => _choose(index, ride),
+                    focused: _focused == index,
+                    onFocus: (focus) => _focus(index, focus),
                   ),
                 if (journey.sections.lastOrNull?.to case final end?)
                   _TimelineRow(
@@ -187,7 +195,14 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
 }
 
 class _SectionTile extends StatelessWidget {
-  const _SectionTile({required this.section, required this.isFirst, this.ride, required this.onChoose});
+  const _SectionTile({
+    required this.section,
+    required this.isFirst,
+    this.ride,
+    required this.onChoose,
+    required this.focused,
+    required this.onFocus,
+  });
 
   final JourneySection section;
 
@@ -198,6 +213,10 @@ class _SectionTile extends StatelessWidget {
   /// Only the first section shows where it starts: the others start where the previous one ended
   final bool isFirst;
 
+  /// Looked at on the map
+  final bool focused;
+  final ValueChanged<bool> onFocus;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -205,7 +224,7 @@ class _SectionTile extends StatelessWidget {
 
     switch (section.kind) {
       case SectionKind.transit:
-        return _RideTile(section: section, plan: ride, onChoose: onChoose);
+        return _RideTile(section: section, plan: ride, onChoose: onChoose, focused: focused, onFocus: onFocus);
       case SectionKind.wait:
         return _TimelineRow(
           color: muted,
@@ -333,11 +352,15 @@ class _BikeShareTile extends ConsumerWidget {
 }
 
 class _RideTile extends StatelessWidget {
-  const _RideTile({required this.section, required this.plan, required this.onChoose});
+  const _RideTile({required this.section, required this.plan, required this.onChoose, required this.focused, required this.onFocus});
 
   final JourneySection section;
   final RidePlan? plan;
   final ValueChanged<Ride> onChoose;
+
+  /// Framed on the map with its stops named: the map button, or opening the list of stops
+  final bool focused;
+  final ValueChanged<bool> onFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +407,13 @@ class _RideTile extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
+                    IconButton(
+                      tooltip: focused ? context.l10n.showWholeJourney : context.l10n.showRideOnMap,
+                      isSelected: focused,
+                      icon: const Icon(Icons.map_outlined),
+                      selectedIcon: Icon(Icons.map, color: color),
+                      onPressed: () => onFocus(!focused),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -417,6 +447,12 @@ class _RideTile extends StatelessWidget {
                     child: ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       dense: true,
+                      // Its stops on the map too
+                      onExpansionChanged: (open) {
+                        if (open) {
+                          onFocus(true);
+                        }
+                      },
                       title: Text(
                         '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
                         style: TextStyle(color: theme.colorScheme.onSurfaceVariant),

@@ -159,6 +159,8 @@
   "or": "or",
   "brokenElevatorsAt": "{count, plural, =1{1 broken elevator} other{{count} broken elevators}} at {stop}",
   "leaveFromHere": "Leave from here",
+  "showRideOnMap": "Show this ride on the map",
+  "showWholeJourney": "Show the whole journey",
   "pointOnMap": "Point on the map",
   "walkingSlow": "Slow",
   "walkingNormal": "Normal",

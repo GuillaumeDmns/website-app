@@ -46,7 +46,7 @@ class MapPath {
 
 /// What a screen shows on the map, and where the camera should go.
 class MapOverlay {
-  const MapOverlay({this.pins = const [], this.paths = const [], this.fit = const []});
+  const MapOverlay({this.pins = const [], this.paths = const [], this.fit = const [], this.fitMargin = EdgeInsets.zero});
 
   static const empty = MapOverlay();
 
@@ -55,6 +55,9 @@ class MapOverlay {
 
   /// Points to frame when the overlay is shown; empty to leave the camera where it is
   final List<LatLng> fit;
+
+  /// Room kept around [fit] beyond the usual margin (e.g. for labels drawn beside the points)
+  final EdgeInsets fitMargin;
 
 }
 
