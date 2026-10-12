@@ -52,4 +52,12 @@ void main() {
       expect(MeasuredPolyline(const [chatelet]).project(gareDeLyon)!.along, 0);
     });
   });
+
+  test('bearings go clockwise from north', () {
+    const here = LatLng(48.8584, 2.3470);
+    expect(bearingBetween(here, const LatLng(48.8684, 2.3470)), closeTo(0, 0.1));
+    expect(bearingBetween(here, const LatLng(48.8584, 2.3570)), closeTo(90, 0.1));
+    expect(bearingBetween(here, const LatLng(48.8484, 2.3470)), closeTo(180, 0.1));
+    expect(bearingBetween(here, const LatLng(48.8584, 2.3370)), closeTo(270, 0.1));
+  });
 }

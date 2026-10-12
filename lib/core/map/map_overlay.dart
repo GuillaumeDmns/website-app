@@ -44,9 +44,26 @@ class MapPath {
   final bool dotted;
 }
 
+/// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close.
+class MapFollow {
+  const MapFollow({required this.position, required this.bearing, this.zoom = 18});
+
+  final LatLng position;
+
+  /// Degrees clockwise from north: what is up on the screen
+  final double bearing;
+  final double zoom;
+}
+
 /// What a screen shows on the map, and where the camera should go.
 class MapOverlay {
-  const MapOverlay({this.pins = const [], this.paths = const [], this.fit = const [], this.fitMargin = EdgeInsets.zero});
+  const MapOverlay({
+    this.pins = const [],
+    this.paths = const [],
+    this.fit = const [],
+    this.fitMargin = EdgeInsets.zero,
+    this.follow,
+  });
 
   static const empty = MapOverlay();
 
@@ -58,6 +75,11 @@ class MapOverlay {
 
   /// Room kept around [fit] beyond the usual margin (e.g. for labels drawn beside the points)
   final EdgeInsets fitMargin;
+
+  /// Instead of framing [fit], the camera follows the user (until they move the map themselves)
+  final MapFollow? follow;
+
+  MapOverlay withFollow(MapFollow? follow) => MapOverlay(pins: pins, paths: paths, fit: fit, fitMargin: fitMargin, follow: follow);
 
 }
 

@@ -113,7 +113,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
         currentAlong: onBoardOrMoving ? progress.along : 0,
         fitSection: shownStep?.sectionIndex,
         focusSection: shownStep?.sectionIndex,
-      ),
+      ).withFollow(goFollow(state, _shown)),
       child: Column(
         children: [
           SizeReporter(
@@ -655,4 +655,16 @@ class _Dots extends StatelessWidget {
       ),
     );
   }
+}
+
+/// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes
+/// little sense when walking. Only for the move in progress, when it is the step shown.
+MapFollow? goFollow(GoState state, int shownStep) {
+  final progress = state.progress;
+  final position = state.position;
+  final step = state.tracker.stepOf(progress);
+  if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
+    return null;
+  }
+  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along));
 }
