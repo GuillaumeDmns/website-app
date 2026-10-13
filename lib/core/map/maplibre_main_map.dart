@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
 
 import '../../l10n/l10n.dart';
+import '../location/device_heading.dart';
 import '../location/location_providers.dart';
 import 'map_overlay.dart';
 import 'map_pins.dart';
@@ -45,6 +46,10 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   MapFollow? _following;
   bool _followPaused = false;
 
+  /// What the camera shows of the follow (its heading the device's when known), and that heading
+  MapFollow? _shown;
+  final _heading = FollowHeading();
+
   /// The overlay shown, for the callbacks of the map
   MapOverlay _overlay = MapOverlay.empty;
 
@@ -54,6 +59,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   @override
   void dispose() {
     _centerDebounce?.cancel();
+    _heading.dispose();
     super.dispose();
   }
 
@@ -119,36 +125,51 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   /// The user low in the visible part (above the panel), the way ahead up: the camera's padding puts its center at
   /// 72 % of the height left above the panel
   void _follow(MapFollow follow) {
-    final previous = _following;
     _following = follow;
     final controller = _controller;
     if (!_ready || controller == null || _followPaused) {
       return;
     }
-    if (previous != null && previous.position == follow.position && (previous.bearing - follow.bearing).abs() < 2 &&
-        previous.zoom == follow.zoom) {
+    final view = _heading.apply(follow);
+    final shown = _shown;
+    if (shown != null && shown.sameView(view)) {
       return;
     }
+    _shown = view;
+    // Only turning (the phone in the hand): quickly, the map stays with the hand
+    final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     final height = context.size?.height ?? 0;
     final visible = height - widget.padding.bottom;
     unawaited(controller.animateCamera(
-      center: _geo(follow.position),
-      zoom: follow.zoom,
-      bearing: follow.bearing,
+      center: _geo(view.position),
+      zoom: view.zoom,
+      bearing: view.bearing,
       padding: EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom),
-      nativeDuration: const Duration(milliseconds: 700),
+      nativeDuration: Duration(milliseconds: turning ? 250 : 700),
     ));
+  }
+
+  /// A new heading of the device: the camera turns with it (at most 10 times a second)
+  void _onDeviceHeading(double heading) {
+    _heading.update(heading, () {
+      final follow = _following;
+      if (mounted && follow != null && follow.compass) {
+        _follow(follow);
+      }
+    });
   }
 
   /// Frames (or follows) the overlay again, even if it is the one framed last
   void _reframe() {
     _framedFit = null;
     _following = null;
+    _shown = null;
     _frame(_overlay);
   }
 
   void _stopFollowing() {
     _following = null;
+    _shown = null;
     _followPaused = false;
     // North up again, then the page's points are framed
     _framedFit = null;
@@ -162,6 +183,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     final follow = _following;
     if (follow != null) {
       _following = null;
+      _shown = null;
       _follow(follow);
     }
   }
@@ -209,6 +231,18 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     _style = style;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
+
+    // GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile)
+    if (overlay.follow?.compass ?? false) {
+      ref.listen(deviceHeadingProvider, (_, next) {
+        final heading = next.value;
+        if (heading != null) {
+          _onDeviceHeading(heading);
+        }
+      });
+    } else {
+      _heading.device = null;
+    }
 
     // First fix: go to the user unless a page already framed something
     ref.listen(userLocationProvider, (previous, next) {
@@ -296,7 +330,8 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
                   builder: (context) {
                     // Upright marker: the heading on the screen is the heading minus the map's bearing
                     final bearing = MapCamera.maybeOf(context)?.bearing ?? 0;
-                    return UserDot(screenHeading: overlay.follow == null ? null : overlay.follow!.bearing - bearing);
+                    final follow = overlay.follow;
+                    return UserDot(screenHeading: follow == null ? null : _heading.apply(follow).bearing - bearing);
                   },
                 ),
               ),

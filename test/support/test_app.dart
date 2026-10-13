@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/app/app.dart';
 import 'package:website_app/core/api/api_providers.dart';
+import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/storage/local_store.dart';
@@ -56,6 +57,8 @@ Future<MemoryStore> pumpApp(
       onboardingDoneProvider.overrideWith(() => _TestOnboarding(onboardingDone)),
       localeProvider.overrideWith(() => LocaleController(locale)),
       userLocationProvider.overrideWith((ref) => Stream.value(position)),
+      // No compass: GO's map keeps the way's direction
+      deviceHeadingProvider.overrideWith((ref) => const Stream.empty()),
       mapTilesEnabledProvider.overrideWithValue(false),
       googleAccountChooserProvider.overrideWithValue(googleAccountChooser),
     ],

@@ -657,7 +657,8 @@ class _Dots extends StatelessWidget {
 }
 
 /// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes
-/// little sense when walking. Only for the move in progress, when it is the step shown.
+/// little sense when walking. Where the device has a compass, the map turns with it instead (the phone in the hand
+/// turns, the map turns). Only for the move in progress, when it is the step shown.
 MapFollow? goFollow(GoState state, int shownStep) {
   final progress = state.progress;
   final position = state.position;
@@ -665,5 +666,5 @@ MapFollow? goFollow(GoState state, int shownStep) {
   if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
     return null;
   }
-  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along));
+  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
 }

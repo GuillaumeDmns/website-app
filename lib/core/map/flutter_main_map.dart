@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng;
 
 import '../../l10n/l10n.dart';
+import '../location/device_heading.dart';
 import '../location/location_providers.dart';
 import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
@@ -42,9 +43,14 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
   MapFollow? _following;
   bool _followPaused = false;
 
+  /// What the camera shows of the follow (its heading the device's when known), and that heading
+  MapFollow? _shown;
+  final _heading = FollowHeading();
+
   @override
   void dispose() {
     _centerDebounce?.cancel();
+    _heading.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -75,32 +81,46 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
 
   /// The user low in the visible part (above the panel), the way ahead up
   void _follow(MapFollow follow) {
-    final previous = _following;
     _following = follow;
     if (!_ready || _followPaused) {
       return;
     }
-    if (previous != null && previous.position == follow.position && (previous.bearing - follow.bearing).abs() < 2 &&
-        previous.zoom == follow.zoom && _controller.mapController.camera.zoom == follow.zoom) {
+    final view = _heading.apply(follow);
+    final shown = _shown;
+    if (shown != null && shown.sameView(view) && _controller.mapController.camera.zoom == view.zoom) {
       return;
     }
+    _shown = view;
+    // Only turning (the phone in the hand): quickly, the map stays with the hand
+    final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     final size = _controller.mapController.camera.nonRotatedSize;
     final visibleHeight = size.height - widget.padding.bottom;
     // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
     // animation's own offset doesn't work with a rotation)
     final below = visibleHeight * 0.72 - size.height / 2;
-    final metersPerPixel = 156543.03392 * math.cos(follow.position.latitudeInRad) / math.pow(2, follow.zoom);
-    final center = const Distance().offset(follow.position, below.abs() * metersPerPixel, below >= 0 ? follow.bearing : follow.bearing + 180);
+    final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
+    final center = const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
     _controller.animateTo(
       dest: center,
-      zoom: follow.zoom,
-      rotation: _closestRotation(-follow.bearing),
-      duration: const Duration(milliseconds: 700),
+      zoom: view.zoom,
+      rotation: _closestRotation(-view.bearing),
+      duration: Duration(milliseconds: turning ? 250 : 700),
     );
+  }
+
+  /// A new heading of the device: the camera turns with it (at most 10 times a second)
+  void _onDeviceHeading(double heading) {
+    _heading.update(heading, () {
+      final follow = _following;
+      if (mounted && follow != null && follow.compass) {
+        _follow(follow);
+      }
+    });
   }
 
   void _stopFollowing() {
     _following = null;
+    _shown = null;
     _followPaused = false;
     // North up again, then the page's points are framed
     _framedFit = null;
@@ -120,6 +140,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final follow = _following;
     if (follow != null) {
       _following = null;
+      _shown = null;
       _follow(follow);
     }
   }
@@ -154,6 +175,18 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
+
+    // GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile)
+    if (overlay.follow?.compass ?? false) {
+      ref.listen(deviceHeadingProvider, (_, next) {
+        final heading = next.value;
+        if (heading != null) {
+          _onDeviceHeading(heading);
+        }
+      });
+    } else {
+      _heading.device = null;
+    }
 
     // First fix: go to the user unless a page already framed something
     ref.listen(userLocationProvider, (previous, next) {
@@ -227,7 +260,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
                 // Upright marker: the heading on the screen is the map's rotation plus the heading
                 child: Builder(
                   builder: (context) => UserDot(
-                    screenHeading: overlay.follow == null ? null : overlay.follow!.bearing + MapCamera.of(context).rotation,
+                    screenHeading: overlay.follow == null ? null : _heading.apply(overlay.follow!).bearing + MapCamera.of(context).rotation,
                   ),
                 ),
               ),
