@@ -31,6 +31,55 @@
 
   <title>Guillaume</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- MapLibre GL JS, drawn by the package maplibre on the web (pinned version) -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+  <script>
+    // Fixes to the map of the package maplibre:
+    // - it is created in a detached element at the window's size, then Flutter moves it into its platform view:
+    //   MapLibre never notices, its canvas stays at the window's size. Follow the container instead (and draw again:
+    //   resizing clears the canvas).
+    // - setStyle diffs the styles by default, dropping the app's layers without the "style.load" event after which
+    //   the package adds them again: reload the style instead.
+    // - fitBounds adds the padding left by the previous move (a pin framed above the panel) to its own: frame with
+    //   its padding only, and leave none.
+    if (window.maplibregl) {
+      const MapLibreMap = maplibregl.Map;
+      maplibregl.Map = class extends MapLibreMap {
+        constructor(options) {
+          super(options);
+          new ResizeObserver(() => {
+            const container = this.getContainer();
+            const canvas = this.getCanvas();
+            if (container.clientWidth > 0 && container.clientHeight > 0
+                && (canvas.clientWidth !== container.clientWidth || canvas.clientHeight !== container.clientHeight)) {
+              this.resize();
+              this.triggerRepaint();
+            }
+          }).observe(this.getContainer());
+        }
+
+        setStyle(style, options) {
+          return super.setStyle(style, { ...options, diff: false });
+        }
+
+        fitBounds(bounds, options = {}, eventData) {
+          const none = { top: 0, right: 0, bottom: 0, left: 0 };
+          const kept = this.getPadding();
+          this.setPadding(none);
+          const camera = this.cameraForBounds(bounds, options);
+          this.setPadding(kept);
+          if (!camera) {
+            return this;
+          }
+          const { padding, offset, maxZoom, ...move } = options;
+          const target = { ...move, ...camera, padding: none };
+          return options.linear ? this.easeTo(target, eventData) : this.flyTo(target, eventData);
+        }
+      };
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
