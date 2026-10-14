@@ -61,6 +61,25 @@ FakeBackend standardBackend() {
   ]).toJson());
   backend.get('/api/v2/lines/C01371/vehicles', []);
   backend.get('/api/v2/lines/C01371/disruptions', [metroStopped.toJson()]);
+  // Today's service: from 3 hours ago, the last departure in 40 min (towards Nation), every 4 to 6 min meanwhile
+  ServiceDirection serviceTowards(String name, {StopRef? at, int? direction, int lastIn = 40}) => ServiceDirection(
+        name: name,
+        direction: direction,
+        at: at,
+        first: inMinutes(-180),
+        last: inMinutes(lastIn),
+        frequencies: [
+          Frequency(period: ServicePeriod.daytime, start: inMinutes(-180), end: inMinutes(lastIn), departures: 40, minMinutes: 4, maxMinutes: 6),
+        ],
+      );
+  backend.get('/api/v2/stops/IDFM:70001/service-hours', StopServiceHours(stop: chatelet, date: DateTime.utc(2026, 10, 14), lines: [
+    LineServiceHours(line: metro1, date: DateTime.utc(2026, 10, 14), directions: [serviceTowards('Nation')]),
+    LineServiceHours(line: rerA, date: DateTime.utc(2026, 10, 14), directions: [serviceTowards('Fontenay-sous-Bois', lastIn: 300)]),
+  ]).toJson());
+  backend.get('/api/v2/lines/C01371/service-hours', LineServiceHours(line: metro1, date: DateTime.utc(2026, 10, 14), directions: [
+    serviceTowards('Nation', direction: 0, at: StopRef(id: chatelet.id, name: chatelet.name, lat: chatelet.lat, lon: chatelet.lon)),
+    serviceTowards('Châtelet', direction: 1, lastIn: 300),
+  ]).toJson());
   backend.get('/api/v2/traffic', [
     LineTraffic(line: metro1, severity: DisruptionSeverity.blocking, titles: [metroStopped.title!]).toJson(),
     const LineTraffic(line: rerA).toJson(),

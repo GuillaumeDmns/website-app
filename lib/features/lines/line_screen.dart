@@ -15,6 +15,7 @@ import '../../core/widgets/line_badge.dart';
 import '../../core/location/location_providers.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
+import '../service_hours/service_hours.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'line_vehicles.dart';
@@ -231,6 +232,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               ],
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
+          child: LineServiceHoursSummary(lineId: line.id, direction: _direction.clamp(0, detail.directions.length - 1)),
+        ),
         const SizedBox(height: 12),
         if (branch != null)
           for (var i = 0; i < branch.stops.length; i++)

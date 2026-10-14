@@ -131,6 +131,75 @@
   "welcomePlacesText": "Pour y aller en un geste depuis l'accueil. Vous pourrez les changer plus tard.",
   "wheelchairAccessible": "Accessible en fauteuil roulant",
   "scheduledTimetable": "Horaires théoriques",
+  "serviceHoursTitle": "Horaires du jour",
+  "serviceFirstLast": "{first} – {last}",
+  "@serviceFirstLast": {
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "last": {
+        "type": "String"
+      }
+    }
+  },
+  "serviceCountedAt": "à {stop}",
+  "@serviceCountedAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "frequencyEvery": "toutes les {interval}",
+  "@frequencyEvery": {
+    "placeholders": {
+      "interval": {
+        "type": "String"
+      }
+    }
+  },
+  "frequencyNow": "En ce moment {frequency}",
+  "@frequencyNow": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "departuresCount": "{count, plural, =1{1 départ} other{{count} départs}}",
+  "@departuresCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lastDepartureIn": "Dernier départ dans {duration}",
+  "@lastDepartureIn": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "serviceNotStarted": "Premier départ à {time}",
+  "@serviceNotStarted": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "serviceOver": "Plus de départ aujourd'hui",
+  "serviceFrequencies": "Fréquences",
+  "periodEarlyMorning": "Tôt le matin",
+  "periodMorningPeak": "Pointe du matin",
+  "periodDaytime": "Journée",
+  "periodEveningPeak": "Pointe du soir",
+  "periodEvening": "Soirée",
+  "periodNight": "Nuit",
+  "serviceHoursUnavailable": "Horaires du jour indisponibles",
   "share": "Partager",
   "nextDepartures": "Prochains départs",
   "walkingConnections": "Correspondances à pied",

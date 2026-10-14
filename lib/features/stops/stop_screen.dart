@@ -17,6 +17,7 @@ import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
+import '../service_hours/service_hours.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'widgets/stop_departures_card.dart';
@@ -177,6 +178,8 @@ class _StopContent extends ConsumerWidget {
                   onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
                   data: (departures) => _DepartureList(departures: departures, now: now),
                 ),
+                const SizedBox(height: 24),
+                StopServiceHoursSection(stopAreaId: detail.id),
                 if (detail.connections.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   Text(
