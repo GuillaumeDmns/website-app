@@ -35,7 +35,11 @@ jobs:
       - name: Unit and widget tests
         run: flutter test
       - name: Integration tests (Linux app)
-        run: xvfb-run -a flutter test integration_test -d linux
+        # One file at a time: started for a second file in the same run, the Linux app never connects
+        run: |
+          for test in integration_test/*_test.dart; do
+            xvfb-run -a flutter test "$test" -d linux
+          done
 
   build:
     name: Build

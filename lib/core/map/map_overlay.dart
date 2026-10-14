@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+
+import '../location/device_heading.dart';
 
 /// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
 class MapPin {
@@ -46,13 +50,59 @@ class MapPath {
 
 /// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close.
 class MapFollow {
-  const MapFollow({required this.position, required this.bearing, this.zoom = 18});
+  const MapFollow({required this.position, required this.bearing, this.zoom = 18, this.compass = false});
 
   final LatLng position;
 
   /// Degrees clockwise from north: what is up on the screen
   final double bearing;
   final double zoom;
+
+  /// Where the device points turns the map instead of [bearing] when it is known (the phone in the hand turns, the
+  /// map turns): [bearing] is then only the fallback, without compass
+  final bool compass;
+
+  MapFollow withBearing(double bearing) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
+
+  /// The camera showing [other] doesn't need to move for this one: same place and zoom, less than 2° apart
+  bool sameView(MapFollow other) =>
+      position == other.position && zoom == other.zoom && headingDelta(bearing, other.bearing).abs() < 2;
+}
+
+/// The heading of the follow camera, for the maps: the device's (kept from [deviceHeadingProvider] while the follow
+/// asks for it) or the way's
+class FollowHeading {
+  /// Turns of the camera by the compass alone, at most this often (headings come about 20 times a second)
+  static const turnInterval = Duration(milliseconds: 100);
+
+  /// The device's last heading, null without compass or while nothing is followed with it
+  double? device;
+
+  Timer? _wait;
+  bool _pending = false;
+
+  /// [follow] with the device's heading when it asks for it and one is known
+  MapFollow apply(MapFollow follow) => follow.compass && device != null ? follow.withBearing(device!) : follow;
+
+  /// Keeps the device's [heading] and calls [turn] now, or at the end of the current [turnInterval]: the last heading
+  /// is always shown, even when the device stops turning in between
+  void update(double heading, void Function() turn) {
+    device = heading;
+    if (_wait != null) {
+      _pending = true;
+      return;
+    }
+    turn();
+    _wait = Timer(turnInterval, () {
+      _wait = null;
+      if (_pending) {
+        _pending = false;
+        update(device ?? heading, turn);
+      }
+    });
+  }
+
+  void dispose() => _wait?.cancel();
 }
 
 /// What a screen shows on the map, and where the camera should go.
