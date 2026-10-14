@@ -11,6 +11,7 @@ import '../../core/map/map_overlay.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
+import '../daily_trips/daily_trip_widgets.dart';
 import '../favorites/favorite_widgets.dart';
 import '../home_widget/home_widget_sync.dart';
 import '../traffic/traffic_screen.dart';
@@ -50,6 +51,10 @@ class HomeScreen extends ConsumerWidget {
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+              sliver: SliverToBoxAdapter(child: DailyTripsSection()),
             ),
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 4, 16, 12),

@@ -33,6 +33,10 @@ class MobilityApi {
       _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides', Ride.fromJson,
           {'from': from, 'to': to, 'after': ?after?.toUtc().toIso8601String(), 'limit': limit});
 
+  /// First and last scheduled rides of a line from [from] to [to] tonight, and the first of the next service day
+  Future<RideSpan> lineRideSpan(String lineId, {required String from, required String to}) =>
+      _get('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides/span', RideSpan.fromJson, {'from': from, 'to': to});
+
   /// Vehicles of a line, estimated from real time (empty without real time)
   Future<List<Vehicle>> lineVehicles(String lineId) =>
       _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/vehicles', Vehicle.fromJson);

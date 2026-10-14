@@ -30,6 +30,87 @@
   "homeSearchHint": "Où allez-vous ?",
   "homeNearby": "À proximité",
   "homeNoPosition": "Position indisponible : autour du centre de la carte",
+  "dailyTripsTitle": "Mes trajets",
+  "dailyTripSave": "Enregistrer comme trajet du quotidien",
+  "dailyTripSaved": "Ajouté à vos trajets du quotidien",
+  "dailyTripRemove": "Retirer de mes trajets",
+  "dailyTripRemoved": "Retiré de vos trajets",
+  "dailyTripReverse": "Trajet retour",
+  "dailyTripMenu": "Options du trajet",
+  "dailyTripHint": "Enregistrez votre trajet {from} → {to} : ses prochains départs ici, sans nouvelle recherche",
+  "@dailyTripHint": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyTripChoose": "Choisir l'itinéraire",
+  "dailyTripName": "{from} → {to}",
+  "@dailyTripName": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyTripArrival": "Arrivée {time}",
+  "@dailyTripArrival": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyTripThen": "Puis {times}",
+  "@dailyTripThen": {
+    "placeholders": {
+      "times": {
+        "type": "String"
+      }
+    }
+  },
+  "lastRideOf": "Dernier {mode} {line} à {time}",
+  "@lastRideOf": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "line": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lastRideLeaveBefore": "partir avant {time}",
+  "@lastRideLeaveBefore": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lastRideOver": "Service terminé",
+  "lastRideResumes": "reprise vers {time}",
+  "@lastRideResumes": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "modeNounMetro": "métro",
+  "modeNounTrain": "train",
+  "modeNounTram": "tram",
+  "modeNounBus": "bus",
   "locationTurnOn": "Activer la localisation",
   "locationAllow": "Autoriser la localisation",
   "account": "Compte",
