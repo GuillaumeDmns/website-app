@@ -15,7 +15,7 @@ import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
 import 'map_pins.dart';
 
-/// The map with flutter_map and the Plan IGN raster tiles (Géoplateforme, free, no key; inverted in dark mode): on
+/// The map with flutter_map and the Plan IGN raster tiles (Géoplateforme, free, no key; light in dark mode too): on
 /// desktop, where MapLibre doesn't run, and in the tests (the tiles off). See [MainMap].
 class FlutterMainMap extends ConsumerStatefulWidget {
   const FlutterMainMap({super.key, this.padding = EdgeInsets.zero, this.onLongPress});
@@ -171,7 +171,6 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
     // Followed (GO on foot): the position the camera follows, so that both agree
     final user = overlay.follow?.position ?? ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
@@ -217,7 +216,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         onSecondaryTap: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),
       ),
       children: [
-        // Plan IGN (Géoplateforme): free, no key, open licence; no dark style, so it is inverted in dark mode
+        // Plan IGN (Géoplateforme): free, no key, open licence; light in dark mode too, like the MapLibre map
         if (ref.watch(mapTilesEnabledProvider))
           TileLayer(
             urlTemplate: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
@@ -225,7 +224,6 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
                 '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png',
             userAgentPackageName: 'com.guillaumedamiens.app',
             maxNativeZoom: 19,
-            tileBuilder: dark ? darkModeTileBuilder : null,
           ),
         PolylineLayer(
           polylines: [
@@ -235,7 +233,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
                 color: path.color,
                 strokeWidth: path.width,
                 pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
-                borderColor: path.dotted ? Colors.transparent : (dark ? Colors.black54 : Colors.white),
+                borderColor: path.dotted ? Colors.transparent : Colors.white,
                 borderStrokeWidth: path.dotted ? 0 : 1.5,
               ),
           ],

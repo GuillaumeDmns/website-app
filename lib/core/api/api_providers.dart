@@ -19,11 +19,11 @@ final dioFactoryProvider = Provider<Dio Function()>((ref) => () => Dio(BaseOptio
       receiveTimeout: const Duration(seconds: 20),
     )));
 
-final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(dioFactoryProvider)()));
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(dioFactoryProvider)()..options.headers.addAll(AppConfig.clientHeaders)));
 
 /// Authenticated client
 final apiDioProvider = Provider<Dio>((ref) {
-  final dio = ref.watch(dioFactoryProvider)();
+  final dio = ref.watch(dioFactoryProvider)()..options.headers.addAll(AppConfig.clientHeaders);
   dio.interceptors.add(AuthInterceptor(
     tokenStore: ref.watch(tokenStoreProvider),
     authApi: ref.watch(authApiProvider),

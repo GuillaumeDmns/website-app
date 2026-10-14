@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -122,5 +121,5 @@ String appBuildDetails({String commit = AppConfig.commit}) => [
       if (commit.isNotEmpty) 'commit $commit',
       AppConfig.environment.name,
       Uri.parse(AppConfig.apiBaseUrl).host,
-      kIsWeb ? 'web' : defaultTargetPlatform.name,
+      AppConfig.platform,
     ].join(' · ');
