@@ -76,6 +76,14 @@ class MobilityApi {
           'date': '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
       });
 
+  /// First and last departures of the lines of [stopAreaId] over the service day running now, and their frequency
+  Future<StopServiceHours> stopServiceHours(String stopAreaId) =>
+      _get('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/service-hours', StopServiceHours.fromJson);
+
+  /// First and last departures of each direction of [lineId] over the service day running now, and its frequency
+  Future<LineServiceHours> lineServiceHours(String lineId) =>
+      _get('/api/v2/lines/${Uri.encodeComponent(lineId)}/service-hours', LineServiceHours.fromJson);
+
   /// Vélib stations around a position, closest first
   Future<List<BikeStation>> bikesNearby(double lat, double lon, {int radius = 500, int limit = 5}) =>
       _getList('/api/v2/bikes/nearby', BikeStation.fromJson, {'lat': lat, 'lon': lon, 'radius': radius, 'limit': limit});
