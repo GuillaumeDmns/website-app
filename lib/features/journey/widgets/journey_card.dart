@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../traffic/disruption_widgets.dart';
 import '../../traffic/traffic_providers.dart';
+import '../../../app/theme.dart';
 
 /// User-facing name of a Navitia journey type
 String journeyTypeLabel(String? type) => switch (type) {
@@ -50,73 +52,72 @@ class JourneyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final colors = context.colors;
     final firstRide = journey.rides.firstOrNull;
     final leaveIn = journey.departure.difference(now);
+    final live = firstRide?.realtime == true;
 
     final details = [
-      '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
+      if (firstRide != null)
+        context.l10n.firstRide(firstRide.line?.name ?? '', formatClock(firstRide.departure), firstRide.from?.name ?? ''),
       if (journey.transfers > 0) context.l10n.transfersShort(journey.transfers),
       if ((journey.walkingDuration ?? 0) >= 60) context.l10n.walkingDuration(formatDuration(journey.walkingDuration!)),
       if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
     ].join(' · ');
+    final minutes = (journey.duration / 60).round();
 
-    final card = Card(
-      clipBehavior: Clip.antiAlias,
-      shape: selected
-          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: scheme.primary, width: 2))
-          : null,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
+    final card = AppCard(
+      onTap: onTap,
+      border: selected ? scheme.primary : null,
+      padding: const EdgeInsets.fromLTRB(16, 12, 4, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: SectionsStrip(journey: journey)),
-                  const SizedBox(width: 12),
-                  Text(formatDuration(journey.duration),
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                  if (onOpen != null)
-                    IconButton(
-                      tooltip: context.l10n.details,
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: onOpen,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(details, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
-              if (firstRide != null) ...[
-                const SizedBox(height: 4),
-                Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (firstRide.realtime == true)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Icon(Icons.rss_feed, size: 13, color: Colors.green.shade600),
-                      ),
-                    Expanded(
-                      child: Text(
-                        '${leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds))}'
-                        ' · ${context.l10n.firstRide(firstRide.line?.name ?? '', formatClock(firstRide.departure), firstRide.from?.name ?? '')}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: firstRide.realtime == true ? Colors.green.shade700 : scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    Text(
+                      leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                      style: theme.textTheme.titleSmall?.copyWith(color: live ? colors.live : null),
                     ),
+                    Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
                   ],
                 ),
-              ],
+              ),
+              // Like Citymapper: the duration in large figures
+              if (minutes < 60) ...[
+                Text('$minutes', style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28, height: 1.05)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 12),
+                  child: Text('min', style: theme.textTheme.labelMedium),
+                ),
+              ] else
+                Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge),
+              if (onOpen != null)
+                IconButton(
+                  tooltip: context.l10n.details,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.chevron_right, color: colors.muted),
+                  onPressed: onOpen,
+                )
+              else
+                const SizedBox(width: 12),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          Padding(padding: const EdgeInsets.only(right: 12), child: SectionsStrip(journey: journey)),
+          if (details.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Text(details, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+            ),
+          ],
+        ],
       ),
     );
     return onHover == null ? card : MouseRegion(onEnter: (_) => onHover!(), child: card);

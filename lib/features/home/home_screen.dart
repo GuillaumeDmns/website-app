@@ -7,7 +7,9 @@ import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../app/theme.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
@@ -27,78 +29,93 @@ class HomeScreen extends ConsumerWidget {
     final stops = ref.watch(nearbyDeparturesProvider(key)).value ?? const <StopDepartures>[];
     final bikeKey = (lat: key.lat, lon: key.lon, radius: 500, limit: 10);
     final bikes = ref.watch(nearbyBikesProvider(bikeKey)).value ?? const <BikeStation>[];
+    final filter = ref.watch(nearbyFilterProvider);
     final theme = Theme.of(context);
 
     return MapOverlayScope(
-      // Stops above the stations
-      overlay: MapOverlay(pins: [...bikeStationPins(context, bikes), ...nearbyStopPins(context, stops)]),
+      // Stops above the stations; only what the filter shows
+      overlay: MapOverlay(pins: [
+        if (filter == NearbyFilter.all || filter == NearbyFilter.bikes) ...bikeStationPins(context, bikes),
+        if (filter != NearbyFilter.bikes)
+          ...nearbyStopPins(context, [
+            for (final departures in stops)
+              if (filter == NearbyFilter.all || departures.lines.any((line) => filter.shows(line.line.mode))) departures,
+          ]),
+      ]),
       child: RefreshIndicator(
         onRefresh: () => ref.refresh(nearbyDeparturesProvider(key).future),
         child: CustomScrollView(
           controller: PanelScrollScope.of(context),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
               sliver: SliverToBoxAdapter(
                 child: Row(
                   children: [
                     Expanded(child: _SearchBox(onTap: () => context.push(Routes.search))),
+                    const SizedBox(width: 4),
                     const _AccountMenu(),
                   ],
                 ),
               ),
             ),
             const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
             ),
             const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-              sliver: SliverToBoxAdapter(child: DailyTripsSection()),
-            ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
             ),
             const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+              sliver: SliverToBoxAdapter(child: DailyTripsSection()),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: FavoriteStopsSection()),
             ),
             const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: FavoriteLinesSection()),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(context.l10n.homeNearby, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    SectionTitle(context.l10n.homeNearby),
                     if (!origin.isUser)
-                      Text(context.l10n.homeNoPosition,
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        child: Text(context.l10n.homeNoPosition, style: theme.textTheme.bodySmall),
+                      ),
                     // Settings can only be opened on phones
                     if (!origin.isUser && !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS))
                       if (ref.watch(locationIssueProvider) case final issue?)
                         TextButton.icon(
-                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
                           icon: const Icon(Icons.my_location, size: 18),
                           label: Text(issue == LocationIssue.serviceDisabled ? context.l10n.locationTurnOn : context.l10n.locationAllow),
                           onPressed: () => fixLocationIssue(ref, issue),
                         ),
+                    const NearbyFilterBar(),
                   ],
                 ),
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              sliver: SliverToBoxAdapter(child: NearbyDeparturesList(position: key)),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: filter == NearbyFilter.bikes ? const SizedBox.shrink() : NearbyDeparturesList(position: key),
+              ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              sliver: SliverToBoxAdapter(child: NearbyBikesSection(bikeKey: bikeKey)),
-            ),
+            if (filter == NearbyFilter.all || filter == NearbyFilter.bikes)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                sliver: SliverToBoxAdapter(child: NearbyBikesSection(bikeKey: bikeKey)),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
             SliverToBoxAdapter(child: HomeWidgetSync(closest: stops.firstOrNull)),
           ],
         ),
@@ -107,6 +124,7 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// "Où allez-vous ?": the big entry of the app, opening the search
 class _SearchBox extends StatelessWidget {
   const _SearchBox({required this.onTap});
 
@@ -116,18 +134,25 @@ class _SearchBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(14),
+      color: context.colors.card,
+      shape: StadiumBorder(side: BorderSide(color: scheme.outline)),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
           child: Row(
             children: [
-              Icon(Icons.search, color: scheme.onSurfaceVariant),
+              Icon(Icons.search, color: scheme.primary),
               const SizedBox(width: 12),
-              Text(context.l10n.homeSearchHint, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16)),
+              Expanded(
+                child: Text(
+                  context.l10n.homeSearchHint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
             ],
           ),
         ),
@@ -145,7 +170,12 @@ class _AccountMenu extends ConsumerWidget {
     final signedIn = ref.watch(authControllerProvider) == AuthStatus.signedIn;
     return PopupMenuButton<void>(
       tooltip: l10n.account,
-      icon: Icon(signedIn ? Icons.account_circle : Icons.account_circle_outlined),
+      icon: CircleAvatar(
+        radius: 20,
+        backgroundColor: signedIn ? Theme.of(context).colorScheme.primary : context.colors.card,
+        foregroundColor: signedIn ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
+        child: Icon(signedIn ? Icons.person : Icons.person_outline, size: 22),
+      ),
       itemBuilder: (context) => [
         PopupMenuItem(
           onTap: () => ref.read(localeProvider.notifier).toggle(),

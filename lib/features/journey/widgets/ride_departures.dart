@@ -5,6 +5,7 @@ import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
 import '../../../l10n/l10n.dart';
 import '../journey_retime.dart';
+import '../../../app/theme.dart';
 
 /// Next departures for a ride, like Citymapper: one row per departure with its times at both stops, mission code,
 /// destination and platform. The [selected] one is raised and scrolled into view when it changes.
@@ -98,10 +99,9 @@ class _RideDepartureListState extends State<RideDepartureList> {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? theme.colorScheme.surfaceContainerLow
-            : theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outline, width: 0.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -195,7 +195,7 @@ class _RideRow extends StatelessWidget {
                       Text(
                         formatClock(departure.time),
                         style: TextStyle(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           fontSize: 15,
                           fontFeatures: figures,
                           decoration: departure.cancelled ? TextDecoration.lineThrough : null,
@@ -207,8 +207,8 @@ class _RideRow extends StatelessWidget {
                           child: Text(
                             late > 0 ? '+$late' : '$late',
                             style: TextStyle(
-                              color: late > 0 ? Colors.orange.shade800 : Colors.blue.shade700,
-                              fontWeight: FontWeight.w700,
+                              color: late > 0 ? context.colors.warning : theme.colorScheme.secondary,
+                              fontWeight: FontWeight.w600,
                               fontSize: 12,
                             ),
                           ),
@@ -242,7 +242,7 @@ class _RideRow extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 6),
                         child: Text(
                           departure.mission!,
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.5),
                         ),
                       ),
                     Expanded(
@@ -275,17 +275,13 @@ class _RideRow extends StatelessWidget {
       ),
     );
 
-    final dark = theme.brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       child: Material(
-        color: selected
-            ? (dark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surfaceContainerLowest)
-            : Colors.transparent,
-        elevation: selected ? 3 : 0,
+        color: selected ? theme.colorScheme.primary.withValues(alpha: 0.08) : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: selected ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)) : BorderSide.none,
+          side: selected ? BorderSide(color: theme.colorScheme.primary, width: 1.5) : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

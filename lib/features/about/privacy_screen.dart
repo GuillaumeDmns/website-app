@@ -16,7 +16,7 @@ class PrivacyScreen extends StatelessWidget {
     final theme = Theme.of(context);
     Widget heading(String text) => Padding(
           padding: const EdgeInsets.only(top: 20, bottom: 6),
-          child: Text(text, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          child: Text(text, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
         );
     Widget paragraph(String text) => Padding(padding: const EdgeInsets.only(bottom: 10), child: SelectableText(text));
 
@@ -32,7 +32,7 @@ class PrivacyScreen extends StatelessWidget {
               onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
             ),
             Expanded(
-              child: Text(l10n.privacy, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              child: Text(l10n.privacy, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
             ),
           ],
         ),

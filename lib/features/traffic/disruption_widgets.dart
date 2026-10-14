@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 
-Color severityColor(DisruptionSeverity? severity, ColorScheme scheme) => switch (severity) {
-      DisruptionSeverity.blocking => scheme.error,
-      DisruptionSeverity.disrupted => Colors.orange.shade700,
-      DisruptionSeverity.info => Colors.blue.shade600,
-      null => Colors.green.shade600,
-    };
+Color severityColor(DisruptionSeverity? severity, ColorScheme scheme) {
+  final colors = scheme.brightness == Brightness.light ? AppColors.light : AppColors.dark;
+  return switch (severity) {
+    DisruptionSeverity.blocking => colors.cancelled,
+    DisruptionSeverity.disrupted => colors.warning,
+    DisruptionSeverity.info => scheme.secondary,
+    null => colors.live,
+  };
+}
 
 IconData severityIcon(DisruptionSeverity? severity) => switch (severity) {
       DisruptionSeverity.blocking => Icons.block,
@@ -132,7 +136,7 @@ class DisruptionCard extends StatelessWidget {
       color: color.withValues(alpha: 0.08),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radius),
         side: BorderSide(color: color.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
@@ -232,8 +236,8 @@ class _ElevatorCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: context.colors.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radius)),
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),

@@ -43,7 +43,7 @@ class AroundScreen extends ConsumerWidget {
             children: [
               IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
               Expanded(
-                child: Text(name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
               ),
               IconButton(
                 tooltip: context.l10n.savePlace,

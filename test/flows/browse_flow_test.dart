@@ -27,7 +27,7 @@ void main() {
     // Today's service of its lines, from the schedule: the last metro soon; a direction unfolds its frequencies
     expect(find.text(currentL10n.serviceHoursTitle), findsOneWidget);
     expect(find.text(currentL10n.lastDepartureIn('40\u00a0min')), findsOneWidget);
-    expect(find.text(currentL10n.frequencyNow(currentL10n.frequencyEvery('4–6\u00a0min'))), findsOneWidget);
+    expect(find.text(currentL10n.frequencyNow(currentL10n.frequencyEvery('4\u2060–\u20606\u00a0min'))), findsOneWidget);
     await tapOn(tester, find.text(currentL10n.towards('Fontenay-sous-Bois')));
     expect(find.text(currentL10n.periodDaytime), findsOneWidget);
 

@@ -55,7 +55,7 @@ class ApiTokensSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.apiTokensTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+        Text(l10n.apiTokensTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Text(l10n.apiTokensHint, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 8),

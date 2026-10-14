@@ -8,7 +8,9 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
+import '../../app/theme.dart';
 
 /// First and last departures of the lines of a stop area today, and their frequency (GTFS: no real-time call)
 final stopServiceHoursProvider = FutureProvider.autoDispose.family<StopServiceHours, String>(
@@ -33,8 +35,8 @@ String frequencyLabel(Frequency frequency) {
   final interval = min == max
       ? formatDuration(min * 60)
       : max < 60
-      ? '$min–${formatDuration(max * 60)}'
-      : '${formatDuration(min * 60)}–${formatDuration(max * 60)}';
+      ? '$min\u2060–\u2060${formatDuration(max * 60)}'
+      : '${formatDuration(min * 60)}\u2060–\u2060${formatDuration(max * 60)}';
   return currentL10n.frequencyEvery(interval);
 }
 
@@ -80,21 +82,27 @@ class StopServiceHoursSection extends ConsumerWidget {
       AsyncData(:final value) when value.lines.isNotEmpty => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(context.l10n.serviceHoursTitle, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          for (final line in value.lines)
-            for (final direction in line.directions)
-              ServiceDirectionTile(
-                line: line.line,
-                direction: direction,
-                now: now,
-                onLine: () => context.push(Routes.line(line.line.id)),
-              ),
+          SectionTitle(context.l10n.serviceHoursTitle),
+          AppCard(
+            padding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (index, (line, direction)) in [
+                  for (final line in value.lines)
+                    for (final direction in line.directions) (line.line, direction),
+                ].indexed) ...[
+                  if (index > 0) const Divider(indent: 36),
+                  ServiceDirectionTile(line: line, direction: direction, now: now, onLine: () => context.push(Routes.line(line.id))),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
-      AsyncError() when !hours.hasValue => Text(
-        context.l10n.serviceHoursUnavailable,
-        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      AsyncError() when !hours.hasValue => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
+        child: Text(context.l10n.serviceHoursUnavailable, style: theme.textTheme.bodySmall),
       ),
       _ => const SizedBox.shrink(),
     };
@@ -154,7 +162,7 @@ class _ServiceDirectionTileState extends State<ServiceDirectionTile> {
                         Text(
                           status.text,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: status.warning ? Colors.orange.shade800 : muted,
+                            color: status.warning ? context.colors.warning : muted,
                             fontWeight: status.warning ? FontWeight.w600 : null,
                           ),
                         ),
@@ -245,15 +253,18 @@ class LineServiceHoursSummary extends ConsumerWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          [context.l10n.serviceHoursTitle, if (service.at case final at?) context.l10n.serviceCountedAt(at.name)].join(' '),
-          style: theme.textTheme.bodySmall?.copyWith(color: muted),
-        ),
-        ServiceDirectionTile(direction: service, now: now),
-      ],
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            [context.l10n.serviceHoursTitle, if (service.at case final at?) context.l10n.serviceCountedAt(at.name)].join(' '),
+            style: theme.textTheme.bodySmall?.copyWith(color: muted),
+          ),
+          ServiceDirectionTile(direction: service, now: now),
+        ],
+      ),
     );
   }
 }

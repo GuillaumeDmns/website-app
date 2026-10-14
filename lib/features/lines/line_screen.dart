@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
@@ -12,6 +13,7 @@ import '../../core/platform/share.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../core/location/location_providers.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
@@ -155,35 +157,16 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
     return ListView(
       controller: PanelScrollScope.of(context),
-      padding: const EdgeInsets.fromLTRB(4, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(4, 0, 16, 32),
       children: [
         Row(
           children: [
             IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-            LineBadge(line, size: 34),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${line.mode.label} ${line.name ?? ''}',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  if (line.longName != null && line.longName != line.name)
-                    Text(
-                      line.longName!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                ],
-              ),
-            ),
+            const Spacer(),
             FavoriteLineButton(line: line),
             IconButton(
               tooltip: context.l10n.share,
-              icon: const Icon(Icons.share_outlined),
+              icon: const Icon(Icons.ios_share),
               onPressed: () => shareLink(
                 context,
                 title: '${line.mode.label} ${line.name ?? ''}'.trim(),
@@ -192,16 +175,35 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 0, 12),
+          padding: const EdgeInsets.only(left: 12),
+          child: Row(
+            children: [
+              LineBadge(line, size: 44),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${line.mode.label} ${line.name ?? ''}', style: theme.textTheme.headlineSmall),
+                    if (line.longName != null && line.longName != line.name && line.longName != '${line.mode.label} ${line.name ?? ''}')
+                      Text(line.longName!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 0, 0),
           child: _LineDisruptions(line: line),
         ),
         if (detail.directions.length > 1)
           Padding(
-            padding: const EdgeInsets.only(left: 12),
+            padding: const EdgeInsets.fromLTRB(12, 16, 0, 0),
             child: SegmentedButton<int>(
               showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
               segments: [
                 for (var i = 0; i < detail.directions.length; i++)
                   ButtonSegment(
@@ -236,17 +238,26 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
           child: LineServiceHoursSummary(lineId: line.id, direction: _direction.clamp(0, detail.directions.length - 1)),
         ),
-        const SizedBox(height: 12),
         if (branch != null)
-          for (var i = 0; i < branch.stops.length; i++)
-            _StopTimelineTile(
-              stop: branch.stops[i],
-              color: color,
-              isFirst: i == 0,
-              isLast: i == branch.stops.length - 1,
-              line: line,
-              vehicles: positions[i] ?? const [],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
+            child: AppCard(
+              padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+              child: Column(
+                children: [
+                  for (var i = 0; i < branch.stops.length; i++)
+                    _StopTimelineTile(
+                      stop: branch.stops[i],
+                      color: color,
+                      isFirst: i == 0,
+                      isLast: i == branch.stops.length - 1,
+                      line: line,
+                      vehicles: positions[i] ?? const [],
+                    ),
+                ],
+              ),
             ),
+          ),
       ],
     );
   }
@@ -320,7 +331,6 @@ class _StopTimelineTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final terminus = isFirst || isLast;
-    final theme = Theme.of(context);
     // Taller with a larger text size
     final height = MediaQuery.textScalerOf(context).scale(_height);
 
@@ -346,7 +356,7 @@ class _StopTimelineTile extends StatelessWidget {
                     width: terminus ? 16 : 12,
                     height: terminus ? 16 : 12,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
+                      color: context.colors.card,
                       shape: BoxShape.circle,
                       border: Border.all(color: color, width: 3),
                     ),
@@ -371,7 +381,7 @@ class _StopTimelineTile extends StatelessWidget {
                 stop.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontWeight: terminus ? FontWeight.w700 : FontWeight.w400),
+                style: TextStyle(fontWeight: terminus ? FontWeight.w600 : FontWeight.w400),
               ),
             ),
           ],

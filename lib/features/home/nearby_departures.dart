@@ -40,7 +40,77 @@ List<MapPin> nearbyStopPins(BuildContext context, List<StopDepartures> stops) =>
         ),
     ];
 
-/// Cards of the departures around [position]
+/// Kind of departures shown around: all, rail (metro, RER, trains), buses (and Noctiliens), trams, Vélib
+enum NearbyFilter {
+  all,
+  rail,
+  bus,
+  tram,
+  bikes;
+
+  String get label => switch (this) {
+    all => currentL10n.filterAll,
+    rail => currentL10n.filterRail,
+    bus => currentL10n.filterBus,
+    tram => currentL10n.filterTram,
+    bikes => 'Vélib',
+  };
+
+  IconData get icon => switch (this) {
+    all => Icons.near_me_outlined,
+    rail => Icons.subway_outlined,
+    bus => Icons.directions_bus_outlined,
+    tram => Icons.tram_outlined,
+    bikes => Icons.pedal_bike,
+  };
+
+  bool shows(TransportMode mode) => switch (this) {
+    all => true,
+    rail => mode == TransportMode.metro || mode.isRail,
+    bus => mode == TransportMode.bus || mode == TransportMode.noctilien,
+    tram => mode == TransportMode.tram,
+    bikes => false,
+  };
+}
+
+class _NearbyFilterState extends Notifier<NearbyFilter> {
+  @override
+  NearbyFilter build() => NearbyFilter.all;
+
+  void select(NearbyFilter filter) => state = filter;
+}
+
+/// The kind of departures shown around, for the time the app runs
+final nearbyFilterProvider = NotifierProvider<_NearbyFilterState, NearbyFilter>(_NearbyFilterState.new);
+
+/// Chips choosing [nearbyFilterProvider], scrolled sideways
+class NearbyFilterBar extends ConsumerWidget {
+  const NearbyFilterBar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(nearbyFilterProvider);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final filter in NearbyFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                avatar: Icon(filter.icon, size: 18),
+                label: Text(filter.label),
+                selected: filter == selected,
+                onSelected: (_) => ref.read(nearbyFilterProvider.notifier).select(filter),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cards of the departures around [position], of the kind chosen with [NearbyFilterBar]
 class NearbyDeparturesList extends ConsumerWidget {
   const NearbyDeparturesList({super.key, required this.position});
 
@@ -50,24 +120,39 @@ class NearbyDeparturesList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final nearby = ref.watch(nearbyDeparturesProvider(position));
     final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final filter = ref.watch(nearbyFilterProvider);
 
     return AsyncView(
       value: nearby,
       onRetry: () => ref.invalidate(nearbyDeparturesProvider(position)),
-      data: (stops) => stops.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(context.l10n.nearbyNoStop, textAlign: TextAlign.center),
-            )
-          : Column(
-              children: [
-                for (final departures in stops)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: StopDeparturesCard(departures: departures, now: now),
-                  ),
-              ],
+      data: (stops) {
+        final shown = [
+          for (final departures in stops)
+            if (filter == NearbyFilter.all)
+              departures
+            else if (departures.lines.where((line) => filter.shows(line.line.mode)).toList() case final lines when lines.isNotEmpty)
+              departures.copyWith(lines: lines),
+        ];
+        if (shown.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              stops.isEmpty ? context.l10n.nearbyNoStop : context.l10n.nearbyNothingForMode,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
+          );
+        }
+        return Column(
+          children: [
+            for (final departures in shown)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: StopDeparturesCard(departures: departures, now: now),
+              ),
+          ],
+        );
+      },
     );
   }
 }

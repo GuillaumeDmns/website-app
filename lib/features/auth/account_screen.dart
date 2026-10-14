@@ -37,7 +37,7 @@ class AccountScreen extends ConsumerWidget {
               onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
             ),
             Expanded(
-              child: Text(l10n.accountTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              child: Text(l10n.accountTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -152,7 +152,7 @@ class _SignedInState extends ConsumerState<_SignedIn> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: CircleAvatar(child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase())),
-          title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: account.firstName != null && account.email != null ? Text(account.email!) : null,
         ),
         const SizedBox(height: 8),

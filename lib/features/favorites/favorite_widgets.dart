@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
@@ -14,6 +15,7 @@ import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import '../stops/widgets/stop_departures_card.dart';
 import 'favorites_controller.dart';
+import '../../app/theme.dart';
 
 /// Runs a favorite change and shows the result in a snackbar. The messenger is resolved before running the action:
 /// the widget that started it may be gone when it ends.
@@ -44,7 +46,7 @@ class FavoriteStopButton extends ConsumerWidget {
     final saved = ref.read(favoritesProvider.notifier).stopFavorite(stop.id) != null;
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
-      icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
+      icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? context.colors.warning : null),
       onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stop)),
     );
   }
@@ -62,7 +64,7 @@ class FavoriteLineButton extends ConsumerWidget {
     final saved = ref.read(favoritesProvider.notifier).lineFavorite(line.id) != null;
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
-      icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? Colors.amber.shade600 : null),
+      icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? context.colors.warning : null),
       onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(line)),
     );
   }
@@ -90,7 +92,7 @@ Future<void> chooseFavoritePlace(BuildContext context, WidgetRef ref, FavoriteKi
   await _runFavoriteAction(messenger, () => favorites.savePlace(kind, place), success: currentL10n.favoriteSaved(title));
 }
 
-/// Home, work and saved places as shortcuts: tap to go there, long press (or the menu) to change them.
+/// Home, work and saved places as tiles, like Citymapper's: tap to go there, long press (or the menu) to change them.
 class FavoriteShortcuts extends ConsumerWidget {
   const FavoriteShortcuts({super.key});
 
@@ -102,25 +104,73 @@ class FavoriteShortcuts extends ConsumerWidget {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_outlined, title: context.l10n.home, favorite: find(FavoriteKind.home)),
-          const SizedBox(width: 8),
-          _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_outline, title: context.l10n.work, favorite: find(FavoriteKind.work)),
-          for (final place in places) ...[
+      clipBehavior: Clip.none,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_rounded, title: context.l10n.home, favorite: find(FavoriteKind.home)),
             const SizedBox(width: 8),
-            _PlaceShortcut(kind: FavoriteKind.place, icon: Icons.star_outline, title: place.label ?? '', favorite: place),
+            _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_rounded, title: context.l10n.work, favorite: find(FavoriteKind.work)),
+            for (final place in places) ...[
+              const SizedBox(width: 8),
+              _PlaceShortcut(kind: FavoriteKind.place, icon: Icons.star_rounded, title: place.label ?? '', favorite: place),
+            ],
+            const SizedBox(width: 8),
+            _ShortcutTile(
+              icon: Icons.add,
+              title: context.l10n.place,
+              subtitle: context.l10n.shortcutAdd,
+              tooltip: context.l10n.favoritePlaceAdd,
+              onTap: () => chooseFavoritePlace(context, ref, FavoriteKind.place),
+            ),
           ],
-          const SizedBox(width: 8),
-          ActionChip(
-            avatar: const Icon(Icons.add, size: 18),
-            label: Text(context.l10n.place),
-            tooltip: context.l10n.favoritePlaceAdd,
-            onPressed: () => chooseFavoritePlace(context, ref, FavoriteKind.place),
-          ),
-        ],
+        ),
       ),
     );
+  }
+}
+
+/// A tile of the shortcuts: an icon in a bubble, a name and a line below
+class _ShortcutTile extends StatelessWidget {
+  const _ShortcutTile({required this.icon, required this.title, required this.subtitle, required this.onTap, this.onLongPress, this.color, this.tooltip});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final Color? color;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final width = MediaQuery.textScalerOf(context).scale(112);
+    final tile = SizedBox(
+      width: width,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          onSecondaryTap: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconBubble(icon, color: color, size: 34),
+                const SizedBox(height: 8),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return tooltip == null ? tile : Tooltip(message: tooltip, child: tile);
   }
 }
 
@@ -176,28 +226,44 @@ class _PlaceShortcut extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final color = switch (kind) {
+      FavoriteKind.home => Theme.of(context).colorScheme.primary,
+      FavoriteKind.work => Theme.of(context).colorScheme.secondary,
+      _ => context.colors.warning,
+    };
     if (favorite == null) {
-      return ActionChip(
-        avatar: Icon(icon, size: 18),
-        label: Text(context.l10n.addPlace(title)),
-        onPressed: () => chooseFavoritePlace(context, ref, kind),
+      return _ShortcutTile(
+        icon: icon,
+        title: title,
+        subtitle: context.l10n.shortcutSet,
+        tooltip: context.l10n.addPlace(title),
+        color: color,
+        onTap: () => chooseFavoritePlace(context, ref, kind),
       );
     }
-    return GestureDetector(
-      onLongPress: () => _edit(context, ref),
-      onSecondaryTap: () => _edit(context, ref),
-      child: InputChip(
-        avatar: Icon(icon, size: 18),
-        label: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 160),
-          child: Text(title, overflow: TextOverflow.ellipsis),
+    return Stack(
+      children: [
+        _ShortcutTile(
+          icon: icon,
+          title: title,
+          subtitle: favorite!.label ?? '',
+          color: color,
+          tooltip: favorite!.label,
+          onTap: () => _go(context, ref),
+          onLongPress: () => _edit(context, ref),
         ),
-        tooltip: favorite!.label,
-        onPressed: () => _go(context, ref),
-        deleteIcon: const Icon(Icons.more_vert, size: 18),
-        deleteButtonTooltipMessage: context.l10n.edit,
-        onDeleted: () => _edit(context, ref),
-      ),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: IconButton(
+            tooltip: context.l10n.edit,
+            visualDensity: VisualDensity.compact,
+            iconSize: 18,
+            icon: Icon(Icons.more_horiz, color: context.colors.muted),
+            onPressed: () => _edit(context, ref),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -219,8 +285,7 @@ class FavoriteStopsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(context.l10n.myStops, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
+        SectionTitle(context.l10n.myStops),
         for (final stop in stops)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -259,8 +324,7 @@ class FavoriteLinesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(context.l10n.myLines, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
+        SectionTitle(context.l10n.myLines),
         Wrap(
           spacing: 8,
           runSpacing: 8,

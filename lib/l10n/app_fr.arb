@@ -29,6 +29,11 @@
   "retry": "Réessayer",
   "homeSearchHint": "Où allez-vous ?",
   "homeNearby": "À proximité",
+  "filterAll": "Tout",
+  "filterRail": "Métro · RER · Train",
+  "filterBus": "Bus",
+  "filterTram": "Tram",
+  "nearbyNothingForMode": "Aucun départ de ce type à proximité",
   "homeNoPosition": "Position indisponible : autour du centre de la carte",
   "dailyTripsTitle": "Mes trajets",
   "dailyTripSave": "Enregistrer comme trajet du quotidien",
@@ -174,6 +179,8 @@
       }
     }
   },
+  "shortcutAdd": "Ajouter",
+  "shortcutSet": "Définir",
   "edit": "Modifier",
   "myStops": "Mes arrêts",
   "myLines": "Mes lignes",
@@ -212,6 +219,7 @@
   "welcomePlacesText": "Pour y aller en un geste depuis l'accueil. Vous pourrez les changer plus tard.",
   "wheelchairAccessible": "Accessible en fauteuil roulant",
   "scheduledTimetable": "Horaires théoriques",
+  "timetableShort": "Horaires",
   "serviceHoursTitle": "Horaires du jour",
   "serviceFirstLast": "{first} – {last}",
   "@serviceFirstLast": {

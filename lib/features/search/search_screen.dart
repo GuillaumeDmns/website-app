@@ -11,11 +11,13 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import 'recent_searches.dart';
+import '../../app/theme.dart';
 
 /// Results of a query (keyed by the query, so that stacked search pages don't share them)
 final _searchResultsProvider = FutureProvider.autoDispose.family<SearchResult, String>((ref, query) {
@@ -180,20 +182,23 @@ class _Suggestions extends ConsumerWidget {
       children: [
         if (isPicking && allowCurrentLocation)
           ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.my_location)),
+            leading: IconBubble(Icons.my_location, color: theme.colorScheme.primary),
             title: Text(context.l10n.myLocation),
             onTap: onCurrentLocation,
           ),
         for (final favorite in places)
           ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.amber.withValues(alpha: 0.2),
-              foregroundColor: Colors.amber.shade800,
-              child: Icon(switch (favorite.kind) {
-                FavoriteKind.home => Icons.home_outlined,
-                FavoriteKind.work => Icons.work_outline,
-                _ => Icons.star_outline,
-              }),
+            leading: IconBubble(
+              switch (favorite.kind) {
+                FavoriteKind.home => Icons.home_rounded,
+                FavoriteKind.work => Icons.work_rounded,
+                _ => Icons.star_rounded,
+              },
+              color: switch (favorite.kind) {
+                FavoriteKind.home => theme.colorScheme.primary,
+                FavoriteKind.work => theme.colorScheme.secondary,
+                _ => context.colors.warning,
+              },
             ),
             title: Text(switch (favorite.kind) {
               FavoriteKind.home => context.l10n.home,
@@ -305,11 +310,7 @@ class _PlaceTile extends StatelessWidget {
     };
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: scheme.surfaceContainerHighest,
-        foregroundColor: scheme.onSurfaceVariant,
-        child: Icon(icon ?? typeIcon),
-      ),
+      leading: IconBubble(icon ?? typeIcon, color: icon == null && place.type == PlaceType.stopArea ? scheme.primary : null),
       title: Text(place.name),
       subtitle: place.lines.isEmpty
           ? null

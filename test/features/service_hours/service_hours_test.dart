@@ -45,15 +45,15 @@ void main() {
   });
 
   test('tells how often a direction leaves', () {
-    expect(frequencyLabel(direction.frequencies[0]), 'toutes les 6–8 min');
+    expect(frequencyLabel(direction.frequencies[0]), 'toutes les 6\u2060–\u20608 min');
     expect(frequencyLabel(direction.frequencies[2]), 'toutes les 6 min');
     expect(frequencyLabel(direction.frequencies[3]), '1 départ');
-    expect(frequencyLabel(direction.frequencies[4]), 'toutes les 1 h 05–1 h 30');
+    expect(frequencyLabel(direction.frequencies[4]), 'toutes les 1 h 05\u2060–\u20601 h 30');
     expect(periodLabel(ServicePeriod.morningPeak), 'Pointe du matin');
   });
 
   test('tells what matters now: the frequency, the last departure soon, the service over or not started', () {
-    expect(serviceStatus(direction, DateTime.utc(2026, 10, 14, 6)), (text: 'En ce moment toutes les 2–3 min', warning: false));
+    expect(serviceStatus(direction, DateTime.utc(2026, 10, 14, 6)), (text: 'En ce moment toutes les 2\u2060–\u20603 min', warning: false));
     expect(direction.frequencyAt(DateTime.utc(2026, 10, 14, 12)), isNull);
     expect(serviceStatus(direction, DateTime.utc(2026, 10, 14, 22, 30)), (text: 'Dernier départ dans 45 min', warning: true));
     expect(serviceStatus(direction, DateTime.utc(2026, 10, 14, 23, 20)), (text: "Plus de départ aujourd'hui", warning: true));

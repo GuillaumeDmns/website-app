@@ -10,6 +10,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../journey/journey_preferences.dart';
@@ -17,6 +18,7 @@ import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/widgets/journey_card.dart';
 import 'daily_trips.dart';
+import '../../app/theme.dart';
 
 typedef RideSpanKey = ({String lineId, String from, String to});
 
@@ -112,15 +114,10 @@ class DailyTripsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(context.l10n.dailyTripsTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        SectionTitle(context.l10n.dailyTripsTitle),
         for (final trip in trips)
-          Padding(padding: const EdgeInsets.only(bottom: 12), child: DailyTripCard(key: ValueKey(trip.id), trip: trip)),
-        if (home != null && work != null && !commuteSaved)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _CommuteHint(home: home, work: work),
-          ),
+          Padding(padding: const EdgeInsets.only(bottom: 10), child: DailyTripCard(key: ValueKey(trip.id), trip: trip)),
+        if (home != null && work != null && !commuteSaved) _CommuteHint(home: home, work: work),
       ],
     );
   }
@@ -135,29 +132,31 @@ class _CommuteHint extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.dailyTripHint(context.l10n.home, context.l10n.work),
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconBubble(Icons.route, color: theme.colorScheme.primary, size: 34),
+              const SizedBox(width: 12),
+              Expanded(child: Text(context.l10n.dailyTripHint(context.l10n.home, context.l10n.work), style: theme.textTheme.bodyMedium)),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.arrow_forward, size: 18),
+              label: Text(context.l10n.dailyTripChoose),
+              onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
+                    from: favoritePlace(home),
+                    to: favoritePlace(work),
+                  )))),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.route, size: 18),
-                label: Text(context.l10n.dailyTripChoose),
-                onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
-                      from: favoritePlace(home),
-                      to: favoritePlace(work),
-                    )))),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -202,82 +201,83 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
     final next = options.first;
     final alert = lastTripText(lastTripAlert(trip.journey, watchSpans(ref), now), now);
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final colors = context.colors;
     final leaveIn = next.departure.difference(now);
     final live = next.rides.firstOrNull?.realtime == true;
-    final name = context.l10n.dailyTripName(tripPlaceName(trip.start, favorites), tripPlaceName(trip.end, favorites));
+    final startName = tripPlaceName(trip.start, favorites);
+    final endName = tripPlaceName(trip.end, favorites);
+    final name = context.l10n.dailyTripName(startName, endName);
+    final icon = endName == context.l10n.home
+        ? Icons.home_rounded
+        : endName == context.l10n.work
+        ? Icons.work_rounded
+        : Icons.route;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          ref.read(selectedJourneyProvider.notifier).select(next, trip.request);
-          context.push(Routes.journeyDetailOf(trip.request, next));
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 4, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 6, 4, 14),
+      onTap: () {
+        ref.read(selectedJourneyProvider.notifier).select(next, trip.request);
+        context.push(Routes.journeyDetailOf(trip.request, next));
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                  IconButton(
-                    tooltip: context.l10n.dailyTripReverse,
-                    icon: const Icon(Icons.swap_horiz),
-                    onPressed: () => setState(() => _reversed = !_reversed),
-                  ),
-                  PopupMenuButton<void>(
-                    tooltip: context.l10n.dailyTripMenu,
-                    itemBuilder: (context) => [
-                      PopupMenuItem(onTap: _remove, child: Text(context.l10n.dailyTripRemove)),
-                    ],
-                  ),
+              IconBubble(icon, color: theme.colorScheme.primary, size: 28),
+              const SizedBox(width: 10),
+              Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall)),
+              IconButton(
+                tooltip: context.l10n.dailyTripReverse,
+                icon: Icon(Icons.swap_horiz, color: colors.muted),
+                onPressed: () => setState(() => _reversed = !_reversed),
+              ),
+              PopupMenuButton<void>(
+                tooltip: context.l10n.dailyTripMenu,
+                icon: Icon(Icons.more_vert, color: colors.muted),
+                itemBuilder: (context) => [
+                  PopupMenuItem(onTap: _remove, child: Text(context.l10n.dailyTripRemove)),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: SectionsStrip(journey: next)),
-                    const SizedBox(width: 12),
-                    Text(formatDuration(next.duration), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
-                style: TextStyle(fontWeight: FontWeight.w600, color: live ? Colors.green.shade700 : null),
-              ),
-              Text(
-                [
-                  '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
-                  if (options.length > 1)
-                    context.l10n.dailyTripThen(options.skip(1).map((option) => formatClock(option.departure)).join(', ')),
-                ].join(' · '),
-                style: theme.textTheme.bodySmall?.copyWith(color: muted),
-              ),
-              if (alert != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 12),
-                  child: Row(
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12, top: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.nightlight_round, size: 18, color: Colors.orange.shade800),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(alert, style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text(
+                        leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                        style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
+                          if (options.length > 1)
+                            context.l10n.dailyTripThen(options.skip(1).map((option) => formatClock(option.departure)).join(', ')),
+                        ].join(' · '),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ),
-            ],
+                const SizedBox(width: 12),
+                Text(formatDuration(next.duration), style: theme.textTheme.titleLarge),
+              ],
+            ),
           ),
-        ),
+          Padding(padding: const EdgeInsets.only(top: 10, right: 12), child: SectionsStrip(journey: next)),
+          if (alert != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, right: 12),
+              child: NoticeLine(icon: Icons.nightlight_round, text: alert),
+            ),
+        ],
       ),
     );
   }
@@ -337,21 +337,10 @@ class LastRideTag extends ConsumerWidget {
         last.departure.isBefore(ride.departure.subtract(const Duration(minutes: 1)))) {
       return const SizedBox.shrink();
     }
-    final color = Colors.orange.shade800;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.nightlight_round, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            context.l10n.lastRideOf(modeNoun(line.mode), line.name ?? '', formatClock(last.departure)),
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
+    return PillTag(
+      icon: Icons.nightlight_round,
+      text: context.l10n.lastRideOf(modeNoun(line.mode), line.name ?? '', formatClock(last.departure)),
+      color: context.colors.warning,
     );
   }
 }

@@ -17,6 +17,7 @@ import 'journey_request.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_options_sheet.dart';
+import '../../app/theme.dart';
 
 /// Option shown on the map, per search (the first one, "Suggéré", until another is chosen)
 class _SelectedOption extends Notifier<int> {
@@ -77,7 +78,7 @@ class JourneyScreen extends ConsumerWidget {
           ? journeyOverlay(context, selectedJourney)
           : MapOverlay(
               pins: [
-                if (point(request.from) case final from?) MapPin(point: from, color: Colors.green.shade600, size: 16),
+                if (point(request.from) case final from?) MapPin(point: from, color: Theme.of(context).colorScheme.primary, size: 16),
                 if (point(request.to) case final to?)
                   MapPin(point: to, color: Theme.of(context).colorScheme.error, icon: Icons.place, size: 24),
               ],
@@ -185,35 +186,50 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: onBack),
         Expanded(
-          child: Column(
-            children: [
-              _PlaceField(
-                label: context.l10n.journeyFrom,
-                place: request.from,
-                icon: Icons.trip_origin,
-                color: Colors.green.shade600,
-                onTap: onPickFrom,
-              ),
-              const SizedBox(height: 8),
-              _PlaceField(
-                label: context.l10n.journeyTo,
-                place: request.to,
-                icon: Icons.place,
-                color: Theme.of(context).colorScheme.error,
-                onTap: onPickTo,
-              ),
-            ],
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      _PlaceField(
+                        label: context.l10n.journeyFrom,
+                        place: request.from,
+                        icon: Icons.trip_origin,
+                        color: scheme.primary,
+                        onTap: onPickFrom,
+                        connector: _Connector.below,
+                      ),
+                      const Divider(indent: 44),
+                      _PlaceField(
+                        label: context.l10n.journeyTo,
+                        place: request.to,
+                        icon: Icons.place,
+                        color: context.colors.cancelled,
+                        onTap: onPickTo,
+                        connector: _Connector.above,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(tooltip: context.l10n.swap, icon: Icon(Icons.swap_vert, color: context.colors.muted), onPressed: onSwap),
+              ],
+            ),
           ),
         ),
-        IconButton(tooltip: context.l10n.swap, icon: const Icon(Icons.swap_vert), onPressed: onSwap),
       ],
     );
   }
 }
+
+/// Where a place row's dot is joined by the dotted line between the start and the end
+enum _Connector { above, below }
 
 class _PlaceField extends StatelessWidget {
   const _PlaceField({
@@ -222,6 +238,7 @@ class _PlaceField extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    required this.connector,
   });
 
   final String label;
@@ -229,32 +246,42 @@ class _PlaceField extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final _Connector connector;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              Icon(place?.isCurrentLocation == true ? Icons.my_location : icon, size: 18, color: color),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  place?.name ?? label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: place == null ? scheme.onSurfaceVariant : null, fontWeight: FontWeight.w500),
-                ),
+    final muted = context.colors.muted;
+    final dots = Expanded(
+      child: Center(child: Container(width: 2, color: connector == _Connector.above ? muted.withValues(alpha: 0.4) : Colors.transparent)),
+    );
+    final dotsBelow = Expanded(
+      child: Center(child: Container(width: 2, color: connector == _Connector.below ? muted.withValues(alpha: 0.4) : Colors.transparent)),
+    );
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: MediaQuery.textScalerOf(context).scale(48),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Column(
+                children: [
+                  dots,
+                  Icon(place?.isCurrentLocation == true ? Icons.my_location : icon, size: 18, color: color),
+                  dotsBelow,
+                ],
               ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: Text(
+                place?.name ?? label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: place == null ? muted : null, fontWeight: FontWeight.w500, fontSize: 16),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -405,13 +432,7 @@ class _Results extends StatelessWidget {
           if (index == 0 || journeyTypeLabel(plan.journeys[index - 1].type) != journeyTypeLabel(journey.type))
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 6),
-              child: Text(
-                journeyTypeLabel(journey.type),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: Text(journeyTypeLabel(journey.type), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
             )
           else
             const SizedBox(height: 8),

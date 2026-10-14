@@ -9,6 +9,7 @@ import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import 'line_vehicles.dart';
+import '../../app/theme.dart';
 
 /// Mission of a vehicle: its next stops with their times, kept up to date while open
 Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, required Vehicle vehicle}) {
@@ -101,7 +102,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                       children: [
                         Text(
                           context.l10n.towards(_vehicle.destination ?? '?'),
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         Row(
                           children: [
@@ -211,10 +212,10 @@ class _CallRow extends StatelessWidget {
                   children: [
                     Text(
                       formatClock(call.expectedAt),
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()]),
                     ),
                     if (until != null)
-                      Text(until, style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
+                      Text(until, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.live)),
                   ],
                 ),
               ),
@@ -280,7 +281,7 @@ class _DelayLabel extends StatelessWidget {
     return Text(
       minutes > 0 ? '+${context.l10n.minutesShort(minutes)}' : context.l10n.minutesShort(minutes),
       style: TextStyle(
-        color: minutes > 0 ? Colors.orange.shade800 : Colors.blue.shade700,
+        color: minutes > 0 ? context.colors.warning : Colors.blue.shade700,
         fontWeight: FontWeight.w600,
         fontSize: 12,
       ),

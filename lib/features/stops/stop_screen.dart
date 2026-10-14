@@ -13,6 +13,7 @@ import '../../core/platform/share.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../journey/journey_preferences.dart';
@@ -96,7 +97,7 @@ class _StopContent extends ConsumerWidget {
       onRefresh: () => ref.refresh(stopDeparturesProvider(detail.id).future),
       child: ListView(
         controller: PanelScrollScope.of(context),
-        padding: const EdgeInsets.fromLTRB(4, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(4, 0, 16, 32),
         children: [
           Row(
             children: [
@@ -106,58 +107,50 @@ class _StopContent extends ConsumerWidget {
                 onPressed: () => context.pop(),
               ),
               Expanded(
-                child: Text(detail.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(detail.name, style: theme.textTheme.headlineSmall, maxLines: 2, overflow: TextOverflow.ellipsis),
               ),
-              if (detail.wheelchairBoarding == 1)
-                Tooltip(
-                  message: context.l10n.wheelchairAccessible,
-                  child: Icon(Icons.accessible, color: theme.colorScheme.primary),
-                ),
               FavoriteStopButton(
                 stop: StopAreaSummary(id: detail.id, name: detail.name, lat: detail.lat, lon: detail.lon, lines: detail.lines),
               ),
-              // Large text: the icon only, so that the name keeps the room
-              if (MediaQuery.textScalerOf(context).scale(1) >= 1.3)
-                IconButton.filledTonal(
-                  tooltip: context.l10n.goThere,
-                  icon: const Icon(Icons.directions),
-                  onPressed: goThere,
-                )
-              else
-                FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-                  icon: const Icon(Icons.directions, size: 18),
-                  label: Text(context.l10n.goThere),
-                  onPressed: goThere,
-                ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 0, 16),
+            padding: const EdgeInsets.fromLTRB(12, 0, 0, 0),
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 for (final line in detail.lines)
                   InkWell(onTap: () => context.push(Routes.line(line.id)), child: LineBadge(line, size: 28)),
+                if (detail.wheelchairBoarding == 1)
+                  Tooltip(
+                    message: context.l10n.wheelchairAccessible,
+                    child: IconBubble(Icons.accessible, color: theme.colorScheme.secondary, size: 28),
+                  ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
+            padding: const EdgeInsets.fromLTRB(12, 16, 0, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                Expanded(child: RoundAction(icon: Icons.directions, label: context.l10n.goThere, primary: true, onPressed: goThere)),
                 if (detail.lines.isNotEmpty)
-                  TextButton.icon(
-                    icon: const Icon(Icons.schedule, size: 18),
-                    label: Text(context.l10n.scheduledTimetable),
-                    onPressed: () => context.push(Routes.timetable(detail.id)),
+                  Expanded(
+                    child: RoundAction(
+                      icon: Icons.schedule,
+                      label: context.l10n.timetableShort,
+                      onPressed: () => context.push(Routes.timetable(detail.id)),
+                    ),
                   ),
-                TextButton.icon(
-                  icon: const Icon(Icons.share_outlined, size: 18),
-                  label: Text(context.l10n.share),
-                  onPressed: () => shareLink(context, title: detail.name, location: Routes.stop(detail.id)),
+                Expanded(
+                  child: RoundAction(
+                    icon: Icons.ios_share,
+                    label: context.l10n.share,
+                    onPressed: () => shareLink(context, title: detail.name, location: Routes.stop(detail.id)),
+                  ),
                 ),
               ],
             ),
@@ -168,35 +161,39 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StopDisruptions(detail: detail),
-                Text(
-                  context.l10n.nextDepartures,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                SectionTitle(context.l10n.nextDepartures),
+                AppCard(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                  child: AsyncView(
+                    value: departures,
+                    onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
+                    data: (departures) => _DepartureList(departures: departures, now: now),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                AsyncView(
-                  value: departures,
-                  onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
-                  data: (departures) => _DepartureList(departures: departures, now: now),
-                ),
-                const SizedBox(height: 24),
                 StopServiceHoursSection(stopAreaId: detail.id),
                 if (detail.connections.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    context.l10n.walkingConnections,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  for (final connection in detail.connections)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.directions_walk),
-                      title: Text(connection.name),
-                      trailing: connection.minTransferSeconds == null
-                          ? null
-                          : Text(context.l10n.minutesShort((connection.minTransferSeconds! / 60).ceil())),
-                      onTap: () => context.push(Routes.stop(connection.id)),
+                  SectionTitle(context.l10n.walkingConnections),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        for (final (index, connection) in detail.connections.indexed) ...[
+                          if (index > 0) const Divider(indent: 56),
+                          ListTile(
+                            leading: const IconBubble(Icons.directions_walk, size: 32),
+                            title: Text(connection.name),
+                            trailing: connection.minTransferSeconds == null
+                                ? const Icon(Icons.chevron_right)
+                                : Text(
+                                    context.l10n.minutesShort((connection.minTransferSeconds! / 60).ceil()),
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                            onTap: () => context.push(Routes.stop(connection.id)),
+                          ),
+                        ],
+                      ],
                     ),
+                  ),
                 ],
               ],
             ),
@@ -222,7 +219,7 @@ class _StopDisruptions extends ConsumerWidget {
     final lines = {for (final line in detail.lines) line.id: line};
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(top: 16),
       child: DisruptionList(
         disruptions: disruptions,
         leading: (disruption) {
@@ -253,14 +250,17 @@ class _DepartureList extends StatelessWidget {
       children: [
         if (!departures.realtimeAvailable)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(context.l10n.realtimeUnavailable, style: TextStyle(color: Colors.orange.shade700)),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: NoticeLine(icon: Icons.schedule, text: context.l10n.realtimeUnavailable),
           ),
         if (rows.isEmpty)
-          Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-        for (final row in rows) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        for (final (index, row) in rows.indexed) ...[
+          if (index > 0) const Divider(indent: 40),
           LineDeparturesRow(row: row, now: now, onTap: () => context.push(Routes.line(row.line.id))),
-          const Divider(height: 1),
         ],
       ],
     );

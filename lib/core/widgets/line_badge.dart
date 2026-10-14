@@ -16,7 +16,7 @@ class LineBadge extends StatelessWidget {
     final foreground = parseHexColor(line.textColor, Colors.white);
     final name = line.name ?? '?';
     final textStyle = TextStyle(
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w600,
       fontSize: size * (name.length > 3 ? 0.36 : 0.5),
       height: 1,
       letterSpacing: -0.3,
