@@ -2,7 +2,8 @@ name: website_app
 description: "Guillaume Damiens mobile application"
 publish_to: 'none'
 
-version: 1.0.0+1
+# The version comes from git's tag vX.Y.Z at build time (tool/build.sh, tool/version.sh): 0.0.0 = a plain flutter build
+version: 0.0.0+1
 
 environment:
   sdk: ^3.13.0

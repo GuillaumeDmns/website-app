@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../core/config.dart';
 import '../../l10n/l10n.dart';
 
-/// The app, where its data come from (with their licences) and the open source licences of its packages
+/// The app, its version (for bug reports), where its data come from (with their licences) and the open source licences of its packages
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -46,6 +49,32 @@ class AboutScreen extends StatelessWidget {
               Text(l10n.appTitle, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
               Text(l10n.welcomeText, style: TextStyle(color: muted)),
               const SizedBox(height: 20),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(l10n.aboutVersion, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        SelectableText(appVersionLabel(l10n)),
+                        SelectableText(appBuildDetails(), style: TextStyle(color: muted)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.aboutCopyVersion,
+                    icon: const Icon(Icons.copy),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: '${l10n.appTitle} ${appVersionLabel(l10n)} · ${appBuildDetails()}'));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.aboutVersionCopied)));
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               Text(l10n.aboutData, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               credit(Icons.directions_transit, l10n.creditIdfmTitle, l10n.creditIdfm),
               credit(Icons.alt_route, l10n.creditNavitiaTitle, l10n.creditNavitia),
@@ -83,3 +112,15 @@ class AboutScreen extends StatelessWidget {
     );
   }
 }
+
+/// The version of the build: `0.4.0 (40000)` from git's tag (`tool/build.sh`), else a development build
+String appVersionLabel(AppLocalizations l10n, {String version = AppConfig.version, String build = AppConfig.build}) =>
+    version.isEmpty ? l10n.aboutDevBuild : '$version ($build)';
+
+/// What else a bug report needs: the commit, the environment, the backend and the platform
+String appBuildDetails({String commit = AppConfig.commit}) => [
+      if (commit.isNotEmpty) 'commit $commit',
+      AppConfig.environment.name,
+      Uri.parse(AppConfig.apiBaseUrl).host,
+      kIsWeb ? 'web' : defaultTargetPlatform.name,
+    ].join(' · ');

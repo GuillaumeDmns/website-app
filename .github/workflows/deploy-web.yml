@@ -22,6 +22,17 @@ jobs:
           echo "Run this workflow on a tag (v1.2.3): the web app is published in the tag's release" >&2
           exit 1
       - uses: actions/checkout@v6
+        with:
+          # The version comes from the tag (tool/version.sh)
+          fetch-depth: 0
+      - name: The tag is the version
+        run: |
+          read -r name code commit < <(tool/version.sh)
+          if [ "v$name" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME: tag vX.Y.Z (minor and patch up to 99) the commit to deploy (version found: $name)" >&2
+            exit 1
+          fi
+          echo "Version $name (build $code, commit $commit)"
       - name: 🛠 Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -32,7 +43,7 @@ jobs:
         run: |
           flutter pub get
           dart run build_runner build -d
-          flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
+          tool/build.sh web --dart-define=APP_ENV=prod --no-web-resources-cdn
       - name: Publish the archive in the release
         id: release
         env:

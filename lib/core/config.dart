@@ -48,6 +48,16 @@ abstract final class AppConfig {
   /// Web app root, for shared links (opened by the prod Android app too, see `web/.well-known/assetlinks.json`)
   static String get webAppUrl => _webAppUrl.isNotEmpty ? _webAppUrl : (isDev ? devWebAppUrl : prodWebAppUrl);
 
+  /// Version of the build, from git's last tag (`tool/build.sh`, `tool/version.sh`): `0.4.0` on the tag, `0.4.0-12` 12
+  /// commits after it; empty for a plain `flutter run` / `flutter build` (a development build)
+  static const version = String.fromEnvironment('APP_VERSION');
+
+  /// Android's versionCode of the build (`40012`), empty without [version]
+  static const build = String.fromEnvironment('APP_BUILD');
+
+  /// Commit of the build (`5d6e7f8`, `-dirty` with uncommitted changes), empty without [version]
+  static const commit = String.fromEnvironment('APP_COMMIT');
+
   /// Prefix of the keys stored on the device: a dev and a prod build on the same desktop keep their own tokens and
   /// data (on Android they are two apps, on the web two sites)
   static String get storagePrefix => isDev ? 'dev.' : '';

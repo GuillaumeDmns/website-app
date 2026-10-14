@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/router.dart';
 import 'package:website_app/app/routes.dart';
@@ -119,6 +120,19 @@ void main() {
 
     await tapOn(tester, find.byTooltip(currentL10n.account));
     await tapOn(tester, find.text(currentL10n.about));
+    // The version, for bug reports (a test build is a development build), copied in one tap
+    expect(find.text(currentL10n.aboutDevBuild), findsOneWidget);
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    await tapOn(tester, find.byTooltip(currentL10n.aboutCopyVersion));
+    expect(copied, startsWith('${currentL10n.appTitle} ${currentL10n.aboutDevBuild} · dev · localhost'));
+    expect(find.text(currentL10n.aboutVersionCopied), findsOneWidget);
     await tapOn(tester, find.text(currentL10n.privacy));
     expect(find.text(currentL10n.privacyHost), findsOneWidget);
     expect(find.text(currentL10n.privacyRights), findsOneWidget);

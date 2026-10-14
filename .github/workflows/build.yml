@@ -43,6 +43,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The version comes from the last tag (tool/version.sh)
+          fetch-depth: 0
       - name: 🛠 Set up Java 21 (Android build)
         uses: actions/setup-java@v5
         with:
@@ -59,10 +62,10 @@ jobs:
           flutter pub get
           dart run build_runner build -d
       - name: Web (prod)
-        run: flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn
+        run: tool/build.sh web --dart-define=APP_ENV=prod --no-web-resources-cdn
       # Signed with the debug key here: the upload key stays off GitHub until the Play Store (android/key.properties)
       - name: Android (prod)
-        run: flutter build apk --flavor prod --build-number=${{ github.run_number }}
+        run: tool/build.sh apk --flavor prod
       - uses: actions/upload-artifact@v5
         with:
           name: app-prod-${{ github.run_number }}
