@@ -9,7 +9,7 @@ flutter pub get
 dart run build_runner build      # freezed / json_serializable (generated *.freezed.dart / *.g.dart are not committed)
 flutter analyze
 flutter test                     # unit, widget and full-app tests (fake backend), about 10 s
-flutter test integration_test -d linux   # the real Linux app (opens a window; the CI uses a virtual screen)
+flutter test integration_test/app_test.dart -d linux   # the real Linux app, one file per run (opens a window; the CI uses a virtual screen)
 flutter run -d <device>          # dev app on http://localhost:8080 (Android: adb reverse tcp:8080 tcp:8080 first)
 tool/build.sh apk --flavor prod  # production, versioned from git (web: --dart-define=APP_ENV=prod; linux: both)
 ```
@@ -74,7 +74,7 @@ Release signing: `android/key.properties` (not committed: `storeFile`, `storePas
 - `test/support/`: `FakeBackend` (dio `HttpClientAdapter`: answers per method and path, `*` for a segment, `down` for no network, records the requests as sent), `MemoryStore` (`LocalStore` in memory), `samples.dart` (models as the backend sends them: Châtelet, Gare de Lyon, Nation, métro 1, RER A, bus 38, like the backend's integration tests), `testContainer` (providers on a fake backend; signed in when a refresh token is given), `pumpApp` (the whole `MobilityApp`, phone size, French, map tiles off, position at Châtelet, onboarding flag in memory; `settle` pumps for a while since the app keeps periodic timers; `closeApp` at the end of each test), `standardBackend()` (usual answers around Châtelet, times relative to now).
 - `test/core`, `test/features`: logic (formats, geometry, models' JSON, errors, token renewal, offline cache, journey retiming, GO tracker, vehicles, session, favorites, recent searches). Code without context formats with `currentL10n`: tests set it with `useLocale` (and `initializeDateFormatting()` for dates).
 - `test/flows`: the app tapped through like a user (home → stop → line → favorite, search, traffic, offline notice, language, journey and detail, guest limit, sign-in/out, account, welcome pages). Find widgets by text through `currentL10n`, by tooltip, or by type (`LineBadge`, `JourneyCard`); `visibleTexts(tester)` lists what is on screen when a test fails.
-- `integration_test/`: the same harness on the real engine (Linux desktop).
+- `integration_test/`: the same harness on the real engine (`app_test.dart`, Linux desktop), and `device_heading_test.dart` (the compass of a real phone, skipped elsewhere). One file per `flutter test` run: started a second time in the same run, the Linux app never connects (the CI loops over the files).
 - Seams for the tests: `dioFactoryProvider` (backend clients), `localStoreProvider`, `onboardingDoneProvider`, `localeProvider`, `userLocationProvider`, `mapTilesEnabledProvider`, `deviceHeadingProvider` (no compass in `pumpApp`), `googleAccountChooserProvider` (`pumpApp` signs in with a test ID token; pass `googleAccountChooser: null` for a device without Google); plugins without a test implementation (secure storage: `FlutterSecureStorage.setMockInitialValues`) or guarded (home widget, Google sign-in on desktop).
 
 ## CI (GitHub Actions)
