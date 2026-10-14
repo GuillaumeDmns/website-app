@@ -298,6 +298,7 @@
   "aboutDevBuild": "Development build",
   "aboutCopyVersion": "Copy the version details",
   "aboutVersionCopied": "Version details copied",
+  "aboutServerVersion": "server {version}",
   "privacy": "Legal notice and privacy",
   "privacyPublisherTitle": "Publisher",
   "privacyPublisher": "Guillaume Damiens, as a private individual, not for profit. Contact: 2a1036eab9fc0b803ed8c73eeb4b8ace-23131907@contact.gandi.net",

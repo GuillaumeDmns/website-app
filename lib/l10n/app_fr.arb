@@ -965,6 +965,14 @@
   "aboutDevBuild": "Version de développement",
   "aboutCopyVersion": "Copier les informations de version",
   "aboutVersionCopied": "Informations de version copiées",
+  "aboutServerVersion": "serveur {version}",
+  "@aboutServerVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "privacy": "Mentions légales et confidentialité",
   "privacyPublisherTitle": "Éditeur",
   "privacyPublisher": "Guillaume Damiens, à titre personnel et non commercial. Contact : 2a1036eab9fc0b803ed8c73eeb4b8ace-23131907@contact.gandi.net",

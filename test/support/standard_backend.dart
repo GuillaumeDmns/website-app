@@ -7,6 +7,7 @@ import 'samples.dart';
 /// integration tests: Châtelet, Gare de Lyon, Nation; métro 1, RER A, bus 38)
 FakeBackend standardBackend() {
   final backend = FakeBackend();
+  backend.get('/api/health', {'status': 'UP', 'version': '0.6.0'});
   DateTime inMinutes(int minutes) => DateTime.now().toUtc().add(Duration(minutes: minutes));
 
   StopDepartures chateletDepartures() => StopDepartures(
