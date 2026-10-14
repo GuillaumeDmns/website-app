@@ -36,6 +36,7 @@ class AuthController extends Notifier<AuthStatus> {
     await store.remove('recent_searches');
     await store.remove('go_session');
     await store.remove('journey_preferences');
+    await store.remove('daily_trips');
     await OfflineCacheInterceptor.clear(store);
     await clearHomeWidget();
   }

@@ -84,6 +84,12 @@ FakeBackend standardBackend() {
   backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
         for (final minutes in [7, 12, 17]) ride(inMinutes(minutes)).toJson(),
       ]));
+  // The last ride tonight in 40 min, the first tomorrow morning
+  backend.on('GET', '/api/v2/lines/*/rides/span', (_) => FakeResponse(RideSpan(
+        first: ScheduledRide(departure: inMinutes(-600), arrival: inMinutes(-592)),
+        last: ScheduledRide(departure: inMinutes(40), arrival: inMinutes(48)),
+        next: ScheduledRide(departure: inMinutes(400), arrival: inMinutes(408)),
+      ).toJson()));
   backend.get('/api/v2/bikes/nearby', [
     const BikeStation(id: '1', name: 'Châtelet - Rivoli', lat: 48.8590, lon: 2.3480, capacity: 30, mechanical: 5, electric: 3, docks: 10, distance: 99)
         .toJson(),

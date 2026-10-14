@@ -13,6 +13,7 @@ import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
 import '../bikes/bike_widgets.dart';
+import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -138,6 +139,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                   ],
                 ),
               ),
+              SaveDailyTripButton(journey: planned, request: request),
               IconButton(
                 tooltip: context.l10n.share,
                 icon: const Icon(Icons.share_outlined),
@@ -420,6 +422,7 @@ class _RideTile extends StatelessWidget {
                         color: delay >= 120 ? Colors.orange.shade700 : Colors.green.shade600,
                         text: delay >= 60 ? context.l10n.delayMinutes((delay / 60).round()) : context.l10n.realtime,
                       ),
+                    if (hasLine) LastRideTag(ride: section),
                     if (section.boardingPositions.isNotEmpty)
                       _Tag(
                         icon: Icons.train,
