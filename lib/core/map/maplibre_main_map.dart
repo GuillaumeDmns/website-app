@@ -12,9 +12,9 @@ import '../location/location_providers.dart';
 import 'map_overlay.dart';
 import 'map_pins.dart';
 
-/// OpenFreeMap styles (free, no key, OpenStreetMap data): Liberty in light mode, Fiord in dark mode
-const _lightStyle = 'https://tiles.openfreemap.org/styles/liberty';
-const _darkStyle = 'https://tiles.openfreemap.org/styles/fiord';
+/// OpenFreeMap's Liberty style (free, no key, OpenStreetMap data), in dark mode too: its dark style (Fiord) showed too
+/// little of the streets
+const _style = 'https://tiles.openfreemap.org/styles/liberty';
 
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
@@ -34,7 +34,6 @@ class MapLibreMainMap extends ConsumerStatefulWidget {
 class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   MapController? _controller;
   bool _ready = false;
-  String? _style;
 
   /// Points framed last: pages republish their overlay when their data refreshes, the camera only moves when the
   /// points to frame change
@@ -221,14 +220,8 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     _overlay = overlay;
     // Followed (GO on foot): the position the camera follows, so that both agree
     final user = overlay.follow?.position ?? ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
-    final style = dark ? _darkStyle : _lightStyle;
-    if (_style != null && _style != style) {
-      _controller?.setStyle(style);
-    }
-    _style = style;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
 
@@ -255,7 +248,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       }
     });
 
-    final casing = dark ? Colors.black54 : Colors.white;
+    const casing = Colors.white;
     return LayoutBuilder(builder: (context, constraints) {
       final size = constraints.biggest;
       if (size != _size) {
@@ -266,14 +259,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           }
         });
       }
-      return _map(context, style, user, overlay, scheme, casing);
+      return _map(context, user, overlay, scheme, casing);
     });
   }
 
-  Widget _map(BuildContext context, String style, LatLng? user, MapOverlay overlay, ColorScheme scheme, Color casing) {
+  Widget _map(BuildContext context, LatLng? user, MapOverlay overlay, ColorScheme scheme, Color casing) {
     return MapLibreMap(
       options: MapOptions(
-        initStyle: style,
+        initStyle: _style,
         initCenter: _geo(user ?? parisCenter),
         initZoom: user != null ? 16 : 13,
         minZoom: 8,

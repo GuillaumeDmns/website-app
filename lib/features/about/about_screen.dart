@@ -1,20 +1,22 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../core/api/api_providers.dart';
 import '../../core/config.dart';
 import '../../l10n/l10n.dart';
 
 /// The app, its version (for bug reports), where its data come from (with their licences) and the open source licences of its packages
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final server = ref.watch(serverVersionProvider).value;
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     Widget credit(IconData icon, String title, String text) => ListTile(
@@ -58,7 +60,7 @@ class AboutScreen extends StatelessWidget {
                       children: [
                         Text(l10n.aboutVersion, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                         SelectableText(appVersionLabel(l10n)),
-                        SelectableText(appBuildDetails(), style: TextStyle(color: muted)),
+                        SelectableText(appBuildDetails(l10n, server: server), style: TextStyle(color: muted)),
                       ],
                     ),
                   ),
@@ -66,7 +68,7 @@ class AboutScreen extends StatelessWidget {
                     tooltip: l10n.aboutCopyVersion,
                     icon: const Icon(Icons.copy),
                     onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: '${l10n.appTitle} ${appVersionLabel(l10n)} · ${appBuildDetails()}'));
+                      await Clipboard.setData(ClipboardData(text: '${l10n.appTitle} ${appVersionLabel(l10n)} · ${appBuildDetails(l10n, server: server)}'));
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.aboutVersionCopied)));
                       }
@@ -117,10 +119,21 @@ class AboutScreen extends StatelessWidget {
 String appVersionLabel(AppLocalizations l10n, {String version = AppConfig.version, String build = AppConfig.build}) =>
     version.isEmpty ? l10n.aboutDevBuild : '$version ($build)';
 
-/// What else a bug report needs: the commit, the environment, the backend and the platform
-String appBuildDetails({String commit = AppConfig.commit}) => [
+/// What else a bug report needs: the commit, the environment, the backend and its release, the platform
+String appBuildDetails(AppLocalizations l10n, {String commit = AppConfig.commit, String? server}) => [
       if (commit.isNotEmpty) 'commit $commit',
       AppConfig.environment.name,
       Uri.parse(AppConfig.apiBaseUrl).host,
-      kIsWeb ? 'web' : defaultTargetPlatform.name,
+      if (server != null) l10n.aboutServerVersion(server),
+      AppConfig.platform,
     ].join(' · ');
+
+/// The backend's release (`/api/health`: the tag of its jar, "dev" otherwise), null when it doesn't answer
+final serverVersionProvider = FutureProvider.autoDispose<String?>((ref) async {
+  try {
+    final response = await ref.watch(apiDioProvider).get<Map<String, dynamic>>('/api/health');
+    return response.data?['version'] as String?;
+  } catch (_) {
+    return null;
+  }
+});

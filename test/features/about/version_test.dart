@@ -15,8 +15,8 @@ void main() {
     expect(appVersionLabel(currentL10n, version: '', build: ''), 'Version de développement');
   });
 
-  test('the details give the commit, the environment, the backend and the platform', () {
-    expect(appBuildDetails(commit: '5d6e7f8-dirty'), 'commit 5d6e7f8-dirty · dev · localhost · android');
-    expect(appBuildDetails(commit: ''), 'dev · localhost · android');
+  test('the details give the commit, the environment, the backend and its release, the platform', () {
+    expect(appBuildDetails(currentL10n, commit: '5d6e7f8-dirty', server: '0.6.0'), 'commit 5d6e7f8-dirty · dev · localhost · serveur 0.6.0 · android');
+    expect(appBuildDetails(currentL10n, commit: ''), 'dev · localhost · android');
   });
 }

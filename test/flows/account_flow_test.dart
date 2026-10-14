@@ -131,7 +131,7 @@ void main() {
     });
     addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     await tapOn(tester, find.byTooltip(currentL10n.aboutCopyVersion));
-    expect(copied, startsWith('${currentL10n.appTitle} ${currentL10n.aboutDevBuild} · dev · localhost'));
+    expect(copied, '${currentL10n.appTitle} ${currentL10n.aboutDevBuild} · dev · localhost · ${currentL10n.aboutServerVersion('0.6.0')} · android');
     expect(find.text(currentL10n.aboutVersionCopied), findsOneWidget);
     await tapOn(tester, find.text(currentL10n.privacy));
     expect(find.text(currentL10n.privacyHost), findsOneWidget);

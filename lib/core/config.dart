@@ -58,6 +58,15 @@ abstract final class AppConfig {
   /// Commit of the build (`5d6e7f8`, `-dirty` with uncommitted changes), empty without [version]
   static const commit = String.fromEnvironment('APP_COMMIT');
 
+  /// The platform, as the backend counts it (`android`, `ios`, `linux`, `web`…)
+  static String get platform => kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase();
+
+  /// Sent with every request: the backend counts the devices per platform and version, anonymously (administration)
+  static Map<String, String> get clientHeaders => {
+        'X-App-Platform': platform,
+        'X-App-Version': version.isEmpty ? 'dev' : version,
+      };
+
   /// Prefix of the keys stored on the device: a dev and a prod build on the same desktop keep their own tokens and
   /// data (on Android they are two apps, on the web two sites)
   static String get storagePrefix => isDev ? 'dev.' : '';

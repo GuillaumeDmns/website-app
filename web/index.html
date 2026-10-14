@@ -40,8 +40,6 @@
     // - it is created in a detached element at the window's size, then Flutter moves it into its platform view:
     //   MapLibre never notices, its canvas stays at the window's size. Follow the container instead (and draw again:
     //   resizing clears the canvas).
-    // - setStyle diffs the styles by default, dropping the app's layers without the "style.load" event after which
-    //   the package adds them again: reload the style instead.
     // - fitBounds adds the padding left by the previous move (a pin framed above the panel) to its own: frame with
     //   its padding only, and leave none.
     if (window.maplibregl) {
@@ -58,10 +56,6 @@
               this.triggerRepaint();
             }
           }).observe(this.getContainer());
-        }
-
-        setStyle(style, options) {
-          return super.setStyle(style, { ...options, diff: false });
         }
 
         fitBounds(bounds, options = {}, eventData) {
