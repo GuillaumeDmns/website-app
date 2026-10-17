@@ -152,6 +152,34 @@ abstract class Ride with _$Ride {
   factory Ride.fromJson(Map<String, dynamic> json) => _$RideFromJson(json);
 }
 
+/// A scheduled trip of a line from a stop to a further one (GTFS)
+@freezed
+abstract class ScheduledRide with _$ScheduledRide {
+  const factory ScheduledRide({
+    required DateTime departure,
+    required DateTime arrival,
+    String? destination,
+    String? mission,
+  }) = _ScheduledRide;
+
+  factory ScheduledRide.fromJson(Map<String, dynamic> json) => _$ScheduledRideFromJson(json);
+}
+
+/// First and last scheduled rides between two stops of a line over the service day running now, and the first of
+/// the next one (`/lines/{id}/rides/span`)
+@freezed
+abstract class RideSpan with _$RideSpan {
+  const factory RideSpan({
+    ScheduledRide? first,
+    ScheduledRide? last,
+
+    /// First ride of the following service day
+    ScheduledRide? next,
+  }) = _RideSpan;
+
+  factory RideSpan.fromJson(Map<String, dynamic> json) => _$RideSpanFromJson(json);
+}
+
 @freezed
 abstract class StopDepartures with _$StopDepartures {
   const factory StopDepartures({
@@ -637,6 +665,106 @@ abstract class TimetableEntry with _$TimetableEntry {
 }
 
 /// A Vélib station with its availability
+/// Periods of a service day over which a frequency is told (Paris time)
+enum ServicePeriod {
+  /// Before 7:00
+  @JsonValue('EARLY_MORNING')
+  earlyMorning,
+
+  /// 7:00 to 10:00
+  @JsonValue('MORNING_PEAK')
+  morningPeak,
+
+  /// 10:00 to 16:00
+  @JsonValue('DAYTIME')
+  daytime,
+
+  /// 16:00 to 20:00
+  @JsonValue('EVENING_PEAK')
+  eveningPeak,
+
+  /// 20:00 to midnight
+  @JsonValue('EVENING')
+  evening,
+
+  /// After midnight, on the same service day
+  @JsonValue('NIGHT')
+  night,
+}
+
+/// How often a direction leaves over a period of the day, from the schedule
+@freezed
+abstract class Frequency with _$Frequency {
+  const factory Frequency({
+    @JsonKey(unknownEnumValue: ServicePeriod.daytime) required ServicePeriod period,
+
+    /// The first departure for the first period of the day
+    required DateTime start,
+
+    /// The last departure for the last period of the day
+    required DateTime end,
+    required int departures,
+
+    /// Usual minutes between two departures; null with a single departure
+    int? minMinutes,
+    int? maxMinutes,
+  }) = _Frequency;
+
+  factory Frequency.fromJson(Map<String, dynamic> json) => _$FrequencyFromJson(json);
+}
+
+/// First and last scheduled departures of a direction over a service day, and its frequency per period
+@freezed
+abstract class ServiceDirection with _$ServiceDirection {
+  const factory ServiceDirection({
+    /// Main destinations, most served first
+    required String name,
+
+    /// For a line, index of the direction in its detail; null at a stop area
+    int? direction,
+
+    /// Where a line's departures are counted (its busiest stop of the direction); null at a stop area
+    StopRef? at,
+    required DateTime first,
+    required DateTime last,
+    @Default([]) List<Frequency> frequencies,
+  }) = _ServiceDirection;
+
+  const ServiceDirection._();
+
+  /// Frequency of the period running at [now], null outside the service
+  Frequency? frequencyAt(DateTime now) =>
+      frequencies.where((frequency) => !now.isBefore(frequency.start) && now.isBefore(frequency.end)).firstOrNull;
+
+  factory ServiceDirection.fromJson(Map<String, dynamic> json) => _$ServiceDirectionFromJson(json);
+}
+
+/// Service hours of a line (at a stop area or along the line) over a service day, per direction
+@freezed
+abstract class LineServiceHours with _$LineServiceHours {
+  const factory LineServiceHours({
+    required LineSummary line,
+
+    /// Service day (departures after midnight belong to the day before)
+    required DateTime date,
+    @Default([]) List<ServiceDirection> directions,
+  }) = _LineServiceHours;
+
+  factory LineServiceHours.fromJson(Map<String, dynamic> json) => _$LineServiceHoursFromJson(json);
+}
+
+/// Service hours of the lines leaving a stop area over a service day
+@freezed
+abstract class StopServiceHours with _$StopServiceHours {
+  const factory StopServiceHours({
+    required StopAreaSummary stop,
+    required DateTime date,
+    @Default([]) List<LineServiceHours> lines,
+  }) = _StopServiceHours;
+
+  factory StopServiceHours.fromJson(Map<String, dynamic> json) => _$StopServiceHoursFromJson(json);
+}
+
 @freezed
 abstract class BikeStation with _$BikeStation {
   const factory BikeStation({

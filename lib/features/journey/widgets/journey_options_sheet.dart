@@ -53,7 +53,7 @@ class _JourneyOptionsSheetState extends ConsumerState<_JourneyOptionsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.l10n.options, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text(context.l10n.options, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             Text(context.l10n.transportModes, style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),

@@ -108,7 +108,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       children: [
                         Text(
                           context.l10n.scheduledTimetable,
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           detail?.name ?? '',
@@ -329,7 +329,7 @@ class _TimetableBody extends ConsumerWidget {
                       child: Text(
                         context.l10n.timetableHour((hour % 24).toString().padLeft(2, '0')),
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                           color: currentHour != null && hour < currentHour ? theme.colorScheme.onSurfaceVariant : null,
                         ),
                       ),
@@ -400,7 +400,7 @@ class _Minute extends StatelessWidget {
       ),
       style: TextStyle(
         color: color,
-        fontWeight: next ? FontWeight.w800 : FontWeight.w500,
+        fontWeight: next ? FontWeight.w600 : FontWeight.w500,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );

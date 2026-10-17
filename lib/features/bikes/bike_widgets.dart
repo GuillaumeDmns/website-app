@@ -12,6 +12,7 @@ import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
+import '../../core/widgets/ui.dart';
 
 typedef BikeKey = ({double lat, double lon, int radius, int limit});
 
@@ -59,7 +60,7 @@ class _BikePin extends StatelessWidget {
           children: [
             const Icon(Icons.pedal_bike, size: 13, color: Colors.white),
             const SizedBox(width: 2),
-            Text('${station.bikes}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text('${station.bikes}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -85,7 +86,7 @@ class BikeCounts extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: value > 0 ? color : muted),
               const SizedBox(width: 3),
-              Text('$value', style: TextStyle(fontWeight: FontWeight.w700, color: value > 0 ? null : muted)),
+              Text('$value', style: TextStyle(fontWeight: FontWeight.w600, color: value > 0 ? null : muted)),
             ],
           ),
         );
@@ -141,8 +142,14 @@ class NearbyBikesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Vélib', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-        for (final station in stations.take(3)) BikeStationTile(station: station),
+        const SectionTitle('Vélib'),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(children: [for (final station in stations.take(3)) BikeStationTile(station: station)]),
+          ),
+        ),
       ],
     );
   }
@@ -167,7 +174,7 @@ Future<void> showBikeStationSheet(BuildContext context, BikeStation station) {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(context.l10n.bikeStation, style: theme.textTheme.labelLarge?.copyWith(color: velibColor)),
-                Text(station.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                Text(station.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
                 _SheetCount(icon: Icons.pedal_bike, color: velibColor, value: station.mechanical, label: context.l10n.bikesMechanicalCount(station.mechanical)),
                 _SheetCount(icon: Icons.electric_bike, color: Colors.blue.shade600, value: station.electric, label: context.l10n.bikesElectricCount(station.electric)),
@@ -226,7 +233,7 @@ class _SheetCount extends StatelessWidget {
           children: [
             Icon(icon, color: value > 0 ? color : Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 10),
-            Text('$value', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            Text('$value', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
             const SizedBox(width: 6),
             Text(label),
           ],

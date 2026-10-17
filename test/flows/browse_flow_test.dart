@@ -24,12 +24,22 @@ void main() {
     expect(find.textContaining('ascenseur en panne'), findsOneWidget);
     expect(backend.requestsTo('/api/v2/stops/IDFM:70001'), hasLength(1));
 
+    // Today's service of its lines, from the schedule: the last metro soon; a direction unfolds its frequencies
+    expect(find.text(currentL10n.serviceHoursTitle), findsOneWidget);
+    expect(find.text(currentL10n.lastDepartureIn('40\u00a0min')), findsOneWidget);
+    expect(find.text(currentL10n.frequencyNow(currentL10n.frequencyEvery('4\u2060–\u20606\u00a0min'))), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.towards('Fontenay-sous-Bois')));
+    expect(find.text(currentL10n.periodDaytime), findsOneWidget);
+
     // Its line
     await tapOn(tester, badgeOf('C01371'));
     expect(find.text('Gare de Lyon'), findsWidgets);
     expect(find.textContaining('trafic interrompu'), findsWidgets);
     expect(find.textContaining(currentL10n.betweenStops('Châtelet', 'Nation')), findsOneWidget);
     expect(backend.requestsTo('/api/v2/lines/C01371/vehicles'), isNotEmpty);
+    // The direction shown's service, counted at its busiest stop
+    expect(find.text('${currentL10n.serviceHoursTitle} ${currentL10n.serviceCountedAt('Châtelet')}'), findsOneWidget);
+    expect(find.text(currentL10n.lastDepartureIn('40\u00a0min')), findsOneWidget);
 
     // Saved on the device (guest)
     await tapOn(tester, find.byTooltip(currentL10n.favoriteAdd));

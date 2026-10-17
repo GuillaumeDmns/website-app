@@ -64,7 +64,7 @@ class GoBar extends ConsumerWidget {
                     Text(alert?.title ?? instruction.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(color: foreground, fontWeight: FontWeight.w800)),
+                        style: theme.textTheme.titleSmall?.copyWith(color: foreground, fontWeight: FontWeight.w600)),
                     if ((alert?.body ?? instruction.subtitle) case final text?)
                       Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: foreground)),
                   ],

@@ -24,6 +24,7 @@ import '../traffic/traffic_providers.dart';
 import 'go_controller.dart';
 import 'go_instruction.dart';
 import 'go_tracker.dart';
+import '../../app/theme.dart';
 
 /// GO mode, like Citymapper: one card per step, swiped horizontally, dots telling where you are. The page follows
 /// the step in progress; the map frames the step shown.
@@ -203,12 +204,12 @@ class _Header extends ConsumerWidget {
                       text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
                       style: TextStyle(
                         fontSize: 14,
-                        color: late >= 3 ? Colors.orange.shade700 : theme.colorScheme.onSurfaceVariant,
+                        color: late >= 3 ? context.colors.warning : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
               ),
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           IconButton(
@@ -387,7 +388,7 @@ class _StepCard extends ConsumerWidget {
                   Text(
                     title,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: urgent
                           ? theme.colorScheme.error
                           : isDone
@@ -400,7 +401,7 @@ class _StepCard extends ConsumerWidget {
                 ],
               ),
             ),
-            if (isDone) Icon(Icons.check_circle, color: Colors.green.shade600),
+            if (isDone) Icon(Icons.check_circle, color: context.colors.live),
           ],
         ),
         if (step.isRide && !isDone && !(isLive && progress.phase == GoPhase.onBoard)) ...[
@@ -522,7 +523,7 @@ class _ArrivalCard extends ConsumerWidget {
                 children: [
                   Text(
                     arrived ? context.l10n.goArrived : context.l10n.goArrivalTitle,
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 2),
                   Text('$destination · ${formatClock(eta)}', style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
@@ -567,9 +568,9 @@ class _Summary extends StatelessWidget {
     final theme = Theme.of(context);
     final late = (arrivedAt.difference(state.plannedArrival).inSeconds / 60).round();
     final (label, color) = switch (late) {
-      0 => (context.l10n.goOnTime, Colors.green.shade700),
-      > 0 => (context.l10n.goMinutesLate(late), late >= 5 ? theme.colorScheme.error : Colors.orange.shade800),
-      _ => (context.l10n.goMinutesEarly(-late), Colors.green.shade700),
+      0 => (context.l10n.goOnTime, context.colors.live),
+      > 0 => (context.l10n.goMinutesLate(late), late >= 5 ? theme.colorScheme.error : context.colors.warning),
+      _ => (context.l10n.goMinutesEarly(-late), context.colors.live),
     };
     final rides = state.journey.rides.length;
     Widget row(IconData icon, String text, {Color? color}) => Padding(
@@ -578,7 +579,7 @@ class _Summary extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: color ?? theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
-              Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: color == null ? null : FontWeight.w700))),
+              Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: color == null ? null : FontWeight.w600))),
             ],
           ),
         );

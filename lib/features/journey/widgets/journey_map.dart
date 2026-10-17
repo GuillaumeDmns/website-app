@@ -7,6 +7,7 @@ import '../../../core/utils/colors.dart';
 import '../../bikes/bike_widgets.dart';
 import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../../app/theme.dart';
 
 /// Map overlay of a journey: rides in their line color, bikes green, walks dotted, the line badge where you board, a
 /// dot where you get off, small dots at the stops between (named in the sheet, not here: the map stays light), start
@@ -115,7 +116,7 @@ MapOverlay journeyOverlay(
     pins: [
       ...stopDots,
       ...dots,
-      if (start != null) MapPin(point: LatLng(start.lat, start.lon), color: Colors.green.shade600, size: 16, label: start.name),
+      if (start != null) MapPin(point: LatLng(start.lat, start.lon), color: context.colors.live, size: 16, label: start.name),
       ...badges,
       if (end != null) MapPin(point: LatLng(end.lat, end.lon), color: scheme.error, icon: Icons.place, size: 24, label: end.name),
     ],

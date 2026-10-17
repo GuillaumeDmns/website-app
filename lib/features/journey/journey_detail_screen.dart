@@ -11,8 +11,10 @@ import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../bikes/bike_widgets.dart';
+import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
@@ -22,6 +24,7 @@ import 'journey_retime.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/ride_departures.dart';
+import '../../app/theme.dart';
 
 /// Step by step view of a journey option. Each ride lists its departures; choosing another one moves the journey
 /// to it, the following connections included (see [retimeJourney]).
@@ -113,34 +116,16 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
       overlay: journeyOverlay(context, journey, fitSection: _focused),
       child: ListView(
         controller: PanelScrollScope.of(context),
-        padding: const EdgeInsets.fromLTRB(4, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(4, 0, 16, 32),
         children: [
           Row(
             children: [
               IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: back),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      formatDuration(journey.duration),
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      [
-                        '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
-                        journeyTypeLabel(journey.type),
-                        if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
-                        if (journey.co2 != null) context.l10n.co2(journey.co2!.round()),
-                      ].join(' · '),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
+              const Spacer(),
+              SaveDailyTripButton(journey: planned, request: request),
               IconButton(
                 tooltip: context.l10n.share,
-                icon: const Icon(Icons.share_outlined),
+                icon: const Icon(Icons.ios_share),
                 onPressed: () => shareLink(
                   context,
                   title: context.l10n.journeyShareTitle(
@@ -150,19 +135,52 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                   location: Routes.journeyDetailOf((request ?? const JourneyRequest()).forSharing(planned), planned),
                 ),
               ),
-              FilledButton.icon(
-                // The theme makes filled buttons full width
-                style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-                icon: const Icon(Icons.navigation),
-                label: Text(context.l10n.go),
-                onPressed: () {
-                  ref.read(goControllerProvider.notifier).start(journey, request);
-                  context.push(Routes.go);
-                },
-              ),
             ],
           ),
-          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(formatDuration(journey.duration), style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28)),
+                      Text(
+                        [
+                          '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
+                          journeyTypeLabel(journey.type),
+                          if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
+                          if (journey.co2 != null) context.l10n.co2(journey.co2!.round()),
+                        ].join(' · '),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Citymapper's big green GO
+                FilledButton.icon(
+                  // The theme makes filled buttons full width
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(104, 52),
+                    textStyle: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1),
+                  ),
+                  icon: const Icon(Icons.navigation),
+                  label: Text(context.l10n.go),
+                  onPressed: () {
+                    ref.read(goControllerProvider.notifier).start(journey, request);
+                    context.push(Routes.go);
+                  },
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 0, 16),
+            child: SectionsStrip(journey: journey),
+          ),
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Column(
@@ -183,7 +201,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                     time: formatClock(journey.arrival),
                     dot: true,
                     isLast: true,
-                    child: Text(end.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text(end.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -252,7 +270,7 @@ class _SectionTile extends StatelessWidget {
                 color: muted,
                 time: formatClock(section.departure),
                 dot: true,
-                child: Text(section.from!.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(section.from!.name, style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
             _TimelineRow(
               color: muted,
@@ -319,7 +337,7 @@ class _BikeShareTile extends ConsumerWidget {
               (start ? context.l10n.bikePickUp : context.l10n.bikeDropOff)(
                 point?.name.replaceFirst('Station Vélib ', '') ?? '',
               ),
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             if (live != null)
               Padding(
@@ -383,7 +401,7 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.from?.stopAreaId == null ? null : () => context.push(Routes.stop(section.from!.stopAreaId!)),
-            child: Text(section.from?.name ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(section.from?.name ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ),
         _TimelineRow(
@@ -415,13 +433,14 @@ class _RideTile extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     if (section.realtime == true)
-                      _Tag(
+                      PillTag(
                         icon: Icons.rss_feed,
-                        color: delay >= 120 ? Colors.orange.shade700 : Colors.green.shade600,
+                        color: delay >= 120 ? context.colors.warning : context.colors.live,
                         text: delay >= 60 ? context.l10n.delayMinutes((delay / 60).round()) : context.l10n.realtime,
                       ),
+                    if (hasLine) LastRideTag(ride: section),
                     if (section.boardingPositions.isNotEmpty)
-                      _Tag(
+                      PillTag(
                         icon: Icons.train,
                         color: theme.colorScheme.primary,
                         text: _boardingLabel(section.boardingPositions),
@@ -484,7 +503,7 @@ class _RideTile extends StatelessWidget {
             onTap: section.to?.stopAreaId == null ? null : () => context.push(Routes.stop(section.to!.stopAreaId!)),
             child: Text(
               context.l10n.getOffAt(section.to?.name ?? ''),
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -521,7 +540,7 @@ class _StopElevators extends ConsumerWidget {
     if (elevators.isEmpty) {
       return const SizedBox.shrink();
     }
-    final color = Colors.orange.shade800;
+    final color = context.colors.warning;
     final title = context.l10n.brokenElevatorsAt(elevators.length, name);
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -612,33 +631,6 @@ class _Departures extends ConsumerWidget {
         earliest: plan.earliest,
         onSelect: onChoose,
         onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.icon, required this.color, required this.text});
-
-  final IconData icon;
-  final Color color;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
       ),
     );
   }

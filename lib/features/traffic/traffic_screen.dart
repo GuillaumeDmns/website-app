@@ -7,6 +7,7 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import 'disruption_widgets.dart';
 import 'traffic_providers.dart';
@@ -37,10 +38,7 @@ class TrafficScreen extends ConsumerWidget {
                 onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
               ),
               Expanded(
-                child: Text(
-                  context.l10n.trafficTitle,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
+                child: Text(context.l10n.trafficTitle, style: theme.textTheme.headlineSmall),
               ),
             ],
           ),
@@ -60,18 +58,39 @@ class TrafficScreen extends ConsumerWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final mode in _mainModes)
-                      if (lines.where((line) => line.line.mode == mode).toList() case final modeLines
-                          when modeLines.isNotEmpty)
-                        _ModeGrid(mode: mode, lines: modeLines),
                     const SizedBox(height: 8),
-                    if (main.isEmpty)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(severityIcon(null), color: severityColor(null, theme.colorScheme)),
-                        title: Text(context.l10n.trafficAllNormal),
+                    AppCard(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final mode in _mainModes)
+                            if (lines.where((line) => line.line.mode == mode).toList() case final modeLines
+                                when modeLines.isNotEmpty)
+                              _ModeGrid(mode: mode, lines: modeLines),
+                        ],
                       ),
-                    for (final line in main) _LineTrafficTile(traffic: line),
+                    ),
+                    const SizedBox(height: 12),
+                    AppCard(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (main.isEmpty)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(severityIcon(null), color: severityColor(null, theme.colorScheme)),
+                              title: Text(context.l10n.trafficAllNormal),
+                            ),
+                          for (final (index, line) in main.indexed) ...[
+                            if (index > 0) const Divider(indent: 42),
+                            _LineTrafficTile(traffic: line),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     if (others.isNotEmpty)
                       Theme(
                         data: theme.copyWith(dividerColor: Colors.transparent),
@@ -79,7 +98,7 @@ class TrafficScreen extends ConsumerWidget {
                           tilePadding: EdgeInsets.zero,
                           title: Text(
                             context.l10n.disruptedBusLines(others.length),
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           children: [for (final line in others) _LineTrafficTile(traffic: line)],
                         ),
@@ -91,7 +110,7 @@ class TrafficScreen extends ConsumerWidget {
                           tilePadding: EdgeInsets.zero,
                           title: Text(
                             context.l10n.linesWithInformation(informations.length),
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           children: [for (final line in informations) _LineTrafficTile(traffic: line)],
                         ),
@@ -117,11 +136,11 @@ class _ModeGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(mode.label, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(mode.label, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 10,
@@ -174,7 +193,7 @@ class _LineTrafficTile extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         severityLabel(traffic.severity),
-                        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: color, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -183,7 +202,7 @@ class _LineTrafficTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -220,19 +239,12 @@ class TrafficSummaryCard extends ConsumerWidget {
       if (disrupted.length > 5) Text('+${disrupted.length - 5}', style: theme.textTheme.bodySmall),
     ];
 
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(Routes.traffic),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+    return AppCard(
+      onTap: () => context.push(Routes.traffic),
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
           child: Row(
             children: [
-              Icon(
-                traffic == null ? Icons.traffic_outlined : severityIcon(worst),
-                color: traffic == null ? null : color,
-              ),
+              IconBubble(traffic == null ? Icons.traffic_outlined : severityIcon(worst), color: traffic == null ? null : color, size: 34),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -240,7 +252,7 @@ class TrafficSummaryCard extends ConsumerWidget {
                   children: [
                     Text(
                       context.l10n.trafficTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     Text(
                       traffic == null
@@ -265,11 +277,9 @@ class TrafficSummaryCard extends ConsumerWidget {
               ),
               if (!below)
                 for (final badge in badges) Padding(padding: const EdgeInsets.only(left: 6), child: badge),
-              Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
             ],
           ),
-        ),
-      ),
     );
   }
 }

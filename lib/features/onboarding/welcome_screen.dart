@@ -11,6 +11,7 @@ import '../auth/auth_controller.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import 'onboarding.dart';
+import '../../app/theme.dart';
 
 /// Shown once per device at the first start: what the app does, the location permission, home and work, then (without
 /// account) what an account adds.
@@ -127,7 +128,7 @@ class _Page extends StatelessWidget {
         children: [
           Icon(icon, size: 64, color: theme.colorScheme.primary),
           const SizedBox(height: 24),
-          Text(title, textAlign: TextAlign.center, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          Text(title, textAlign: TextAlign.center, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
           Text(text, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 24),
@@ -146,7 +147,7 @@ class _IntroPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     Widget feature(IconData icon, String title, String text) => ListTile(
           leading: Icon(icon, color: scheme.primary),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(text),
         );
     final l10n = context.l10n;
@@ -181,7 +182,7 @@ class _LocationPage extends ConsumerWidget {
       children: [
         switch (position) {
           AsyncValue(value: _?) => ListTile(
-              leading: Icon(Icons.check_circle, color: Colors.green.shade600),
+              leading: Icon(Icons.check_circle, color: context.colors.live),
               title: Text(context.l10n.locationFound),
             ),
           AsyncValue(isLoading: true) => const Center(child: CircularProgressIndicator()),
@@ -214,7 +215,7 @@ class _PlacesPage extends ConsumerWidget {
       return Card(
         child: ListTile(
           leading: Icon(icon),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(favorite?.label ?? context.l10n.addAddress, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Icon(favorite == null ? Icons.add : Icons.edit_outlined),
           onTap: () => chooseFavoritePlace(context, ref, kind),

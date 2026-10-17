@@ -38,7 +38,7 @@ class AboutScreen extends ConsumerWidget {
               onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
             ),
             Expanded(
-              child: Text(l10n.aboutTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              child: Text(l10n.aboutTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -48,7 +48,7 @@ class AboutScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
-              Text(l10n.appTitle, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(l10n.appTitle, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
               Text(l10n.welcomeText, style: TextStyle(color: muted)),
               const SizedBox(height: 20),
               Row(
@@ -58,7 +58,7 @@ class AboutScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.aboutVersion, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(l10n.aboutVersion, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                         SelectableText(appVersionLabel(l10n)),
                         SelectableText(appBuildDetails(l10n, server: server), style: TextStyle(color: muted)),
                       ],
@@ -77,7 +77,7 @@ class AboutScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              Text(l10n.aboutData, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(l10n.aboutData, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               credit(Icons.directions_transit, l10n.creditIdfmTitle, l10n.creditIdfm),
               credit(Icons.alt_route, l10n.creditNavitiaTitle, l10n.creditNavitia),
               credit(Icons.map_outlined, l10n.creditIgnTitle, l10n.creditIgn),

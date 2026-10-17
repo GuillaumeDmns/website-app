@@ -33,6 +33,10 @@ class MobilityApi {
       _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides', Ride.fromJson,
           {'from': from, 'to': to, 'after': ?after?.toUtc().toIso8601String(), 'limit': limit});
 
+  /// First and last scheduled rides of a line from [from] to [to] tonight, and the first of the next service day
+  Future<RideSpan> lineRideSpan(String lineId, {required String from, required String to}) =>
+      _get('/api/v2/lines/${Uri.encodeComponent(lineId)}/rides/span', RideSpan.fromJson, {'from': from, 'to': to});
+
   /// Vehicles of a line, estimated from real time (empty without real time)
   Future<List<Vehicle>> lineVehicles(String lineId) =>
       _getList('/api/v2/lines/${Uri.encodeComponent(lineId)}/vehicles', Vehicle.fromJson);
@@ -75,6 +79,14 @@ class MobilityApi {
         if (date != null)
           'date': '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
       });
+
+  /// First and last departures of the lines of [stopAreaId] over the service day running now, and their frequency
+  Future<StopServiceHours> stopServiceHours(String stopAreaId) =>
+      _get('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/service-hours', StopServiceHours.fromJson);
+
+  /// First and last departures of each direction of [lineId] over the service day running now, and its frequency
+  Future<LineServiceHours> lineServiceHours(String lineId) =>
+      _get('/api/v2/lines/${Uri.encodeComponent(lineId)}/service-hours', LineServiceHours.fromJson);
 
   /// Vélib stations around a position, closest first
   Future<List<BikeStation>> bikesNearby(double lat, double lon, {int radius = 500, int limit = 5}) =>
