@@ -67,6 +67,45 @@ void main() {
     });
   });
 
+  group('stopListPositions', () {
+    // A branch from W merging at M with another one from N
+    const branch = LineBranch(headsign: 'Paris', tripCount: 10, stops: [
+      StopRef(id: 'W1', name: 'W1', lat: 48.80, lon: 2.20),
+      StopRef(id: 'W2', name: 'W2', lat: 48.81, lon: 2.21),
+      StopRef(id: 'M', name: 'M', lat: 48.82, lon: 2.22),
+      StopRef(id: 'P', name: 'Paris', lat: 48.83, lon: 2.23),
+    ]);
+
+    test('places a vehicle between the stop it left and the next one', () {
+      final positions = stopListPositions(branch, [(vehicle: vehicle(from: 'W2', to: 'M'), progress: 0.75)]);
+
+      expect(positions.keys, [2]);
+      expect(positions[2]!.single.offset, closeTo(-0.25, 0.001));
+    });
+
+    test('spreads a direct train over the stops it skips', () {
+      // Left W1 for M, skipping W2: halfway is at W2
+      final positions = stopListPositions(branch, [(vehicle: vehicle(from: 'W1', to: 'M'), progress: 0.5)]);
+
+      expect(positions.keys, [1]);
+      expect(positions[1]!.single.offset, closeTo(0, 0.001));
+    });
+
+    test('leaves out a vehicle coming from another branch until it runs on this one', () {
+      final coming = vehicle(from: 'N2', to: 'M');
+      final merged = vehicle(from: 'M', to: 'P');
+
+      expect(stopListPositions(branch, [(vehicle: coming, progress: 0.5)]), isEmpty);
+      expect(stopListPositions(branch, [(vehicle: merged, progress: 0.5)]).values.single.single.vehicle, merged);
+    });
+
+    test('places a vehicle waiting at its first stop on it', () {
+      final positions = stopListPositions(branch, [(vehicle: vehicle(from: null, to: 'M'), progress: 1)]);
+
+      expect(positions.keys, [2]);
+    });
+  });
+
   test('labels a vehicle with its next stop', () {
     expect(vehicleLabel(vehicle(toNext: const Duration(minutes: 2)), fetchedAt), '→ Nation · Gare de Lyon dans 2 min');
     expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt), startsWith('→ Nation · Gare de Lyon'));

@@ -68,6 +68,32 @@ class BranchPath {
   }
 }
 
+/// Vehicles on the stop list of [branch], by the stop they are closest to, with their offset from it (between -0.5
+/// and 0.5): their fractional stop index between the stop they left and the next one. Vehicles of other branches
+/// are shown where they run on this one: the stop they left must be on it too, so that a train coming from another
+/// branch to where both merge is not drawn on this one's last segment.
+Map<int, List<({double offset, Vehicle vehicle})>> stopListPositions(
+  LineBranch? branch,
+  List<({Vehicle vehicle, double progress})> vehicles,
+) {
+  final positions = <int, List<({double offset, Vehicle vehicle})>>{};
+  final stopIds = [for (final stop in branch?.stops ?? const <StopRef>[]) stop.id];
+  for (final (:vehicle, :progress) in vehicles) {
+    final to = stopIds.indexOf(vehicle.toStopId);
+    if (to < 0) {
+      continue;
+    }
+    // The stop left may be several stops back (stops it doesn't serve)
+    final from = vehicle.fromStopId == null ? to : stopIds.lastIndexOf(vehicle.fromStopId!, to);
+    if (from < 0) {
+      continue;
+    }
+    final position = from + (to - from) * progress;
+    positions.putIfAbsent(position.round(), () => []).add((offset: position - position.round(), vehicle: vehicle));
+  }
+  return positions;
+}
+
 IconData vehicleIcon(TransportMode mode) => switch (mode) {
       TransportMode.metro => Icons.subway,
       TransportMode.rer || TransportMode.transilien || TransportMode.ter => Icons.train,
