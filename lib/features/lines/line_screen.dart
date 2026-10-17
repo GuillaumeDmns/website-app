@@ -130,23 +130,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     LineBranch? branch,
     List<({Vehicle vehicle, double progress})> vehicles,
   ) {
-    // Vehicles on the stop list: fractional stop index in the branch shown (vehicles of other branches too, where
-    // they run on it)
-    final positions = <int, List<({double offset, Vehicle vehicle})>>{};
-    final stopIds = [for (final stop in branch?.stops ?? const <StopRef>[]) stop.id];
-    for (final (:vehicle, :progress) in vehicles) {
-      final to = stopIds.indexOf(vehicle.toStopId);
-      if (to < 0) {
-        continue;
-      }
-      final left = vehicle.fromStopId == null ? to : stopIds.lastIndexOf(vehicle.fromStopId!, to);
-      if (vehicle.fromStopId != null && left < 0 && to == 0) {
-        continue;
-      }
-      final from = left >= 0 ? left : to - 1;
-      final position = from + (to - from) * progress;
-      positions.putIfAbsent(position.round(), () => []).add((offset: position - position.round(), vehicle: vehicle));
-    }
+    final positions = stopListPositions(branch, vehicles);
 
     final theme = Theme.of(context);
     final line = detail.line;
