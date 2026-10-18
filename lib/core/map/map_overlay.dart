@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,7 +39,14 @@ class MapPin {
 
 /// Line drawn on the shared map
 class MapPath {
-  const MapPath({required this.points, required this.color, this.width = 5, this.dotted = false});
+  const MapPath({
+    required this.points,
+    required this.color,
+    this.width = 5,
+    this.dotted = false,
+    this.casing = true,
+    this.others = const [],
+  });
 
   final List<LatLng> points;
   final Color color;
@@ -46,6 +54,24 @@ class MapPath {
 
   /// Walking paths
   final bool dotted;
+
+  /// On a light edge, so that it stands out from the map's roads
+  final bool casing;
+
+  /// More lines drawn the same way, in the same map layer (the trails of a line's vehicles)
+  final List<List<LatLng>> others;
+
+  List<List<LatLng>> get parts => [points, ...others];
+
+  /// Drawn the same: the map keeps its layer instead of sending it again
+  bool sameAs(MapPath other) =>
+      color == other.color &&
+      width == other.width &&
+      dotted == other.dotted &&
+      casing == other.casing &&
+      listEquals(points, other.points) &&
+      others.length == other.others.length &&
+      [for (var i = 0; i < others.length; i++) listEquals(others[i], other.others[i])].every((same) => same);
 }
 
 /// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close.

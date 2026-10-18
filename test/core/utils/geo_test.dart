@@ -46,6 +46,18 @@ void main() {
       expect(before.last, after.first);
     });
 
+    test('gives the part between two distances', () {
+      final first = metersBetween(chatelet, gareDeLyon);
+      final part = line.between(first / 2, first + 100);
+
+      expect(part.first.latitude, closeTo((chatelet.latitude + gareDeLyon.latitude) / 2, 0.0001));
+      expect(part[1], gareDeLyon);
+      expect(MeasuredPolyline(part).length, closeTo(first / 2 + 100, 0.5));
+      // Clamped to the line
+      expect(line.between(-50, line.length + 50).first, chatelet);
+      expect(line.between(-50, line.length + 50).last, nation);
+    });
+
     test('handles empty and single-point lines', () {
       expect(MeasuredPolyline(const []).project(chatelet), isNull);
       expect(MeasuredPolyline(const []).length, 0);

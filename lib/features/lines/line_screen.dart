@@ -59,9 +59,11 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       }
     }
 
-    // Vehicles of the direction shown, moved along between two fetches
+    // Vehicles of the direction shown, moved along between two fetches (every second while there are some)
     final fetched = ref.watch(lineVehiclesProvider(widget.lineId)).value;
-    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final now = (fetched?.vehicles.isNotEmpty ?? false)
+        ? ref.watch(vehicleClockProvider).value ?? DateTime.now()
+        : ref.watch(nowProvider).value ?? DateTime.now();
     final vehicles = [
       if (fetched != null)
         for (final vehicle in fetched.vehicles)
@@ -93,11 +95,32 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
+    final placed = [
+      for (final (:vehicle, :progress) in vehicles)
+        if (vehicle.direction < detail.directions.length &&
+            vehicle.branch < detail.directions[vehicle.direction].branches.length)
+          if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch]).place(vehicle, progress) case final place?)
+            (vehicle: vehicle, place: place),
+    ];
+    // Where the vehicles just ran: a wide band over the line, darker than it, all of them in one layer (redrawn every
+    // second)
+    final trails = [
+      for (final (:vehicle, :place) in placed)
+        if (!vehicle.stale && place.trail.length >= 2) place.trail,
+    ];
     return MapOverlay(
       paths: [
         for (final other in direction?.branches ?? const <LineBranch>[])
           if (other != branch) MapPath(points: points(other), color: color.withValues(alpha: 0.35), width: 4),
         if (selected.isNotEmpty) MapPath(points: selected, color: color, width: 6),
+        if (trails.isNotEmpty)
+          MapPath(
+            points: trails.first,
+            others: trails.sublist(1),
+            color: darken(color, 0.15).withValues(alpha: 0.6),
+            width: 12,
+            casing: false,
+          ),
       ],
       pins: [
         for (final stop in branch?.stops ?? const <StopRef>[])
@@ -108,19 +131,22 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             label: stop.name,
             onTap: () => context.push(Routes.stop(stop.id)),
           ),
-        for (final (:vehicle, :progress) in vehicles)
-          if (vehicle.direction < detail.directions.length &&
-              vehicle.branch < detail.directions[vehicle.direction].branches.length)
-            if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch]).position(vehicle, progress)
-                case final point?)
-              MapPin(
-                point: point,
-                color: color,
-                label: vehicleLabel(vehicle, now),
-                onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
-                childSize: const Size(24, 24),
-                child: VehicleMarker(line: line),
-              ),
+        for (final (:vehicle, :place) in placed)
+          MapPin(
+            point: place.point,
+            color: color,
+            label: vehicleLabel(vehicle, now),
+            onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+            childSize: Size.square(VehicleMarker.boxSize(24)),
+            child: VehicleMarker(
+              line: line,
+              size: 24,
+              // The map of a line's page is north up
+              heading: place.heading,
+              punctuality: Punctuality.of(vehicle),
+              stale: vehicle.stale,
+            ),
+          ),
       ],
       fit: selected,
     );
@@ -353,7 +379,7 @@ class _StopTimelineTile extends StatelessWidget {
                         onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
-                          child: VehicleMarker(line: line, size: 20),
+                          child: VehicleMarker(line: line, size: 20, punctuality: Punctuality.of(vehicle), stale: vehicle.stale),
                         ),
                       ),
                     ),

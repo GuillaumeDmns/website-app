@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 
+import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/colors.dart';
@@ -19,6 +20,20 @@ final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> v
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());
 });
+
+/// Ticks every second while a line's vehicles are shown, so that they glide along their path
+final vehicleClockProvider = StreamProvider.autoDispose<DateTime>(
+  (ref) => Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+);
+
+/// Longest trail drawn behind a moving vehicle, in meters
+const maxTrailLength = 500.0;
+
+/// Where a vehicle is on its branch's path
+///
+/// [heading]: its direction of travel, in degrees clockwise from north; [trail]: the path it just ran since the stop
+/// it left (at most [maxTrailLength]), empty when it is waiting at a stop
+typedef VehiclePlacement = ({LatLng point, double heading, List<LatLng> trail});
 
 /// Progress of a vehicle between its two stops at [now]: it keeps moving between two fetches, at the pace given by
 /// the progress and the expected time at the next stop when fetched
@@ -55,7 +70,11 @@ class BranchPath {
   final List<double> stopAlongs = [];
 
   /// Where [vehicle] is at [progress] between its two stops, null when they are not on this branch
-  LatLng? position(Vehicle vehicle, double progress) {
+  LatLng? position(Vehicle vehicle, double progress) => place(vehicle, progress)?.point;
+
+  /// Where [vehicle] is at [progress] between its two stops, which way it goes and the path it just ran; null when
+  /// they are not on this branch
+  VehiclePlacement? place(Vehicle vehicle, double progress) {
     final to = stopIds.indexOf(vehicle.toStopId);
     if (to < 0 || line.isEmpty) {
       return null;
@@ -64,7 +83,16 @@ class BranchPath {
     final left = vehicle.fromStopId == null ? -1 : stopIds.lastIndexOf(vehicle.fromStopId!, to);
     final from = vehicle.fromStopId == null ? to : left >= 0 ? left : math.max(0, to - 1);
     final along = stopAlongs[from] + (stopAlongs[to] - stopAlongs[from]) * progress;
-    return line.pointAt(along);
+    // The way ahead around it (the branch's direction at a stop where it waits)
+    const around = 20.0;
+    final ahead = math.min(along + around, line.length);
+    final behind = math.max(ahead - 2 * around, 0.0);
+    final moving = from != to && progress < 1;
+    return (
+      point: line.pointAt(along),
+      heading: bearingBetween(line.pointAt(behind), line.pointAt(ahead)),
+      trail: moving ? line.between(math.max(stopAlongs[from], along - maxTrailLength), along) : const <LatLng>[],
+    );
   }
 }
 
@@ -101,27 +129,115 @@ IconData vehicleIcon(TransportMode mode) => switch (mode) {
       _ => Icons.directions_bus,
     };
 
-/// Small round marker in the line's color
+/// How on time a vehicle is, for the ring of its marker
+enum Punctuality {
+  /// No delay given
+  unknown,
+  onTime,
+  late;
+
+  /// Late from a minute, like the delays shown in the vehicle sheet
+  static Punctuality of(Vehicle vehicle) => switch (vehicle.delaySeconds) {
+        null => unknown,
+        final delay when delay >= 60 => late,
+        _ => onTime,
+      };
+}
+
+/// Round marker in the line's color, its ring telling how on time it is (white when unknown). With a [heading] (degrees
+/// clockwise from the top of the screen), a pointer shows which way it goes; [stale] (missing from the latest real
+/// time) fades it.
 class VehicleMarker extends StatelessWidget {
-  const VehicleMarker({super.key, required this.line, this.size = 22});
+  const VehicleMarker({
+    super.key,
+    required this.line,
+    this.size = 22,
+    this.heading,
+    this.punctuality = Punctuality.unknown,
+    this.stale = false,
+  });
 
   final LineSummary line;
   final double size;
+  final double? heading;
+  final Punctuality punctuality;
+  final bool stale;
+
+  /// Box of a marker with a pointer: the pointer goes beyond the circle
+  static double boxSize(double size) => size + 22;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final color = parseHexColor(line.color, Colors.grey.shade700);
+    final ring = switch (punctuality) {
+      Punctuality.unknown => Colors.white,
+      Punctuality.onTime => context.colors.live,
+      Punctuality.late => context.colors.delayed,
+    };
+    final circle = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: parseHexColor(line.color, Colors.grey.shade700),
+        color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: ring, width: punctuality == Punctuality.unknown ? 2 : 2.5),
         boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 3)],
       ),
       child: Icon(vehicleIcon(line.mode), size: size * 0.6, color: parseHexColor(line.textColor, Colors.white)),
     );
+    final heading = this.heading;
+    final marker = heading == null
+        ? circle
+        : SizedBox.square(
+            dimension: boxSize(size),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.rotate(
+                  angle: heading * math.pi / 180,
+                  child: CustomPaint(size: Size.square(boxSize(size)), painter: _PointerPainter(radius: size / 2)),
+                ),
+                circle,
+              ],
+            ),
+          );
+    return stale ? Opacity(opacity: 0.45, child: marker) : marker;
   }
+}
+
+/// A dark triangle pointing up, just outside a circle of [radius] at the center: dark, since it points along the line
+/// drawn in the line's color
+class _PointerPainter extends CustomPainter {
+  const _PointerPainter({required this.radius});
+
+  static const color = Color(0xFF1F2933);
+
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final tip = center.dy - radius - 10;
+    final base = center.dy - radius + 1;
+    final path = Path()
+      ..moveTo(center.dx, tip)
+      ..lineTo(center.dx - 7, base)
+      ..lineTo(center.dx + 7, base)
+      ..close();
+    // With a white edge, like the circle
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PointerPainter old) => old.radius != radius;
 }
 
 /// `→ Saint-Denis - Pleyel · Madeleine dans 2 min`

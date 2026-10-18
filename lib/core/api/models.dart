@@ -606,6 +606,9 @@ abstract class Vehicle with _$Vehicle {
 
     /// Next stops with their times, from the next one (as far as the real time goes)
     @Default([]) List<VehicleCall> calls,
+
+    /// Missing from the latest real time: kept a minute or two by the backend, moved along from where it was last seen
+    @Default(false) bool stale,
   }) = _Vehicle;
 
   factory Vehicle.fromJson(Map<String, dynamic> json) => _$VehicleFromJson(json);

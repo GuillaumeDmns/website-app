@@ -228,14 +228,15 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
-              Polyline(
-                points: path.points,
-                color: path.color,
-                strokeWidth: path.width,
-                pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
-                borderColor: Colors.white.withValues(alpha: path.color.a),
-                borderStrokeWidth: 1.5,
-              ),
+              for (final part in path.parts)
+                Polyline(
+                  points: part,
+                  color: path.color,
+                  strokeWidth: path.width,
+                  pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
+                  borderColor: path.casing ? Colors.white.withValues(alpha: path.color.a) : Colors.transparent,
+                  borderStrokeWidth: path.casing ? 1.5 : 0,
+                ),
           ],
         ),
         MarkerLayer(
