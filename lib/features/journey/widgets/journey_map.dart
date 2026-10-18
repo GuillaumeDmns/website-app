@@ -9,6 +9,12 @@ import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../app/theme.dart';
 
+/// Walks on the map: dark, since the map stays light in dark mode too (the theme's grey is light there)
+const walkPathColor = Color(0xFF3C4654);
+
+/// Bike rides on the map: a darker green than [velibColor], which melts into the map's parks
+const bikePathColor = Color(0xFF2E7D32);
+
 /// Map overlay of a journey: rides in their line color, bikes green, walks dotted, the line badge where you board, a
 /// dot where you get off, small dots at the stops between (named in the sheet, not here: the map stays light), start
 /// and end.
@@ -50,9 +56,9 @@ MapOverlay journeyOverlay(
     final color = ride
         ? parseHexColor(section.line?.color, scheme.primary)
         : bike
-            ? velibColor
-            : scheme.onSurfaceVariant;
-    final width = ride ? 6.0 : bike ? 5.0 : 4.0;
+            ? bikePathColor
+            : walkPathColor;
+    final width = ride ? 6.0 : 5.0;
     // Walks dotted, rides and bikes solid
     final dotted = !ride && !bike;
     // Done part: the line's color faded (plain grey looks like a road on the map)
