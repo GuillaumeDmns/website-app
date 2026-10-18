@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../location/device_heading.dart';
+import '../utils/geo.dart';
 
 /// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
 class MapPin {
@@ -90,6 +91,15 @@ class MapFollow {
 
   MapFollow withBearing(double bearing) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
 
+  MapFollow withPosition(LatLng position) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
+
+  /// The camera showing [other] only has to move a little, at once (no animation): a smoothed position redrawn several
+  /// times a second, or the compass turning it
+  bool closeTo(MapFollow other) =>
+      zoom == other.zoom &&
+      metersBetween(position, other.position) < 8 &&
+      headingDelta(bearing, other.bearing).abs() < 25;
+
   /// The camera showing [other] doesn't need to move for this one: same place and zoom, less than 2° apart
   bool sameView(MapFollow other) =>
       position == other.position && zoom == other.zoom && headingDelta(bearing, other.bearing).abs() < 2;
@@ -155,7 +165,9 @@ class MapOverlay {
 
 }
 
-/// Position shown as the user dot instead of the regular one (GO mode, more frequent fixes)
+/// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them); the
+/// map following the user follows it too
+
 class PreciseUserPosition extends Notifier<LatLng?> {
   @override
   LatLng? build() => null;

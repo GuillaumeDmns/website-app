@@ -894,6 +894,15 @@
     }
   },
   "goNoJourney": "Aucun trajet en cours",
+  "goGpsWaiting": "GPS : en attente d'une position",
+  "goGpsStats": "GPS ±{accuracy} m · une position toutes les {interval} s · il y a {age} s",
+  "@goGpsStats": {
+    "placeholders": {
+      "accuracy": {"type": "int"},
+      "interval": {"type": "String"},
+      "age": {"type": "int"}
+    }
+  },
   "goFinished": "Trajet terminé",
   "goLetScreenSleep": "Laisser l'écran s'éteindre",
   "goKeepScreenOn": "Garder l'écran allumé",

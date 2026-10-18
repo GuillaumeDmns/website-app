@@ -135,15 +135,21 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     _shown = view;
-    // Only turning (the phone in the hand): quickly, the map stays with the hand
-    final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     final height = context.size?.height ?? 0;
     final visible = height - widget.padding.bottom;
+    final padding = EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom);
+    // A small step (the smoothed position, the compass): at once, the next one comes a tenth of a second later
+    if (shown != null && shown.closeTo(view)) {
+      unawaited(controller.moveCamera(center: _geo(view.position), zoom: view.zoom, bearing: view.bearing, padding: padding));
+      return;
+    }
+    // Only turning (the phone in the hand): quickly, the map stays with the hand
+    final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     unawaited(controller.animateCamera(
       center: _geo(view.position),
       zoom: view.zoom,
       bearing: view.bearing,
-      padding: EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom),
+      padding: padding,
       nativeDuration: Duration(milliseconds: turning ? 250 : 700),
     ));
   }
@@ -218,10 +224,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   @override
   Widget build(BuildContext context) {
     final location = ref.watch(routerLocationProvider);
-    final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
+    final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
+    // Followed (GO on foot): the smoothed position when there is one, so that the camera and the dot agree
+    final precise = ref.watch(preciseUserPositionProvider);
+    final pageFollow = page.follow;
+    final overlay = pageFollow != null && precise != null ? page.withFollow(pageFollow.withPosition(precise)) : page;
     _overlay = overlay;
-    // Followed (GO on foot): the position the camera follows, so that both agree
-    final user = overlay.follow?.position ?? ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
+    final user = overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value;
     final scheme = Theme.of(context).colorScheme;
 
 

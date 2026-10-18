@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/models.dart';
+import '../../core/config.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/geo.dart';
@@ -124,6 +125,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
             child: Column(
               children: [
                 _Header(state: state, onBack: back),
+                if (AppConfig.isDev) const _GpsStats(),
                 if (progress.issue != null) _IssueBanner(state: state),
               ],
             ),
@@ -171,6 +173,30 @@ class _GoScreenState extends ConsumerState<GoScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// How the fixes come (development builds): is the device's GPS giving one a second?
+class _GpsStats extends ConsumerWidget {
+  const _GpsStats();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(goFixStatsProvider);
+    // Redrawn at each fix, and by the clock while none comes
+    ref.watch(nowProvider);
+    final interval = stats?.interval;
+    final text = stats == null
+        ? context.l10n.goGpsWaiting
+        : context.l10n.goGpsStats(
+            stats.accuracy.round(),
+            interval == null ? '?' : (interval.inMilliseconds / 1000).toStringAsFixed(1),
+            DateTime.now().difference(stats.at).inSeconds,
+          );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.muted)),
     );
   }
 }

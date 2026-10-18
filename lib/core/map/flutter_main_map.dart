@@ -91,6 +91,8 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
       return;
     }
     _shown = view;
+    // A small step (the smoothed position, the compass): at once, the next one comes a tenth of a second later
+    final step = shown != null && shown.closeTo(view);
     // Only turning (the phone in the hand): quickly, the map stays with the hand
     final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     final size = _controller.mapController.camera.nonRotatedSize;
@@ -100,6 +102,10 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final below = visibleHeight * 0.72 - size.height / 2;
     final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
     final center = const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
+    if (step) {
+      _controller.mapController.moveAndRotate(center, view.zoom, -view.bearing);
+      return;
+    }
     _controller.animateTo(
       dest: center,
       zoom: view.zoom,
@@ -173,9 +179,12 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
   @override
   Widget build(BuildContext context) {
     final location = ref.watch(routerLocationProvider);
-    final overlay = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
-    // Followed (GO on foot): the position the camera follows, so that both agree
-    final user = overlay.follow?.position ?? ref.watch(preciseUserPositionProvider) ?? ref.watch(userLocationProvider).value;
+    final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
+    // Followed (GO on foot): the smoothed position when there is one, so that the camera and the dot agree
+    final precise = ref.watch(preciseUserPositionProvider);
+    final pageFollow = page.follow;
+    final overlay = pageFollow != null && precise != null ? page.withFollow(pageFollow.withPosition(precise)) : page;
+    final user = overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value;
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
