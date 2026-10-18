@@ -277,9 +277,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       onEvent: _onEvent,
       layers: [
         for (final path in overlay.paths) ...[
-          // A light edge under the solid paths, so that they stand out from the map's roads
-          if (!path.dotted)
-            PolylineLayer(polylines: [_line(path.points)], color: casing, width: (path.width + 3).round()),
+          // A light edge under the paths (a band under the dotted ones), so that they stand out from the map's roads;
+          // as faded as the path
+          PolylineLayer(
+            polylines: [_line(path.points)],
+            color: casing.withValues(alpha: path.color.a),
+            width: (path.width + 3).round(),
+          ),
           PolylineLayer(
             polylines: [_line(path.points)],
             color: path.color,
