@@ -100,7 +100,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         if (selected.isNotEmpty) MapPath(points: selected, color: color, width: 6),
       ],
       pins: [
-        for (final stop in branch?.stops ?? const <StopRef>[])
+        for (final stop in branch == null ? const <StopRef>[] : stopsOnce(branch))
           MapPin(
             point: LatLng(stop.lat, stop.lon),
             color: color,
@@ -133,7 +133,9 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     LineBranch? branch,
     List<({Vehicle vehicle, double progress})> vehicles,
   ) {
-    final positions = stopListPositions(branch, vehicles);
+    // A stop area served twice in a row (two of its quays) shows once
+    final shown = branch?.copyWith(stops: stopsOnce(branch));
+    final positions = stopListPositions(shown, vehicles);
 
     final theme = Theme.of(context);
     final line = detail.line;
@@ -222,19 +224,19 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
           child: LineServiceHoursSummary(lineId: line.id, direction: _direction.clamp(0, detail.directions.length - 1)),
         ),
-        if (branch != null)
+        if (shown != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
             child: AppCard(
               padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
               child: Column(
                 children: [
-                  for (var i = 0; i < branch.stops.length; i++)
+                  for (var i = 0; i < shown.stops.length; i++)
                     _StopTimelineTile(
-                      stop: branch.stops[i],
+                      stop: shown.stops[i],
                       color: color,
                       isFirst: i == 0,
-                      isLast: i == branch.stops.length - 1,
+                      isLast: i == shown.stops.length - 1,
                       line: line,
                       vehicles: positions[i] ?? const [],
                     ),

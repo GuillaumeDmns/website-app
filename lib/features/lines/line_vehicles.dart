@@ -68,6 +68,13 @@ class BranchPath {
   }
 }
 
+/// The stops of [branch], a stop area served twice in a row (two of its quays, as the bus 38 at Denfert-Rochereau)
+/// once
+List<StopRef> stopsOnce(LineBranch branch) => [
+      for (final (index, stop) in branch.stops.indexed)
+        if (index == 0 || branch.stops[index - 1].id != stop.id) stop,
+    ];
+
 /// Vehicles on the stop list of [branch], by the stop they are closest to, with their offset from it (between -0.5
 /// and 0.5): their fractional stop index between the stop they left and the next one. Vehicles of other branches
 /// are shown where they run on this one: the stop they left must be on it too, so that a train coming from another
