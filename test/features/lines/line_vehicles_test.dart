@@ -105,6 +105,20 @@ void main() {
     });
   });
 
+  test('lists a stop area served twice in a row once', () {
+    const denfert = StopRef(id: 'D', name: 'Denfert-Rochereau', lat: 48.834, lon: 2.333);
+    const branch = LineBranch(headsign: 'Porte de la Chapelle', tripCount: 10, stops: [
+      StopRef(id: 'A', name: 'Alésia', lat: 48.828, lon: 2.327),
+      denfert,
+      denfert,
+      StopRef(id: 'P', name: 'Port Royal', lat: 48.840, lon: 2.337),
+      denfert,
+    ]);
+
+    // Twice in a row once; again later (a loop) kept
+    expect(stopsOnce(branch).map((stop) => stop.id), ['A', 'D', 'P', 'D']);
+  });
+
   group('stopListPositions', () {
     // A branch from W merging at M with another one from N
     const branch = LineBranch(headsign: 'Paris', tripCount: 10, stops: [
