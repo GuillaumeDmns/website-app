@@ -127,6 +127,21 @@ class MeasuredPolyline {
     return points.last;
   }
 
+  /// The part of the line between [from] and [to] meters (clamped to the line)
+  List<LatLng> between(double from, double to) {
+    final start = from.clamp(0.0, length);
+    final end = to.clamp(start, length);
+    if (points.length < 2) {
+      return points;
+    }
+    return [
+      pointAt(start),
+      for (var i = 0; i < points.length; i++)
+        if (cumulative[i] > start && cumulative[i] < end) points[i],
+      pointAt(end),
+    ];
+  }
+
   /// The line cut at [along] meters: the part before and the part after
   (List<LatLng>, List<LatLng>) split(double along) {
     if (points.length < 2 || along <= 0) {

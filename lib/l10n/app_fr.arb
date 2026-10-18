@@ -383,6 +383,7 @@
     }
   },
   "nextStopsUnavailable": "Prochains arrêts indisponibles",
+  "vehicleStale": "Position estimée : absent du dernier temps réel",
   "vehicleTimesNotice": "Horaires estimés d'après le temps réel, jusqu'où il est connu",
   "platform": "Voie {platform}",
   "@platform": {

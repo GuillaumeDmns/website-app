@@ -94,7 +94,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
               padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
               child: Row(
                 children: [
-                  VehicleMarker(line: widget.line, size: 32),
+                  VehicleMarker(line: widget.line, size: 32, punctuality: Punctuality.of(_vehicle), stale: _vehicle.stale),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -126,6 +126,11 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                 ],
               ),
             ),
+            if (_vehicle.stale)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(context.l10n.vehicleStale, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+              ),
             const Divider(height: 1),
             if (calls.isEmpty)
               Padding(

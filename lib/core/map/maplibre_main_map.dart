@@ -201,9 +201,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       case MapEventCameraIdle():
         _centerDebounce?.cancel();
         _centerDebounce = Timer(const Duration(milliseconds: 600), () {
-          final center = _controller?.camera?.center;
-          if (mounted && center != null) {
+          final controller = _controller;
+          final center = controller?.camera?.center;
+          if (mounted && controller != null && center != null) {
             ref.read(mapCenterProvider.notifier).update(LatLng(center.lat, center.lon));
+            ref.read(mapScaleProvider.notifier).update(controller.getMetersPerPixelAtLatitude(center.lat.toDouble()));
           }
         });
       case MapEventLongClick(:final point) || MapEventSecondaryClick(:final point):
@@ -275,23 +277,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         gestures: const MapGestures.all(rotate: false, pitch: false),
       ),
       onEvent: _onEvent,
-      layers: [
-        for (final path in overlay.paths) ...[
-          // A light edge under the paths (a band under the dotted ones), so that they stand out from the map's roads;
-          // as faded as the path
-          PolylineLayer(
-            polylines: [_line(path.points)],
-            color: casing.withValues(alpha: path.color.a),
-            width: (path.width + 3).round(),
-          ),
-          PolylineLayer(
-            polylines: [_line(path.points)],
-            color: path.color,
-            width: path.width.round(),
-            dashArray: path.dotted ? const [1, 2] : null,
-          ),
-        ],
-      ],
+      layers: _layers(overlay.paths, casing),
       children: [
         // The controller of the map actually shown: the map can be created again (the page laid out again), and the
         // overlay is then framed on the new one
@@ -350,6 +336,28 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         const _Attribution(),
       ],
     );
+  }
+
+  /// Layers of the paths drawn last: the map sends a layer to the map engine again unless it is the same object, so
+  /// the layers of unchanged paths are kept (vehicles move every second on a line's page)
+  List<(MapPath, List<Layer>)> _pathLayers = const [];
+
+  List<Layer> _layers(List<MapPath> paths, Color casing) {
+    final previous = _pathLayers;
+    _pathLayers = [
+      for (final (index, path) in paths.indexed)
+        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, _pathLayersOf(path, casing)),
+    ];
+    return [for (final (_, layers) in _pathLayers) ...layers];
+  }
+
+  static List<Layer> _pathLayersOf(MapPath path, Color casing) {
+    final lines = [for (final part in path.parts) if (part.length >= 2) _line(part)];
+    return [
+      // A light edge under the path (a band under the dotted ones), as faded as the path
+      if (path.casing) PolylineLayer(polylines: lines, color: casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
+      PolylineLayer(polylines: lines, color: path.color, width: path.width.round(), dashArray: path.dotted ? const [1, 2] : null),
+    ];
   }
 
   static Feature<LineString> _line(List<LatLng> points) =>

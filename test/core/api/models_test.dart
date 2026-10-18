@@ -140,6 +140,8 @@ void main() {
       ],
     });
     expect(vehicle.calls.single.platform, 'A');
+    expect(vehicle.stale, isFalse);
+    expect(Vehicle.fromJson({...vehicle.toJson(), 'calls': [], 'stale': true}).stale, isTrue);
 
     final timetable = Timetable.fromJson({
       'stop': {'id': 'IDFM:70001', 'name': 'Châtelet', 'lat': 48.8584, 'lon': 2.347},

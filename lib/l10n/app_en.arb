@@ -147,6 +147,7 @@
   "vehicleAtStop": "at the stop",
   "inMinutes": "in {minutes} min",
   "nextStopsUnavailable": "Next stops unavailable",
+  "vehicleStale": "Estimated position: missing from the latest real time",
   "vehicleTimesNotice": "Times estimated from real time, as far as it is known",
   "platform": "Platform {platform}",
   "severityBlocking": "Service suspended",

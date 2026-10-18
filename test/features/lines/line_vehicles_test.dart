@@ -1,8 +1,12 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/utils/geo.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
 import 'package:website_app/l10n/l10n.dart';
+
+import '../../support/samples.dart';
 
 void main() {
   setUp(() => useLocale(const Locale('fr')));
@@ -62,6 +66,40 @@ void main() {
       expect(path.position(vehicle(from: 'IDFM:9', to: 'IDFM:3'), 0)!.latitude, closeTo(48.8443, 0.0001));
     });
 
+    test('tells which way a vehicle goes and the path it just ran', () {
+      // Châtelet → Gare de Lyon goes south-east; a tenth of the way (about 230 m): the trail starts at Châtelet
+      final place = path.place(vehicle(), 0.1, trailLength: 1000)!;
+
+      expect(place.heading, closeTo(bearingBetween(const LatLng(48.8584, 2.3470), const LatLng(48.8443, 2.3730)), 2));
+      expect(place.trail.first.latitude, closeTo(48.8584, 0.0001));
+      expect(place.trail.last, place.point);
+    });
+
+    test('keeps the trail as long as asked behind a vehicle far from the stop it left', () {
+      final place = path.place(vehicle(from: 'IDFM:1', to: 'IDFM:3'), 0.9, trailLength: 220)!;
+
+      expect(MeasuredPolyline(place.trail).length, closeTo(220, 1));
+      expect(path.place(vehicle(), 0.5)!.trail, isEmpty);
+    });
+
+    test('makes trails about as long as the vehicle, and visible from afar', () {
+      // Zoomed in (1 m per pixel): a metro's length, a bus's, out of the marker (12 pixels of radius)
+      expect(trailLength(TransportMode.metro, 1), 12 + 100);
+      expect(trailLength(TransportMode.bus, 1), 12 + 15);
+      // A whole bus line on the screen (12 m per pixel): long enough to see
+      expect(trailLength(TransportMode.bus, 12), 12 * (12 + minTrailPixels));
+      expect(trailLength(TransportMode.rer, null), 220);
+    });
+
+    test('draws no trail behind a vehicle waiting at a stop', () {
+      final waiting = path.place(vehicle(from: null, to: 'IDFM:1'), 1, trailLength: 100)!;
+
+      expect(waiting.trail, isEmpty);
+      // The way the branch goes
+      expect(waiting.heading, greaterThan(90));
+      expect(waiting.heading, lessThan(180));
+    });
+
     test('ignores vehicles of another branch', () {
       expect(path.position(vehicle(to: 'IDFM:99'), 0.5), isNull);
     });
@@ -104,6 +142,27 @@ void main() {
 
       expect(positions.keys, [2]);
     });
+  });
+
+  test('tells how on time a vehicle is', () {
+    expect(Punctuality.of(vehicle()), Punctuality.unknown);
+    expect(Punctuality.of(vehicle().copyWith(delaySeconds: 30)), Punctuality.onTime);
+    expect(Punctuality.of(vehicle().copyWith(delaySeconds: -90)), Punctuality.onTime);
+    expect(Punctuality.of(vehicle().copyWith(delaySeconds: 60)), Punctuality.late);
+  });
+
+  testWidgets('fades a stale vehicle and points it the way it goes', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Row(children: [
+        VehicleMarker(line: metro1, heading: 90, punctuality: Punctuality.late),
+        VehicleMarker(line: metro1, stale: true),
+      ]),
+    ));
+
+    expect(tester.getSize(find.byType(VehicleMarker).first), Size.square(VehicleMarker.boxSize(22)));
+    expect(find.descendant(of: find.byType(VehicleMarker).first, matching: find.byType(Transform)), findsWidgets);
+    expect(find.descendant(of: find.byType(VehicleMarker).last, matching: find.byType(Opacity)), findsOneWidget);
+    expect(find.descendant(of: find.byType(VehicleMarker).first, matching: find.byType(Opacity)), findsNothing);
   });
 
   test('labels a vehicle with its next stop', () {

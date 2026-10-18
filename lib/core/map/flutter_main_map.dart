@@ -154,12 +154,17 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         }) {
       setState(() => _followPaused = true);
     }
-    if (event is MapEventMoveEnd || event is MapEventFlingAnimationEnd || event is MapEventDoubleTapZoomEnd ||
-        event is MapEventScrollWheelZoom) {
+    // Moves by hand, and framings (the scale of a page's map)
+    if (event is MapEventMove || event is MapEventMoveEnd || event is MapEventFlingAnimationEnd ||
+        event is MapEventDoubleTapZoomEnd || event is MapEventScrollWheelZoom) {
       _centerDebounce?.cancel();
       _centerDebounce = Timer(const Duration(milliseconds: 600), () {
         if (mounted) {
-          ref.read(mapCenterProvider.notifier).update(_controller.mapController.camera.center);
+          final camera = _controller.mapController.camera;
+          ref.read(mapCenterProvider.notifier).update(camera.center);
+          // 256-pixel tiles
+          ref.read(mapScaleProvider.notifier)
+              .update(156543.03392 * math.cos(camera.center.latitude * math.pi / 180) / math.pow(2, camera.zoom));
         }
       });
     }
@@ -228,14 +233,15 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
-              Polyline(
-                points: path.points,
-                color: path.color,
-                strokeWidth: path.width,
-                pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
-                borderColor: Colors.white.withValues(alpha: path.color.a),
-                borderStrokeWidth: 1.5,
-              ),
+              for (final part in path.parts)
+                Polyline(
+                  points: part,
+                  color: path.color,
+                  strokeWidth: path.width,
+                  pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
+                  borderColor: path.casing ? Colors.white.withValues(alpha: path.color.a) : Colors.transparent,
+                  borderStrokeWidth: path.casing ? 1.5 : 0,
+                ),
           ],
         ),
         MarkerLayer(
