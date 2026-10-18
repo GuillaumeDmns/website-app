@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/utils/geo.dart';
 import 'package:website_app/features/go/go_controller.dart';
@@ -69,6 +70,24 @@ void main() {
     expect(follow.closeTo(follow.withPosition(east(1)).withBearing(100)), isTrue);
     expect(follow.closeTo(follow.withPosition(east(20))), isFalse);
     expect(follow.closeTo(follow.withBearing(180)), isFalse);
+  });
+
+  test('the follow camera glides to the view asked, frame by frame, the short way round', () {
+    const camera = MapFollow(position: start, bearing: 350);
+    final target = camera.withBearing(20).withPosition(east(2));
+
+    // A 60 Hz frame: part of the way, through north
+    final frame = camera.glideTo(target, 1 / 60);
+    expect(headingDelta(350, frame.bearing), inExclusiveRange(0, 30));
+    expect(metersBetween(frame.position, start), inExclusiveRange(0, 2));
+    // A longer frame goes further
+    expect(headingDelta(350, camera.glideTo(target, 1 / 30).bearing), greaterThan(headingDelta(350, frame.bearing)));
+    // Then there
+    var view = camera;
+    for (var i = 0; i < 120 && view != target; i++) {
+      view = view.glideTo(target, 1 / 60);
+    }
+    expect(view, same(target));
   });
 
   test('counts the time between fixes', () {

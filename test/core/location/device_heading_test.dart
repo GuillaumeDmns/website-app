@@ -56,10 +56,10 @@ void main() {
     expect(turns, [10, 30]);
   });
 
-  test('a view less than 2° away needs no move', () {
-    const shown = MapFollow(position: LatLng(48.85, 2.35), bearing: 359);
+  test('a view less than half a degree away needs no move', () {
+    const shown = MapFollow(position: LatLng(48.85, 2.35), bearing: 359.8);
 
-    expect(shown.sameView(shown.withBearing(0.5)), isTrue);
-    expect(shown.sameView(shown.withBearing(3)), isFalse);
+    expect(shown.sameView(shown.withBearing(0.1)), isTrue);
+    expect(shown.sameView(shown.withBearing(1)), isFalse);
   });
 }
