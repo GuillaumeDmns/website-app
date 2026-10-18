@@ -68,21 +68,31 @@ void main() {
 
     test('tells which way a vehicle goes and the path it just ran', () {
       // Châtelet → Gare de Lyon goes south-east; a tenth of the way (about 230 m): the trail starts at Châtelet
-      final place = path.place(vehicle(), 0.1)!;
+      final place = path.place(vehicle(), 0.1, trailLength: 1000)!;
 
       expect(place.heading, closeTo(bearingBetween(const LatLng(48.8584, 2.3470), const LatLng(48.8443, 2.3730)), 2));
       expect(place.trail.first.latitude, closeTo(48.8584, 0.0001));
       expect(place.trail.last, place.point);
     });
 
-    test('keeps the trail short behind a vehicle far from the stop it left', () {
-      final place = path.place(vehicle(from: 'IDFM:1', to: 'IDFM:3'), 0.9)!;
+    test('keeps the trail as long as asked behind a vehicle far from the stop it left', () {
+      final place = path.place(vehicle(from: 'IDFM:1', to: 'IDFM:3'), 0.9, trailLength: 220)!;
 
-      expect(MeasuredPolyline(place.trail).length, closeTo(maxTrailLength, 1));
+      expect(MeasuredPolyline(place.trail).length, closeTo(220, 1));
+      expect(path.place(vehicle(), 0.5)!.trail, isEmpty);
+    });
+
+    test('makes trails about as long as the vehicle, and visible from afar', () {
+      // Zoomed in (1 m per pixel): a metro's length, a bus's, out of the marker (12 pixels of radius)
+      expect(trailLength(TransportMode.metro, 1), 12 + 100);
+      expect(trailLength(TransportMode.bus, 1), 12 + 15);
+      // A whole bus line on the screen (12 m per pixel): long enough to see
+      expect(trailLength(TransportMode.bus, 12), 12 * (12 + minTrailPixels));
+      expect(trailLength(TransportMode.rer, null), 220);
     });
 
     test('draws no trail behind a vehicle waiting at a stop', () {
-      final waiting = path.place(vehicle(from: null, to: 'IDFM:1'), 1)!;
+      final waiting = path.place(vehicle(from: null, to: 'IDFM:1'), 1, trailLength: 100)!;
 
       expect(waiting.trail, isEmpty);
       // The way the branch goes

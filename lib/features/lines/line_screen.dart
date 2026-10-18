@@ -37,6 +37,9 @@ class LineScreen extends ConsumerStatefulWidget {
 }
 
 class _LineScreenState extends ConsumerState<LineScreen> {
+  /// Vehicle markers on the map, in logical pixels
+  static const _vehicleSize = 24.0;
+
   int _direction = 0;
   int _branch = 0;
 
@@ -95,11 +98,15 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
+    // About as long as the vehicle, never too short to see
+    final trail = trailLength(line.mode, ref.watch(mapScaleProvider), markerRadius: _vehicleSize / 2);
     final placed = [
       for (final (:vehicle, :progress) in vehicles)
         if (vehicle.direction < detail.directions.length &&
             vehicle.branch < detail.directions[vehicle.direction].branches.length)
-          if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch]).place(vehicle, progress) case final place?)
+          if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch])
+                  .place(vehicle, progress, trailLength: trail)
+              case final place?)
             (vehicle: vehicle, place: place),
     ];
     // Where the vehicles just ran: a wide band over the line, darker than it, all of them in one layer (redrawn every
@@ -137,10 +144,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             color: color,
             label: vehicleLabel(vehicle, now),
             onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
-            childSize: Size.square(VehicleMarker.boxSize(24)),
+            childSize: Size.square(VehicleMarker.boxSize(_vehicleSize)),
             child: VehicleMarker(
               line: line,
-              size: 24,
+              size: _vehicleSize,
               // The map of a line's page is north up
               heading: place.heading,
               punctuality: Punctuality.of(vehicle),

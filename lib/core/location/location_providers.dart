@@ -88,6 +88,22 @@ class MapCenterController extends Notifier<LatLng> {
 
 final mapCenterProvider = NotifierProvider<MapCenterController, LatLng>(MapCenterController.new);
 
+/// Meters per logical pixel at the map's center once it has settled, null before: to size things in pixels
+class MapScaleController extends Notifier<double?> {
+  @override
+  double? build() => null;
+
+  /// Ignores changes under 1 % (the same zoom at a slightly different latitude)
+  void update(double metersPerPixel) {
+    final current = state;
+    if (current == null || (metersPerPixel - current).abs() > current * 0.01) {
+      state = metersPerPixel;
+    }
+  }
+}
+
+final mapScaleProvider = NotifierProvider<MapScaleController, double?>(MapScaleController.new);
+
 /// Where "nearby" means: the user when located, the map center otherwise.
 final nearbyOriginProvider = Provider<({LatLng position, bool isUser})>((ref) {
   final user = ref.watch(userLocationProvider).value;

@@ -201,9 +201,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       case MapEventCameraIdle():
         _centerDebounce?.cancel();
         _centerDebounce = Timer(const Duration(milliseconds: 600), () {
-          final center = _controller?.camera?.center;
-          if (mounted && center != null) {
+          final controller = _controller;
+          final center = controller?.camera?.center;
+          if (mounted && controller != null && center != null) {
             ref.read(mapCenterProvider.notifier).update(LatLng(center.lat, center.lon));
+            ref.read(mapScaleProvider.notifier).update(controller.getMetersPerPixelAtLatitude(center.lat.toDouble()));
           }
         });
       case MapEventLongClick(:final point) || MapEventSecondaryClick(:final point):
