@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener, AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -18,6 +19,7 @@ import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
 import 'go_instruction.dart';
+import 'go_smoother.dart';
 import 'go_tracker.dart';
 
 const _storageKey = 'go_session';
@@ -108,6 +110,47 @@ class GoState {
       );
 }
 
+/// How the position fixes of GO come, for the development builds: is the device's GPS giving a fix every second?
+@immutable
+class GoFixStats {
+  const GoFixStats({required this.at, required this.accuracy, this.interval});
+
+  /// When the last fix came
+  final DateTime at;
+
+  /// Its accuracy (m)
+  final double accuracy;
+
+  /// Mean time between the last fixes, null after the first one
+  final Duration? interval;
+}
+
+class GoFixStatsController extends Notifier<GoFixStats?> {
+  final _times = <DateTime>[];
+
+  @override
+  GoFixStats? build() => null;
+
+  void record(DateTime at, double accuracy) {
+    _times.add(at);
+    if (_times.length > 6) {
+      _times.removeAt(0);
+    }
+    state = GoFixStats(
+      at: at,
+      accuracy: accuracy,
+      interval: _times.length < 2 ? null : _times.last.difference(_times.first) ~/ (_times.length - 1),
+    );
+  }
+
+  void clear() {
+    _times.clear();
+    state = null;
+  }
+}
+
+final goFixStatsProvider = NotifierProvider<GoFixStatsController, GoFixStats?>(GoFixStatsController.new);
+
 /// GO session: feeds the [GoTracker] with high-accuracy positions, a 5 s clock and the real-time departures of the
 /// next ride (every 30 s), gives the alerts, and keeps the session on the device so that it survives a restart.
 class GoController extends Notifier<GoState?> {
@@ -115,6 +158,13 @@ class GoController extends Notifier<GoState?> {
   Timer? _tick;
   Timer? _departuresTimer;
   Position? _lastFix;
+
+  /// What the map shows of the fixes, redrawn every [_smoothInterval] while it moves and the app is shown
+  final _smoother = GoSmoother();
+  Timer? _smoothTimer;
+  AppLifecycleListener? _lifecycle;
+  bool _foreground = true;
+  static const _smoothInterval = Duration(milliseconds: 100);
 
   /// Last content sent to the system notification, to only send changes
   String? _lastLive;
@@ -321,16 +371,92 @@ class GoController extends Notifier<GoState?> {
   void _startFeeds() {
     _stopFeeds();
     _positions = Geolocator.getPositionStream(locationSettings: _locationSettings()).listen(
-      (position) {
-        _lastFix = position;
-        _update();
-      },
+      _onFix,
       onError: (Object e) => debugPrint('GO positions unavailable: $e'),
     );
+    _lifecycle = AppLifecycleListener(onStateChange: (lifecycle) {
+      _foreground = lifecycle == AppLifecycleState.resumed;
+      _smoothen();
+    });
+    unawaited(_seed());
     _tick = Timer.periodic(const Duration(seconds: 5), (_) => _update());
     _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadDepartures());
     _loadDepartures();
     _update();
+  }
+
+  void _onFix(Position position) {
+    _lastFix = position;
+    final now = DateTime.now();
+    ref.read(goFixStatsProvider.notifier).record(now, position.accuracy);
+    final current = state;
+    final step = current?.tracker.stepOf(current.progress);
+    _smoother.fix(
+      LatLng(position.latitude, position.longitude),
+      now,
+      speed: position.speed < 0 ? null : position.speed,
+      accuracy: position.accuracy,
+      // Going on along the way on foot or by bike only
+      path: step == null || step.isRide ? null : step.line,
+    );
+    _update();
+    _smoothen();
+  }
+
+  /// GO's first high-accuracy fix may take seconds (the GPS starting): the last known position meanwhile, so that the
+  /// map follows the user at once instead of framing the whole journey
+  Future<void> _seed() async {
+    Position? known;
+    try {
+      known = kIsWeb ? null : await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      // Not on this platform
+    }
+    if (_lastFix != null || _positions == null) {
+      return;
+    }
+    if (known != null && DateTime.now().difference(known.timestamp) < const Duration(minutes: 1)) {
+      _onFix(known);
+      return;
+    }
+    final position = ref.read(userLocationProvider).value;
+    if (position != null) {
+      _onFix(Position(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        timestamp: DateTime.now(),
+        // The app's regular positions: within 25 m
+        accuracy: 25,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: -1,
+        speedAccuracy: 0,
+      ));
+    }
+  }
+
+  /// Shows the smoothed position, redrawn while it moves and the app is shown (nothing drawn screen off)
+  void _smoothen() {
+    void show() {
+      final position = _smoother.at(DateTime.now());
+      if (position != null) {
+        ref.read(preciseUserPositionProvider.notifier).set(position);
+      }
+    }
+
+    show();
+    if (_smoothTimer != null || !_foreground || !_smoother.moving(DateTime.now())) {
+      return;
+    }
+    _smoothTimer = Timer.periodic(_smoothInterval, (_) {
+      show();
+      if (!_foreground || !_smoother.moving(DateTime.now())) {
+        _smoothTimer?.cancel();
+        _smoothTimer = null;
+      }
+    });
   }
 
   /// Regular fixes even when not moving: a user waiting at a stop must not look like one without GPS (underground)
@@ -342,7 +468,8 @@ class GoController extends Notifier<GoState?> {
       TargetPlatform.android => AndroidSettings(
           accuracy: LocationAccuracy.best,
           distanceFilter: 0,
-          intervalDuration: const Duration(seconds: 2),
+          // The GPS gives one a second: all of them (it runs anyway, taking them costs little more)
+          intervalDuration: const Duration(seconds: 1),
         ),
       TargetPlatform.iOS || TargetPlatform.macOS => AppleSettings(
           accuracy: LocationAccuracy.bestForNavigation,
@@ -365,6 +492,19 @@ class GoController extends Notifier<GoState?> {
     });
     _positions?.cancel();
     _positions = null;
+    _smoothTimer?.cancel();
+    _smoothTimer = null;
+    _smoother.reset();
+    _lifecycle?.dispose();
+    _lifecycle = null;
+    _foreground = true;
+    Future.microtask(() {
+      try {
+        ref.read(goFixStatsProvider.notifier).clear();
+      } catch (_) {
+        // Disposed
+      }
+    });
     _tick?.cancel();
     _tick = null;
     _departuresTimer?.cancel();
@@ -410,9 +550,6 @@ class GoController extends Notifier<GoState?> {
     }
     state = next;
     _publishLive(next);
-    if (position != null) {
-      ref.read(preciseUserPositionProvider.notifier).set(position);
-    }
 
     if (changed) {
       _save();

@@ -279,6 +279,8 @@
   "goChipGetOff": "Get off",
   "goArrival": "Arrival {time}",
   "goNoJourney": "No journey in progress",
+  "goGpsWaiting": "GPS: waiting for a fix",
+  "goGpsStats": "GPS ±{accuracy} m · a fix every {interval} s · {age} s ago",
   "goFinished": "Journey finished",
   "goLetScreenSleep": "Let the screen turn off",
   "goKeepScreenOn": "Keep the screen on",

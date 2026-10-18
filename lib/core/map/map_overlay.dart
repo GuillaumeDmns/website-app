@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../location/device_heading.dart';
+import '../utils/geo.dart';
 
 /// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
 class MapPin {
@@ -90,16 +92,46 @@ class MapFollow {
 
   MapFollow withBearing(double bearing) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
 
-  /// The camera showing [other] doesn't need to move for this one: same place and zoom, less than 2° apart
+  MapFollow withPosition(LatLng position) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
+
+  /// The camera showing [other] only has to move a little, at once (no animation): a smoothed position redrawn several
+  /// times a second, or the compass turning it
+  bool closeTo(MapFollow other) =>
+      zoom == other.zoom &&
+      metersBetween(position, other.position) < 8 &&
+      headingDelta(bearing, other.bearing).abs() < 25;
+
+  /// Time constants of [glideTo] (s): turns catch up with the hand quickly, moves with the smoothed position
+  static const turnLag = 0.07;
+  static const moveLag = 0.12;
+
+  /// The camera showing this view [seconds] later on its way to [target]: part of the way (more the longer), [target]
+  /// itself once there
+  MapFollow glideTo(MapFollow target, double seconds) {
+    final turn = 1 - math.exp(-seconds / turnLag);
+    final move = 1 - math.exp(-seconds / moveLag);
+    final nextBearing = (bearing + headingDelta(bearing, target.bearing) * turn + 360) % 360;
+    final nextPosition = LatLng(
+      position.latitude + (target.position.latitude - position.latitude) * move,
+      position.longitude + (target.position.longitude - position.longitude) * move,
+    );
+    final there =
+        headingDelta(nextBearing, target.bearing).abs() < 0.2 && metersBetween(nextPosition, target.position) < 0.05;
+    return there
+        ? target
+        : MapFollow(position: nextPosition, bearing: nextBearing, zoom: target.zoom, compass: target.compass);
+  }
+
+  /// The camera showing [other] doesn't need to move for this one: same place and zoom, less than half a degree apart
   bool sameView(MapFollow other) =>
-      position == other.position && zoom == other.zoom && headingDelta(bearing, other.bearing).abs() < 2;
+      position == other.position && zoom == other.zoom && headingDelta(bearing, other.bearing).abs() < 0.5;
 }
 
 /// The heading of the follow camera, for the maps: the device's (kept from [deviceHeadingProvider] while the follow
 /// asks for it) or the way's
 class FollowHeading {
-  /// Turns of the camera by the compass alone, at most this often (headings come about 20 times a second)
-  static const turnInterval = Duration(milliseconds: 100);
+  /// New headings for the camera at most this often (they come about 50 times a second; the map glides between them)
+  static const turnInterval = Duration(milliseconds: 20);
 
   /// The device's last heading, null without compass or while nothing is followed with it
   double? device;
@@ -155,7 +187,9 @@ class MapOverlay {
 
 }
 
-/// Position shown as the user dot instead of the regular one (GO mode, more frequent fixes)
+/// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them); the
+/// map following the user follows it too
+
 class PreciseUserPosition extends Notifier<LatLng?> {
   @override
   LatLng? build() => null;

@@ -15,7 +15,7 @@ import kotlin.math.hypot
 
 /**
  * Where the phone points, in degrees clockwise from (magnetic) north, for GO's map on foot and by bike: the rotation
- * vector sensor (gyroscope, accelerometer and magnetometer fused by Android). Only while Dart listens; at most 20
+ * vector sensor (gyroscope, accelerometer and magnetometer fused by Android). Only while Dart listens; at most 50
  * headings a second, smoothed on the Dart side.
  */
 class DeviceHeading(private val activity: Activity) : EventChannel.StreamHandler, SensorEventListener {
@@ -34,7 +34,8 @@ class DeviceHeading(private val activity: Activity) : EventChannel.StreamHandler
             return
         }
         events = sink
-        sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        // Every 20 ms: the map turns smoothly with the hand
+        sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
     }
 
     override fun onCancel(arguments: Any?) {
@@ -77,6 +78,6 @@ class DeviceHeading(private val activity: Activity) : EventChannel.StreamHandler
 
     companion object {
         const val CHANNEL = "com.guillaumedamiens.app/heading"
-        private const val MIN_INTERVAL_MS = 50L
+        private const val MIN_INTERVAL_MS = 20L
     }
 }
