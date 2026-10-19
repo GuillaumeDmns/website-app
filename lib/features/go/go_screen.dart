@@ -4,31 +4,36 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/config.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
-import '../../core/utils/geo.dart';
+import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/size_reporter.dart';
 import '../../l10n/l10n.dart';
+import '../daily_trips/daily_trip_widgets.dart';
 import '../journey/journey_providers.dart';
+import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
 import '../journey/widgets/journey_map.dart';
 import '../journey/widgets/ride_departures.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'go_controller.dart';
+import 'go_guidance.dart';
 import 'go_instruction.dart';
 import 'go_tracker.dart';
-import '../../app/theme.dart';
 
-/// GO mode, like Citymapper: one card per step, swiped horizontally, dots telling where you are. The page follows
-/// the step in progress; the map frames the step shown.
+/// GO mode, like Citymapper: the instruction in large over the map (`GoBar`), and in the panel the arrival with the
+/// journey's progress, the strip of its steps (tap one to look at it) and one card per step, swiped horizontally. The
+/// page follows the step in progress; the map frames the step shown (on a ride, what is left of it).
 class GoScreen extends ConsumerStatefulWidget {
   const GoScreen({super.key});
 
@@ -47,7 +52,6 @@ class _GoScreenState extends ConsumerState<GoScreen> {
 
   /// Heights of the parts of the page, to fit the bottom sheet to the card shown
   double _top = 0;
-  double _bottom = 0;
   final _cards = <int, double>{};
   bool _newCard = true;
 
@@ -56,7 +60,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     if (card == null || !mounted) {
       return;
     }
-    PanelSheetScope.fitContent(context, _top + card + _bottom, reset: _newCard);
+    PanelSheetScope.fitContent(context, _top + card + MediaQuery.paddingOf(context).bottom, reset: _newCard);
     _newCard = false;
   }
 
@@ -75,6 +79,14 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     void back() => context.canPop() ? context.pop() : context.go(Routes.home);
 
     if (state == null) {
+      // The session closed itself after the arrival: back home
+      if (_pages != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            context.go(Routes.home);
+          }
+        });
+      }
       return ListView(
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 8, 16, 24),
@@ -104,17 +116,8 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _show(live));
     }
 
-    final shownStep = _shown < tracker.steps.length ? tracker.steps[_shown] : null;
-    final onBoardOrMoving = progress.phase == GoPhase.moving || progress.phase == GoPhase.onBoard;
-
     return MapOverlayScope(
-      overlay: journeyOverlay(
-        context,
-        state.journey,
-        currentSection: arrived ? state.journey.sections.length : tracker.stepOf(progress)?.sectionIndex ?? -1,
-        currentAlong: onBoardOrMoving ? progress.along : 0,
-        fitSection: shownStep?.sectionIndex,
-      ).withFollow(goFollow(state, _shown)),
+      overlay: _overlay(state, live),
       child: Column(
         children: [
           SizeReporter(
@@ -125,8 +128,11 @@ class _GoScreenState extends ConsumerState<GoScreen> {
             child: Column(
               children: [
                 _Header(state: state, onBack: back),
+                _JourneyProgress(state: state),
                 if (AppConfig.isDev) const _GpsStats(),
-                if (progress.issue != null) _IssueBanner(state: state),
+                _StepStrip(state: state, shown: _shown, onTap: _show),
+                if (progress.issue case final issue? when issue != GoIssue.offRoute) _IssueCard(state: state, issue: issue),
+                if (progress.issue == GoIssue.offRoute) _OffRouteBanner(state: state),
               ],
             ),
           ),
@@ -143,9 +149,11 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                   _fitSheet();
                 },
                 itemBuilder: (context, page) {
-                  final Widget card = page < tracker.steps.length
-                      ? _StepCard(state: state, index: page)
-                      : _ArrivalCard(state: state);
+                  final Widget card = page >= tracker.steps.length
+                      ? _ArrivalCard(state: state)
+                      : tracker.steps[page].isRide
+                          ? _RideCard(state: state, index: page)
+                          : _MoveCard(state: state, index: page);
                   return SingleChildScrollView(
                     // The bottom sheet is dragged by the list of the page shown only
                     controller: page == _shown ? PanelScrollScope.of(context) : null,
@@ -164,16 +172,45 @@ class _GoScreenState extends ConsumerState<GoScreen> {
               ),
             ),
           ),
-          SizeReporter(
-            onSize: (size) {
-              _bottom = size.height;
-              _fitSheet();
-            },
-            child: _Dots(count: pageCount, shown: _shown, live: live, onTap: _show),
-          ),
         ],
       ),
     );
+  }
+
+  /// The journey on the map, framing the step shown; on the ride in progress, what is left of it (from the last stop
+  /// passed to where to get off), the next stop marked
+  MapOverlay _overlay(GoState state, int live) {
+    final tracker = state.tracker;
+    final progress = state.progress;
+    final arrived = progress.phase == GoPhase.arrived;
+    final shownStep = _shown < tracker.steps.length ? tracker.steps[_shown] : null;
+    final onBoardOrMoving = progress.phase == GoPhase.moving || progress.phase == GoPhase.onBoard;
+    final overlay = journeyOverlay(
+      context,
+      state.journey,
+      currentSection: arrived ? state.journey.sections.length : tracker.stepOf(progress)?.sectionIndex ?? -1,
+      currentAlong: onBoardOrMoving ? progress.along : 0,
+      fitSection: shownStep?.sectionIndex,
+    );
+    final step = tracker.stepOf(progress);
+    if (step != null && progress.phase == GoPhase.onBoard && _shown == live) {
+      final stops = step.section.stops;
+      final left = [
+        for (var k = math.min(progress.stopIndex, stops.length - 1); k < stops.length; k++) LatLng(stops[k].lat, stops[k].lon),
+      ];
+      final next = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1] : null;
+      final color = parseHexColor(step.section.line?.color, Theme.of(context).colorScheme.primary);
+      return MapOverlay(
+        pins: [
+          ...overlay.pins,
+          if (next != null)
+            MapPin(point: LatLng(next.lat, next.lon), color: color, size: 18, label: next.name, above: false),
+        ],
+        paths: overlay.paths,
+        fit: left.length >= 2 ? left : overlay.fit,
+      );
+    }
+    return overlay.withFollow(goFollow(state, _shown));
   }
 }
 
@@ -195,12 +232,13 @@ class _GpsStats extends ConsumerWidget {
             DateTime.now().difference(stats.at).inSeconds,
           );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.muted)),
     );
   }
 }
 
+/// The arrival, in how long and against the plan; screen, sound and stop
 class _Header extends ConsumerWidget {
   const _Header({required this.state, required this.onBack});
 
@@ -212,30 +250,40 @@ class _Header extends ConsumerWidget {
     final theme = Theme.of(context);
     final controller = ref.read(goControllerProvider.notifier);
     final arrived = state.progress.phase == GoPhase.arrived;
+    final now = DateTime.now();
     final eta = state.tracker.eta(state.progress, state.currentVehicle);
     final late = eta.difference(state.journey.arrival).inMinutes;
+    final left = eta.difference(now);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(
         children: [
           IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: onBack),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: arrived ? context.l10n.goFinished : context.l10n.goArrival(formatClock(eta))),
-                  if (!arrived && late.abs() >= 1)
-                    TextSpan(
-                      text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: late >= 3 ? context.colors.warning : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: arrived ? context.l10n.goFinished : context.l10n.goArrival(formatClock(eta))),
+                      if (!arrived && late.abs() >= 1)
+                        TextSpan(
+                          text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: late >= 3 ? context.colors.warning : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                if (!arrived && left > Duration.zero)
+                  Text(context.l10n.goArrivesIn(formatDuration(left.inSeconds)),
+                      style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+              ],
             ),
           ),
           IconButton(
@@ -280,9 +328,109 @@ class _Header extends ConsumerWidget {
   }
 }
 
-/// Off route, missed or cancelled vehicle: one line, with the recalculation
-class _IssueBanner extends ConsumerWidget {
-  const _IssueBanner({required this.state});
+/// A thin bar: the share of the journey done
+class _JourneyProgress extends StatelessWidget {
+  const _JourneyProgress({required this.state});
+
+  final GoState state;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: journeyFraction(state),
+            minHeight: 4,
+            color: AppTheme.brand,
+            backgroundColor: context.colors.subtle,
+          ),
+        ),
+      );
+}
+
+/// The steps of the journey in a row, like the journey results (walks with their minutes, rides with their line):
+/// the one in progress outlined, the one shown filled, the ones done faded with a check. Tap one to look at it.
+class _StepStrip extends StatelessWidget {
+  const _StepStrip({required this.state, required this.shown, required this.onTap});
+
+  final GoState state;
+  final int shown;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = context.colors;
+    final steps = state.tracker.steps;
+    final progress = state.progress;
+    final arrived = progress.phase == GoPhase.arrived;
+    final live = arrived ? steps.length : progress.step;
+
+    Widget item(int index, Widget child, String label) {
+      final done = index < live;
+      return Semantics(
+        button: true,
+        label: label,
+        selected: index == shown,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => onTap(index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: index == shown ? theme.colorScheme.primary.withValues(alpha: 0.14) : null,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: index == live && index != shown ? theme.colorScheme.primary : Colors.transparent, width: 1.5),
+            ),
+            child: Opacity(
+              opacity: done ? 0.45 : 1,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                child,
+                if (done) Padding(padding: const EdgeInsets.only(left: 2), child: Icon(Icons.check, size: 14, color: colors.live)),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final items = <Widget>[];
+    for (final (index, step) in steps.indexed) {
+      final section = step.section;
+      if (items.isNotEmpty) {
+        items.add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline));
+      }
+      items.add(step.isRide && section.line != null
+          ? item(index, LineBadge(section.line!, size: 24), '${section.line!.mode.label} ${section.line!.name ?? ''}')
+          : item(
+              index,
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk, size: 20, color: colors.muted),
+                Text('${math.max(1, (section.duration / 60).round())}', style: TextStyle(fontSize: 12, color: colors.muted)),
+              ]),
+              context.l10n.goVerbTo(context.l10n.goVerbWalk, section.to?.name ?? ''),
+            ));
+    }
+    items
+      ..add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline))
+      ..add(item(steps.length, Icon(Icons.flag, size: 20, color: theme.colorScheme.error), context.l10n.goArrivalTitle));
+
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+        children: [Row(children: items)],
+      ),
+    );
+  }
+}
+
+/// Off the way for a while: one line, with the recalculation
+class _OffRouteBanner extends ConsumerWidget {
+  const _OffRouteBanner({required this.state});
 
   final GoState state;
 
@@ -290,25 +438,15 @@ class _IssueBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final controller = ref.read(goControllerProvider.notifier);
-    final line = state.tracker.stepOf(state.progress)?.section.line;
-    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
-    final text = switch (state.progress.issue!) {
-      GoIssue.offRoute => context.l10n.goOffRoute,
-      GoIssue.missed => context.l10n.goMissedChoose(lineLabel),
-      GoIssue.cancelled => context.l10n.goCancelledChoose(lineLabel),
-    };
-
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.only(left: 12),
       decoration: BoxDecoration(color: theme.colorScheme.tertiaryContainer, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 20, color: theme.colorScheme.onTertiaryContainer),
+          Icon(Icons.wrong_location_outlined, size: 20, color: theme.colorScheme.onTertiaryContainer),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ),
+          Expanded(child: Text(context.l10n.goOffRoute, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
           state.recalculating
               ? const Padding(
                   padding: EdgeInsets.all(12),
@@ -322,9 +460,137 @@ class _IssueBanner extends ConsumerWidget {
   }
 }
 
-/// One step: a few words in big, one detail line, the departures for a ride
-class _StepCard extends ConsumerWidget {
-  const _StepCard({required this.state, required this.index});
+/// Missed or cancelled vehicle: the next departure of the line at once, to take it in one tap (no new search); the
+/// recalculation second
+class _IssueCard extends ConsumerWidget {
+  const _IssueCard({required this.state, required this.issue});
+
+  final GoState state;
+  final GoIssue issue;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final controller = ref.read(goControllerProvider.notifier);
+    final progress = state.progress;
+    final index = progress.step;
+    final step = state.tracker.stepOf(progress);
+    final line = step?.section.line;
+    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final key = step == null || !step.isRide ? null : rideKey(step.section, now, now);
+    final planned = step == null ? now : state.tracker.expectedDeparture(step, progress, state.currentVehicle);
+    final next = key == null
+        ? null
+        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
+            .where((ride) => ride.departure.time.isAfter(now) && ride.departure.cancelled != true)
+            .where((ride) => issue != GoIssue.cancelled || ride.departure.time.isAfter(planned.add(const Duration(seconds: 30))))
+            .firstOrNull;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+      decoration: BoxDecoration(color: theme.colorScheme.errorContainer, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(issue == GoIssue.cancelled ? Icons.block : Icons.directions_run, color: theme.colorScheme.onErrorContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  issue == GoIssue.cancelled ? context.l10n.goCancelledChoose(lineLabel) : context.l10n.goMissedChoose(lineLabel),
+                  style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onErrorContainer),
+                ),
+              ),
+              IconButton(tooltip: context.l10n.dismiss, icon: const Icon(Icons.close, size: 18), onPressed: controller.dismissIssue),
+            ],
+          ),
+          if (next != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              [
+                context.l10n.goNextDeparture(formatClock(next.departure.time), math.max(0, next.departure.time.difference(now).inMinutes)),
+                if (next.arrivalAt case final arrival?) context.l10n.arrivalAt(formatClock(arrival)),
+              ].join(' · '),
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onErrorContainer, fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (next != null)
+                FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                  onPressed: () {
+                    controller.dismissIssue();
+                    controller.choose(index, next);
+                  },
+                  child: Text(context.l10n.goTakeThisOne),
+                ),
+              const SizedBox(width: 8),
+              state.recalculating
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : TextButton(onPressed: controller.recalculate, child: Text(context.l10n.recalculate)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Title row of a card: the line badge or the move's icon, a few words in large, one detail line
+class _CardTitle extends StatelessWidget {
+  const _CardTitle({required this.leading, required this.title, required this.detail, this.done = false, this.urgent = false});
+
+  final Widget leading;
+  final String title;
+  final String detail;
+  final bool done;
+  final bool urgent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(padding: const EdgeInsets.only(top: 2, right: 12), child: leading),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: urgent
+                      ? theme.colorScheme.error
+                      : done
+                          ? muted
+                          : null,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(detail, style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
+            ],
+          ),
+        ),
+        if (done) Icon(Icons.check_circle, color: context.colors.live),
+      ],
+    );
+  }
+}
+
+/// A move on foot or by bike: where to, how far, the turns (the next one marked), then what comes next
+class _MoveCard extends ConsumerWidget {
+  const _MoveCard({required this.state, required this.index});
 
   final GoState state;
   final int index;
@@ -332,133 +598,411 @@ class _StepCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
     final tracker = state.tracker;
     final progress = state.progress;
     final step = tracker.steps[index];
     final section = step.section;
     final isLive = index == progress.step && progress.phase != GoPhase.arrived;
     final isDone = index < progress.step || progress.phase == GoPhase.arrived;
-
-    final String title;
-    final String? detail;
-    if (step.isRide) {
-      final lineLabel = '${section.line?.mode.label ?? ''} ${section.line?.name ?? ''}'.trim();
-      if (isLive && progress.phase == GoPhase.onBoard) {
-        final left = tracker.stopsLeft(progress);
-        final stops = section.stops;
-        final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
-        title = left <= 1 ? context.l10n.goGetOffNext : context.l10n.goGetOffIn(left);
-        detail = [
-          context.l10n.goAtStop(section.to?.name ?? ''),
-          if (left > 1 && nextStop != null) context.l10n.goNextShort(nextStop),
-        ].join(' · ');
-      } else {
-        final stopCount = math.max(0, section.stops.length - 1);
-        title = '$lineLabel → ${section.headsign ?? ''}';
-        detail = [
-          context.l10n.goFromTo(section.from?.name ?? '', section.to?.name ?? ''),
-          if (stopCount > 0) context.l10n.stopsCount(stopCount),
-        ].join(' · ');
-      }
+    final verb = switch (section.kind) {
+      SectionKind.bike => context.l10n.goVerbBike,
+      SectionKind.car => context.l10n.goVerbCar,
+      SectionKind.transfer => context.l10n.goVerbTransfer,
+      _ => context.l10n.goVerbWalk,
+    };
+    final title = section.kind == SectionKind.transfer
+        ? context.l10n.goTransferTo(section.to?.name ?? '')
+        : context.l10n.goVerbTo(verb, section.to?.name ?? '');
+    final String detail;
+    if (isLive) {
+      final meters = metersToGo(state);
+      detail = '${formatDistance(meters.round())} · ${context.l10n.minutesShort(math.max(1, (meters / movePace(state, step) / 60).ceil()))}';
     } else {
-      final verb = switch (section.kind) {
-        SectionKind.bike => context.l10n.goVerbBike,
-        SectionKind.car => context.l10n.goVerbCar,
-        SectionKind.transfer => context.l10n.goVerbTransfer,
-        _ => context.l10n.goVerbWalk,
-      };
-      title = section.kind == SectionKind.transfer
-          ? context.l10n.goTransferTo(section.to?.name ?? '')
-          : context.l10n.goVerbTo(verb, section.to?.name ?? '');
-      if (isLive) {
-        // Away from the path: at least the straight distance to the end
-        final end = step.end;
-        final position = state.position;
-        final meters = math.max(
-          tracker.metersLeft(progress),
-          end == null || position == null ? 0.0 : metersBetween(position, end),
-        );
-        detail = '${formatDistance(meters.round())} · ${context.l10n.minutesShort(math.max(1, (meters / 1.2 / 60).ceil()))}';
-      } else {
-        detail = [
-          formatDuration(section.duration),
-          if ((section.length ?? 0) > 0) formatDistance(section.length!),
-        ].join(' · ');
-      }
+      detail = [formatDuration(section.duration), if ((section.length ?? 0) > 0) formatDistance(section.length!)].join(' · ');
     }
-
-    final urgent = isLive && progress.phase == GoPhase.onBoard && tracker.stopsLeft(progress) <= 1;
-    final positions = section.boardingPositions;
+    final next = isLive ? nextManeuver(step, progress.along) : null;
+    final along = isLive ? progress.along : (isDone ? double.infinity : 0.0);
+    final total = (section.length ?? 0) > 0 ? section.length! : (section.steps.isEmpty ? 0 : section.steps.last.offset + section.steps.last.length);
+    final scale = total > 0 && step.line.length > 0 ? step.line.length / total : 1.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 12),
-              child: step.isRide && section.line != null
-                  ? LineBadge(section.line!, size: 36)
-                  : Icon(
-                      section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
-                      size: 34,
-                      color: isDone ? muted : theme.colorScheme.primary,
-                    ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: urgent
-                          ? theme.colorScheme.error
-                          : isDone
-                          ? muted
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(detail, style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
-                ],
-              ),
-            ),
-            if (isDone) Icon(Icons.check_circle, color: context.colors.live),
-          ],
+        _CardTitle(
+          leading: Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
+              size: 34, color: isDone ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
+          title: title,
+          detail: detail,
+          done: isDone,
         ),
-        if (step.isRide && !isDone && !(isLive && progress.phase == GoPhase.onBoard)) ...[
-          const SizedBox(height: 14),
-          _Departures(state: state, step: step, index: index),
-          if (positions.isNotEmpty && positions.length < 3)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                context.l10n.boardAt(boardingPositions(positions)),
-                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-              ),
+        // The turns, the next one marked, the ones passed faded
+        if (section.steps.length > 1) ...[
+          const SizedBox(height: 10),
+          for (final walk in section.steps)
+            _TurnRow(
+              walk: walk,
+              passed: walk.offset * scale < along - 3 && walk != next?.walk,
+              next: walk == next?.walk,
+              meters: walk == next?.walk ? next!.meters : null,
             ),
         ],
-        if (step.isRide && !isDone) _LineDisruption(lineId: section.line?.id),
+        if (!isDone && index + 1 < tracker.steps.length) _NextStep(state: state, index: index + 1),
         const SizedBox(height: 8),
-        // Manual corrections, kept discreet
-        if (isLive && progress.phase == GoPhase.waiting)
-          _SmallAction(label: context.l10n.goImOnBoard, onPressed: () => ref.read(goControllerProvider.notifier).next())
-        else if (!isLive)
-          _SmallAction(
-            label: context.l10n.goImAtThisStep,
-            onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index),
-          ),
+        if (!isLive && !isDone)
+          _SmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),
       ],
     );
   }
 }
 
+class _TurnRow extends StatelessWidget {
+  const _TurnRow({required this.walk, required this.passed, required this.next, this.meters});
+
+  final WalkStep walk;
+  final bool passed;
+  final bool next;
+
+  /// To the turn, for the next one
+  final double? meters;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = next ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
+    return Opacity(
+      opacity: passed ? 0.4 : 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(walk.offset == 0 ? Icons.navigation_outlined : turnIcon(walk.direction), size: 22, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                walk.instruction,
+                style: (next ? theme.textTheme.titleSmall : theme.textTheme.bodyMedium)?.copyWith(
+                  fontWeight: next ? FontWeight.w600 : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              formatDistance((meters ?? walk.length.toDouble()).round()),
+              style: theme.textTheme.bodySmall?.copyWith(color: color, fontWeight: next ? FontWeight.w600 : null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A ride: waiting for it (countdown in the banner, where to board, departures, the next one if missed), on board
+/// (the stops left with their times, where to get off), or to come (its departures)
+class _RideCard extends ConsumerWidget {
+  const _RideCard({required this.state, required this.index});
+
+  final GoState state;
+  final int index;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tracker = state.tracker;
+    final progress = state.progress;
+    final step = tracker.steps[index];
+    final section = step.section;
+    final isLive = index == progress.step && progress.phase != GoPhase.arrived;
+    final isDone = index < progress.step || progress.phase == GoPhase.arrived;
+    final onBoard = isLive && progress.phase == GoPhase.onBoard;
+    final lineLabel = '${section.line?.mode.label ?? ''} ${section.line?.name ?? ''}'.trim();
+    final stopCount = math.max(0, section.stops.length - 1);
+
+    final String title;
+    final String detail;
+    var urgent = false;
+    if (onBoard) {
+      final left = tracker.stopsLeft(progress);
+      urgent = left <= 1;
+      title = left <= 1 ? context.l10n.goGetOffNext : context.l10n.goGetOffIn(left);
+      detail = context.l10n.goAtStop(section.to?.name ?? '');
+    } else {
+      title = '$lineLabel → ${section.headsign ?? ''}';
+      detail = [
+        context.l10n.goFromTo(section.from?.name ?? '', section.to?.name ?? ''),
+        if (stopCount > 0) context.l10n.stopsCount(stopCount),
+      ].join(' · ');
+    }
+    final positions = section.boardingPositions;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CardTitle(
+          leading: section.line != null ? LineBadge(section.line!, size: 36) : const Icon(Icons.directions_transit, size: 34),
+          title: title,
+          detail: detail,
+          done: isDone,
+          urgent: urgent,
+        ),
+        if (onBoard) ...[
+          const SizedBox(height: 12),
+          _StopsLeft(state: state, step: step),
+        ] else if (!isDone) ...[
+          if (positions.isNotEmpty && positions.length < 3) ...[
+            const SizedBox(height: 12),
+            TrainPositions(positions: positions, color: parseHexColor(section.line?.color, Theme.of(context).colorScheme.primary)),
+          ],
+          const SizedBox(height: 14),
+          _Departures(state: state, step: step, index: index),
+        ],
+        if (!isDone) _LineDisruption(lineId: section.line?.id),
+        if (!isDone && index + 1 < tracker.steps.length) _NextStep(state: state, index: index + 1),
+        const SizedBox(height: 8),
+        // Manual corrections, kept discreet
+        if (isLive && progress.phase == GoPhase.waiting)
+          _SmallAction(label: context.l10n.goImOnBoard, onPressed: () => ref.read(goControllerProvider.notifier).next())
+        else if (!isLive && !isDone)
+          _SmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),
+      ],
+    );
+  }
+}
+
+/// Where to board along the train: its cars from the front, the ones to board highlighted
+class TrainPositions extends StatelessWidget {
+  const TrainPositions({super.key, required this.positions, required this.color});
+
+  /// `front`, `middle`, `back`
+  final List<String> positions;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = context.colors.subtle;
+    bool boarded(int car) => switch (car) {
+          0 || 1 => positions.contains('front'),
+          2 => positions.contains('middle'),
+          _ => positions.contains('back'),
+        };
+    return Semantics(
+      label: context.l10n.boardAt(boardingPositions(positions)),
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          Icon(Icons.arrow_back, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          for (var car = 0; car < 5; car++)
+            Expanded(
+              child: Container(
+                height: 18,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: boarded(car) ? color : muted,
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(car == 0 ? 9 : 3),
+                    right: const Radius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(width: 10),
+          Text(context.l10n.boardAt(boardingPositions(positions)),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// On board: the stops left with their times, a dot on the next one, where to get off marked
+class _StopsLeft extends StatelessWidget {
+  const _StopsLeft({required this.state, required this.step});
+
+  final GoState state;
+  final GoStep step;
+
+  /// More stops left than this: the ones in between folded
+  static const _maxShown = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final progress = state.progress;
+    final stops = step.section.stops;
+    final color = parseHexColor(step.section.line?.color, theme.colorScheme.primary);
+    final first = math.min(progress.stopIndex + 1, stops.length - 1);
+    final indexes = [for (var k = first; k < stops.length; k++) k];
+    final folded = indexes.length > _maxShown ? indexes.length - (_maxShown - 1) : 0;
+    final shown = folded == 0 ? indexes : [...indexes.take(_maxShown - 2), -1, indexes.last];
+
+    return Column(
+      children: [
+        for (final (row, k) in shown.indexed)
+          if (k < 0)
+            _StopRow(color: color, name: context.l10n.stopsCount(folded), time: null, first: false, last: false, folded: true)
+          else
+            _StopRow(
+              color: color,
+              name: stops[k].name,
+              time: step.stopTime(k).add(progress.shift),
+              first: row == 0,
+              last: k == stops.length - 1,
+            ),
+      ],
+    );
+  }
+}
+
+class _StopRow extends StatelessWidget {
+  const _StopRow({required this.color, required this.name, required this.time, required this.first, required this.last, this.folded = false});
+
+  final Color color;
+  final String name;
+  final DateTime? time;
+
+  /// The next stop
+  final bool first;
+
+  /// Where to get off
+  final bool last;
+  final bool folded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final emphasis = first || last;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 48,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(time == null ? '' : formatClock(time!),
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: emphasis ? FontWeight.w600 : null)),
+            ),
+          ),
+          SizedBox(
+            width: 24,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Column(children: [
+                  Expanded(child: Container(width: 5, color: color)),
+                  Expanded(child: Container(width: 5, color: last ? Colors.transparent : color)),
+                ]),
+                if (!folded)
+                  Container(
+                    width: emphasis ? 16 : 10,
+                    height: emphasis ? 16 : 10,
+                    decoration: BoxDecoration(
+                      color: last ? color : context.colors.card,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: color, width: 3),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      name,
+                      style: folded
+                          ? theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)
+                          : (emphasis ? theme.textTheme.titleSmall : theme.textTheme.bodyMedium),
+                    ),
+                  ),
+                  if (first && !last) ...[
+                    const SizedBox(width: 8),
+                    _Tag(text: context.l10n.goNextStopLabel, color: theme.colorScheme.primary),
+                  ],
+                  if (last) ...[
+                    const SizedBox(width: 8),
+                    _Tag(text: context.l10n.goGetOffHere, color: theme.colorScheme.error),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+        child: Text(text, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w600)),
+      );
+}
+
+/// What comes after this step: the next ride (line, direction, departure, platform) or the walk to the destination
+class _NextStep extends StatelessWidget {
+  const _NextStep({required this.state, required this.index});
+
+  final GoState state;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tracker = state.tracker;
+    final step = tracker.steps[index];
+    final section = step.section;
+    final String text;
+    Widget leading;
+    if (step.isRide) {
+      final vehicle = state.vehicleStep == index ? state.vehicle : null;
+      final departure = tracker.expectedDeparture(step, state.progress, vehicle);
+      text = [
+        context.l10n.direction(section.headsign ?? ''),
+        context.l10n.goDepartsAt(formatClock(departure)),
+        ?platformLabel(section.line, vehicle?.platform),
+      ].join(' · ');
+      leading = section.line != null ? LineBadge(section.line!, size: 22) : const Icon(Icons.directions_transit, size: 20);
+    } else {
+      text = context.l10n.goNextMove(formatDuration(section.duration), section.to?.name ?? '');
+      leading = Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk, size: 20, color: context.colors.muted);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(color: context.colors.subtle, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            Text(context.l10n.goThen, style: theme.textTheme.labelLarge?.copyWith(color: context.colors.muted)),
+            const SizedBox(width: 10),
+            leading,
+            const SizedBox(width: 8),
+            Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their
-/// times at both stops; the one followed is highlighted. Choosing another one moves the journey to it.
+/// times at both stops; the one followed is highlighted, and the next one told in case it is missed. Choosing another
+/// one moves the journey to it.
 class _Departures extends ConsumerWidget {
   const _Departures({required this.state, required this.step, required this.index});
 
@@ -485,13 +1029,28 @@ class _Departures extends ConsumerWidget {
     if (rides.isEmpty) {
       return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: theme.textTheme.titleMedium);
     }
-    return RideDepartureList(
-      rides: rides,
-      now: now,
-      selected: plannedRide(rides, planned),
-      earliest: earliest,
-      onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
-      onAllDepartures: () => context.push(Routes.stop(key!.from)),
+    final selected = plannedRide(rides, planned);
+    final after = selected == null ? null : rides.skipWhile((ride) => ride != selected).skip(1).firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RideDepartureList(
+          rides: rides,
+          now: now,
+          selected: selected,
+          earliest: earliest,
+          onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
+          onAllDepartures: () => context.push(Routes.stop(key!.from)),
+        ),
+        if (selected != null && after != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              context.l10n.goIfMissed(formatClock(after.departure.time), after.departure.time.difference(selected.departure.time).inMinutes),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -519,6 +1078,7 @@ class _LineDisruption extends ConsumerWidget {
   }
 }
 
+/// The arrival: the summary, then the way back, saving the trip, finishing (it closes itself after a while)
 class _ArrivalCard extends ConsumerWidget {
   const _ArrivalCard({required this.state});
 
@@ -560,10 +1120,11 @@ class _ArrivalCard extends ConsumerWidget {
                 ],
               ),
             ),
+            if (arrived) SaveDailyTripButton(journey: state.journey, request: state.request),
           ],
         ),
         const SizedBox(height: 16),
-        if (arrived)
+        if (arrived) ...[
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             onPressed: () {
@@ -571,13 +1132,36 @@ class _ArrivalCard extends ConsumerWidget {
               context.go(Routes.home);
             },
             child: Text(context.l10n.finish),
-          )
-        else
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            icon: const Icon(Icons.u_turn_left),
+            label: Text(context.l10n.goWayBack),
+            onPressed: () {
+              final back = _wayBack(state);
+              ref.read(goControllerProvider.notifier).stop();
+              context.go(Routes.home);
+              context.push(Routes.journey(back));
+            },
+          ),
+        ] else
           _SmallAction(
             label: context.l10n.goImArrived,
             onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(state.tracker.steps.length),
           ),
       ],
+    );
+  }
+
+  /// From here (the destination) to where the journey started, leaving now
+  static JourneyRequest _wayBack(GoState state) {
+    final fixed = state.request.forSharing(state.journey);
+    return fixed.copyWith(
+      from: const JourneyPlace.currentLocation(),
+      to: fixed.from,
+      datetime: () => null,
+      arriveBy: false,
     );
   }
 }
@@ -634,53 +1218,6 @@ class _SmallAction extends StatelessWidget {
     onPressed: onPressed,
     child: Text(label),
   );
-}
-
-/// One dot per step and one for the arrival: the page shown is long, done steps are faded, the step in progress
-/// has a ring when another page is shown
-class _Dots extends StatelessWidget {
-  const _Dots({required this.count, required this.shown, required this.live, required this.onTap});
-
-  final int count;
-  final int shown;
-  final int live;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      // Above the system navigation bar
-      padding: EdgeInsets.only(top: 4, bottom: 12 + MediaQuery.paddingOf(context).bottom),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < count; i++)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(i),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: i == shown ? 22 : 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: i == shown
-                        ? scheme.primary
-                        : i < live
-                        ? scheme.outlineVariant
-                        : scheme.outline,
-                    borderRadius: BorderRadius.circular(5),
-                    border: i == live && i != shown ? Border.all(color: scheme.primary, width: 2) : null,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 /// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes

@@ -19,6 +19,15 @@ object LiveJourneyNotification {
     private const val JOURNEY_CHANNEL_ID = "live_journey_channel"
     private const val ALERT_CHANNEL_ID = "go_alerts"
 
+    /** Alerts felt apart (each channel has its vibration: Android takes the channel's, not the notification's) */
+    private const val PREPARE_CHANNEL_ID = "go_alerts_prepare"
+    private const val ALIGHT_CHANNEL_ID = "go_alerts_alight"
+    private const val PLATFORM_CHANNEL_ID = "go_alerts_platform"
+    private val PREPARE_PATTERN = longArrayOf(0, 120, 100, 120)
+    private val ALIGHT_PATTERN = longArrayOf(0, 500, 200, 500, 200, 500)
+    private val PLATFORM_PATTERN = longArrayOf(0, 80)
+    private val ALERT_PATTERN = longArrayOf(0, 400, 200, 400)
+
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return
@@ -30,12 +39,21 @@ object LiveJourneyNotification {
                 setShowBadge(false)
             }
         )
-        manager.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL_ID, context.getString(R.string.alert_channel), NotificationManager.IMPORTANCE_HIGH).apply {
-                description = context.getString(R.string.alert_channel_description)
+        fun alertChannel(id: String, name: Int, description: Int, pattern: LongArray) =
+            NotificationChannel(id, context.getString(name), NotificationManager.IMPORTANCE_HIGH).apply {
+                this.description = context.getString(description)
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 400, 200, 400)
+                vibrationPattern = pattern
             }
+        manager.createNotificationChannel(alertChannel(ALERT_CHANNEL_ID, R.string.alert_channel, R.string.alert_channel_description, ALERT_PATTERN))
+        manager.createNotificationChannel(
+            alertChannel(PREPARE_CHANNEL_ID, R.string.prepare_channel, R.string.prepare_channel_description, PREPARE_PATTERN)
+        )
+        manager.createNotificationChannel(
+            alertChannel(ALIGHT_CHANNEL_ID, R.string.alight_channel, R.string.alight_channel_description, ALIGHT_PATTERN)
+        )
+        manager.createNotificationChannel(
+            alertChannel(PLATFORM_CHANNEL_ID, R.string.platform_channel, R.string.platform_channel_description, PLATFORM_PATTERN)
         )
     }
 
@@ -120,15 +138,22 @@ object LiveJourneyNotification {
         return builder.build()
     }
 
-    fun alert(context: Context, title: String, body: String, urgent: Boolean) {
-        val notification = NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
+    /** @param kind how it is felt: `prepare` (two short), `alight` (long, repeated), `platform` (one short), else the usual */
+    fun alert(context: Context, title: String, body: String, urgent: Boolean, kind: String) {
+        val (channel, pattern) = when (kind) {
+            "prepare" -> PREPARE_CHANNEL_ID to PREPARE_PATTERN
+            "alight" -> ALIGHT_CHANNEL_ID to ALIGHT_PATTERN
+            "platform" -> PLATFORM_CHANNEL_ID to PLATFORM_PATTERN
+            else -> ALERT_CHANNEL_ID to ALERT_PATTERN
+        }
+        val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(if (urgent) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVibrate(longArrayOf(0, 400, 200, 400))
+            .setVibrate(pattern)
             .setAutoCancel(true)
             .setTimeoutAfter(3 * 60 * 1000L)
             .setContentIntent(openApp(context))

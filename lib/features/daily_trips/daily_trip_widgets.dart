@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
+import '../go/go_controller.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
@@ -268,6 +269,16 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
                 ),
                 const SizedBox(width: 12),
                 Text(formatDuration(next.duration), style: theme.textTheme.titleLarge),
+                const SizedBox(width: 10),
+                // Straight to GO on the next departure: the usual gesture for a daily trip
+                FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(56, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
+                  onPressed: () {
+                    ref.read(goControllerProvider.notifier).start(next, trip.request);
+                    context.push(Routes.go);
+                  },
+                  child: Text(context.l10n.go),
+                ),
               ],
             ),
           ),

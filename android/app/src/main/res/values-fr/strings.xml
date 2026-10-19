@@ -12,4 +12,10 @@
     <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
     <string name="alert_channel">Alertes de trajet</string>
     <string name="alert_channel_description">Descendre, véhicule qui arrive, retard ou suppression</string>
+    <string name="prepare_channel">Préparez-vous à descendre</string>
+    <string name="prepare_channel_description">Votre arrêt est le prochain : deux vibrations courtes</string>
+    <string name="alight_channel">Descendez maintenant</string>
+    <string name="alight_channel_description">À votre arrêt : vibrations longues</string>
+    <string name="platform_channel">Voie annoncée</string>
+    <string name="platform_channel_description">La voie de votre train, ou son changement : une vibration courte</string>
 </resources>

@@ -187,6 +187,24 @@ class MapOverlay {
 
 }
 
+/// How much of the map's top is hidden by what floats over it (GO's instruction banner): framings stay below it
+class MapTopInset extends Notifier<double> {
+  @override
+  double build() => 0;
+
+  void set(double inset) {
+    // The banner leaving with the whole app
+    if (!ref.mounted) {
+      return;
+    }
+    if ((inset - state).abs() >= 1) {
+      state = inset;
+    }
+  }
+}
+
+final mapTopInsetProvider = NotifierProvider<MapTopInset, double>(MapTopInset.new);
+
 /// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them); the
 /// map following the user follows it too
 

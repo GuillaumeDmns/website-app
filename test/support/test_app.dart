@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
@@ -43,6 +44,7 @@ Future<MemoryStore> pumpApp(
   Locale locale = const Locale('fr'),
   Size size = const Size(412, 915),
   Future<String?> Function()? googleAccountChooser = _testGoogleAccount,
+  List<Override> overrides = const [],
 }) async {
   FlutterSecureStorage.setMockInitialValues({refreshTokenKey: ?refreshToken});
   useLocale(locale);
@@ -61,6 +63,7 @@ Future<MemoryStore> pumpApp(
       deviceHeadingProvider.overrideWith((ref) => const Stream.empty()),
       mapTilesEnabledProvider.overrideWithValue(false),
       googleAccountChooserProvider.overrideWithValue(googleAccountChooser),
+      ...overrides,
     ],
     child: const MobilityApp(),
   ));

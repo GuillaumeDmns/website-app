@@ -56,6 +56,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
   /// Size of the map last laid out: a frame computed at another size (the page still being laid out) is done again
   Size? _size;
 
+  /// Top of the map hidden by what floats over it (GO's banner): framed below it, again when it changes
+  double _topInset = 0;
+
   /// Small steps of the follow camera (the smoothed position, the compass) are eased frame by frame towards the last
   /// view asked, so that the camera glides whatever the rate views come at; the ticker only runs until it is there
   late final Ticker _glide = createTicker(_onGlideFrame);
@@ -93,7 +96,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
       return;
     }
     _framedFit = overlay.fit;
-    final padding = widget.padding + const EdgeInsets.all(48);
+    final padding = widget.padding + EdgeInsets.only(top: _topInset) + const EdgeInsets.all(48);
     if (overlay.fit.length == 1) {
       unawaited(controller.animateCamera(
         center: _geo(overlay.fit.single),
@@ -151,8 +154,8 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     }
     _shown = view;
     final height = context.size?.height ?? 0;
-    final visible = height - widget.padding.bottom;
-    _followPadding = EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom);
+    final visible = height - widget.padding.bottom - _topInset;
+    _followPadding = EdgeInsets.only(top: _topInset + visible * 0.44, bottom: widget.padding.bottom);
     // A small step (the smoothed position, the compass): glided to, frame by frame
     if (shown != null && shown.closeTo(view)) {
       _camera ??= shown;
@@ -293,7 +296,15 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     _overlay = overlay;
     final user = overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value;
     final scheme = Theme.of(context).colorScheme;
-
+    final topInset = ref.watch(mapTopInsetProvider);
+    if (topInset != _topInset) {
+      _topInset = topInset;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _ready) {
+          _reframe();
+        }
+      });
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
 

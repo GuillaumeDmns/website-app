@@ -73,6 +73,7 @@ class MainActivity: FlutterFragmentActivity() {
                         title = call.argument<String>("title") ?: "",
                         body = call.argument<String>("body") ?: "",
                         urgent = call.argument<Boolean>("urgent") ?: false,
+                        kind = call.argument<String>("kind") ?: "info",
                     )
                     result.success(null)
                 }

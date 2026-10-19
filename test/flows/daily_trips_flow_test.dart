@@ -1,6 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/daily_trips/daily_trips.dart';
+import 'package:website_app/features/go/go_controller.dart';
+import 'package:website_app/features/go/go_screen.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
 import 'package:website_app/l10n/l10n.dart';
@@ -57,6 +60,32 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('GO starts on the next departure of a daily trip, without a search', (tester) async {
+    final saved = DateTime.utc(2026, 10, 7, 7);
+    final trip = DailyTrip.of(
+      journey([walk(saved, 300), transit(saved.add(const Duration(minutes: 5)), 480)]),
+      const JourneyRequest(
+        from: JourneyPlace.point(name: '10 Rue de Rivoli', lat: 48.86, lon: 2.34),
+        to: JourneyPlace.point(name: 'Bureau', lat: 48.8484, lon: 2.3959),
+      ),
+      now: saved,
+    );
+    final go = _StartedGo();
+    final backend = standardBackend();
+    await pumpApp(tester, backend, store: MemoryStore({DailyTrips.key: [trip.toJson()]}), overrides: [
+      goControllerProvider.overrideWith(() => go),
+    ]);
+
+    await tapOn(tester, find.widgetWithText(FilledButton, currentL10n.go));
+
+    // The métro in 7 min, not the one saved a few days ago
+    expect(go.started?.rides.single.departure.isAfter(DateTime.now().toUtc()), isTrue);
+    expect(find.byType(GoScreen), findsOneWidget);
+    expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
+
+    await closeApp(tester);
+  });
+
   testWidgets('home and work saved: the commute is chosen once, then followed', (tester) async {
     final backend = standardBackend();
     final home = Favorite(id: -2, kind: FavoriteKind.home, label: '10 Rue de Rivoli', lat: 48.86, lon: 2.34);
@@ -99,4 +128,15 @@ void main() {
 
     await closeApp(tester);
   });
+}
+
+/// GO without its system side (GPS, notification): records the journey started
+class _StartedGo extends GoController {
+  JourneyOption? started;
+
+  @override
+  GoState? build() => null;
+
+  @override
+  void start(JourneyOption journey, JourneyRequest? request) => started = journey;
 }

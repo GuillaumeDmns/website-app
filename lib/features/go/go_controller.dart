@@ -18,6 +18,7 @@ import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
+import 'go_guidance.dart';
 import 'go_instruction.dart';
 import 'go_smoother.dart';
 import 'go_tracker.dart';
@@ -36,6 +37,7 @@ class GoState {
     this.muted = false,
     this.keepAwake = false,
     this.position,
+    this.walkSpeed,
     this.vehicle,
     this.vehicleStep,
     this.alert,
@@ -63,6 +65,9 @@ class GoState {
   /// Last position fix
   final LatLng? position;
 
+  /// The user's walking pace (m/s), from the fixes' speeds while walking; null until known
+  final double? walkSpeed;
+
   /// Real-time departure of the planned vehicle of the ride [vehicleStep] (the next one)
   final Departure? vehicle;
   final int? vehicleStep;
@@ -85,6 +90,7 @@ class GoState {
     bool? muted,
     bool? keepAwake,
     LatLng? position,
+    double? walkSpeed,
     Departure? Function()? vehicle,
     int? Function()? vehicleStep,
     GoAlert? alert,
@@ -101,6 +107,7 @@ class GoState {
         muted: muted ?? this.muted,
         keepAwake: keepAwake ?? this.keepAwake,
         position: position ?? this.position,
+        walkSpeed: walkSpeed ?? this.walkSpeed,
         vehicle: vehicle != null ? vehicle() : this.vehicle,
         vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
         alert: alert ?? this.alert,
@@ -166,6 +173,16 @@ class GoController extends Notifier<GoState?> {
   bool _foreground = true;
   static const _smoothInterval = Duration(milliseconds: 100);
 
+  /// The user's pace on the moves (m/s), averaged over the fixes
+  double? _walkSpeed;
+
+  /// The turn last felt (its offset on the walk of that step), to give each one once
+  String? _turnFelt;
+
+  /// After the arrival, the session closes itself
+  Timer? _closeTimer;
+  static const _closeAfter = Duration(minutes: 2);
+
   /// Last content sent to the system notification, to only send changes
   String? _lastLive;
   int _lastLiveProgress = -1;
@@ -192,6 +209,8 @@ class GoController extends Notifier<GoState?> {
   }
 
   void stop() {
+    _closeTimer?.cancel();
+    _closeTimer = null;
     _stopFeeds();
     state = null;
     _lastLive = null;
@@ -330,6 +349,10 @@ class GoController extends Notifier<GoState?> {
     GoProgress? progress,
     DateTime? startedAt,
   }) {
+    _closeTimer?.cancel();
+    _closeTimer = null;
+    _walkSpeed = null;
+    _turnFelt = null;
     final tracker = GoTracker(journey);
     state = GoState(
       tracker: tracker,
@@ -391,6 +414,11 @@ class GoController extends Notifier<GoState?> {
     ref.read(goFixStatsProvider.notifier).record(now, position.accuracy);
     final current = state;
     final step = current?.tracker.stepOf(current.progress);
+    // The pace on foot or by bike, from decent fixes while moving
+    if (step != null && !step.isRide && position.speed >= 0.5 && position.speed <= 9 && position.accuracy <= 30) {
+      final pace = _walkSpeed;
+      _walkSpeed = pace == null ? position.speed : pace + (position.speed - pace) * 0.2;
+    }
     _smoother.fix(
       LatLng(position.latitude, position.longitude),
       now,
@@ -535,7 +563,11 @@ class GoController extends Notifier<GoState?> {
         progress.issue != current.progress.issue ||
         progress.fired.length != current.progress.fired.length;
 
-    var next = current.copyWith(progress: progress, position: position);
+    if (progress.step != current.progress.step) {
+      // A new move: its own pace (on foot after a bike, say)
+      _walkSpeed = null;
+    }
+    var next = current.copyWith(progress: progress, position: position, walkSpeed: _walkSpeed);
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
@@ -545,11 +577,12 @@ class GoController extends Notifier<GoState?> {
           _signal(alert);
         }
         // Web: a notification when the tab is hidden
-        live.alert(alert.title, alert.body ?? '', urgent: alert.urgent);
+        live.alert(alert.title, alert.body ?? '', urgent: alert.urgent, kind: alert.kind);
       }
     }
     state = next;
     _publishLive(next);
+    _feelTurn(next);
 
     if (changed) {
       _save();
@@ -561,6 +594,13 @@ class GoController extends Notifier<GoState?> {
       _stopFeeds();
       _lastLive = null;
       ref.read(liveJourneyProvider).stop();
+      // The summary stays a while, then the session ends on its own
+      _closeTimer ??= Timer(_closeAfter, () {
+        _closeTimer = null;
+        if (state?.progress.phase == GoPhase.arrived) {
+          stop();
+        }
+      });
     }
   }
 
@@ -641,13 +681,44 @@ class GoController extends Notifier<GoState?> {
         ));
   }
 
+  /// An alert felt in the app (where the system doesn't give it): each kind its own pattern, as the Android channels
   static void _signal(GoAlert alert) {
     SystemSound.play(SystemSoundType.alert);
-    if (alert.urgent) {
-      HapticFeedback.heavyImpact();
-      Future.delayed(const Duration(milliseconds: 300), HapticFeedback.heavyImpact);
-    } else {
+    void pulses(int count, Duration gap, void Function() pulse) {
+      for (var i = 0; i < count; i++) {
+        Future.delayed(gap * i, pulse);
+      }
+    }
+
+    switch (alert.kind) {
+      case 'prepare':
+        pulses(2, const Duration(milliseconds: 220), HapticFeedback.mediumImpact);
+      case 'alight':
+        pulses(3, const Duration(milliseconds: 450), HapticFeedback.heavyImpact);
+      case 'platform':
+        HapticFeedback.selectionClick();
+      case 'urgent':
+        pulses(2, const Duration(milliseconds: 300), HapticFeedback.heavyImpact);
+      default:
+        HapticFeedback.mediumImpact();
+    }
+  }
+
+  /// A turn of the walk close ahead (15 m): felt once, like a navigation app, unless muted
+  void _feelTurn(GoState state) {
+    final step = state.tracker.stepOf(state.progress);
+    if (state.muted || step == null || state.progress.phase != GoPhase.moving) {
+      return;
+    }
+    final maneuver = nextManeuver(step, state.progress.along);
+    if (maneuver == null || maneuver.meters > 15) {
+      return;
+    }
+    final key = '${state.progress.step}-${maneuver.walk.offset}';
+    if (key != _turnFelt) {
+      _turnFelt = key;
       HapticFeedback.mediumImpact();
+      Future.delayed(const Duration(milliseconds: 180), HapticFeedback.mediumImpact);
     }
   }
 
