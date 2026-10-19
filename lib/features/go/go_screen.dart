@@ -848,7 +848,8 @@ class _StopsLeft extends StatelessWidget {
             _StopRow(
               color: color,
               name: stops[k].name,
-              time: step.stopTime(k).add(progress.shift),
+              // Where to get off: the ride's arrival (a stop's time is its departure)
+              time: (k == stops.length - 1 ? step.section.arrival : step.stopTime(k)).add(progress.shift),
               first: row == 0,
               last: k == stops.length - 1,
             ),
@@ -1048,7 +1049,10 @@ class _Departures extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text(
-              context.l10n.goIfMissed(formatClock(after.departure.time), after.departure.time.difference(selected.departure.time).inMinutes),
+              context.l10n.goIfMissed(
+                formatClock(after.departure.time),
+                (after.departure.time.difference(selected.departure.time).inSeconds / 60).round(),
+              ),
               style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted),
             ),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/utils/time_format.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_guidance.dart';
 import 'package:website_app/features/go/go_instruction.dart';
@@ -21,7 +22,9 @@ void main() {
   final firstWalk = walk(at(0), 240).copyWith(length: 500, steps: const [
     WalkStep(instruction: "Marchez vers l'est sur Rue de Rivoli", length: 300, offset: 0),
     WalkStep(instruction: 'Tournez à gauche sur Rue des Halles', length: 150, offset: 300, direction: -90, name: 'Rue des Halles'),
-    WalkStep(instruction: 'Légèrement à droite sur Rue Saint-Denis', length: 50, offset: 450, direction: 30),
+    WalkStep(instruction: 'Légèrement à droite sur Rue Saint-Denis', length: 40, offset: 450, direction: 30),
+    // Navitia's last ones: nothing to do there
+    WalkStep(instruction: 'Vous êtes arrivé à votre destination.', length: 10, offset: 490),
   ]);
   final plan = journey([
     firstWalk,
@@ -53,7 +56,7 @@ void main() {
 
       // Past it: the next one
       expect(nextManeuver(walkStep, 300 * scale + 10)!.walk.direction, 30);
-      // None left after the last one, none on a ride
+      // None left after the last turn (arriving is no turn), none on a ride
       expect(nextManeuver(walkStep, 460 * scale), isNull);
       expect(nextManeuver(tracker.steps[1], 0), isNull);
     });
@@ -131,5 +134,12 @@ void main() {
     expect(const GoAlert(id: 'platform-1-B', title: '').kind, 'platform');
     expect(const GoAlert(id: 'cancel-1', title: '', urgent: true).kind, 'urgent');
     expect(const GoAlert(id: 'delay-1', title: '').kind, 'info');
+  });
+
+  test('tells the minutes left like the departure lists, rounded down', () {
+    final waiting = state(const GoProgress(step: 1, phase: GoPhase.waiting));
+    // The metro at 8:06: at 8:02:30, 3 min left and a half
+    expect(goInstruction(waiting, at(2, 30)).detail, startsWith(currentL10n.goDeparture(currentL10n.inMinutes(3), formatClock(at(6)))));
+    expect(goInstruction(waiting, at(5, 40)).detail, startsWith(currentL10n.goDeparture(currentL10n.now, formatClock(at(6)))));
   });
 }

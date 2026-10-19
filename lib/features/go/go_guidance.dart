@@ -25,7 +25,8 @@ class Maneuver {
 }
 
 /// The next turn of the walk [step] after [along] meters on its path, null when none is left (or without
-/// instructions). Navitia's lengths are scaled to the path drawn, which may be a little longer or shorter.
+/// instructions). Only real turns count: Navitia also lists going straight on, arriving and entering the station,
+/// which tell nothing to do. Its lengths are scaled to the path drawn, which may be a little longer or shorter.
 Maneuver? nextManeuver(GoStep step, double along) {
   final walks = step.section.steps;
   if (step.isRide || walks.isEmpty) {
@@ -35,7 +36,7 @@ Maneuver? nextManeuver(GoStep step, double along) {
   final scale = total > 0 && step.line.length > 0 ? step.line.length / total : 1.0;
   for (final walk in walks) {
     // The first one says where to head from the start: the map shows it
-    if (walk.offset == 0) {
+    if (walk.offset == 0 || walk.direction.abs() <= straightOn) {
       continue;
     }
     final at = walk.offset * scale;
@@ -45,6 +46,9 @@ Maneuver? nextManeuver(GoStep step, double along) {
   }
   return null;
 }
+
+/// Turns of at most this many degrees are going straight on
+const straightOn = 20;
 
 /// The arrow of a turn of [direction] degrees (negative to the left)
 IconData turnIcon(int direction) => switch (direction) {

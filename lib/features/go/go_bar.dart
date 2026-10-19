@@ -273,7 +273,8 @@ class _Countdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final minutes = (until.inSeconds / 60).ceil();
+    // Like the departure lists: whole minutes left, "now" within 30 s
+    final minutes = until.inSeconds <= 30 ? 0 : (until.inSeconds ~/ 60).clamp(1, 999);
     final theme = Theme.of(context);
     return SizedBox.square(
       dimension: 60,
@@ -357,7 +358,7 @@ class _MarginPill extends ConsumerWidget {
     if (next == null) {
       return null;
     }
-    final later = next.departure.time.difference(margin.departure).inMinutes;
+    final later = (next.departure.time.difference(margin.departure).inSeconds / 60).round();
     return context.l10n.goMarginLateNext(formatClock(next.departure.time), later);
   }
 }

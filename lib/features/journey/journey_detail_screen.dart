@@ -709,7 +709,10 @@ class _Departures extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 6, left: 4),
               child: Text(
-                context.l10n.goIfMissed(formatClock(after.departure.time), after.departure.time.difference(taken.departure.time).inMinutes),
+                context.l10n.goIfMissed(
+                  formatClock(after.departure.time),
+                  (after.departure.time.difference(taken.departure.time).inSeconds / 60).round(),
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
               ),
             ),

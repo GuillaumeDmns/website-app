@@ -56,9 +56,10 @@ String? goPlatformText(GoState state) {
   return waitingForIt ? label : '${_lineLabel(line)} $label';
 }
 
+/// Like the departure lists: whole minutes left (rounded down), "now" within 30 s
 String _minutes(Duration duration) {
-  final minutes = (duration.inSeconds / 60).ceil();
-  return minutes <= 0 ? currentL10n.now : currentL10n.inMinutes(minutes);
+  final seconds = duration.inSeconds;
+  return seconds <= 30 ? currentL10n.now : currentL10n.inMinutes(math.max(1, seconds ~/ 60));
 }
 
 GoInstruction goInstruction(GoState state, DateTime now) {
