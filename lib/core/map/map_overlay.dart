@@ -98,7 +98,7 @@ class MapFollow {
   /// times a second, or the compass turning it
   bool closeTo(MapFollow other) =>
       zoom == other.zoom &&
-      metersBetween(position, other.position) < 8 &&
+      metersBetween(position, other.position) < 50 &&
       headingDelta(bearing, other.bearing).abs() < 25;
 
   /// Time constants of [glideTo] (s): turns catch up with the hand quickly, moves with the smoothed position

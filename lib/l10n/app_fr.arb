@@ -1258,5 +1258,11 @@
   "favoriteStopRemoved": "{name} retiré des favoris",
   "@favoriteStopRemoved": {"placeholders": {"name": {"type": "String"}}},
   "homeSuggestHome": "Rentrer à la maison",
-  "homeSuggestWork": "Aller au travail"
+  "homeSuggestWork": "Aller au travail",
+  "notServed": "Non desservi",
+  "notServedLines": "Ne s'arrête pas ici en ce moment : {lines}",
+  "@notServedLines": {"placeholders": {"lines": {"type": "String"}}},
+  "vehicleFollow": "Suivre sur la carte",
+  "vehicleFollowing": "Véhicule suivi sur la carte",
+  "vehicleStopFollowing": "Arrêter de suivre"
 }

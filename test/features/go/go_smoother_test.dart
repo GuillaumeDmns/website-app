@@ -68,7 +68,8 @@ void main() {
     const follow = MapFollow(position: start, bearing: 90);
 
     expect(follow.closeTo(follow.withPosition(east(1)).withBearing(100)), isTrue);
-    expect(follow.closeTo(follow.withPosition(east(20))), isFalse);
+    expect(follow.closeTo(follow.withPosition(east(30))), isTrue);
+    expect(follow.closeTo(follow.withPosition(east(80))), isFalse);
     expect(follow.closeTo(follow.withBearing(180)), isFalse);
   });
 

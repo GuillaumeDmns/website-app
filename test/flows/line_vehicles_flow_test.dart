@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
+import 'package:website_app/l10n/l10n.dart';
 
 import '../support/samples.dart';
 import '../support/standard_backend.dart';
@@ -67,6 +68,13 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump(const Duration(seconds: 1));
     expect(tester.getCenter(onMap.first), isNot(before));
+
+    // Followed on the map from its sheet, until stopped
+    await tapOn(tester, onMap.first);
+    await tapOn(tester, find.text(currentL10n.vehicleFollow));
+    expect(find.text(currentL10n.vehicleFollowing), findsOneWidget);
+    await tapOn(tester, find.byTooltip(currentL10n.vehicleStopFollowing));
+    expect(find.text(currentL10n.vehicleFollowing), findsNothing);
 
     await closeApp(tester);
   });

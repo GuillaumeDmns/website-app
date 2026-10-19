@@ -47,6 +47,13 @@ class MobilityApi {
   Future<List<Disruption>> stopDisruptions(String stopAreaId) =>
       _getList('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/disruptions', Disruption.fromJson);
 
+  /// Stop areas the line doesn't serve now (station closed, stops not served)
+  Future<List<String>> lineClosedStops(String lineId) => _getStrings('/api/v2/lines/${Uri.encodeComponent(lineId)}/closed-stops');
+
+  /// Lines that don't stop at the stop area now
+  Future<List<String>> stopClosedLines(String stopAreaId) =>
+      _getStrings('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}/closed-lines');
+
   /// Metro, RER, Transilien and tram lines, and every other disrupted line
   Future<List<LineTraffic>> traffic() => _getList('/api/v2/traffic', LineTraffic.fromJson);
 
@@ -177,6 +184,15 @@ class MobilityApi {
     try {
       final response = await _dio.get<Map<String, dynamic>>(path, queryParameters: query);
       return fromJson(response.data!);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<List<String>> _getStrings(String path) async {
+    try {
+      final response = await _dio.get<List<dynamic>>(path);
+      return response.data!.cast<String>();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

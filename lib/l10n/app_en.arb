@@ -425,5 +425,10 @@
   "alsoAt": "Also at {times}",
   "favoriteStopRemoved": "{name} removed from favorites",
   "homeSuggestHome": "Go home",
-  "homeSuggestWork": "Go to work"
+  "homeSuggestWork": "Go to work",
+  "notServed": "Not served",
+  "notServedLines": "Not stopping here now: {lines}",
+  "vehicleFollow": "Follow on the map",
+  "vehicleFollowing": "Vehicle followed on the map",
+  "vehicleStopFollowing": "Stop following"
 }

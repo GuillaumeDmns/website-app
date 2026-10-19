@@ -12,7 +12,8 @@ import 'line_vehicles.dart';
 import '../../app/theme.dart';
 
 /// Mission of a vehicle: its next stops with their times, kept up to date while open
-Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, required Vehicle vehicle}) {
+/// [onFollow]: "Suivre", the map keeping the vehicle in view
+Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, required Vehicle vehicle, VoidCallback? onFollow}) {
   final router = GoRouter.of(context);
   return showModalBottomSheet<void>(
     context: context,
@@ -21,7 +22,7 @@ Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, 
     isScrollControlled: true,
     showDragHandle: true,
     constraints: const BoxConstraints(maxWidth: 560),
-    builder: (context) => _VehicleSheet(line: line, vehicle: vehicle, router: router),
+    builder: (context) => _VehicleSheet(line: line, vehicle: vehicle, router: router, onFollow: onFollow),
   );
 }
 
@@ -50,11 +51,12 @@ Vehicle? sameVehicle(Vehicle vehicle, List<Vehicle> vehicles) {
 }
 
 class _VehicleSheet extends ConsumerStatefulWidget {
-  const _VehicleSheet({required this.line, required this.vehicle, required this.router});
+  const _VehicleSheet({required this.line, required this.vehicle, required this.router, this.onFollow});
 
   final LineSummary line;
   final Vehicle vehicle;
   final GoRouter router;
+  final VoidCallback? onFollow;
 
   @override
   ConsumerState<_VehicleSheet> createState() => _VehicleSheetState();
@@ -130,6 +132,18 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Text(context.l10n.vehicleStale, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+              ),
+            if (widget.onFollow case final follow?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: FilledButton.tonalIcon(
+                  icon: const Icon(Icons.my_location),
+                  label: Text(context.l10n.vehicleFollow),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    follow();
+                  },
+                ),
               ),
             const Divider(height: 1),
             if (calls.isEmpty)
