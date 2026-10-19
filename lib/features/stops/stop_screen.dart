@@ -13,6 +13,7 @@ import '../../core/platform/share.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
@@ -191,11 +192,12 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StopDisruptions(detail: detail),
-                SectionTitle(context.l10n.nextDepartures),
+                SectionTitle(context.l10n.nextDepartures, trailing: UpdatedAgo(value: departures)),
                 AppCard(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                   child: AsyncView(
                     value: departures,
+                    loading: const SkeletonCards(count: 3, height: 52),
                     onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
                     data: (departures) => _DepartureList(departures: departures, now: now),
                   ),

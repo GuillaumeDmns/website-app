@@ -6,15 +6,17 @@ import '../../app/routes.dart';
 import '../../l10n/l10n.dart';
 import '../api/api_exception.dart';
 import '../map/map_overlay.dart';
+import 'skeleton.dart';
 
-/// Renders an [AsyncValue]: spinner while loading the first time, error with retry, then [data]. Keeps showing the
-/// previous data while refreshing.
+/// Renders an [AsyncValue]: grey cards of the content's shape while loading the first time ([loading] instead), error
+/// with retry, then [data]. Keeps showing the previous data while refreshing.
 class AsyncView<T> extends StatelessWidget {
-  const AsyncView({super.key, required this.value, required this.data, this.onRetry});
+  const AsyncView({super.key, required this.value, required this.data, this.onRetry, this.loading});
 
   final AsyncValue<T> value;
   final Widget Function(T data) data;
   final VoidCallback? onRetry;
+  final Widget? loading;
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +24,7 @@ class AsyncView<T> extends StatelessWidget {
       skipLoadingOnRefresh: true,
       skipLoadingOnReload: true,
       data: data,
-      loading: () => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => loading ?? const SkeletonCards(),
       error: (error, _) => ErrorMessage(message: error.toString(), error: error, onRetry: onRetry),
     );
   }

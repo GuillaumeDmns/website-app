@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -262,7 +263,10 @@ class _GoBar extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.navigation),
                 label: Text(context.l10n.go),
-                onPressed: onGo,
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  onGo();
+                },
               ),
             ],
           ),

@@ -1264,5 +1264,11 @@
   "@notServedLines": {"placeholders": {"lines": {"type": "String"}}},
   "vehicleFollow": "Suivre sur la carte",
   "vehicleFollowing": "Véhicule suivi sur la carte",
-  "vehicleStopFollowing": "Arrêter de suivre"
+  "vehicleStopFollowing": "Arrêter de suivre",
+  "loading": "Chargement",
+  "updatedJustNow": "À jour",
+  "updatedSecondsAgo": "Il y a {seconds} s",
+  "@updatedSecondsAgo": {"placeholders": {"seconds": {"type": "int"}}},
+  "updatedMinutesAgo": "Il y a {minutes} min",
+  "@updatedMinutesAgo": {"placeholders": {"minutes": {"type": "int"}}}
 }

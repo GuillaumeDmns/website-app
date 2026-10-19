@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -323,6 +324,7 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
                 FilledButton(
                   style: FilledButton.styleFrom(minimumSize: const Size(56, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
                   onPressed: () {
+                    HapticFeedback.mediumImpact();
                     ref.read(goControllerProvider.notifier).start(next, trip.request);
                     context.push(Routes.go);
                   },

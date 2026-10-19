@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,7 +49,10 @@ class FavoriteStopButton extends ConsumerWidget {
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? context.colors.warning : null),
-      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stop)),
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleStop(stop));
+      },
     );
   }
 }
@@ -66,7 +70,10 @@ class FavoriteLineButton extends ConsumerWidget {
     return IconButton(
       tooltip: saved ? context.l10n.favoriteRemove : context.l10n.favoriteAdd,
       icon: Icon(saved ? Icons.star : Icons.star_border, color: saved ? context.colors.warning : null),
-      onPressed: () => runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(line)),
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).toggleLine(line));
+      },
     );
   }
 }

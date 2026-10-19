@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -524,6 +525,7 @@ class _IssueCard extends ConsumerWidget {
                 FilledButton(
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                   onPressed: () {
+                    HapticFeedback.mediumImpact();
                     controller.dismissIssue();
                     controller.choose(index, next);
                   },

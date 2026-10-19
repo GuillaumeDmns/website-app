@@ -12,6 +12,7 @@ import '../../app/theme.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
@@ -93,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SectionTitle(context.l10n.homeNearby),
+                    SectionTitle(context.l10n.homeNearby, trailing: UpdatedAgo(value: ref.watch(nearbyDeparturesProvider(key)))),
                     if (!origin.isUser)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),

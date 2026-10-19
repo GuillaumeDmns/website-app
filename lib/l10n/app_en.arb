@@ -430,5 +430,9 @@
   "notServedLines": "Not stopping here now: {lines}",
   "vehicleFollow": "Follow on the map",
   "vehicleFollowing": "Vehicle followed on the map",
-  "vehicleStopFollowing": "Stop following"
+  "vehicleStopFollowing": "Stop following",
+  "loading": "Loading",
+  "updatedJustNow": "Up to date",
+  "updatedSecondsAgo": "{seconds} s ago",
+  "updatedMinutesAgo": "{minutes} min ago"
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
@@ -126,7 +127,10 @@ class _RideDepartureListState extends State<RideDepartureList> {
                       earliest != null && ride.departure.time.isBefore(earliest.subtract(const Duration(minutes: 1))),
                   onTap: widget.onSelect == null || isSelected || ride.departure.cancelled
                       ? null
-                      : () => widget.onSelect!(ride),
+                      : () {
+                          HapticFeedback.selectionClick();
+                          widget.onSelect!(ride);
+                        },
                 );
               },
             ),
