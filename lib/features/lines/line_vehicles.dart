@@ -99,8 +99,9 @@ class BranchPath {
     final left = vehicle.fromStopId == null ? -1 : stopIds.lastIndexOf(vehicle.fromStopId!, to);
     final from = vehicle.fromStopId == null ? to : left >= 0 ? left : math.max(0, to - 1);
     final along = stopAlongs[from] + (stopAlongs[to] - stopAlongs[from]) * progress;
-    // The way ahead around it (the branch's direction at a stop where it waits)
-    const around = 20.0;
+    // The way ahead around it (the branch's direction at a stop where it waits), over 100 m: GTFS shapes often make a
+    // small hook at stations, which turned the pointer sideways
+    const around = 50.0;
     final ahead = math.min(along + around, line.length);
     final behind = math.max(ahead - 2 * around, 0.0);
     final moving = from != to && progress < 1;
