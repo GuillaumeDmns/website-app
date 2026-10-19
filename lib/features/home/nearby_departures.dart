@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -11,6 +12,8 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
+import '../favorites/favorite_widgets.dart';
+import '../favorites/favorites_controller.dart';
 import '../stops/widgets/stop_departures_card.dart';
 
 typedef NearbyKey = ({double lat, double lon});
@@ -148,7 +151,21 @@ class NearbyDeparturesList extends ConsumerWidget {
             for (final departures in shown)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: StopDeparturesCard(departures: departures, now: now),
+                child: StopDeparturesCard(
+                  departures: departures,
+                  now: now,
+                  // A long press saves the stop (or takes it out) without opening it
+                  onLongPress: () {
+                    final favorites = ref.read(favoritesProvider.notifier);
+                    final saved = favorites.stopFavorite(departures.stop.id) != null;
+                    HapticFeedback.mediumImpact();
+                    runFavoriteAction(
+                      context,
+                      () => favorites.toggleStop(departures.stop),
+                      success: saved ? context.l10n.favoriteStopRemoved(departures.stop.name) : context.l10n.favoriteSaved(departures.stop.name),
+                    );
+                  },
+                ),
               ),
           ],
         );

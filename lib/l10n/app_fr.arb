@@ -1254,5 +1254,9 @@
   "leaveInMinutes": "Dans {minutes} min",
   "@leaveInMinutes": {"placeholders": {"minutes": {"type": "int"}}},
   "alsoAt": "Aussi à {times}",
-  "@alsoAt": {"placeholders": {"times": {"type": "String"}}}
+  "@alsoAt": {"placeholders": {"times": {"type": "String"}}},
+  "favoriteStopRemoved": "{name} retiré des favoris",
+  "@favoriteStopRemoved": {"placeholders": {"name": {"type": "String"}}},
+  "homeSuggestHome": "Rentrer à la maison",
+  "homeSuggestWork": "Aller au travail"
 }

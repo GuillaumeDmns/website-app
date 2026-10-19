@@ -74,6 +74,55 @@ String? lastTripText(LastTripAlert? alert, DateTime now) {
 }
 
 /// "Maison" or "Travail" when [point] is one of them, else its name
+/// The saved trip to [place]: one ending there, else the way back of one starting there; null without
+DailyTrip? tripTo(List<DailyTrip> trips, Favorite place) {
+  final lat = place.lat;
+  final lon = place.lon;
+  if (lat == null || lon == null) {
+    return null;
+  }
+  bool near(JourneyPoint? point) => point != null && metersBetween(LatLng(point.lat, point.lon), LatLng(lat, lon)) < 200;
+  for (final trip in trips) {
+    if (near(trip.end) && !near(trip.start)) {
+      return trip;
+    }
+  }
+  for (final trip in trips) {
+    if (near(trip.start) && !near(trip.end)) {
+      return trip.reversed();
+    }
+  }
+  return null;
+}
+
+/// The next departure of the saved trip to [place] (see [tripTo]), retimed on its lines' departures (no search); null
+/// without such a trip, or when the user is there already
+JourneyOption? nextTripTo(WidgetRef ref, Favorite place, DateTime now) {
+  final trip = tripTo(ref.watch(dailyTripsProvider).value ?? const [], place);
+  final user = ref.watch(userLocationProvider).value;
+  if (trip == null ||
+      (user != null && place.lat != null && metersBetween(user, LatLng(place.lat!, place.lon!)) < 300)) {
+    return null;
+  }
+  return upcomingTrips(trip.journey, lookup: watchRides(ref, now), now: now).firstOrNull;
+}
+
+/// Goes to [place]: the detail of the next departure of the trip saved there (no search), else a search from here
+void goToPlace(BuildContext context, WidgetRef ref, Favorite place) {
+  final now = ref.read(nowProvider).value ?? DateTime.now();
+  final trip = tripTo(ref.read(dailyTripsProvider).value ?? const [], place);
+  final next = trip == null ? null : nextTripTo(ref, place, now);
+  if (trip != null && next != null) {
+    ref.read(selectedJourneyProvider.notifier).select(next, trip.request);
+    context.push(Routes.journeyDetailOf(trip.request, next));
+    return;
+  }
+  context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
+        from: const JourneyPlace.currentLocation(),
+        to: favoritePlace(place),
+      ))));
+}
+
 String tripPlaceName(JourneyPoint? point, List<Favorite> favorites) {
   if (point == null) {
     return '';

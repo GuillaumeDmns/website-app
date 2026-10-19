@@ -8,7 +8,8 @@ import '../../core/location/location_providers.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
-import '../journey/journey_preferences.dart';
+import '../daily_trips/daily_trip_widgets.dart';
+import '../../core/utils/time_format.dart';
 import '../journey/journey_request.dart';
 import '../stops/stop_screen.dart';
 import '../traffic/disruption_widgets.dart';
@@ -133,11 +134,21 @@ class FavoriteShortcuts extends ConsumerWidget {
 
 /// A tile of the shortcuts: an icon in a bubble, a name and a line below
 class _ShortcutTile extends StatelessWidget {
-  const _ShortcutTile({required this.icon, required this.title, required this.subtitle, required this.onTap, this.onLongPress, this.color, this.tooltip});
+  const _ShortcutTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.onLongPress,
+    this.color,
+    this.tooltip,
+    this.subtitleColor,
+  });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final Color? subtitleColor;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final Color? color;
@@ -163,7 +174,7 @@ class _ShortcutTile extends StatelessWidget {
                 IconBubble(icon, color: color, size: 34),
                 const SizedBox(height: 8),
                 Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
-                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: subtitleColor)),
               ],
             ),
           ),
@@ -182,10 +193,7 @@ class _PlaceShortcut extends ConsumerWidget {
   final String title;
   final Favorite? favorite;
 
-  void _go(BuildContext context, WidgetRef ref) => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
-        from: const JourneyPlace.currentLocation(),
-        to: favoritePlace(favorite!),
-      ))));
+  void _go(BuildContext context, WidgetRef ref) => goToPlace(context, ref, favorite!);
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final action = await showModalBottomSheet<String>(
@@ -241,12 +249,19 @@ class _PlaceShortcut extends ConsumerWidget {
         onTap: () => chooseFavoritePlace(context, ref, kind),
       );
     }
+    // A trip saved there: when to leave, live, like Citymapper's home and work
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final next = nextTripTo(ref, favorite!, now);
+    final leaveIn = next?.departure.difference(now);
     return Stack(
       children: [
         _ShortcutTile(
           icon: icon,
           title: title,
-          subtitle: favorite!.label ?? '',
+          subtitle: next == null || leaveIn == null
+              ? favorite!.label ?? ''
+              : '${leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds))} · ${formatClock(next.arrival)}',
+          subtitleColor: next?.rides.firstOrNull?.realtime == true ? context.colors.live : null,
           color: color,
           tooltip: favorite!.label,
           onTap: () => _go(context, ref),
