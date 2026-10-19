@@ -1250,5 +1250,9 @@
   "goTakeThisOne": "Prendre celui-ci",
   "goWayBack": "Itinéraire retour",
   "arrivalAt": "arrivée {time}",
-  "@arrivalAt": {"placeholders": {"time": {"type": "String"}}}
+  "@arrivalAt": {"placeholders": {"time": {"type": "String"}}},
+  "leaveInMinutes": "Dans {minutes} min",
+  "@leaveInMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "alsoAt": "Aussi à {times}",
+  "@alsoAt": {"placeholders": {"times": {"type": "String"}}}
 }

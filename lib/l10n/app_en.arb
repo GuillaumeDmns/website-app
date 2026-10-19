@@ -420,5 +420,7 @@
   "goNextDeparture": "Next at {time}, in {minutes} min",
   "goTakeThisOne": "Take this one",
   "goWayBack": "Way back",
-  "arrivalAt": "arrives {time}"
+  "arrivalAt": "arrives {time}",
+  "leaveInMinutes": "In {minutes} min",
+  "alsoAt": "Also at {times}"
 }

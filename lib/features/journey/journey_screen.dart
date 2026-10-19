@@ -84,20 +84,20 @@ class JourneyScreen extends ConsumerWidget {
               ],
               fit: [?point(request.from), ?point(request.to)],
             ),
-      // Not the sheet's controller: the options scroll inside the sheet, which stays low enough to see them on the
-      // map (it only moves with its handle)
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(4, 8, 16, 24),
+      // The search stays at the top, like Citymapper; the options scroll below it inside the sheet (not the sheet's
+      // controller: the sheet stays low enough to see them on the map, it only moves with its handle)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(
+          Padding(padding: const EdgeInsets.fromLTRB(4, 8, 16, 0), child: _Header(
             request: request,
             onBack: () => context.canPop() ? context.pop() : context.go(Routes.home),
             onPickFrom: () => _pickPlace(context, from: true),
             onPickTo: () => _pickPlace(context, from: false),
             onSwap: () => _update(context, request.swapped()),
-          ),
+          )),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 0, 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: _Toolbar(
               time: _TimeButton(request: request, onChanged: (next) => _update(context, next)),
               actions: Row(
@@ -138,8 +138,14 @@ class JourneyScreen extends ConsumerWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: plan == null
+            padding: const EdgeInsets.only(left: 16, bottom: 4),
+            child: _QuickFilters(request: request, onChanged: (next) => _update(context, next)),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              children: [
+                plan == null
                 ? Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(context.l10n.chooseFromTo, textAlign: TextAlign.center),
@@ -162,6 +168,8 @@ class JourneyScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -218,7 +226,7 @@ class _Header extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(tooltip: context.l10n.swap, icon: Icon(Icons.swap_vert, color: context.colors.muted), onPressed: onSwap),
+                _SwapButton(onSwap: onSwap),
               ],
             ),
           ),
@@ -294,6 +302,93 @@ enum _TimeChoice { now, departAt, arriveBy }
 final _compact = OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12));
 
 /// Time on the left, options on the right; on two lines with a large text size
+/// Swaps the start and the destination, the arrows turning
+class _SwapButton extends StatefulWidget {
+  const _SwapButton({required this.onSwap});
+
+  final VoidCallback onSwap;
+
+  @override
+  State<_SwapButton> createState() => _SwapButtonState();
+}
+
+class _SwapButtonState extends State<_SwapButton> {
+  double _turns = 0;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: context.l10n.swap,
+        icon: AnimatedRotation(
+          turns: _turns,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          child: Icon(Icons.swap_vert, color: context.colors.muted),
+        ),
+        onPressed: () {
+          setState(() => _turns += 0.5);
+          widget.onSwap();
+        },
+      );
+}
+
+/// The usual changes in one tap, without the options sheet: leaving a bit later, the modes, Vélib
+class _QuickFilters extends StatelessWidget {
+  const _QuickFilters({required this.request, required this.onChanged});
+
+  final JourneyRequest request;
+  final ValueChanged<JourneyRequest> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    JourneyRequest leaving(Duration? later) =>
+        request.copyWith(datetime: () => later == null ? null : DateTime.now().add(later), arriveBy: false);
+    // Few chips: all built (scrolled to when focused or tapped)
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          if (request.datetime != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.schedule, size: 18),
+              label: Text(context.l10n.leaveNow),
+              onPressed: () => onChanged(leaving(null)),
+            ),
+            const SizedBox(width: 6),
+          ],
+          for (final minutes in [15, 30]) ...[
+            ActionChip(
+              label: Text(context.l10n.leaveInMinutes(minutes)),
+              onPressed: () => onChanged(leaving(Duration(minutes: minutes))),
+            ),
+            const SizedBox(width: 6),
+          ],
+          const SizedBox(height: 24, child: VerticalDivider(width: 12)),
+          for (final mode in JourneyRequest.choosableModes) ...[
+            FilterChip(
+              label: Text(mode.label),
+              selected: request.modes.isNotEmpty && request.allows(mode),
+              showCheckmark: false,
+              onSelected: (_) => onChanged(
+                // Without a choice, a tap keeps this mode only; then each tap adds or removes one
+                request.modes.isEmpty ? request.withOnly(mode) : request.withMode(mode, !request.allows(mode)),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          FilterChip(
+            avatar: const Icon(Icons.pedal_bike, size: 18),
+            label: Text(context.l10n.journeyBikeShare),
+            selected: request.bikeShare,
+            showCheckmark: false,
+            onSelected: (selected) => onChanged(request.copyWith(bikeShare: selected)),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+}
+
 class _Toolbar extends StatelessWidget {
   const _Toolbar({required this.time, required this.actions});
 

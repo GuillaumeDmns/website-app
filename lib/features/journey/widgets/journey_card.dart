@@ -7,6 +7,8 @@ import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../traffic/disruption_widgets.dart';
+import '../journey_providers.dart';
+import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
 
@@ -23,8 +25,9 @@ String journeyTypeLabel(String? type) => switch (type) {
       _ => currentL10n.journeyOther,
     };
 
-/// Result row: duration, the chain of lines, times, and when to leave.
-class JourneyCard extends StatelessWidget {
+/// Result row, like Citymapper: when to leave in large (green with real time), the duration in large figures, the
+/// chain of lines, the next departures of its first ride, then the details.
+class JourneyCard extends ConsumerWidget {
   const JourneyCard({
     super.key,
     required this.journey,
@@ -49,11 +52,12 @@ class JourneyCard extends StatelessWidget {
   final VoidCallback? onHover;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final colors = context.colors;
     final firstRide = journey.rides.firstOrNull;
+    final later = _laterDepartures(ref, firstRide);
     final leaveIn = journey.departure.difference(now);
     final live = firstRide?.realtime == true;
 
@@ -82,7 +86,7 @@ class JourneyCard extends StatelessWidget {
                   children: [
                     Text(
                       leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
-                      style: theme.textTheme.titleSmall?.copyWith(color: live ? colors.live : null),
+                      style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null, fontWeight: FontWeight.w600),
                     ),
                     Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
                   ],
@@ -110,6 +114,16 @@ class JourneyCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Padding(padding: const EdgeInsets.only(right: 12), child: SectionsStrip(journey: journey)),
+          if (later.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.update, size: 16, color: colors.muted),
+                const SizedBox(width: 6),
+                Text(context.l10n.alsoAt(later.map(formatClock).join(' · ')), style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ],
           if (details.isNotEmpty) ...[
             const SizedBox(height: 8),
             Padding(
@@ -121,6 +135,22 @@ class JourneyCard extends StatelessWidget {
       ),
     );
     return onHover == null ? card : MouseRegion(onEnter: (_) => onHover!(), child: card);
+  }
+
+  /// The next two departures of the first ride after the one of this option, from its line's departures
+  List<DateTime> _laterDepartures(WidgetRef ref, JourneySection? firstRide) {
+    if (firstRide == null) {
+      return const [];
+    }
+    final key = rideKey(firstRide, firstRide.departure.subtract(const Duration(minutes: 1)), now);
+    if (key == null) {
+      return const [];
+    }
+    return (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
+        .map((ride) => ride.departure.time)
+        .where((time) => time.isAfter(firstRide.departure.add(const Duration(seconds: 30))))
+        .take(2)
+        .toList();
   }
 }
 
