@@ -196,7 +196,6 @@ void main() {
 
     expect(tracker.stopsLeft(onBoard), 2);
     expect(tracker.metersLeft(tracker.initial()), greaterThan(0));
-    expect(tracker.nextRide(tracker.initial()), tracker.steps[1]);
   });
 
   test('keeps its progress across restarts', () {

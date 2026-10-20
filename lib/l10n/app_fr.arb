@@ -65,14 +65,6 @@
       }
     }
   },
-  "dailyTripArrival": "Arrivée {time}",
-  "@dailyTripArrival": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
   "dailyTripThen": "Puis {times}",
   "@dailyTripThen": {
     "placeholders": {
@@ -281,7 +273,6 @@
     }
   },
   "serviceOver": "Plus de départ aujourd'hui",
-  "serviceFrequencies": "Fréquences",
   "periodEarlyMorning": "Tôt le matin",
   "periodMorningPeak": "Pointe du matin",
   "periodDaytime": "Journée",
@@ -942,14 +933,6 @@
   },
   "goAtStop": "à {stop}",
   "@goAtStop": {
-    "placeholders": {
-      "stop": {
-        "type": "String"
-      }
-    }
-  },
-  "goNextShort": "prochain : {stop}",
-  "@goNextShort": {
     "placeholders": {
       "stop": {
         "type": "String"

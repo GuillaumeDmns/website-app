@@ -270,16 +270,6 @@ class GoTracker {
 
   GoStep? stepOf(GoProgress progress) => progress.step < steps.length ? steps[progress.step] : null;
 
-  /// Next ride from the current step on (the current one included)
-  GoStep? nextRide(GoProgress progress) {
-    for (var i = progress.step; i < steps.length; i++) {
-      if (steps[i].isRide) {
-        return steps[i];
-      }
-    }
-    return null;
-  }
-
   /// Planned departure of a ride, shifted when the user takes a later vehicle
   DateTime plannedDeparture(GoStep ride, GoProgress progress) => ride.section.departure.add(progress.shift);
 

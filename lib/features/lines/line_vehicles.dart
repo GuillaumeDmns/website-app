@@ -65,9 +65,6 @@ class BranchPath {
   final List<String> stopIds;
   final List<double> stopAlongs = [];
 
-  /// Where [vehicle] is at [progress] between its two stops, null when they are not on this branch
-  LatLng? position(Vehicle vehicle, double progress) => place(vehicle, progress)?.point;
-
   /// Where [vehicle] is at [progress] between its two stops and which way it goes; null when they are not on this branch
   VehiclePlacement? place(Vehicle vehicle, double progress) {
     final to = stopIds.indexOf(vehicle.toStopId);

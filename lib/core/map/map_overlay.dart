@@ -171,12 +171,10 @@ class MapOverlay {
   final MapFollow? follow;
 
   MapOverlay withFollow(MapFollow? follow) => MapOverlay(pins: pins, paths: paths, fit: fit, follow: follow);
-
 }
 
 /// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them); the
 /// map following the user follows it too
-
 class PreciseUserPosition extends Notifier<LatLng?> {
   @override
   LatLng? build() => null;
