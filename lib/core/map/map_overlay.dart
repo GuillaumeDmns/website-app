@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../location/device_heading.dart';
+import '../location/location_providers.dart';
 import '../utils/geo.dart';
 
 /// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
@@ -147,6 +148,21 @@ class FollowHeading {
     });
   }
 
+  /// GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile). Called while the map
+  /// builds; [turn] moves the camera to the follow again, with the new heading
+  void watch(WidgetRef ref, MapFollow? follow, void Function() turn) {
+    if (follow?.compass ?? false) {
+      ref.listen(deviceHeadingProvider, (_, next) {
+        final heading = next.value;
+        if (heading != null) {
+          update(heading, turn);
+        }
+      });
+    } else {
+      device = null;
+    }
+  }
+
   void dispose() => _wait?.cancel();
 }
 
@@ -214,6 +230,17 @@ class RouterLocation extends Notifier<String> {
 }
 
 final routerLocationProvider = NotifierProvider<RouterLocation, String>(RouterLocation.new);
+
+/// What the maps show: the overlay of the current page, its follow on the smoothed position when there is one (GO on
+/// foot) so that the camera and the dot agree, and where the user dot goes
+({MapOverlay overlay, LatLng? user}) watchMapView(WidgetRef ref) {
+  final location = ref.watch(routerLocationProvider);
+  final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
+  final precise = ref.watch(preciseUserPositionProvider);
+  final follow = page.follow;
+  final overlay = follow != null && precise != null ? page.withFollow(follow.withPosition(precise)) : page;
+  return (overlay: overlay, user: overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value);
+}
 
 /// Publishes [overlay] for the page it is in while the page exists.
 class MapOverlayScope extends ConsumerStatefulWidget {

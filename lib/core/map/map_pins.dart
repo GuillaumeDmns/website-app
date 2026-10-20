@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import 'map_overlay.dart';
 
 /// A pin of an overlay: its widget, or a colored dot; a button named by its label when it can be tapped
@@ -112,4 +113,26 @@ class _HeadingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_HeadingPainter oldDelegate) => false;
+}
+
+/// "Recentrer", in the corner above the panel ([bottom] high): the map follows the user again after they moved it
+class RecenterButton extends StatelessWidget {
+  const RecenterButton({super.key, required this.bottom, required this.onPressed});
+
+  final double bottom;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.bottomRight,
+        child: Padding(
+          padding: EdgeInsets.only(right: 16, bottom: bottom + 16),
+          child: FloatingActionButton.small(
+            heroTag: null,
+            tooltip: context.l10n.recenter,
+            onPressed: onPressed,
+            child: const Icon(Icons.navigation),
+          ),
+        ),
+      );
 }

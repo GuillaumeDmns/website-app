@@ -7,8 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
 
-import '../../l10n/l10n.dart';
-import '../location/device_heading.dart';
 import '../location/location_providers.dart';
 import 'map_overlay.dart';
 import 'map_pins.dart';
@@ -209,17 +207,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     }
   }
 
-  /// A new heading of the device: the camera turns with it (at most 10 times a second)
-  void _onDeviceHeading(double heading) {
-    _heading.update(heading, () {
-      final follow = _following;
-      if (mounted && follow != null && follow.compass) {
-        _follow(follow);
-      }
-    });
+  /// The device turned: the camera turns with it
+  void _turn() {
+    final follow = _following;
+    if (mounted && follow != null && follow.compass) {
+      _follow(follow);
+    }
   }
 
-  /// Frames (or follows) the overlay again, even if it is the one framed last
   @override
   void didUpdateWidget(covariant MapLibreMainMap oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -235,6 +230,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     }
   }
 
+  /// Frames (or follows) the overlay again, even if it is the one framed last
   void _reframe() {
     _framedFit = null;
     _following = null;
@@ -298,29 +294,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final location = ref.watch(routerLocationProvider);
-    final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
-    // Followed (GO on foot): the smoothed position when there is one, so that the camera and the dot agree
-    final precise = ref.watch(preciseUserPositionProvider);
-    final pageFollow = page.follow;
-    final overlay = pageFollow != null && precise != null ? page.withFollow(pageFollow.withPosition(precise)) : page;
+    final (:overlay, :user) = watchMapView(ref);
     _overlay = overlay;
-    final user = overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value;
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
 
-    // GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile)
-    if (overlay.follow?.compass ?? false) {
-      ref.listen(deviceHeadingProvider, (_, next) {
-        final heading = next.value;
-        if (heading != null) {
-          _onDeviceHeading(heading);
-        }
-      });
-    } else {
-      _heading.device = null;
-    }
+    _heading.watch(ref, overlay.follow, _turn);
 
     // First fix: go to the user unless a page already framed something
     ref.listen(userLocationProvider, (previous, next) {
@@ -333,7 +313,6 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
       }
     });
 
-    const casing = Colors.white;
     return LayoutBuilder(builder: (context, constraints) {
       final size = constraints.biggest;
       if (size != _size) {
@@ -344,11 +323,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
           }
         });
       }
-      return _map(context, user, overlay, scheme, casing);
+      return _map(context, user, overlay, scheme);
     });
   }
 
-  Widget _map(BuildContext context, LatLng? user, MapOverlay overlay, ColorScheme scheme, Color casing) {
+  Widget _map(BuildContext context, LatLng? user, MapOverlay overlay, ColorScheme scheme) {
     return MapLibreMap(
       options: MapOptions(
         initStyle: _style,
@@ -360,7 +339,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
         gestures: const MapGestures.all(rotate: false, pitch: false),
       ),
       onEvent: _onEvent,
-      layers: _layers(overlay.paths, casing),
+      layers: _layers(overlay.paths),
       children: [
         // The controller of the map actually shown: the map can be created again (the page laid out again), and the
         // overlay is then framed on the new one
@@ -403,42 +382,33 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
               ),
           ],
         ),
-        if (_following != null && _followPaused)
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Padding(
-              padding: EdgeInsets.only(right: 16, bottom: widget.padding.bottom + 16),
-              child: FloatingActionButton.small(
-                heroTag: null,
-                tooltip: context.l10n.recenter,
-                onPressed: _recenter,
-                child: const Icon(Icons.navigation),
-              ),
-            ),
-          ),
+        if (_following != null && _followPaused) RecenterButton(bottom: widget.padding.bottom, onPressed: _recenter),
         const _Attribution(),
       ],
     );
   }
 
   /// Layers of the paths drawn last: the map sends a layer to the map engine again unless it is the same object, so
-  /// the layers of unchanged paths are kept (vehicles move every second on a line's page)
+  /// the layers of unchanged paths are kept (a line's page publishes its overlay every second while its vehicles move)
   List<(MapPath, List<Layer>)> _pathLayers = const [];
 
-  List<Layer> _layers(List<MapPath> paths, Color casing) {
+  List<Layer> _layers(List<MapPath> paths) {
     final previous = _pathLayers;
     _pathLayers = [
       for (final (index, path) in paths.indexed)
-        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, _pathLayersOf(path, casing)),
+        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, _pathLayersOf(path)),
     ];
     return [for (final (_, layers) in _pathLayers) ...layers];
   }
 
-  static List<Layer> _pathLayersOf(MapPath path, Color casing) {
+  /// Light edge of the paths: the map stays light in dark mode too
+  static const _casing = Colors.white;
+
+  static List<Layer> _pathLayersOf(MapPath path) {
     final lines = [if (path.points.length >= 2) _line(path.points)];
     return [
       // A light edge under the path (a band under the dotted ones), as faded as the path
-      PolylineLayer(polylines: lines, color: casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
+      PolylineLayer(polylines: lines, color: _casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
       PolylineLayer(polylines: lines, color: path.color, width: path.width.round(), dashArray: path.dotted ? const [1, 2] : null),
     ];
   }
