@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
@@ -21,11 +22,16 @@ void main() {
     expect(request.queryParameters['from'], '48.8584,2.347');
     expect(request.queryParameters['to'], 'IDFM:70001');
     expect(find.byType(JourneyCard), findsNWidgets(2));
+    // Each option with the next departures of its first ride
+    expect(find.textContaining(currentL10n.alsoAt('').trim()), findsWidgets);
 
     await tapOn(tester, find.byType(JourneyCard));
-    // The ride with its next departures from the boarding stop
+    // The ride with its next departures from the boarding stop, and the next one in case it is missed
     expect(find.text('Gare de Lyon'), findsWidgets);
     expect(backend.requestsTo('/api/v2/lines/C01371/rides'), isNotEmpty);
+    expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsWidgets);
+    // GO at hand at the bottom
+    expect(find.widgetWithText(FilledButton, currentL10n.go), findsOneWidget);
 
     await closeApp(tester);
   });
@@ -52,6 +58,31 @@ void main() {
 
     await tapOn(tester, find.textContaining(currentL10n.stopsCount(1)));
     expect(find.text('Gare de Lyon'), findsNothing);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('the modes, Vélib and leaving later in one tap', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+
+    // Without a choice, a mode chip keeps that mode only
+    await tapOn(tester, find.widgetWithText(FilterChip, TransportMode.metro.label));
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters['modes'], 'METRO');
+    // Then each one adds or removes its mode
+    await tapOn(tester, find.widgetWithText(FilterChip, TransportMode.bus.label));
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters['modes']?.split(','), containsAll(['METRO', 'BUS', 'NOCTILIEN']));
+
+    await tapOn(tester, find.widgetWithText(FilterChip, currentL10n.journeyBikeShare));
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters['bikeShare'], isTrue);
+
+    await tapOn(tester, find.text(currentL10n.leaveInMinutes(15)));
+    final at = DateTime.parse(backend.requestsTo('/api/v2/journeys').last.queryParameters['datetime']!);
+    expect(at.difference(DateTime.now()).inMinutes, inInclusiveRange(13, 15));
+    // And back to now
+    expect(find.widgetWithText(ActionChip, currentL10n.leaveNow), findsOneWidget);
 
     await closeApp(tester);
   });

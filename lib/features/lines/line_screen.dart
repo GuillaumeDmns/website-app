@@ -48,6 +48,11 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
   BranchPath _pathOf(LineBranch branch) => _paths[branch] ??= BranchPath(branch);
 
+  /// Vehicle the map keeps in view ("Suivre" in its sheet), until stopped or gone
+  String? _followed;
+
+  void _follow(Vehicle vehicle) => setState(() => _followed = vehicle.id);
+
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(lineDetailProvider(widget.lineId));
@@ -98,36 +103,20 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
-    // About as long as the vehicle, never too short to see
-    final trail = trailLength(line.mode, ref.watch(mapScaleProvider), markerRadius: _vehicleSize / 2);
     final placed = [
       for (final (:vehicle, :progress) in vehicles)
         if (vehicle.direction < detail.directions.length &&
             vehicle.branch < detail.directions[vehicle.direction].branches.length)
           if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch])
-                  .place(vehicle, progress, trailLength: trail)
+                  .place(vehicle, progress)
               case final place?)
             (vehicle: vehicle, place: place),
-    ];
-    // Where the vehicles just ran: a wide band over the line, darker than it, all of them in one layer (redrawn every
-    // second)
-    final trails = [
-      for (final (:vehicle, :place) in placed)
-        if (!vehicle.stale && place.trail.length >= 2) place.trail,
     ];
     return MapOverlay(
       paths: [
         for (final other in direction?.branches ?? const <LineBranch>[])
           if (other != branch) MapPath(points: points(other), color: color.withValues(alpha: 0.35), width: 4),
         if (selected.isNotEmpty) MapPath(points: selected, color: color, width: 6),
-        if (trails.isNotEmpty)
-          MapPath(
-            points: trails.first,
-            others: trails.sublist(1),
-            color: darken(color, 0.15).withValues(alpha: 0.6),
-            width: 12,
-            casing: false,
-          ),
       ],
       pins: [
         for (final stop in branch == null ? const <StopRef>[] : stopsOnce(branch))
@@ -143,7 +132,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             point: place.point,
             color: color,
             label: vehicleLabel(vehicle, now),
-            onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+            onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle, onFollow: () => _follow(vehicle)),
             childSize: Size.square(VehicleMarker.boxSize(_vehicleSize)),
             child: VehicleMarker(
               line: line,
@@ -156,7 +145,25 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           ),
       ],
       fit: selected,
-    );
+    ).withFollow(_followView(placed));
+  }
+
+  /// The camera on the vehicle followed, north up; it stops when the vehicle is gone
+  MapFollow? _followView(List<({Vehicle vehicle, VehiclePlacement place})> placed) {
+    final followed = _followed;
+    if (followed == null) {
+      return null;
+    }
+    final place = placed.where((entry) => entry.vehicle.id == followed).firstOrNull?.place;
+    if (place == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _followed = null);
+        }
+      });
+      return null;
+    }
+    return MapFollow(position: place.point, bearing: 0, zoom: 15);
   }
 
   Widget _content(
@@ -169,6 +176,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     // A stop area served twice in a row (two of its quays) shows once
     final shown = branch?.copyWith(stops: stopsOnce(branch));
     final positions = stopListPositions(shown, vehicles);
+    final closed = ref.watch(lineClosedStopsProvider(detail.line.id)).value ?? const <String>{};
 
     final theme = Theme.of(context);
     final line = detail.line;
@@ -257,6 +265,19 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
           child: LineServiceHoursSummary(lineId: line.id, direction: _direction.clamp(0, detail.directions.length - 1)),
         ),
+        if (_followed != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: InputChip(
+                avatar: const Icon(Icons.my_location, size: 18),
+                label: Text(context.l10n.vehicleFollowing),
+                deleteButtonTooltipMessage: context.l10n.vehicleStopFollowing,
+                onDeleted: () => setState(() => _followed = null),
+              ),
+            ),
+          ),
         if (shown != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
@@ -272,6 +293,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                       isLast: i == shown.stops.length - 1,
                       line: line,
                       vehicles: positions[i] ?? const [],
+                      closed: closed.contains(shown.stops[i].id),
+                      onFollow: _follow,
                     ),
                 ],
               ),
@@ -334,9 +357,17 @@ class _StopTimelineTile extends StatelessWidget {
     required this.isLast,
     required this.line,
     this.vehicles = const [],
+    this.closed = false,
+    required this.onFollow,
   });
 
+  /// "Suivre" in a vehicle's sheet
+  final ValueChanged<Vehicle> onFollow;
+
   static const _height = 44.0;
+
+  /// The line doesn't stop there now (station closed, stop not served)
+  final bool closed;
 
   final StopRef stop;
   final Color color;
@@ -385,7 +416,7 @@ class _StopTimelineTile extends StatelessWidget {
                       top: height / 2 + offset * height - 10,
                       left: 14,
                       child: GestureDetector(
-                        onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle),
+                        onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle, onFollow: () => onFollow(vehicle)),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
                           child: VehicleMarker(line: line, size: 20, punctuality: Punctuality.of(vehicle), stale: vehicle.stale),
@@ -400,9 +431,14 @@ class _StopTimelineTile extends StatelessWidget {
                 stop.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontWeight: terminus ? FontWeight.w600 : FontWeight.w400),
+                style: TextStyle(
+                  fontWeight: terminus ? FontWeight.w600 : FontWeight.w400,
+                  color: closed ? context.colors.muted : null,
+                  decoration: closed ? TextDecoration.lineThrough : null,
+                ),
               ),
             ),
+            if (closed) PillTag(icon: Icons.block, color: Theme.of(context).colorScheme.error, text: context.l10n.notServed),
           ],
         ),
       ),

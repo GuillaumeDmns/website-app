@@ -14,4 +14,10 @@
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>
     <string name="alert_channel">Journey alerts</string>
     <string name="alert_channel_description">Get off, vehicle arriving, delay or cancellation</string>
+    <string name="prepare_channel">Get ready to get off</string>
+    <string name="prepare_channel_description">Your stop is next: two short vibrations</string>
+    <string name="alight_channel">Get off now</string>
+    <string name="alight_channel_description">At your stop: long vibrations</string>
+    <string name="platform_channel">Platform announced</string>
+    <string name="platform_channel_description">The platform of your train, or its change: one short vibration</string>
 </resources>

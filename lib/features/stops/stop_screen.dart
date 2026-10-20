@@ -13,6 +13,7 @@ import '../../core/platform/share.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
@@ -80,6 +81,7 @@ class _StopContent extends ConsumerWidget {
     final theme = Theme.of(context);
     final departures = ref.watch(stopDeparturesProvider(detail.id));
     final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final closedLines = ref.watch(stopClosedLinesProvider(detail.id)).value ?? const <String>{};
     void goThere() => context.push(
       Routes.journey(
         ref
@@ -122,7 +124,26 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 for (final line in detail.lines)
-                  InkWell(onTap: () => context.push(Routes.line(line.id)), child: LineBadge(line, size: 28)),
+                  InkWell(
+                    onTap: () => context.push(Routes.line(line.id)),
+                    child: closedLines.contains(line.id)
+                        // Not stopping here now: faded, crossed
+                        ? Tooltip(
+                            message: context.l10n.notServed,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Opacity(opacity: 0.35, child: LineBadge(line, size: 28)),
+                                Positioned(
+                                  right: -4,
+                                  top: -4,
+                                  child: Icon(Icons.block, size: 16, color: theme.colorScheme.error),
+                                ),
+                              ],
+                            ),
+                          )
+                        : LineBadge(line, size: 28),
+                  ),
                 if (detail.wheelchairBoarding == 1)
                   Tooltip(
                     message: context.l10n.wheelchairAccessible,
@@ -131,6 +152,16 @@ class _StopContent extends ConsumerWidget {
               ],
             ),
           ),
+          if (closedLines.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 0, 0),
+              child: NoticeLine(
+                icon: Icons.block,
+                text: context.l10n.notServedLines(
+                  detail.lines.where((line) => closedLines.contains(line.id)).map((line) => '${line.mode.label} ${line.name ?? ''}'.trim()).join(', '),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 16, 0, 4),
             child: Row(
@@ -161,11 +192,12 @@ class _StopContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StopDisruptions(detail: detail),
-                SectionTitle(context.l10n.nextDepartures),
+                SectionTitle(context.l10n.nextDepartures, trailing: UpdatedAgo(value: departures)),
                 AppCard(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                   child: AsyncView(
                     value: departures,
+                    loading: const SkeletonCards(count: 3, height: 52),
                     onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
                     data: (departures) => _DepartureList(departures: departures, now: now),
                   ),

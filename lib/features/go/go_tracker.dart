@@ -224,6 +224,15 @@ class GoAlert {
 
   /// Time to act now (get off, vehicle leaving)
   final bool urgent;
+
+  /// How it is felt (vibration): `prepare` (two short), `alight` (long, repeated), `platform` (one short), `urgent`,
+  /// else `info`
+  String get kind => switch (id.split('-').first) {
+        'prepare' => 'prepare',
+        'alight' => 'alight',
+        'platform' => 'platform',
+        _ => urgent ? 'urgent' : 'info',
+      };
 }
 
 /// Follows a journey from positions, the clock and real time. Pure: [update] returns the new progress and the
@@ -414,6 +423,9 @@ class GoTracker {
     final at = input.fixAt ?? input.now;
     return input.now.difference(at) <= _fixValidity ? position : null;
   }
+
+  /// No usable fix for a while (underground, indoors): the schedule leads
+  bool followsSchedule(GoProgress progress, DateTime now) => _noFixFor(progress, now);
 
   bool _noFixFor(GoProgress progress, DateTime now) =>
       progress.lastFixAt == null || now.difference(progress.lastFixAt!) > _noFixDelay;

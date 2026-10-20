@@ -23,6 +23,8 @@ void main() {
     // Elevator outages are grouped
     expect(find.textContaining('ascenseur en panne'), findsOneWidget);
     expect(backend.requestsTo('/api/v2/stops/IDFM:70001'), hasLength(1));
+    // The bus 38 doesn't stop here now
+    expect(find.text(currentL10n.notServedLines('Bus 38')), findsOneWidget);
 
     // Today's service of its lines, from the schedule: the last metro soon; a direction unfolds its frequencies
     expect(find.text(currentL10n.serviceHoursTitle), findsOneWidget);

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
@@ -9,12 +10,16 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../app/theme.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/utils/geo.dart';
+import '../../core/utils/time_format.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../favorites/favorite_widgets.dart';
+import '../favorites/favorites_controller.dart';
 import '../home_widget/home_widget_sync.dart';
 import '../traffic/traffic_screen.dart';
 import 'nearby_departures.dart';
@@ -60,6 +65,10 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+              sliver: SliverToBoxAdapter(child: _Suggestion()),
+            ),
+            const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
             ),
@@ -85,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SectionTitle(context.l10n.homeNearby),
+                    SectionTitle(context.l10n.homeNearby, trailing: UpdatedAgo(value: ref.watch(nearbyDeparturesProvider(key)))),
                     if (!origin.isUser)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
@@ -118,6 +127,46 @@ class HomeScreen extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
             SliverToBoxAdapter(child: HomeWidgetSync(closest: stops.firstOrNull)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What the user likely wants now, in one tap: home in the evening, work in the morning (when saved, and away from it)
+class _Suggestion extends ConsumerWidget {
+  const _Suggestion();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
+    final hour = now.toLocal().hour;
+    final kind = hour >= 16 || hour < 3
+        ? FavoriteKind.home
+        : hour >= 5 && hour < 11
+            ? FavoriteKind.work
+            : null;
+    final favorites = ref.watch(favoritesProvider).value ?? const <Favorite>[];
+    final place = kind == null ? null : favorites.where((favorite) => favorite.kind == kind).firstOrNull;
+    final user = ref.watch(userLocationProvider).value;
+    if (place == null ||
+        place.lat == null ||
+        (user != null && metersBetween(user, LatLng(place.lat!, place.lon!)) < 300)) {
+      return const SizedBox.shrink();
+    }
+    final next = nextTripTo(ref, place, now);
+    final leaveIn = next?.departure.difference(now);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: ActionChip(
+          avatar: Icon(kind == FavoriteKind.home ? Icons.home_rounded : Icons.work_rounded, size: 18),
+          label: Text([
+            kind == FavoriteKind.home ? context.l10n.homeSuggestHome : context.l10n.homeSuggestWork,
+            if (leaveIn != null) leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+          ].join(' · ')),
+          onPressed: () => goToPlace(context, ref, place),
         ),
       ),
     );

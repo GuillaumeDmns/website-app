@@ -26,3 +26,13 @@ final lineDisruptionsProvider = FutureProvider.autoDispose.family<List<Disruptio
 final stopDisruptionsProvider = FutureProvider.autoDispose.family<List<Disruption>, String>(
   (ref, stopAreaId) => ref.watch(mobilityApiProvider).stopDisruptions(stopAreaId),
 );
+
+/// Stop areas a line doesn't serve now (from its blocking disruptions), none when unknown
+final lineClosedStopsProvider = FutureProvider.autoDispose.family<Set<String>, String>(
+  (ref, lineId) async => (await ref.watch(mobilityApiProvider).lineClosedStops(lineId)).toSet(),
+);
+
+/// Lines that don't stop at a stop area now
+final stopClosedLinesProvider = FutureProvider.autoDispose.family<Set<String>, String>(
+  (ref, stopAreaId) async => (await ref.watch(mobilityApiProvider).stopClosedLines(stopAreaId)).toSet(),
+);

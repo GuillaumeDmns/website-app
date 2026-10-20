@@ -55,6 +55,21 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant FlutterMainMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The panel opened higher or lower (GO's turns unfolded): the user followed kept low above it
+    final following = _following;
+    if (following != null && widget.padding != oldWidget.padding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _following == following) {
+          _shown = null;
+          _follow(following);
+        }
+      });
+    }
+  }
+
   void _frame(MapOverlay overlay) {
     final follow = overlay.follow;
     if (follow != null) {
@@ -168,9 +183,6 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         if (mounted) {
           final camera = _controller.mapController.camera;
           ref.read(mapCenterProvider.notifier).update(camera.center);
-          // 256-pixel tiles
-          ref.read(mapScaleProvider.notifier)
-              .update(156543.03392 * math.cos(camera.center.latitude * math.pi / 180) / math.pow(2, camera.zoom));
         }
       });
     }
@@ -242,15 +254,14 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
-              for (final part in path.parts)
-                Polyline(
-                  points: part,
-                  color: path.color,
-                  strokeWidth: path.width,
-                  pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
-                  borderColor: path.casing ? Colors.white.withValues(alpha: path.color.a) : Colors.transparent,
-                  borderStrokeWidth: path.casing ? 1.5 : 0,
-                ),
+              Polyline(
+                points: path.points,
+                color: path.color,
+                strokeWidth: path.width,
+                pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
+                borderColor: Colors.white.withValues(alpha: path.color.a),
+                borderStrokeWidth: 1.5,
+              ),
           ],
         ),
         MarkerLayer(

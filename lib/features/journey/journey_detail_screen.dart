@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,6 +17,7 @@ import '../../l10n/l10n.dart';
 import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
+import '../go/go_instruction.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
@@ -68,7 +70,6 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     final shared = inMemory || departure == null ? null : ref.watch(sharedJourneyProvider(widget.query));
     final planned = inMemory ? selected : shared?.value;
     final request = inMemory ? ref.read(selectedJourneyProvider.notifier).request : JourneyRequest.fromQuery(params);
-    final theme = Theme.of(context);
 
     void back() =>
         context.canPop() ? context.pop() : context.go(request == null ? Routes.home : Routes.journey(request));
@@ -114,7 +115,27 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
 
     return MapOverlayScope(
       overlay: journeyOverlay(context, journey, fitSection: _focused),
-      child: ListView(
+      // Citymapper's big green GO stays at hand at the bottom, whatever is scrolled
+      child: Column(
+        children: [
+          Expanded(child: _content(context, journey, retimed, planned, request, back)),
+          _GoBar(
+            journey: journey,
+            now: now,
+            onGo: () {
+              ref.read(goControllerProvider.notifier).start(journey, request);
+              context.push(Routes.go);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, JourneyOption journey, RetimedJourney retimed, JourneyOption planned, JourneyRequest? request,
+      VoidCallback back) {
+    final theme = Theme.of(context);
+    return ListView(
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 0, 16, 32),
         children: [
@@ -159,21 +180,6 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Citymapper's big green GO
-                FilledButton.icon(
-                  // The theme makes filled buttons full width
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(104, 52),
-                    textStyle: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1),
-                  ),
-                  icon: const Icon(Icons.navigation),
-                  label: Text(context.l10n.go),
-                  onPressed: () {
-                    ref.read(goControllerProvider.notifier).start(journey, request);
-                    context.push(Routes.go);
-                  },
-                ),
               ],
             ),
           ),
@@ -207,6 +213,64 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
             ),
           ),
         ],
+    );
+  }
+}
+
+/// At the bottom of the detail: when to leave, the duration and arrival, the big green GO
+class _GoBar extends StatelessWidget {
+  const _GoBar({required this.journey, required this.now, required this.onGo});
+
+  final JourneyOption journey;
+  final DateTime now;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final leaveIn = journey.departure.difference(now);
+    final live = journey.rides.firstOrNull?.realtime == true;
+    return Material(
+      color: context.colors.card,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: live ? context.colors.live : null),
+                    ),
+                    Text(
+                      '${formatDuration(journey.duration)} · ${context.l10n.arrivalAt(formatClock(journey.arrival))}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              // The theme makes filled buttons full width
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(112, 52),
+                  textStyle: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1),
+                ),
+                icon: const Icon(Icons.navigation),
+                label: Text(context.l10n.go),
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  onGo();
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -445,6 +509,9 @@ class _RideTile extends StatelessWidget {
                         color: theme.colorScheme.primary,
                         text: _boardingLabel(section.boardingPositions),
                       ),
+                    // The platform of the departure taken, once announced
+                    if (platformLabel(line, plan?.ride?.departure.platform) case final platform?)
+                      PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.primary, text: platform),
                   ],
                 ),
                 if (hasLine) _RideDisruptions(lineId: lineId),
@@ -622,15 +689,34 @@ class _Departures extends ConsumerWidget {
     if (rides.isEmpty) {
       return const SizedBox.shrink();
     }
+    final taken = plan.ride;
+    // If it is missed: the next one
+    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).firstOrNull;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: RideDepartureList(
-        rides: rides,
-        now: now,
-        selected: plan.ride,
-        earliest: plan.earliest,
-        onSelect: onChoose,
-        onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RideDepartureList(
+            rides: rides,
+            now: now,
+            selected: taken,
+            earliest: plan.earliest,
+            onSelect: onChoose,
+            onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
+          ),
+          if (taken != null && after != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 4),
+              child: Text(
+                context.l10n.goIfMissed(
+                  formatClock(after.departure.time),
+                  (after.departure.time.difference(taken.departure.time).inSeconds / 60).round(),
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
+              ),
+            ),
+        ],
       ),
     );
   }

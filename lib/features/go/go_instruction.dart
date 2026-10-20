@@ -3,19 +3,33 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
-import '../../core/utils/geo.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import 'go_controller.dart';
+import 'go_guidance.dart';
 import 'go_tracker.dart';
+
+/// A turn this close becomes the instruction (m)
+const maneuverAhead = 250.0;
 
 /// What to do now, in a few words
 class GoInstruction {
-  const GoInstruction({required this.title, this.subtitle, this.detail, this.icon, this.line, this.urgent = false});
+  const GoInstruction({
+    required this.title,
+    this.subtitle,
+    this.detail,
+    this.towards,
+    this.icon,
+    this.line,
+    this.urgent = false,
+  });
 
   final String title;
   final String? subtitle;
   final String? detail;
+
+  /// Under a turn: where the move goes and how far (`Marchez jusqu'à Châtelet · 350 m · 4 min`)
+  final String? towards;
   final IconData? icon;
 
   /// Shown as a badge instead of [icon]
@@ -53,9 +67,10 @@ String? goPlatformText(GoState state) {
   return waitingForIt ? label : '${_lineLabel(line)} $label';
 }
 
+/// Like the departure lists: whole minutes left (rounded down), "now" within 30 s
 String _minutes(Duration duration) {
-  final minutes = (duration.inSeconds / 60).ceil();
-  return minutes <= 0 ? currentL10n.now : currentL10n.inMinutes(minutes);
+  final seconds = duration.inSeconds;
+  return seconds <= 30 ? currentL10n.now : currentL10n.inMinutes(math.max(1, seconds ~/ 60));
 }
 
 GoInstruction goInstruction(GoState state, DateTime now) {
@@ -118,13 +133,9 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       );
 
     case GoPhase.moving:
-      // Away from the path: at least the straight distance to the end
-      final end = step.end;
-      final position = state.position;
-      final meters = math.max(tracker.metersLeft(progress),
-          end == null || position == null ? 0.0 : metersBetween(position, end));
+      final meters = metersToGo(state);
       final nextStep = progress.step + 1 < tracker.steps.length ? tracker.steps[progress.step + 1] : null;
-      final walkMinutes = math.max(1, (meters / 1.2 / 60).ceil());
+      final walkMinutes = math.max(1, (meters / movePace(state, step) / 60).ceil());
       final verb = switch (section.kind) {
         SectionKind.bike => currentL10n.goVerbBike,
         SectionKind.car => currentL10n.goVerbCar,
@@ -141,10 +152,23 @@ GoInstruction goInstruction(GoState state, DateTime now) {
           ?platform,
         ].join(' · ');
       }
+      final goTo = currentL10n.goVerbTo(verb, section.to?.name ?? '');
+      final toGo = meters >= 1 ? '${formatDistance(meters.round())} · ${currentL10n.minutesShort(walkMinutes)}' : null;
+      // A turn coming: what to do there first, like a navigation app
+      final maneuver = nextManeuver(step, progress.along);
+      if (maneuver != null && maneuver.meters <= maneuverAhead) {
+        return GoInstruction(
+          icon: maneuver.icon,
+          title: maneuver.label,
+          subtitle: [currentL10n.goInDistance(formatDistance(maneuver.meters.round())), ?maneuver.walk.name].join(' · '),
+          detail: [goTo, ?toGo, ?detail].join(' · '),
+          towards: [goTo, ?toGo].join(' · '),
+        );
+      }
       return GoInstruction(
         icon: section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
-        title: currentL10n.goVerbTo(verb, section.to?.name ?? ''),
-        subtitle: meters >= 1 ? '${formatDistance(meters.round())} · ${currentL10n.minutesShort(walkMinutes)}' : null,
+        title: goTo,
+        subtitle: toGo,
         detail: detail,
       );
 

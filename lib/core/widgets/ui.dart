@@ -24,10 +24,11 @@ class SectionTitle extends StatelessWidget {
 
 /// White rounded card of the pages (grey background), tappable when [onTap] is given
 class AppCard extends StatelessWidget {
-  const AppCard({super.key, required this.child, this.onTap, this.padding = const EdgeInsets.all(16), this.color, this.border});
+  const AppCard({super.key, required this.child, this.onTap, this.onLongPress, this.padding = const EdgeInsets.all(16), this.color, this.border});
 
   final Widget child;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final EdgeInsets padding;
   final Color? color;
 
@@ -44,9 +45,9 @@ class AppCard extends StatelessWidget {
       color: color,
       shape: border == null ? null : shape,
       clipBehavior: Clip.antiAlias,
-      child: onTap == null
+      child: onTap == null && onLongPress == null
           ? Padding(padding: padding, child: child)
-          : InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+          : InkWell(onTap: onTap, onLongPress: onLongPress, onSecondaryTap: onLongPress, child: Padding(padding: padding, child: child)),
     );
   }
 }

@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
+import 'package:website_app/l10n/l10n.dart';
 
 import '../support/samples.dart';
 import '../support/standard_backend.dart';
 import '../support/test_app.dart';
 
-/// The vehicles of a line on its page: pointing the way they go, gliding along, their trail, late or stale
+/// The vehicles of a line on its page: pointing the way they go, gliding along, late or stale
 void main() {
   testWidgets('vehicles glide along the line, pointing the way they go', (tester) async {
     final backend = standardBackend();
@@ -55,11 +56,9 @@ void main() {
     expect(moving.heading, inInclusiveRange(90, 180));
     expect(tester.widgetList<VehicleMarker>(find.byType(VehicleMarker)).where((marker) => marker.stale), hasLength(2));
 
-    // Its trail: a wide band over the line, none behind the stale one
-    final trails = tester.widgetList<fm.PolylineLayer>(find.byType(fm.PolylineLayer))
-        .expand((layer) => layer.polylines)
-        .where((polyline) => polyline.strokeWidth == 12);
-    expect(trails, hasLength(1));
+    // No trail behind them: the line's branches only
+    final paths = tester.widgetList<fm.PolylineLayer>(find.byType(fm.PolylineLayer)).expand((layer) => layer.polylines);
+    expect(paths.where((polyline) => polyline.strokeWidth > 6), isEmpty);
 
     // It moves on between two fetches, every second
     final before = tester.getCenter(onMap.first);
@@ -67,6 +66,13 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump(const Duration(seconds: 1));
     expect(tester.getCenter(onMap.first), isNot(before));
+
+    // Followed on the map from its sheet, until stopped
+    await tapOn(tester, onMap.first);
+    await tapOn(tester, find.text(currentL10n.vehicleFollow));
+    expect(find.text(currentL10n.vehicleFollowing), findsOneWidget);
+    await tapOn(tester, find.byTooltip(currentL10n.vehicleStopFollowing));
+    expect(find.text(currentL10n.vehicleFollowing), findsNothing);
 
     await closeApp(tester);
   });

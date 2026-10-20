@@ -360,6 +360,15 @@ abstract class WalkStep with _$WalkStep {
 
     /// Seconds
     @Default(0) int duration,
+
+    /// Turn at its start, in degrees: 0 straight on, negative to the left, positive to the right
+    @Default(0) int direction,
+
+    /// Meters from the start of the section where it starts
+    @Default(0) int offset,
+
+    /// Street, when given
+    String? name,
   }) = _WalkStep;
 
   factory WalkStep.fromJson(Map<String, dynamic> json) => _$WalkStepFromJson(json);

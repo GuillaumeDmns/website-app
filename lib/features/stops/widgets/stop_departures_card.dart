@@ -16,11 +16,14 @@ int walkingMinutes(int meters) => (meters / 80).ceil().clamp(1, 999);
 
 /// Next departures of a stop area, one row per line and destination (Citymapper's "nearby" card).
 class StopDeparturesCard extends StatelessWidget {
-  const StopDeparturesCard({super.key, required this.departures, required this.now, this.maxRows = 6});
+  const StopDeparturesCard({super.key, required this.departures, required this.now, this.maxRows = 6, this.onLongPress});
 
   final StopDepartures departures;
   final DateTime now;
   final int maxRows;
+
+  /// Long press (right click): saving the stop, around
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,7 @@ class StopDeparturesCard extends StatelessWidget {
 
     return AppCard(
       onTap: () => context.push(Routes.stop(stop.id)),
+      onLongPress: onLongPress,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

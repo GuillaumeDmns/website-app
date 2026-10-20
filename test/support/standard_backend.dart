@@ -100,6 +100,11 @@ FakeBackend standardBackend() {
       journey([walk(start, 240), transit(start.add(const Duration(minutes: 4)), 600, line: rerA, to: gareDeLyon)]).copyWith(type: 'rapid'),
     ]).toJson());
   });
+  // "Bus 38 : arrêt Châtelet non desservi", like the backend's tests
+  backend.on('GET', '/api/v2/lines/*/closed-stops',
+      (request) => FakeResponse(Uri.decodeFull(request.uri.path).contains('C02000') ? ['IDFM:70001'] : <String>[]));
+  backend.on('GET', '/api/v2/stops/*/closed-lines',
+      (request) => FakeResponse(Uri.decodeFull(request.uri.path).contains('IDFM:70001') ? ['C02000'] : <String>[]));
   backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
         for (final minutes in [7, 12, 17]) ride(inMinutes(minutes)).toJson(),
       ]));

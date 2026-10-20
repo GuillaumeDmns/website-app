@@ -26,30 +26,10 @@ final vehicleClockProvider = StreamProvider.autoDispose<DateTime>(
   (ref) => Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
 );
 
-/// Usual length of a vehicle of [mode], in meters: its trail is about as long
-double vehicleLength(TransportMode mode) => switch (mode) {
-      TransportMode.metro => 100,
-      TransportMode.rer => 220,
-      TransportMode.transilien || TransportMode.ter => 200,
-      TransportMode.tram => 40,
-      _ => 15,
-    };
-
-/// Shortest trail on the screen, in logical pixels: a bus's must show without zooming in
-const minTrailPixels = 14.0;
-
-/// Length of the trails of [mode]'s vehicles on a map at [metersPerPixel] (unknown: the vehicle's length): what shows
-/// out of the marker (of [markerRadius] pixels) is as long as the vehicle, at least [minTrailPixels]
-double trailLength(TransportMode mode, double? metersPerPixel, {double markerRadius = 12}) {
-  final scale = metersPerPixel ?? 0;
-  return scale * markerRadius + math.max(vehicleLength(mode), scale * minTrailPixels);
-}
-
 /// Where a vehicle is on its branch's path
 ///
-/// [heading]: its direction of travel, in degrees clockwise from north; [trail]: the path it just ran, as long as the
-/// trail asked for and never before the stop it left, empty when it is waiting at a stop
-typedef VehiclePlacement = ({LatLng point, double heading, List<LatLng> trail});
+/// [heading]: its direction of travel, in degrees clockwise from north
+typedef VehiclePlacement = ({LatLng point, double heading});
 
 /// Progress of a vehicle between its two stops at [now]: it keeps moving between two fetches, at the pace given by
 /// the progress and the expected time at the next stop when fetched
@@ -88,9 +68,8 @@ class BranchPath {
   /// Where [vehicle] is at [progress] between its two stops, null when they are not on this branch
   LatLng? position(Vehicle vehicle, double progress) => place(vehicle, progress)?.point;
 
-  /// Where [vehicle] is at [progress] between its two stops, which way it goes and the [trailLength] meters it just ran;
-  /// null when they are not on this branch
-  VehiclePlacement? place(Vehicle vehicle, double progress, {double trailLength = 0}) {
+  /// Where [vehicle] is at [progress] between its two stops and which way it goes; null when they are not on this branch
+  VehiclePlacement? place(Vehicle vehicle, double progress) {
     final to = stopIds.indexOf(vehicle.toStopId);
     if (to < 0 || line.isEmpty) {
       return null;
@@ -99,18 +78,12 @@ class BranchPath {
     final left = vehicle.fromStopId == null ? -1 : stopIds.lastIndexOf(vehicle.fromStopId!, to);
     final from = vehicle.fromStopId == null ? to : left >= 0 ? left : math.max(0, to - 1);
     final along = stopAlongs[from] + (stopAlongs[to] - stopAlongs[from]) * progress;
-    // The way ahead around it (the branch's direction at a stop where it waits)
-    const around = 20.0;
+    // The way ahead around it (the branch's direction at a stop where it waits), over 100 m: GTFS shapes often make a
+    // small hook at stations, which turned the pointer sideways
+    const around = 50.0;
     final ahead = math.min(along + around, line.length);
     final behind = math.max(ahead - 2 * around, 0.0);
-    final moving = from != to && progress < 1;
-    return (
-      point: line.pointAt(along),
-      heading: bearingBetween(line.pointAt(behind), line.pointAt(ahead)),
-      trail: moving && trailLength > 0
-          ? line.between(math.max(stopAlongs[from], along - trailLength), along)
-          : const <LatLng>[],
-    );
+    return (point: line.pointAt(along), heading: bearingBetween(line.pointAt(behind), line.pointAt(ahead)));
   }
 }
 

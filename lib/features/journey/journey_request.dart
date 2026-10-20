@@ -101,6 +101,38 @@ class JourneyRequest {
 
   bool get isComplete => from != null && to != null;
 
+  /// The modes the user chooses from (TER goes with Transilien, Noctilien with the buses)
+  static const choosableModes = [TransportMode.metro, TransportMode.rer, TransportMode.transilien, TransportMode.tram, TransportMode.bus];
+
+  /// [mode] is allowed (all are without a choice)
+  bool allows(TransportMode mode) => modes.isEmpty || modes.contains(mode);
+
+  /// Only [mode] (and its linked ones)
+  JourneyRequest withOnly(TransportMode mode) {
+    var request = this;
+    for (final other in choosableModes) {
+      request = request.withMode(other, other == mode);
+    }
+    return request.withMode(mode, true);
+  }
+
+  /// [mode] allowed or not; never none, and all of them is no choice
+  JourneyRequest withMode(TransportMode mode, bool allowed) {
+    final chosen = {for (final choosable in choosableModes) if (choosable == mode ? allowed : allows(choosable)) choosable};
+    if (chosen.isEmpty) {
+      return this;
+    }
+    return copyWith(
+      modes: chosen.length == choosableModes.length
+          ? <TransportMode>{}
+          : {
+              ...chosen,
+              if (chosen.contains(TransportMode.transilien)) TransportMode.ter,
+              if (chosen.contains(TransportMode.bus)) TransportMode.noctilien,
+            },
+    );
+  }
+
   /// Options other than the defaults
   int get optionCount =>
       (modes.isEmpty ? 0 : 1) + (wheelchair ? 1 : 0) + (walkingSpeed == WalkingSpeed.normal ? 0 : 1) + (bikeShare ? 1 : 0);

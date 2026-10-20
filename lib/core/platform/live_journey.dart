@@ -50,7 +50,8 @@ abstract class LiveJourney {
 
   Future<void> update(LiveJourneyUpdate update);
 
-  Future<void> alert(String title, String body, {bool urgent = false});
+  /// [kind]: how it is felt (`GoAlert.kind`: `prepare`, `alight`, `platform`, `urgent`, `info`)
+  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'});
 
   Future<void> stop();
 
@@ -92,8 +93,8 @@ class _AndroidLiveJourney implements LiveJourney {
       });
 
   @override
-  Future<void> alert(String title, String body, {bool urgent = false}) =>
-      _call('alert', {'title': title, 'body': body, 'urgent': urgent});
+  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) =>
+      _call('alert', {'title': title, 'body': body, 'urgent': urgent, 'kind': kind});
 
   @override
   Future<void> stop() async {
@@ -116,7 +117,7 @@ class _NoLiveJourney implements LiveJourney {
   Future<void> update(LiveJourneyUpdate update) async {}
 
   @override
-  Future<void> alert(String title, String body, {bool urgent = false}) async {}
+  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
 
   @override
   Future<void> stop() async {}
@@ -137,7 +138,7 @@ class _WebLiveJourney implements LiveJourney {
   Future<void> update(LiveJourneyUpdate update) async {}
 
   @override
-  Future<void> alert(String title, String body, {bool urgent = false}) async {
+  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {
     if (browser.pageHidden) {
       browser.notify(title, body);
     }
