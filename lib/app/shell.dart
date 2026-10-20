@@ -160,7 +160,7 @@ class _WideLayout extends StatelessWidget {
 
 /// How the bottom sheet behaves on a page
 class _SheetProfile {
-  const _SheetProfile({this.peek = 110, this.middle = 0.5, this.full = false});
+  const _SheetProfile({this.peek = 110, this.middle = 0.5, this.maxMiddle = 0.8, this.full = false});
 
   /// Lowest height (pixels, handle included): enough for the page's header to stay readable
   final double peek;
@@ -169,7 +169,7 @@ class _SheetProfile {
   final double middle;
 
   /// At most for a content-sized middle: the map keeps a part of the screen
-  final double maxMiddle = 0.8;
+  final double maxMiddle;
 
   /// Always at full height: nothing to see on the map (search, traffic), and room for the keyboard
   final bool full;
@@ -182,8 +182,9 @@ class _SheetProfile {
       return const _SheetProfile(full: true);
     }
     if (location.startsWith(Routes.go)) {
-      // One step card, most of the screen for the map; lowered, the arrival time and buttons stay
-      return const _SheetProfile(peek: 84, middle: 0.45);
+      // One compact step card, at least half of the screen for the map (drag up for the rest); lowered, the arrival
+      // time and buttons stay
+      return const _SheetProfile(peek: 84, middle: 0.4, maxMiddle: 0.5);
     }
     if (location.startsWith(Routes.journeyPath) && !location.startsWith(Routes.journeyDetail)) {
       // Start and end fields stay

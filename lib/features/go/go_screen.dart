@@ -32,9 +32,10 @@ import 'go_guidance.dart';
 import 'go_instruction.dart';
 import 'go_tracker.dart';
 
-/// GO mode, like Citymapper: the instruction in large over the map (`GoBar`), and in the panel the arrival with the
-/// journey's progress, the strip of its steps (tap one to look at it) and one card per step, swiped horizontally. The
-/// page follows the step in progress; the map frames the step shown (on a ride, what is left of it).
+/// GO mode, like Citymapper: in the panel the arrival with the journey's progress, the strip of its steps (tap one to
+/// look at it) and one card per step, swiped horizontally, the one in progress telling what to do now (the next turn,
+/// the time to spare, the countdown to the departure). The panel stays low, the map above it free: the page follows
+/// the step in progress; the map frames the step shown (on a ride, what is left of it) or follows the user on foot.
 class GoScreen extends ConsumerStatefulWidget {
   const GoScreen({super.key});
 
@@ -548,11 +549,19 @@ class _IssueCard extends ConsumerWidget {
 
 /// Title row of a card: the line badge or the move's icon, a few words in large, one detail line
 class _CardTitle extends StatelessWidget {
-  const _CardTitle({required this.leading, required this.title, required this.detail, this.done = false, this.urgent = false});
+  const _CardTitle({
+    required this.leading,
+    required this.title,
+    required this.detail,
+    this.trailing,
+    this.done = false,
+    this.urgent = false,
+  });
 
   final Widget leading;
   final String title;
-  final String detail;
+  final String? detail;
+  final Widget? trailing;
   final bool done;
   final bool urgent;
 
@@ -579,18 +588,23 @@ class _CardTitle extends StatelessWidget {
                           : null,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(detail, style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
+              if (detail case final detail? when detail.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(detail, style: theme.textTheme.bodyLarge?.copyWith(color: muted)),
+              ],
             ],
           ),
         ),
+        ?trailing,
         if (done) Icon(Icons.check_circle, color: context.colors.live),
       ],
     );
   }
 }
 
-/// A move on foot or by bike: where to, how far, the turns (the next one marked), then what comes next
+/// A move on foot or by bike. In progress: what to do now (the next turn, else where to go), how far, the time to
+/// spare; the turns folded under it so that the panel stays low. Otherwise where to, how long and its turns. Then what
+/// comes next.
 class _MoveCard extends ConsumerWidget {
   const _MoveCard({required this.state, required this.index});
 
@@ -604,54 +618,120 @@ class _MoveCard extends ConsumerWidget {
     final progress = state.progress;
     final step = tracker.steps[index];
     final section = step.section;
-    final isLive = index == progress.step && progress.phase != GoPhase.arrived;
+    final isLive = index == progress.step && progress.phase == GoPhase.moving;
     final isDone = index < progress.step || progress.phase == GoPhase.arrived;
-    final verb = switch (section.kind) {
-      SectionKind.bike => context.l10n.goVerbBike,
-      SectionKind.car => context.l10n.goVerbCar,
-      SectionKind.transfer => context.l10n.goVerbTransfer,
-      _ => context.l10n.goVerbWalk,
-    };
-    final title = section.kind == SectionKind.transfer
-        ? context.l10n.goTransferTo(section.to?.name ?? '')
-        : context.l10n.goVerbTo(verb, section.to?.name ?? '');
-    final String detail;
-    if (isLive) {
-      final meters = metersToGo(state);
-      detail = '${formatDistance(meters.round())} · ${context.l10n.minutesShort(math.max(1, (meters / movePace(state, step) / 60).ceil()))}';
-    } else {
-      detail = [formatDuration(section.duration), if ((section.length ?? 0) > 0) formatDistance(section.length!)].join(' · ');
-    }
+    final moveIcon = section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk;
     final next = isLive ? nextManeuver(step, progress.along) : null;
     final along = isLive ? progress.along : (isDone ? double.infinity : 0.0);
     final total = (section.length ?? 0) > 0 ? section.length! : (section.steps.isEmpty ? 0 : section.steps.last.offset + section.steps.last.length);
     final scale = total > 0 && step.line.length > 0 ? step.line.length / total : 1.0;
+    final turns = [
+      for (final walk in section.steps)
+        _TurnRow(
+          walk: walk,
+          passed: walk.offset * scale < along - 3 && walk != next?.walk,
+          next: walk == next?.walk,
+          meters: walk == next?.walk ? next!.meters : null,
+        ),
+    ];
+
+    final Widget title;
+    if (isLive) {
+      final now = DateTime.now();
+      final instruction = goInstruction(state, now);
+      title = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: AppTheme.brand, borderRadius: BorderRadius.circular(12)),
+              child: Icon(instruction.icon ?? moveIcon, size: 30, color: Colors.white),
+            ),
+            title: instruction.title,
+            detail: instruction.subtitle,
+          ),
+          if (instruction.towards case final towards?)
+            Padding(
+              padding: const EdgeInsets.only(left: 56, top: 4),
+              child: Text(towards, style: theme.textTheme.bodyMedium?.copyWith(color: context.colors.muted)),
+            ),
+          _GoPills(state: state, now: now),
+        ],
+      );
+    } else {
+      final verb = switch (section.kind) {
+        SectionKind.bike => context.l10n.goVerbBike,
+        SectionKind.car => context.l10n.goVerbCar,
+        SectionKind.transfer => context.l10n.goVerbTransfer,
+        _ => context.l10n.goVerbWalk,
+      };
+      title = _CardTitle(
+        leading: Icon(moveIcon, size: 34, color: isDone ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
+        title: section.kind == SectionKind.transfer
+            ? context.l10n.goTransferTo(section.to?.name ?? '')
+            : context.l10n.goVerbTo(verb, section.to?.name ?? ''),
+        detail: [formatDuration(section.duration), if ((section.length ?? 0) > 0) formatDistance(section.length!)].join(' · '),
+        done: isDone,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _CardTitle(
-          leading: Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
-              size: 34, color: isDone ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
-          title: title,
-          detail: detail,
-          done: isDone,
-        ),
-        // The turns, the next one marked, the ones passed faded
-        if (section.steps.length > 1) ...[
-          const SizedBox(height: 10),
-          for (final walk in section.steps)
-            _TurnRow(
-              walk: walk,
-              passed: walk.offset * scale < along - 3 && walk != next?.walk,
-              next: walk == next?.walk,
-              meters: walk == next?.walk ? next!.meters : null,
-            ),
-        ],
+        title,
+        // The turns: folded while walking (the next one is the title), open on a step looked at
+        if (turns.length > 1) _Turns(initiallyExpanded: !isLive, children: turns),
         if (!isDone && index + 1 < tracker.steps.length) _NextStep(state: state, index: index + 1),
         const SizedBox(height: 8),
-        if (!isLive && !isDone)
+        if (!isDone && index != progress.step)
           _SmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),
+      ],
+    );
+  }
+}
+
+/// The turns of a move behind a header, folded or not
+class _Turns extends StatefulWidget {
+  const _Turns({required this.initiallyExpanded, required this.children});
+
+  final bool initiallyExpanded;
+  final List<Widget> children;
+
+  @override
+  State<_Turns> createState() => _TurnsState();
+}
+
+class _TurnsState extends State<_Turns> {
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.format_list_bulleted, size: 20, color: context.colors.muted),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('${context.l10n.goTurnByTurn} · ${widget.children.length}',
+                      style: theme.textTheme.labelLarge?.copyWith(color: context.colors.muted)),
+                ),
+                Icon(_expanded ? Icons.expand_less : Icons.expand_more, color: context.colors.muted),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded) ...widget.children,
       ],
     );
   }
@@ -700,7 +780,7 @@ class _TurnRow extends StatelessWidget {
   }
 }
 
-/// A ride: waiting for it (countdown in the banner, where to board, departures, the next one if missed), on board
+/// A ride: waiting for it (countdown, where to board, departures, the next one if missed), on board
 /// (the stops left with their times, where to get off), or to come (its departures)
 class _RideCard extends ConsumerWidget {
   const _RideCard({required this.state, required this.index});
@@ -736,6 +816,9 @@ class _RideCard extends ConsumerWidget {
       ].join(' · ');
     }
     final positions = section.boardingPositions;
+    final now = DateTime.now();
+    final waiting = isLive && progress.phase == GoPhase.waiting;
+    final countdown = waiting ? tracker.expectedDeparture(step, progress, state.currentVehicle).difference(now) : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -744,9 +827,16 @@ class _RideCard extends ConsumerWidget {
           leading: section.line != null ? LineBadge(section.line!, size: 36) : const Icon(Icons.directions_transit, size: 34),
           title: title,
           detail: detail,
+          trailing: countdown == null
+              ? null
+              : _Countdown(
+                  until: countdown,
+                  color: countdown <= const Duration(minutes: 1) ? Theme.of(context).colorScheme.error : AppTheme.brand,
+                ),
           done: isDone,
           urgent: urgent,
         ),
+        if (waiting) _GoPills(state: state, now: now),
         if (onBoard) ...[
           const SizedBox(height: 12),
           _StopsLeft(state: state, step: step),
@@ -1224,6 +1314,162 @@ class _SmallAction extends StatelessWidget {
     onPressed: onPressed,
     child: Text(label),
   );
+}
+
+/// Under the instruction: the time to spare walking to the ride, and following the schedule without GPS
+class _GoPills extends StatelessWidget {
+  const _GoPills({required this.state, required this.now});
+
+  final GoState state;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final margin = walkMargin(state, now);
+    final noGps = state.progress.phase != GoPhase.arrived && state.tracker.followsSchedule(state.progress, now);
+    if (margin == null && !noGps) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 56, top: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (margin != null) _MarginPill(state: state, margin: margin, now: now),
+          if (noGps) _Pill(icon: Icons.gps_off, text: context.l10n.goNoGps, color: scheme.inverseSurface, textColor: scheme.onInverseSurface),
+        ],
+      ),
+    );
+  }
+}
+
+/// Minutes until the vehicle leaves, large, with a ring emptying over the last ten minutes
+class _Countdown extends StatelessWidget {
+  const _Countdown({required this.until, required this.color});
+
+  final Duration until;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // Like the departure lists: whole minutes left, "now" within 30 s
+    final minutes = until.inSeconds <= 30 ? 0 : (until.inSeconds ~/ 60).clamp(1, 999);
+    final theme = Theme.of(context);
+    return SizedBox.square(
+      dimension: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: CircularProgressIndicator(
+              value: (until.inSeconds / 600).clamp(0.0, 1.0),
+              strokeWidth: 4,
+              color: color,
+              backgroundColor: color.withValues(alpha: 0.2),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                minutes <= 0 ? context.l10n.now : '$minutes',
+                style: (minutes <= 0 ? theme.textTheme.labelLarge : theme.textTheme.titleLarge)
+                    ?.copyWith(color: color, fontWeight: FontWeight.w700, height: 1),
+              ),
+              if (minutes > 0) Text(context.l10n.minutesUnit, style: theme.textTheme.labelSmall?.copyWith(color: color, height: 1)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Time to spare walking to the ride: green with time, orange to hurry, red with the next departure when too late
+class _MarginPill extends ConsumerWidget {
+  const _MarginPill({required this.state, required this.margin, required this.now});
+
+  final GoState state;
+  final WalkMargin margin;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final minutes = (margin.margin.inSeconds.abs() / 60).floor();
+    return switch (margin.level) {
+      MarginLevel.ahead => _Pill(
+          icon: Icons.check_circle,
+          text: context.l10n.goMarginAhead(minutes),
+          color: context.colors.live,
+          textColor: Colors.white,
+        ),
+      MarginLevel.hurry => _Pill(
+          icon: Icons.directions_run,
+          text: context.l10n.goMarginHurry,
+          color: context.colors.warning,
+          textColor: Colors.white,
+        ),
+      MarginLevel.late => _Pill(
+          icon: Icons.warning_amber,
+          text: _nextOne(context, ref) ?? context.l10n.goMarginLate,
+          color: scheme.error,
+          textColor: scheme.onError,
+        ),
+    };
+  }
+
+  /// `Vous allez le rater · suivant à 14:38 (+6 min)`, from the ride's departures
+  String? _nextOne(BuildContext context, WidgetRef ref) {
+    final tracker = state.tracker;
+    final index = state.progress.step + 1;
+    final ride = tracker.steps[index];
+    final earliest = earliestBoarding(state.journey, ride.sectionIndex, now).add(state.progress.shift);
+    final key = rideKey(ride.section, earliest, now);
+    if (key == null) {
+      return null;
+    }
+    final walk = Duration(seconds: (metersToGo(state) / movePace(state, tracker.steps[state.progress.step])).round());
+    final reachable = now.add(walk);
+    final next = (ref.watch(rideOptionsProvider(key)).value ?? const [])
+        .where((ride) => ride.departure.time.isAfter(reachable) && ride.departure.time.isAfter(margin.departure))
+        .firstOrNull;
+    if (next == null) {
+      return null;
+    }
+    final later = (next.departure.time.difference(margin.departure).inSeconds / 60).round();
+    return context.l10n.goMarginLateNext(formatClock(next.departure.time), later);
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.text, required this.color, required this.textColor});
+
+  final IconData icon;
+  final String text;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 5, 12, 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: textColor),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(text,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(color: textColor, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 /// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes

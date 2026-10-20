@@ -54,17 +54,23 @@ void main() {
     expect(find.byType(GoScreen), findsOneWidget);
   }
 
-  testWidgets('walking: the next turn in large, the turns listed, the time to spare, what comes next', (tester) async {
+  testWidgets('walking: the next turn in the panel, the turns folded under it, what comes next', (tester) async {
     final along = tracker.steps.first.line.length * 260 / 500;
     await openGo(tester, followed(GoProgress(step: 0, phase: GoPhase.moving, along: along), position: LatLng(chatelet.lat, chatelet.lon)));
 
+    // Once, in the card: nothing over the map
     expect(find.text(currentL10n.goTurnLeft), findsOneWidget);
     expect(find.textContaining('Rue des Halles'), findsWidgets);
-    expect(find.text('Tournez à gauche sur Rue des Halles'), findsOneWidget);
+    expect(find.textContaining(currentL10n.goVerbTo(currentL10n.goVerbWalk, 'Châtelet')), findsOneWidget);
     expect(find.text(currentL10n.goThen), findsOneWidget);
     // The steps' strip and the journey's progress
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.byIcon(Icons.flag), findsWidgets);
+
+    // The turns, folded so that the panel stays low
+    expect(find.text('Tournez à gauche sur Rue des Halles'), findsNothing);
+    await tapOn(tester, find.textContaining(currentL10n.goTurnByTurn));
+    expect(find.text('Tournez à gauche sur Rue des Halles'), findsOneWidget);
 
     await closeApp(tester);
   });
@@ -72,7 +78,9 @@ void main() {
   testWidgets('waiting: the countdown, where to board, the departures and the next one if missed', (tester) async {
     await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon)));
 
-    expect(find.text(currentL10n.goTake('Métro 1')), findsOneWidget);
+    expect(find.textContaining('Métro 1 →'), findsOneWidget);
+    // The countdown to the departure (in 6 min): a ring emptying
+    expect(find.byWidgetPredicate((widget) => widget is CircularProgressIndicator && widget.value != null), findsOneWidget);
     expect(find.byType(TrainPositions), findsOneWidget);
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
 

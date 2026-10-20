@@ -55,6 +55,21 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant FlutterMainMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The panel opened higher or lower (GO's turns unfolded): the user followed kept low above it
+    final following = _following;
+    if (following != null && widget.padding != oldWidget.padding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _following == following) {
+          _shown = null;
+          _follow(following);
+        }
+      });
+    }
+  }
+
   void _frame(MapOverlay overlay) {
     final follow = overlay.follow;
     if (follow != null) {
@@ -73,7 +88,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     _controller.animatedFitCamera(
       cameraFit: CameraFit.coordinates(
         coordinates: overlay.fit,
-        padding: widget.padding + EdgeInsets.only(top: ref.read(mapTopInsetProvider)) + const EdgeInsets.all(48),
+        padding: widget.padding + const EdgeInsets.all(48),
         maxZoom: overlay.fit.length == 1 ? 16 : 17,
       ),
     );
@@ -96,11 +111,10 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     // Only turning (the phone in the hand): quickly, the map stays with the hand
     final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
     final size = _controller.mapController.camera.nonRotatedSize;
-    final topInset = ref.read(mapTopInsetProvider);
-    final visibleHeight = size.height - widget.padding.bottom - topInset;
+    final visibleHeight = size.height - widget.padding.bottom;
     // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
     // animation's own offset doesn't work with a rotation)
-    final below = topInset + visibleHeight * 0.72 - size.height / 2;
+    final below = visibleHeight * 0.72 - size.height / 2;
     final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
     final center = const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
     if (step) {

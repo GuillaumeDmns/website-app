@@ -14,11 +14,22 @@ const maneuverAhead = 250.0;
 
 /// What to do now, in a few words
 class GoInstruction {
-  const GoInstruction({required this.title, this.subtitle, this.detail, this.icon, this.line, this.urgent = false});
+  const GoInstruction({
+    required this.title,
+    this.subtitle,
+    this.detail,
+    this.towards,
+    this.icon,
+    this.line,
+    this.urgent = false,
+  });
 
   final String title;
   final String? subtitle;
   final String? detail;
+
+  /// Under a turn: where the move goes and how far (`Marchez jusqu'à Châtelet · 350 m · 4 min`)
+  final String? towards;
   final IconData? icon;
 
   /// Shown as a badge instead of [icon]
@@ -151,6 +162,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
           title: maneuver.label,
           subtitle: [currentL10n.goInDistance(formatDistance(maneuver.meters.round())), ?maneuver.walk.name].join(' · '),
           detail: [goTo, ?toGo, ?detail].join(' · '),
+          towards: [goTo, ?toGo].join(' · '),
         );
       }
       return GoInstruction(

@@ -434,5 +434,6 @@
   "loading": "Loading",
   "updatedJustNow": "Up to date",
   "updatedSecondsAgo": "{seconds} s ago",
-  "updatedMinutesAgo": "{minutes} min ago"
+  "updatedMinutesAgo": "{minutes} min ago",
+  "goTurnByTurn": "Turn-by-turn directions"
 }

@@ -1270,5 +1270,6 @@
   "updatedSecondsAgo": "Il y a {seconds} s",
   "@updatedSecondsAgo": {"placeholders": {"seconds": {"type": "int"}}},
   "updatedMinutesAgo": "Il y a {minutes} min",
-  "@updatedMinutesAgo": {"placeholders": {"minutes": {"type": "int"}}}
+  "@updatedMinutesAgo": {"placeholders": {"minutes": {"type": "int"}}},
+  "goTurnByTurn": "Itinéraire détaillé"
 }
