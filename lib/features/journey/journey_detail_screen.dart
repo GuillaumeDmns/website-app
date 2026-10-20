@@ -5,28 +5,23 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../app/theme.dart';
 import '../../core/api/models.dart';
+import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/share.dart';
-import '../../core/location/location_providers.dart';
-import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
-import '../../core/widgets/line_badge.dart';
-import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
-import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
 import 'journey_labels.dart';
-import '../traffic/disruption_widgets.dart';
-import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
-import 'widgets/ride_departures.dart';
-import '../../app/theme.dart';
+import 'widgets/journey_sections.dart';
+import 'widgets/journey_timeline.dart';
 
 /// Step by step view of a journey option. Each ride lists its departures; choosing another one moves the journey
 /// to it, the following connections included (see [retimeJourney]).
@@ -119,7 +114,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
       child: Column(
         children: [
           Expanded(child: _content(context, journey, retimed, planned, request, back)),
-          _GoBar(
+          _GoFooter(
             journey: journey,
             now: now,
             onGo: () {
@@ -193,7 +188,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (index, section) in journey.sections.indexed)
-                  _SectionTile(
+                  JourneySectionTile(
                     section: section,
                     isFirst: index == 0,
                     ride: retimed.rides[index],
@@ -202,7 +197,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                     onFocus: (focus) => _focus(index, focus),
                   ),
                 if (journey.sections.lastOrNull?.to case final end?)
-                  _TimelineRow(
+                  TimelineRow(
                     color: theme.colorScheme.error,
                     time: formatClock(journey.arrival),
                     dot: true,
@@ -218,8 +213,8 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
 }
 
 /// At the bottom of the detail: when to leave, the duration and arrival, the big green GO
-class _GoBar extends StatelessWidget {
-  const _GoBar({required this.journey, required this.now, required this.onGo});
+class _GoFooter extends StatelessWidget {
+  const _GoFooter({required this.journey, required this.now, required this.onGo});
 
   final JourneyOption journey;
   final DateTime now;
@@ -274,519 +269,4 @@ class _GoBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SectionTile extends StatelessWidget {
-  const _SectionTile({
-    required this.section,
-    required this.isFirst,
-    this.ride,
-    required this.onChoose,
-    required this.focused,
-    required this.onFocus,
-  });
-
-  final JourneySection section;
-
-  /// A ride's departures and the one taken
-  final RidePlan? ride;
-  final ValueChanged<Ride> onChoose;
-
-  /// Only the first section shows where it starts: the others start where the previous one ended
-  final bool isFirst;
-
-  /// Its stops shown, framed on the map
-  final bool focused;
-  final ValueChanged<bool> onFocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-
-    switch (section.kind) {
-      case SectionKind.transit:
-        return _RideTile(section: section, plan: ride, onChoose: onChoose, focused: focused, onFocus: onFocus);
-      case SectionKind.wait:
-        return _TimelineRow(
-          color: muted,
-          dotted: true,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text(context.l10n.waitFor(formatDuration(section.duration)), style: TextStyle(color: muted)),
-          ),
-        );
-      case SectionKind.bike when section.from?.name.startsWith('Station Vélib') ?? false:
-        return _BikeShareTile(section: section);
-      case SectionKind.walk || SectionKind.transfer || SectionKind.bike || SectionKind.car || SectionKind.other:
-        final verb = switch (section.kind) {
-          SectionKind.bike => context.l10n.sectionBike,
-          SectionKind.car => context.l10n.sectionCar,
-          SectionKind.transfer => context.l10n.sectionTransfer,
-          _ => context.l10n.sectionWalk,
-        };
-        final distance = section.length == null || section.length == 0 ? '' : ' (${formatDistance(section.length!)})';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (section.from != null && isFirst)
-              _TimelineRow(
-                color: muted,
-                time: formatClock(section.departure),
-                dot: true,
-                child: Text(section.from!.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            _TimelineRow(
-              color: muted,
-              dotted: true,
-              child: section.steps.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('$verb ${formatDuration(section.duration)}$distance', style: TextStyle(color: muted)),
-                    )
-                  : Theme(
-                      data: theme.copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        tilePadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(
-                          '$verb ${formatDuration(section.duration)}$distance',
-                          style: TextStyle(color: muted),
-                        ),
-                        children: [
-                          for (final step in section.steps)
-                            ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.turn_right, size: 18),
-                              title: Text(step.instruction),
-                            ),
-                        ],
-                      ),
-                    ),
-            ),
-          ],
-        );
-    }
-  }
-}
-
-/// Vélib ride: the stations with their live availability (bikes where it starts, free docks where it ends)
-class _BikeShareTile extends ConsumerWidget {
-  const _BikeShareTile({required this.section});
-
-  final JourneySection section;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-    BikeStation? station(JourneyPoint? point) => point == null
-        ? null
-        : ref.watch(nearbyBikesProvider((lat: point.lat, lon: point.lon, radius: 60, limit: 1))).value?.firstOrNull;
-    final take = station(section.from);
-    final leave = station(section.to);
-    final distance = section.length == null || section.length == 0 ? '' : ' (${formatDistance(section.length!)})';
-
-    Widget stationRow(JourneyPoint? point, BikeStation? live, {required bool start}) => _TimelineRow(
-      color: velibColor,
-      time: formatClock(start ? section.departure : section.arrival),
-      dot: true,
-      child: InkWell(
-        onTap: live == null ? null : () => showBikeStationSheet(context, live),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              (start ? context.l10n.bikePickUp : context.l10n.bikeDropOff)(
-                point?.name.replaceFirst('Station Vélib ', '') ?? '',
-              ),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            if (live != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2, bottom: 4),
-                child: BikeCounts(station: live, bikes: start, docks: !start),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        stationRow(section.from, take, start: true),
-        _TimelineRow(
-          color: velibColor,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              context.l10n.bikeRideEstimated(formatDuration(section.duration), distance),
-              style: TextStyle(color: muted),
-            ),
-          ),
-        ),
-        stationRow(section.to, leave, start: false),
-      ],
-    );
-  }
-}
-
-class _RideTile extends StatelessWidget {
-  const _RideTile({required this.section, required this.plan, required this.onChoose, required this.focused, required this.onFocus});
-
-  final JourneySection section;
-  final RidePlan? plan;
-  final ValueChanged<Ride> onChoose;
-
-  /// Its stops shown in the timeline, and the ride framed on the map
-  final bool focused;
-  final ValueChanged<bool> onFocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final lineId = section.line?.id;
-    final hasLine = lineId != null && lineId.isNotEmpty;
-    final theme = Theme.of(context);
-    final line = section.line;
-    final color = parseHexColor(line?.color, theme.colorScheme.primary);
-    final intermediate = section.stops.length > 2
-        ? section.stops.sublist(1, section.stops.length - 1)
-        : const <JourneyStop>[];
-    final delay = section.delay ?? 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _TimelineRow(
-          color: color,
-          time: formatClock(section.departure),
-          dot: true,
-          child: InkWell(
-            onTap: section.from?.stopAreaId == null ? null : () => context.push(Routes.stop(section.from!.stopAreaId!)),
-            child: Text(section.from?.name ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ),
-        _TimelineRow(
-          color: color,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (line != null)
-                      InkWell(
-                        onTap: line.id.isEmpty ? null : () => context.push(Routes.line(line.id)),
-                        child: LineBadge(line, size: 26),
-                      ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        context.l10n.direction(section.headsign ?? ''),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    if (section.realtime == true)
-                      PillTag(
-                        icon: Icons.rss_feed,
-                        color: delay >= 120 ? context.colors.warning : context.colors.live,
-                        text: delay >= 60 ? context.l10n.delayMinutes(Duration(seconds: delay).roundedMinutes) : context.l10n.realtime,
-                      ),
-                    if (hasLine) LastRideTag(ride: section),
-                    if (section.boardingPositions.isNotEmpty)
-                      PillTag(
-                        icon: Icons.train,
-                        color: theme.colorScheme.primary,
-                        text: boardingLabel(section.boardingPositions),
-                      ),
-                    // The platform of the departure taken, once announced
-                    if (platformLabel(line, plan?.ride?.departure.platform) case final platform?)
-                      PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.primary, text: platform),
-                  ],
-                ),
-                if (hasLine) RideDisruptions(lineId: lineId),
-                // Elevators matter to get on and off: those of both stops
-                for (final point in [section.from, section.to])
-                  if (point?.stopAreaId case final stopAreaId?)
-                    _StopElevators(stopAreaId: stopAreaId, name: point!.name),
-                if (plan != null) _Departures(plan: plan!, onChoose: onChoose),
-                if (intermediate.isNotEmpty)
-                  // The stops between, like Citymapper: below, on the line
-                  InkWell(
-                    onTap: () => onFocus(!focused),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
-                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                            ),
-                          ),
-                          Icon(focused ? Icons.expand_less : Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      formatDuration(section.duration),
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (focused)
-          for (final stop in intermediate)
-            _TimelineRow(
-              color: color,
-              time: stop.time == null ? null : formatClock(stop.time!),
-              stopDot: true,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(stop.name, style: theme.textTheme.bodyMedium),
-              ),
-            ),
-        _TimelineRow(
-          color: color,
-          time: formatClock(section.arrival),
-          dot: true,
-          child: InkWell(
-            onTap: section.to?.stopAreaId == null ? null : () => context.push(Routes.stop(section.to!.stopAreaId!)),
-            child: Text(
-              context.l10n.getOffAt(section.to?.name ?? ''),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Elevator outages of a stop of the ride, on one line (a folding card would break the timeline's intrinsic height);
-/// tapping it shows the messages
-class _StopElevators extends ConsumerWidget {
-  const _StopElevators({required this.stopAreaId, required this.name});
-
-  final String stopAreaId;
-  final String name;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final elevators = (ref.watch(stopDisruptionsProvider(stopAreaId)).value ?? const <Disruption>[])
-        .where((disruption) => disruption.active && disruption.category == DisruptionCategory.elevator)
-        .toList();
-    if (elevators.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final color = context.colors.warning;
-    final title = context.l10n.brokenElevatorsAt(elevators.length, name);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(title),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final disruption in elevators)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text('• ${disruption.message ?? disruption.title ?? ''}'),
-                    ),
-                ],
-              ),
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close))],
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.elevator_outlined, size: 18, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 18, color: color),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Departures of the ride's line at the boarding stop that stop at the alighting one, from when the traveller can
-/// be there: the one taken is highlighted, choosing another one moves the journey to it.
-class _Departures extends ConsumerWidget {
-  const _Departures({required this.plan, required this.onChoose});
-
-  final RidePlan plan;
-  final ValueChanged<Ride> onChoose;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final now = ref.watch(nowProvider).value ?? DateTime.now();
-    final rides = ref.watch(rideOptionsProvider(plan.key)).value ?? const <Ride>[];
-    if (rides.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final taken = plan.ride;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RideDepartureList(
-            rides: rides,
-            now: now,
-            selected: taken,
-            earliest: plan.earliest,
-            onSelect: onChoose,
-            onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
-          ),
-          // If it is missed: the next one
-          IfMissedLine(rides: rides, taken: taken),
-        ],
-      ),
-    );
-  }
-}
-
-/// Row of the timeline: time on the left, a vertical line (solid or dotted) with an optional stop dot, content
-class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({
-    required this.color,
-    required this.child,
-    this.time,
-    this.dot = false,
-    this.stopDot = false,
-    this.dotted = false,
-    this.isLast = false,
-  });
-
-  final Color color;
-  final Widget child;
-  final String? time;
-  final bool dot;
-
-  /// A stop the vehicle passes: a small dot on the line, which goes on
-  final bool stopDot;
-  final bool dotted;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            // Room for "09:15" at the user's text size
-            width: MediaQuery.textScalerOf(context).scale(44),
-            child: time == null
-                ? null
-                : Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      time!,
-                      style: theme.textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-                    ),
-                  ),
-          ),
-          SizedBox(
-            width: 24,
-            child: Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                if (!(dot && isLast))
-                  Positioned.fill(
-                    top: dot ? 8 : 0,
-                    child: Center(
-                      child: dotted ? _DottedLine(color: color) : Container(width: 5, color: color),
-                    ),
-                  ),
-                if (stopDot)
-                  Container(
-                    margin: const EdgeInsets.only(top: 5),
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: color, width: 2),
-                    ),
-                  ),
-                if (dot)
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: color, width: 3),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Padding(padding: const EdgeInsets.only(bottom: 4), child: child),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Vertical dotted line (walking); painted, since the timeline rows are sized with IntrinsicHeight
-class _DottedLine extends StatelessWidget {
-  const _DottedLine({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(size: const Size(4, double.infinity), painter: _DotsPainter(color));
-}
-
-class _DotsPainter extends CustomPainter {
-  _DotsPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    for (var y = 2.0; y < size.height; y += 8) {
-      canvas.drawCircle(Offset(size.width / 2, y), 2, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DotsPainter oldDelegate) => oldDelegate.color != color;
 }
