@@ -6,7 +6,7 @@ import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../journey/journey_labels.dart';
-import 'go_controller.dart';
+import 'go_state.dart';
 import 'go_guidance.dart';
 import 'go_tracker.dart';
 

@@ -32,6 +32,7 @@ import '../traffic/disruption_widgets.dart';
 import 'go_controller.dart';
 import 'go_guidance.dart';
 import 'go_instruction.dart';
+import 'go_state.dart';
 import 'go_tracker.dart';
 
 /// GO mode, like Citymapper: in the panel the arrival with the journey's progress, the strip of its steps (tap one to
@@ -1410,17 +1411,4 @@ class _Pill extends StatelessWidget {
           ),
         ),
       );
-}
-
-/// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes
-/// little sense when walking. Where the device has a compass, the map turns with it instead (the phone in the hand
-/// turns, the map turns). Only for the move in progress, when it is the step shown.
-MapFollow? goFollow(GoState state, int shownStep) {
-  final progress = state.progress;
-  final position = state.position;
-  final step = state.tracker.stepOf(progress);
-  if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
-    return null;
-  }
-  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
 }

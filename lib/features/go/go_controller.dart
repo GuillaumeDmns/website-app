@@ -13,150 +13,17 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
-import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
 import 'go_guidance.dart';
-import 'go_instruction.dart';
+import 'go_live.dart';
 import 'go_smoother.dart';
+import 'go_state.dart';
 import 'go_tracker.dart';
 
 const _storageKey = 'go_session';
-
-/// A journey followed in GO mode
-@immutable
-class GoState {
-  const GoState({
-    required this.tracker,
-    required this.request,
-    required this.progress,
-    required this.startedAt,
-    required this.plannedArrival,
-    this.muted = false,
-    this.keepAwake = false,
-    this.position,
-    this.walkSpeed,
-    this.vehicle,
-    this.vehicleStep,
-    this.alert,
-    this.alertAt,
-    this.recalculating = false,
-    this.error,
-  });
-
-  final GoTracker tracker;
-
-  /// Destination and options, to recalculate
-  final JourneyRequest request;
-  final GoProgress progress;
-  final DateTime startedAt;
-
-  /// Arrival planned when GO was started (kept through recalculations and departures chosen), for the arrival summary
-  final DateTime plannedArrival;
-
-  /// No sound nor vibration for the alerts
-  final bool muted;
-
-  /// The screen stays on
-  final bool keepAwake;
-
-  /// Last position fix
-  final LatLng? position;
-
-  /// The user's walking pace (m/s), from the fixes' speeds while walking; null until known
-  final double? walkSpeed;
-
-  /// Real-time departure of the planned vehicle of the ride [vehicleStep] (the next one)
-  final Departure? vehicle;
-  final int? vehicleStep;
-
-  /// Last alert given, and when
-  final GoAlert? alert;
-  final DateTime? alertAt;
-  final bool recalculating;
-
-  /// Last recalculation failure
-  final String? error;
-
-  JourneyOption get journey => tracker.journey;
-
-  /// Vehicle of the current ride (null when the next ride is not the current step)
-  Departure? get currentVehicle => vehicleStep == progress.step ? vehicle : null;
-
-  GoState copyWith({
-    GoProgress? progress,
-    bool? muted,
-    bool? keepAwake,
-    LatLng? position,
-    double? walkSpeed,
-    Departure? Function()? vehicle,
-    int? Function()? vehicleStep,
-    GoAlert? alert,
-    DateTime? alertAt,
-    bool? recalculating,
-    String? Function()? error,
-  }) =>
-      GoState(
-        tracker: tracker,
-        request: request,
-        progress: progress ?? this.progress,
-        startedAt: startedAt,
-        plannedArrival: plannedArrival,
-        muted: muted ?? this.muted,
-        keepAwake: keepAwake ?? this.keepAwake,
-        position: position ?? this.position,
-        walkSpeed: walkSpeed ?? this.walkSpeed,
-        vehicle: vehicle != null ? vehicle() : this.vehicle,
-        vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
-        alert: alert ?? this.alert,
-        alertAt: alertAt ?? this.alertAt,
-        recalculating: recalculating ?? this.recalculating,
-        error: error != null ? error() : this.error,
-      );
-}
-
-/// How the position fixes of GO come, for the development builds: is the device's GPS giving a fix every second?
-@immutable
-class GoFixStats {
-  const GoFixStats({required this.at, required this.accuracy, this.interval});
-
-  /// When the last fix came
-  final DateTime at;
-
-  /// Its accuracy (m)
-  final double accuracy;
-
-  /// Mean time between the last fixes, null after the first one
-  final Duration? interval;
-}
-
-class GoFixStatsController extends Notifier<GoFixStats?> {
-  final _times = <DateTime>[];
-
-  @override
-  GoFixStats? build() => null;
-
-  void record(DateTime at, double accuracy) {
-    _times.add(at);
-    if (_times.length > 6) {
-      _times.removeAt(0);
-    }
-    state = GoFixStats(
-      at: at,
-      accuracy: accuracy,
-      interval: _times.length < 2 ? null : _times.last.difference(_times.first) ~/ (_times.length - 1),
-    );
-  }
-
-  void clear() {
-    _times.clear();
-    state = null;
-  }
-}
-
-final goFixStatsProvider = NotifierProvider<GoFixStatsController, GoFixStats?>(GoFixStatsController.new);
 
 /// GO session: feeds the [GoTracker] with high-accuracy positions, a 5 s clock and the real-time departures of the
 /// next ride (every 30 s), gives the alerts, and keeps the session on the device so that it survives a restart.
@@ -511,9 +378,11 @@ class GoController extends Notifier<GoState?> {
 
   void _stopFeeds() {
     _lastFix = null;
+    // Not during a build: providers can't be modified while widgets build
     Future.microtask(() {
       try {
         ref.read(preciseUserPositionProvider.notifier).set(null);
+        ref.read(goFixStatsProvider.notifier).clear();
       } catch (_) {
         // Disposed
       }
@@ -526,13 +395,6 @@ class GoController extends Notifier<GoState?> {
     _lifecycle?.dispose();
     _lifecycle = null;
     _foreground = true;
-    Future.microtask(() {
-      try {
-        ref.read(goFixStatsProvider.notifier).clear();
-      } catch (_) {
-        // Disposed
-      }
-    });
     _tick?.cancel();
     _tick = null;
     _departuresTimer?.cancel();
@@ -574,7 +436,7 @@ class GoController extends Notifier<GoState?> {
       if (!current.muted) {
         final live = ref.read(liveJourneyProvider);
         if (!live.systemAlerts) {
-          _signal(alert);
+          feelGoAlert(alert);
         }
         // Web: a notification when the tab is hidden
         live.alert(alert.title, alert.body ?? '', urgent: alert.urgent, kind: alert.kind);
@@ -609,99 +471,14 @@ class GoController extends Notifier<GoState?> {
     if (state.progress.phase == GoPhase.arrived) {
       return;
     }
-    final now = DateTime.now();
-    final instruction = goInstruction(state, now);
-    final tracker = state.tracker;
-    final progress = state.progress;
-    final step = tracker.stepOf(progress);
-
-    var done = 0;
-    for (var i = 0; i < progress.step && i < tracker.steps.length; i++) {
-      done += tracker.steps[i].section.duration;
-    }
-    if (step != null) {
-      final fraction = switch (progress.phase) {
-        GoPhase.moving => step.line.length == 0 ? 0.0 : progress.along / step.line.length,
-        GoPhase.onBoard => step.section.stops.length < 2 ? 0.5 : progress.stopIndex / (step.section.stops.length - 1),
-        _ => 0.0,
-      };
-      done += (step.section.duration * fraction.clamp(0.0, 1.0)).round();
-    }
-
-    final chip = switch (progress.phase) {
-      GoPhase.onBoard =>
-        tracker.stopsLeft(progress) <= 1 ? currentL10n.goChipGetOff : currentL10n.stopsCount(tracker.stopsLeft(progress)),
-      GoPhase.waiting when step != null =>
-        currentL10n.minutesShort(
-            (tracker.expectedDeparture(step, progress, state.currentVehicle).difference(now).inSeconds / 60).ceil().clamp(0, 999)),
-      _ => currentL10n.minutesShort((tracker.metersLeft(progress) / 1.2 / 60).ceil()),
-    };
-    final info = currentL10n.goArrival(formatClock(tracker.eta(progress, state.currentVehicle)));
-    // The platform as soon as it is known: the subtitle while waiting, the next ride's otherwise
-    final platform = goPlatformText(state);
-    final status = [
-      if (instruction.subtitle case final subtitle? when subtitle.isNotEmpty) subtitle,
-      ?platform,
-    ].join(' · ');
-    final key = '${instruction.title}|$status|$chip|$info|${progress.step}';
-    if (key == _lastLive && (done - _lastLiveProgress).abs() < 15) {
+    final update = goLiveUpdate(state, DateTime.now());
+    final key = '${update.title}|${update.status}|${update.chip}|${update.info}|${state.progress.step}';
+    if (key == _lastLive && (update.progress - _lastLiveProgress).abs() < 15) {
       return;
     }
     _lastLive = key;
-    _lastLiveProgress = done;
-
-    final section = step?.section;
-    final mode = section == null
-        ? 'walk'
-        : section.kind == SectionKind.transit
-            ? switch (section.line?.mode) {
-                TransportMode.metro => 'metro',
-                TransportMode.rer || TransportMode.transilien || TransportMode.ter => 'train',
-                TransportMode.tram => 'tram',
-                _ => 'bus',
-              }
-            : section.kind == SectionKind.transfer
-                ? 'transfer'
-                : 'walk';
-
-    ref.read(liveJourneyProvider).update(LiveJourneyUpdate(
-          title: instruction.title,
-          status: status,
-          progress: done,
-          mode: mode,
-          chip: chip,
-          info: info,
-          segments: [
-            for (final goStep in tracker.steps)
-              LiveJourneySegment(
-                seconds: goStep.section.duration,
-                color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : '#9E9E9E',
-              ),
-          ],
-        ));
-  }
-
-  /// An alert felt in the app (where the system doesn't give it): each kind its own pattern, as the Android channels
-  static void _signal(GoAlert alert) {
-    SystemSound.play(SystemSoundType.alert);
-    void pulses(int count, Duration gap, void Function() pulse) {
-      for (var i = 0; i < count; i++) {
-        Future.delayed(gap * i, pulse);
-      }
-    }
-
-    switch (alert.kind) {
-      case 'prepare':
-        pulses(2, const Duration(milliseconds: 220), HapticFeedback.mediumImpact);
-      case 'alight':
-        pulses(3, const Duration(milliseconds: 450), HapticFeedback.heavyImpact);
-      case 'platform':
-        HapticFeedback.selectionClick();
-      case 'urgent':
-        pulses(2, const Duration(milliseconds: 300), HapticFeedback.heavyImpact);
-      default:
-        HapticFeedback.mediumImpact();
-    }
+    _lastLiveProgress = update.progress;
+    ref.read(liveJourneyProvider).update(update);
   }
 
   /// A turn of the walk close ahead (15 m): felt once, like a navigation app, unless muted

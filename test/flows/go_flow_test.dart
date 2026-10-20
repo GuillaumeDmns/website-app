@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_screen.dart';
+import 'package:website_app/features/go/go_state.dart';
 import 'package:website_app/features/go/go_tracker.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';

@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/geo.dart';
 import '../../l10n/l10n.dart';
-import 'go_controller.dart';
+import '../../core/map/map_overlay.dart';
+import 'go_state.dart';
 import 'go_tracker.dart';
 
 /// A turn ahead on a walk, for turn-by-turn guidance: Navitia's instruction placed along the walking path
@@ -125,18 +126,12 @@ double metersToGo(GoState state) {
   return math.max(state.tracker.metersLeft(state.progress), end == null || position == null ? 0.0 : metersBetween(position, end));
 }
 
-/// Share of the journey done (0 to 1), by the planned durations of its steps
-double journeyFraction(GoState state) {
-  final tracker = state.tracker;
-  final progress = state.progress;
-  if (progress.phase == GoPhase.arrived) {
-    return 1;
-  }
-  var total = 0;
+/// Seconds of the journey done, by the planned durations of its steps: the steps before the current one, and the
+/// share of the current one done (along its path on foot, by its stops on board)
+double journeySecondsDone(GoTracker tracker, GoProgress progress) {
   var done = 0.0;
   for (final (index, step) in tracker.steps.indexed) {
     final duration = step.section.duration;
-    total += duration;
     if (index < progress.step) {
       done += duration;
     } else if (index == progress.step) {
@@ -148,5 +143,28 @@ double journeyFraction(GoState state) {
       done += duration * fraction.clamp(0.0, 1.0);
     }
   }
-  return total == 0 ? 0 : (done / total).clamp(0.0, 1.0);
+  return done;
+}
+
+/// Share of the journey done (0 to 1), by the planned durations of its steps
+double journeyFraction(GoState state) {
+  final tracker = state.tracker;
+  if (state.progress.phase == GoPhase.arrived) {
+    return 1;
+  }
+  final total = tracker.steps.fold(0, (total, step) => total + step.section.duration);
+  return total == 0 ? 0 : (journeySecondsDone(tracker, state.progress) / total).clamp(0.0, 1.0);
+}
+
+/// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes
+/// little sense when walking. Where the device has a compass, the map turns with it instead (the phone in the hand
+/// turns, the map turns). Only for the move in progress, when it is the step shown.
+MapFollow? goFollow(GoState state, int shownStep) {
+  final progress = state.progress;
+  final position = state.position;
+  final step = state.tracker.stepOf(progress);
+  if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
+    return null;
+  }
+  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
 }

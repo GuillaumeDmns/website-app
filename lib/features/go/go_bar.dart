@@ -8,6 +8,7 @@ import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
 import 'go_controller.dart';
 import 'go_instruction.dart';
+import 'go_state.dart';
 import 'go_tracker.dart';
 
 /// Floating bar over the map while a journey is followed: on the other pages, the current instruction (tap to open GO);
