@@ -103,36 +103,20 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
-    // About as long as the vehicle, never too short to see
-    final trail = trailLength(line.mode, ref.watch(mapScaleProvider), markerRadius: _vehicleSize / 2);
     final placed = [
       for (final (:vehicle, :progress) in vehicles)
         if (vehicle.direction < detail.directions.length &&
             vehicle.branch < detail.directions[vehicle.direction].branches.length)
           if (_pathOf(detail.directions[vehicle.direction].branches[vehicle.branch])
-                  .place(vehicle, progress, trailLength: trail)
+                  .place(vehicle, progress)
               case final place?)
             (vehicle: vehicle, place: place),
-    ];
-    // Where the vehicles just ran: a wide band over the line, darker than it, all of them in one layer (redrawn every
-    // second)
-    final trails = [
-      for (final (:vehicle, :place) in placed)
-        if (!vehicle.stale && place.trail.length >= 2) place.trail,
     ];
     return MapOverlay(
       paths: [
         for (final other in direction?.branches ?? const <LineBranch>[])
           if (other != branch) MapPath(points: points(other), color: color.withValues(alpha: 0.35), width: 4),
         if (selected.isNotEmpty) MapPath(points: selected, color: color, width: 6),
-        if (trails.isNotEmpty)
-          MapPath(
-            points: trails.first,
-            others: trails.sublist(1),
-            color: darken(color, 0.15).withValues(alpha: 0.6),
-            width: 12,
-            casing: false,
-          ),
       ],
       pins: [
         for (final stop in branch == null ? const <StopRef>[] : stopsOnce(branch))

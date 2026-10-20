@@ -287,7 +287,6 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
           final center = controller?.camera?.center;
           if (mounted && controller != null && center != null) {
             ref.read(mapCenterProvider.notifier).update(LatLng(center.lat, center.lon));
-            ref.read(mapScaleProvider.notifier).update(controller.getMetersPerPixelAtLatitude(center.lat.toDouble()));
           }
         });
       case MapEventLongClick(:final point) || MapEventSecondaryClick(:final point):
@@ -436,10 +435,10 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
   }
 
   static List<Layer> _pathLayersOf(MapPath path, Color casing) {
-    final lines = [for (final part in path.parts) if (part.length >= 2) _line(part)];
+    final lines = [if (path.points.length >= 2) _line(path.points)];
     return [
       // A light edge under the path (a band under the dotted ones), as faded as the path
-      if (path.casing) PolylineLayer(polylines: lines, color: casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
+      PolylineLayer(polylines: lines, color: casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
       PolylineLayer(polylines: lines, color: path.color, width: path.width.round(), dashArray: path.dotted ? const [1, 2] : null),
     ];
   }
