@@ -267,7 +267,7 @@ class _PlaceShortcut extends ConsumerWidget {
           title: title,
           subtitle: next == null || leaveIn == null
               ? favorite!.label ?? ''
-              : '${leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds))} · ${formatClock(next.arrival)}',
+              : '${leaveInLabel(leaveIn)} · ${formatClock(next.arrival)}',
           subtitleColor: next?.rides.firstOrNull?.realtime == true ? context.colors.live : null,
           color: color,
           tooltip: favorite!.label,
@@ -353,7 +353,7 @@ class FavoriteLinesSection extends ConsumerWidget {
           children: [
             for (final line in lines)
               Tooltip(
-                message: '${line.mode.label} ${line.name ?? ''}',
+                message: line.label,
                 child: InkWell(
                   onTap: () => context.push(Routes.line(line.id)),
                   child: WithSeverity(severity: severities[line.id], child: LineBadge(line, size: 34)),

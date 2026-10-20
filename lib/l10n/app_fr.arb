@@ -950,7 +950,6 @@
       }
     }
   },
-  "goVerbTransfer": "Correspondance",
   "goImOnBoard": "Je suis à bord",
   "goImAtThisStep": "Je suis à cette étape",
   "goPlannedDeparture": "Départ prévu à {time}",

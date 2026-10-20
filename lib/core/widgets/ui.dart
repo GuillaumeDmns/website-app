@@ -105,11 +105,11 @@ class RoundAction extends StatelessWidget {
   }
 }
 
-/// Small colored tag with an icon: real time, a delay, boarding position, last metro
+/// Small colored tag, with an icon or not: real time, a delay, boarding position, last metro, the next stop
 class PillTag extends StatelessWidget {
-  const PillTag({super.key, required this.icon, required this.text, required this.color});
+  const PillTag({super.key, this.icon, required this.text, required this.color});
 
-  final IconData icon;
+  final IconData? icon;
   final String text;
   final Color color;
 
@@ -120,8 +120,10 @@ class PillTag extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+            ],
             Flexible(child: Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600))),
           ],
         ),

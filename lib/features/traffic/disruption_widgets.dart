@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
+import 'traffic_providers.dart';
 
 Color severityColor(DisruptionSeverity? severity, ColorScheme scheme) {
   final colors = scheme.brightness == Brightness.light ? AppColors.light : AppColors.dark;
@@ -219,6 +221,40 @@ class DisruptionLine extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Active disruptions of a ride's line, information messages left out: the first [max] of them, one line each
+class RideDisruptions extends ConsumerWidget {
+  const RideDisruptions({super.key, required this.lineId, this.max = 3, this.top = 8});
+
+  /// None for a line the GTFS doesn't know (empty id)
+  final String? lineId;
+  final int max;
+
+  /// Space above them, when there are some
+  final double top;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lineId = this.lineId;
+    if (lineId == null || lineId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final disruptions = (ref.watch(lineDisruptionsProvider(lineId)).value ?? const <Disruption>[])
+        .where((disruption) => disruption.active && disruption.severity != DisruptionSeverity.info)
+        .take(max)
+        .toList();
+    if (disruptions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: EdgeInsets.only(top: top),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final disruption in disruptions) DisruptionLine(disruption: disruption)],
       ),
     );
   }

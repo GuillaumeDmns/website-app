@@ -18,15 +18,17 @@ import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/size_reporter.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../daily_trips/daily_trip_widgets.dart';
+import '../journey/journey_labels.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
+import '../journey/widgets/journey_card.dart';
 import '../journey/widgets/journey_map.dart';
 import '../journey/widgets/ride_departures.dart';
 import '../traffic/disruption_widgets.dart';
-import '../traffic/traffic_providers.dart';
 import 'go_controller.dart';
 import 'go_guidance.dart';
 import 'go_instruction.dart';
@@ -405,15 +407,8 @@ class _StepStrip extends StatelessWidget {
         items.add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline));
       }
       items.add(step.isRide && section.line != null
-          ? item(index, LineBadge(section.line!, size: 24), '${section.line!.mode.label} ${section.line!.name ?? ''}')
-          : item(
-              index,
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk, size: 20, color: colors.muted),
-                Text('${math.max(1, (section.duration / 60).round())}', style: TextStyle(fontSize: 12, color: colors.muted)),
-              ]),
-              context.l10n.goVerbTo(context.l10n.goVerbWalk, section.to?.name ?? ''),
-            ));
+          ? item(index, LineBadge(section.line!, size: 24), section.line!.label)
+          : item(index, MoveMinutes(section: section), context.l10n.goVerbTo(context.l10n.goVerbWalk, section.to?.name ?? '')));
     }
     items
       ..add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline))
@@ -478,7 +473,7 @@ class _IssueCard extends ConsumerWidget {
     final index = progress.step;
     final step = state.tracker.stepOf(progress);
     final line = step?.section.line;
-    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final lineLabel = line?.label ?? '';
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final key = step == null || !step.isRide ? null : rideKey(step.section, now, now);
     final planned = step == null ? now : state.tracker.expectedDeparture(step, progress, state.currentVehicle);
@@ -620,7 +615,6 @@ class _MoveCard extends ConsumerWidget {
     final section = step.section;
     final isLive = index == progress.step && progress.phase == GoPhase.moving;
     final isDone = index < progress.step || progress.phase == GoPhase.arrived;
-    final moveIcon = section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk;
     final next = isLive ? nextManeuver(step, progress.along) : null;
     final along = isLive ? progress.along : (isDone ? double.infinity : 0.0);
     final total = (section.length ?? 0) > 0 ? section.length! : (section.steps.isEmpty ? 0 : section.steps.last.offset + section.steps.last.length);
@@ -647,7 +641,7 @@ class _MoveCard extends ConsumerWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(color: AppTheme.brand, borderRadius: BorderRadius.circular(12)),
-              child: Icon(instruction.icon ?? moveIcon, size: 30, color: Colors.white),
+              child: Icon(instruction.icon ?? moveIcon(section.kind), size: 30, color: Colors.white),
             ),
             title: instruction.title,
             detail: instruction.subtitle,
@@ -661,17 +655,11 @@ class _MoveCard extends ConsumerWidget {
         ],
       );
     } else {
-      final verb = switch (section.kind) {
-        SectionKind.bike => context.l10n.goVerbBike,
-        SectionKind.car => context.l10n.goVerbCar,
-        SectionKind.transfer => context.l10n.goVerbTransfer,
-        _ => context.l10n.goVerbWalk,
-      };
       title = _CardTitle(
-        leading: Icon(moveIcon, size: 34, color: isDone ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
+        leading: Icon(moveIcon(section.kind), size: 34, color: isDone ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
         title: section.kind == SectionKind.transfer
             ? context.l10n.goTransferTo(section.to?.name ?? '')
-            : context.l10n.goVerbTo(verb, section.to?.name ?? ''),
+            : context.l10n.goVerbTo(moveVerb(section.kind), section.to?.name ?? ''),
         detail: [formatDuration(section.duration), if ((section.length ?? 0) > 0) formatDistance(section.length!)].join(' · '),
         done: isDone,
       );
@@ -797,7 +785,7 @@ class _RideCard extends ConsumerWidget {
     final isLive = index == progress.step && progress.phase != GoPhase.arrived;
     final isDone = index < progress.step || progress.phase == GoPhase.arrived;
     final onBoard = isLive && progress.phase == GoPhase.onBoard;
-    final lineLabel = '${section.line?.mode.label ?? ''} ${section.line?.name ?? ''}'.trim();
+    final lineLabel = section.line?.label ?? '';
     final stopCount = math.max(0, section.stops.length - 1);
 
     final String title;
@@ -848,7 +836,7 @@ class _RideCard extends ConsumerWidget {
           const SizedBox(height: 14),
           _Departures(state: state, step: step, index: index),
         ],
-        if (!isDone) _LineDisruption(lineId: section.line?.id),
+        if (!isDone) RideDisruptions(lineId: section.line?.id, max: 1, top: 10),
         if (!isDone && index + 1 < tracker.steps.length) _NextStep(state: state, index: index + 1),
         const SizedBox(height: 8),
         // Manual corrections, kept discreet
@@ -879,7 +867,7 @@ class TrainPositions extends StatelessWidget {
           _ => positions.contains('back'),
         };
     return Semantics(
-      label: context.l10n.boardAt(boardingPositions(positions)),
+      label: boardingLabel(positions),
       excludeSemantics: true,
       child: Row(
         children: [
@@ -900,7 +888,7 @@ class TrainPositions extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 10),
-          Text(context.l10n.boardAt(boardingPositions(positions)),
+          Text(boardingLabel(positions),
               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
@@ -1016,11 +1004,11 @@ class _StopRow extends StatelessWidget {
                   ),
                   if (first && !last) ...[
                     const SizedBox(width: 8),
-                    _Tag(text: context.l10n.goNextStopLabel, color: theme.colorScheme.primary),
+                    PillTag(text: context.l10n.goNextStopLabel, color: theme.colorScheme.primary),
                   ],
                   if (last) ...[
                     const SizedBox(width: 8),
-                    _Tag(text: context.l10n.goGetOffHere, color: theme.colorScheme.error),
+                    PillTag(text: context.l10n.goGetOffHere, color: theme.colorScheme.error),
                   ],
                 ],
               ),
@@ -1030,20 +1018,6 @@ class _StopRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.text, required this.color});
-
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-        child: Text(text, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w600)),
-      );
 }
 
 /// What comes after this step: the next ride (line, direction, departure, platform) or the walk to the destination
@@ -1072,7 +1046,7 @@ class _NextStep extends StatelessWidget {
       leading = section.line != null ? LineBadge(section.line!, size: 22) : const Icon(Icons.directions_transit, size: 20);
     } else {
       text = context.l10n.goNextMove(formatDuration(section.duration), section.to?.name ?? '');
-      leading = Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk, size: 20, color: context.colors.muted);
+      leading = Icon(moveIcon(section.kind), size: 20, color: context.colors.muted);
     }
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -1123,7 +1097,6 @@ class _Departures extends ConsumerWidget {
       return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: theme.textTheme.titleMedium);
     }
     final selected = plannedRide(rides, planned);
-    final after = selected == null ? null : rides.skipWhile((ride) => ride != selected).skip(1).firstOrNull;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1135,42 +1108,9 @@ class _Departures extends ConsumerWidget {
           onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
           onAllDepartures: () => context.push(Routes.stop(key!.from)),
         ),
-        if (selected != null && after != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 4),
-            child: Text(
-              context.l10n.goIfMissed(
-                formatClock(after.departure.time),
-                (after.departure.time.difference(selected.departure.time).inSeconds / 60).round(),
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted),
-            ),
-          ),
+        IfMissedLine(rides: rides, taken: selected),
       ],
     );
-  }
-}
-
-/// The worst active disruption of the line, on one line
-class _LineDisruption extends ConsumerWidget {
-  const _LineDisruption({required this.lineId});
-
-  final String? lineId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (lineId == null || lineId!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final disruption = (ref.watch(lineDisruptionsProvider(lineId!)).value ?? const <Disruption>[])
-        .where((disruption) => disruption.active && disruption.severity != DisruptionSeverity.info)
-        .firstOrNull;
-    return disruption == null
-        ? const SizedBox.shrink()
-        : Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: DisruptionLine(disruption: disruption),
-          );
   }
 }
 
@@ -1272,7 +1212,7 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final late = (arrivedAt.difference(state.plannedArrival).inSeconds / 60).round();
+    final late = arrivedAt.difference(state.plannedArrival).roundedMinutes;
     final (label, color) = switch (late) {
       0 => (context.l10n.goOnTime, context.colors.live),
       > 0 => (context.l10n.goMinutesLate(late), late >= 5 ? theme.colorScheme.error : context.colors.warning),
@@ -1355,7 +1295,7 @@ class _Countdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Like the departure lists: whole minutes left, "now" within 30 s
-    final minutes = until.inSeconds <= 30 ? 0 : (until.inSeconds ~/ 60).clamp(1, 999);
+    final minutes = math.min(minutesLeft(until), 999);
     final theme = Theme.of(context);
     return SizedBox.square(
       dimension: 56,
@@ -1439,7 +1379,7 @@ class _MarginPill extends ConsumerWidget {
     if (next == null) {
       return null;
     }
-    final later = (next.departure.time.difference(margin.departure).inSeconds / 60).round();
+    final later = next.departure.time.difference(margin.departure).roundedMinutes;
     return context.l10n.goMarginLateNext(formatClock(next.departure.time), later);
   }
 }

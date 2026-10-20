@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:intl/intl.dart';
 
 import '../../l10n/l10n.dart';
@@ -40,6 +42,19 @@ String formatDuration(int seconds) {
     return '$minutes\u00a0min';
   }
   return '${minutes ~/ 60}\u00a0h\u00a0${(minutes % 60).toString().padLeft(2, '0')}';
+}
+
+/// `Partez maintenant`, `Partez dans 12 min`: when to leave, [leaveIn] from now
+String leaveInLabel(Duration leaveIn) =>
+    leaveIn.inMinutes <= 0 ? currentL10n.leaveNowShort : currentL10n.leaveIn(formatDuration(leaveIn.inSeconds));
+
+/// Whole minutes left before [duration] is over, as the departure lists count them: rounded down, at least 1, and 0
+/// ("now") within 30 s
+int minutesLeft(Duration duration) => duration.inSeconds <= 30 ? 0 : math.max(1, duration.inSeconds ~/ 60);
+
+extension RoundedMinutes on Duration {
+  /// The nearest whole minute: a delay, a gap between two departures
+  int get roundedMinutes => (inSeconds / 60).round();
 }
 
 /// `2,55 €` (`€2.55` in English)

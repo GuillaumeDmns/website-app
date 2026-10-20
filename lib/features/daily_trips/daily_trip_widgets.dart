@@ -302,7 +302,7 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                        leaveInLabel(leaveIn),
                         style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null),
                       ),
                       const SizedBox(height: 2),

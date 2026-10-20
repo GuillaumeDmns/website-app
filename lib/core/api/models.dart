@@ -67,6 +67,11 @@ abstract class LineSummary with _$LineSummary {
     String? textColor,
   }) = _LineSummary;
 
+  const LineSummary._();
+
+  /// `Métro 1`, `RER A`, `Bus 38`
+  String get label => '${mode.label} ${name ?? ''}'.trim();
+
   factory LineSummary.fromJson(Map<String, dynamic> json) => _$LineSummaryFromJson(json);
 }
 

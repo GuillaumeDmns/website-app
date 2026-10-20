@@ -144,7 +144,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   children: [
                     for (final option in detail.lines)
                       Tooltip(
-                        message: '${option.mode.label} ${option.name ?? ''}',
+                        message: option.label,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
                           onTap: option.id == line.id ? null : () => _open(lineId: option.id),

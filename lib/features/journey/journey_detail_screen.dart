@@ -17,7 +17,7 @@ import '../../l10n/l10n.dart';
 import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
-import '../go/go_instruction.dart';
+import 'journey_labels.dart';
 import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'journey_providers.dart';
@@ -245,7 +245,7 @@ class _GoBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                      leaveInLabel(leaveIn),
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: live ? context.colors.live : null),
                     ),
                     Text(
@@ -500,21 +500,21 @@ class _RideTile extends StatelessWidget {
                       PillTag(
                         icon: Icons.rss_feed,
                         color: delay >= 120 ? context.colors.warning : context.colors.live,
-                        text: delay >= 60 ? context.l10n.delayMinutes((delay / 60).round()) : context.l10n.realtime,
+                        text: delay >= 60 ? context.l10n.delayMinutes(Duration(seconds: delay).roundedMinutes) : context.l10n.realtime,
                       ),
                     if (hasLine) LastRideTag(ride: section),
                     if (section.boardingPositions.isNotEmpty)
                       PillTag(
                         icon: Icons.train,
                         color: theme.colorScheme.primary,
-                        text: _boardingLabel(section.boardingPositions),
+                        text: boardingLabel(section.boardingPositions),
                       ),
                     // The platform of the departure taken, once announced
                     if (platformLabel(line, plan?.ride?.departure.platform) case final platform?)
                       PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.primary, text: platform),
                   ],
                 ),
-                if (hasLine) _RideDisruptions(lineId: lineId),
+                if (hasLine) RideDisruptions(lineId: lineId),
                 // Elevators matter to get on and off: those of both stops
                 for (final point in [section.from, section.to])
                   if (point?.stopAreaId case final stopAreaId?)
@@ -577,18 +577,6 @@ class _RideTile extends StatelessWidget {
       ],
     );
   }
-
-  static String _boardingLabel(List<String> positions) {
-    String name(String position) => switch (position) {
-      'front' => currentL10n.boardFront,
-      'middle' => currentL10n.boardMiddle,
-      'back' => currentL10n.boardBack,
-      _ => position,
-    };
-    return positions.length >= 3
-        ? currentL10n.boardAnywhere
-        : currentL10n.boardAt(positions.map(name).join(' ${currentL10n.or} '));
-  }
 }
 
 /// Elevator outages of a stop of the ride, on one line (a folding card would break the timeline's intrinsic height);
@@ -650,30 +638,6 @@ class _StopElevators extends ConsumerWidget {
   }
 }
 
-/// Active disruptions of the ride's line (information messages left out)
-class _RideDisruptions extends ConsumerWidget {
-  const _RideDisruptions({required this.lineId});
-
-  final String lineId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final disruptions = (ref.watch(lineDisruptionsProvider(lineId)).value ?? const <Disruption>[])
-        .where((disruption) => disruption.active && disruption.severity != DisruptionSeverity.info)
-        .toList();
-    if (disruptions.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [for (final disruption in disruptions.take(3)) DisruptionLine(disruption: disruption)],
-      ),
-    );
-  }
-}
-
 /// Departures of the ride's line at the boarding stop that stop at the alighting one, from when the traveller can
 /// be there: the one taken is highlighted, choosing another one moves the journey to it.
 class _Departures extends ConsumerWidget {
@@ -690,8 +654,6 @@ class _Departures extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final taken = plan.ride;
-    // If it is missed: the next one
-    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).firstOrNull;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
@@ -705,17 +667,8 @@ class _Departures extends ConsumerWidget {
             onSelect: onChoose,
             onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
           ),
-          if (taken != null && after != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6, left: 4),
-              child: Text(
-                context.l10n.goIfMissed(
-                  formatClock(after.departure.time),
-                  (after.departure.time.difference(taken.departure.time).inSeconds / 60).round(),
-                ),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
-              ),
-            ),
+          // If it is missed: the next one
+          IfMissedLine(rides: rides, taken: taken),
         ],
       ),
     );

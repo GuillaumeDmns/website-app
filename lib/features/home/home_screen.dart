@@ -164,7 +164,7 @@ class _Suggestion extends ConsumerWidget {
           avatar: Icon(kind == FavoriteKind.home ? Icons.home_rounded : Icons.work_rounded, size: 18),
           label: Text([
             kind == FavoriteKind.home ? context.l10n.homeSuggestHome : context.l10n.homeSuggestWork,
-            if (leaveIn != null) leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+            if (leaveIn != null) leaveInLabel(leaveIn),
           ].join(' · ')),
           onPressed: () => goToPlace(context, ref, place),
         ),

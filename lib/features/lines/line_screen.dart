@@ -98,9 +98,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
   ) {
     final line = detail.line;
     final color = parseHexColor(line.color, Colors.grey);
-    List<LatLng> points(LineBranch b) => b.shape.isNotEmpty
-        ? [for (final point in b.shape) LatLng(point[1], point[0])]
-        : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
+    List<LatLng> points(LineBranch branch) => _pathOf(branch).line.points;
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
     final placed = [
@@ -196,7 +194,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               icon: const Icon(Icons.ios_share),
               onPressed: () => shareLink(
                 context,
-                title: '${line.mode.label} ${line.name ?? ''}'.trim(),
+                title: line.label,
                 location: Routes.line(line.id),
               ),
             ),
@@ -212,8 +210,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${line.mode.label} ${line.name ?? ''}', style: theme.textTheme.headlineSmall),
-                    if (line.longName != null && line.longName != line.name && line.longName != '${line.mode.label} ${line.name ?? ''}')
+                    Text(line.label, style: theme.textTheme.headlineSmall),
+                    if (line.longName != null && line.longName != line.name && line.longName != line.label)
                       Text(line.longName!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
                   ],
                 ),

@@ -49,9 +49,8 @@ double vehicleProgress(Vehicle vehicle, DateTime fetchedAt, DateTime now) {
 /// Path of a branch with the distance of each of its stops along it, to place vehicles
 class BranchPath {
   BranchPath(LineBranch branch)
-      : line = MeasuredPolyline(branch.shape.isNotEmpty
-            ? [for (final point in branch.shape) LatLng(point[1], point[0])]
-            : [for (final stop in branch.stops) LatLng(stop.lat, stop.lon)]),
+      : line = MeasuredPolyline(
+            branch.shape.isNotEmpty ? shapePoints(branch.shape) : [for (final stop in branch.stops) LatLng(stop.lat, stop.lon)]),
         stopIds = [for (final stop in branch.stops) stop.id] {
     var minAlong = 0.0;
     for (final stop in branch.stops) {

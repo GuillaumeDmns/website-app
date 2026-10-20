@@ -297,7 +297,6 @@
   "goGetOffIn": "Get off in {count} stops",
   "goAtStop": "at {stop}",
   "goFromTo": "From {from} to {to}",
-  "goVerbTransfer": "Transfer",
   "goImOnBoard": "I'm on board",
   "goImAtThisStep": "I'm at this step",
   "goPlannedDeparture": "Scheduled departure at {time}",

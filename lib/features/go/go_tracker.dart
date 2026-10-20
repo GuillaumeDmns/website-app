@@ -13,13 +13,7 @@ class GoStep {
   GoStep._(this.section, this.sectionIndex, this.line, this.stopAlongs);
 
   factory GoStep(JourneySection section, int sectionIndex) {
-    final points = section.shape.length >= 2
-        ? [for (final point in section.shape) LatLng(point[1], point[0])]
-        : [
-            if (section.from != null) LatLng(section.from!.lat, section.from!.lon),
-            if (section.to != null) LatLng(section.to!.lat, section.to!.lon),
-          ];
-    final line = MeasuredPolyline(points);
+    final line = MeasuredPolyline(sectionPath(section));
 
     // Position of each served stop along the path, in order
     final stopAlongs = <double>[];
@@ -395,7 +389,7 @@ class GoTracker {
     if (!(line?.mode.isRail ?? false)) {
       return;
     }
-    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final lineLabel = line?.label ?? '';
     final changed = progress.fired.any((id) => id.startsWith('platform-$index-') && id != 'platform-$index-$platform');
     alerts.add(GoAlert(
       id: 'platform-$index-$platform',
@@ -465,7 +459,7 @@ class GoTracker {
             id: 'hurry-${current.step}',
             title: currentL10n.alertHurry,
             body: currentL10n.alertHurryBody(
-                '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim(), (margin / 60).ceil(), metersLeft(current).round()),
+                line?.label ?? '', (margin / 60).ceil(), metersLeft(current).round()),
           ));
         }
       }
@@ -480,7 +474,7 @@ class GoTracker {
   GoProgress _wait(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
     final ride = steps[progress.step];
     final line = ride.section.line;
-    final lineLabel = '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
+    final lineLabel = line?.label ?? '';
     final vehicle = input.vehicleOf(progress.step);
     final departure = expectedDeparture(ride, progress, vehicle);
     final untilDeparture = departure.difference(input.now);

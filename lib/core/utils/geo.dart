@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:latlong2/latlong.dart';
 
+import '../api/models.dart';
+
 const _earthRadius = 6371000.0;
 
 /// Great-circle distance in meters
@@ -24,6 +26,17 @@ double bearingBetween(LatLng a, LatLng b) {
   final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
   return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
 }
+
+/// Points of a shape as the API sends it: `[lon, lat]` pairs
+List<LatLng> shapePoints(List<List<double>> shape) => [for (final point in shape) LatLng(point[1], point[0])];
+
+/// Path of a journey section: its shape, else a straight line from where it starts to where it ends
+List<LatLng> sectionPath(JourneySection section) => section.shape.length >= 2
+    ? shapePoints(section.shape)
+    : [
+        if (section.from != null) LatLng(section.from!.lat, section.from!.lon),
+        if (section.to != null) LatLng(section.to!.lat, section.to!.lon),
+      ];
 
 /// Where a point falls on a [MeasuredPolyline]
 class PolylineProjection {
