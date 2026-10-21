@@ -18,5 +18,8 @@ class MemoryStore implements LocalStore {
   Future<void> writeJson(String key, Object? value) async => values[key] = jsonEncode(value);
 
   @override
+  Future<void> writeEncoded(String key, String json) async => values[key] = json;
+
+  @override
   Future<void> remove(String key) async => values.remove(key);
 }
