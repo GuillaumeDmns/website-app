@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_screen.dart';
 import 'package:website_app/features/go/go_state.dart';
@@ -110,6 +113,34 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('waiting: GO and its ride card ask the departures once, for both', (tester) async {
+    // A device whose GPS gives nothing yet: GO starts from the app's position
+    final messenger = tester.binding.defaultBinaryMessenger;
+    const updates = EventChannel('flutter.baseflow.com/geolocator_updates');
+    const geolocator = MethodChannel('flutter.baseflow.com/geolocator');
+    messenger.setMockStreamHandler(updates, MockStreamHandler.inline(onListen: (_, _) {}));
+    messenger.setMockMethodCallHandler(geolocator, (_) async => null);
+    addTearDown(() {
+      messenger.setMockStreamHandler(updates, null);
+      messenger.setMockMethodCallHandler(geolocator, null);
+    });
+    final backend = standardBackend();
+    await pumpApp(tester, backend, overrides: [liveJourneyProvider.overrideWithValue(_NoLiveJourney())]);
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    container.read(goControllerProvider.notifier)
+      ..start(plan, const JourneyRequest())
+      ..jumpTo(1);
+    await settle(tester);
+    await tapOn(tester, find.text(currentL10n.go).first);
+    expect(find.byType(GoScreen), findsOneWidget);
+
+    // The card lists them, the controller follows the planned vehicle in them
+    expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
+    expect(backend.requests.where((request) => request.uri.path.endsWith('/rides')), hasLength(1));
+
+    await closeApp(tester);
+  });
+
   testWidgets('arrived: the summary, the way back', (tester) async {
     await openGo(tester, followed(GoProgress(step: 3, phase: GoPhase.arrived, arrivedAt: inMinutes(17))));
 
@@ -118,4 +149,25 @@ void main() {
 
     await closeApp(tester);
   });
+}
+
+/// No notification nor screen kept on in the tests
+class _NoLiveJourney implements LiveJourney {
+  @override
+  bool get systemAlerts => false;
+
+  @override
+  Future<void> prepare() async {}
+
+  @override
+  Future<void> update(LiveJourneyUpdate update) async {}
+
+  @override
+  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> keepScreenOn(bool on) async {}
 }

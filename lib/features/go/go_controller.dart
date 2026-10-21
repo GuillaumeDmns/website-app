@@ -15,6 +15,7 @@ import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
+import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
 import 'go_guidance.dart';
@@ -26,7 +27,7 @@ import 'go_tracker.dart';
 const _storageKey = 'go_session';
 
 /// GO session: feeds the [GoTracker] with high-accuracy positions, a 5 s clock and the real-time departures of the
-/// next ride (every 30 s), gives the alerts, and keeps the session on the device so that it survives a restart.
+/// next ride (`rideOptionsProvider`, every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it survives a restart.
 class GoController extends Notifier<GoState?> {
   StreamSubscription<Position>? _positions;
   Timer? _tick;
@@ -53,7 +54,10 @@ class GoController extends Notifier<GoState?> {
   /// Last content sent to the system notification, to only send changes
   String? _lastLive;
   int _lastLiveProgress = -1;
-  bool _loadingDepartures = false;
+
+  /// Departures of the next ride listened to, and for which ride (step and tracker) of which key
+  ProviderSubscription<AsyncValue<List<Ride>>>? _departures;
+  ({RideKey key, GoTracker tracker, int step})? _departuresOf;
 
   @override
   GoState? build() {
@@ -142,7 +146,7 @@ class GoController extends Notifier<GoState?> {
       position: latest.position,
     );
     _save();
-    _loadDepartures();
+    _watchDepartures();
     _update();
   }
 
@@ -270,8 +274,8 @@ class GoController extends Notifier<GoState?> {
     });
     unawaited(_seed());
     _tick = Timer.periodic(const Duration(seconds: 5), (_) => _update());
-    _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadDepartures());
-    _loadDepartures();
+    _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) => _watchDepartures());
+    _watchDepartures();
     _update();
   }
 
@@ -399,6 +403,9 @@ class GoController extends Notifier<GoState?> {
     _tick = null;
     _departuresTimer?.cancel();
     _departuresTimer = null;
+    _departures?.close();
+    _departures = null;
+    _departuresOf = null;
   }
 
   void _update() {
@@ -449,7 +456,7 @@ class GoController extends Notifier<GoState?> {
     if (changed) {
       _save();
       if (progress.step != current.progress.step) {
-        _loadDepartures();
+        _watchDepartures();
       }
     }
     if (progress.phase == GoPhase.arrived) {
@@ -499,10 +506,11 @@ class GoController extends Notifier<GoState?> {
     }
   }
 
-  /// Real-time departures of the next ride's line at its boarding stop
-  Future<void> _loadDepartures() async {
+  /// Real-time departures of the next ride's line at its boarding stop: listened to from where the traveller gets
+  /// there (checked every 30 s and at each step, as that time moves), the provider re-fetching them every 30 s
+  void _watchDepartures() {
     final current = state;
-    if (current == null || _loadingDepartures) {
+    if (current == null) {
       return;
     }
     final progress = current.progress;
@@ -511,32 +519,44 @@ class GoController extends Notifier<GoState?> {
     final steps = current.tracker.steps;
     final index = [for (var i = start; i < steps.length; i++) i].where((i) => steps[i].isRide).firstOrNull;
     final ride = index == null ? null : steps[index];
-    final from = ride?.section.from?.stopAreaId;
-    final to = ride?.section.to?.stopAreaId;
-    final lineId = ride?.section.line?.id;
-    if (ride == null || from == null || to == null || lineId == null || lineId.isEmpty) {
+    final now = DateTime.now();
+    final earliest = ride == null || index == progress.step
+        ? now
+        : earliestBoarding(current.journey, ride.sectionIndex, now).add(progress.shift);
+    final key = ride == null ? null : rideKey(ride.section, earliest, now);
+    if (ride == null || index == null || key == null) {
+      _departures?.close();
+      _departures = null;
+      _departuresOf = null;
       state = current.copyWith(vehicle: () => null, vehicleStep: () => null);
       return;
     }
-
-    _loadingDepartures = true;
-    try {
-      final now = DateTime.now();
-      final earliest = index == progress.step ? now : earliestBoarding(current.journey, ride.sectionIndex, now).add(progress.shift);
-      final key = rideKey(ride.section, earliest, now)!;
-      final rides = await ref.read(mobilityApiProvider).lineRides(lineId, from: from, to: to, after: key.after, limit: 8);
-      final latest = state;
-      if (latest == null || latest.tracker != current.tracker) {
-        return;
-      }
-      // The planned vehicle: same scheduled time (a few minutes of tolerance)
-      final vehicle = plannedRide(rides, current.tracker.plannedDeparture(ride, latest.progress))?.departure;
-      state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => index);
-    } catch (e) {
-      debugPrint('GO departures unavailable: $e');
-    } finally {
-      _loadingDepartures = false;
+    final of = (key: key, tracker: current.tracker, step: index);
+    if (of == _departuresOf) {
+      return;
     }
+    _departures?.close();
+    _departuresOf = of;
+    _departures = ref.listen(
+      rideOptionsProvider(key),
+      (_, departures) => _onDepartures(of, departures),
+      fireImmediately: true,
+    );
+  }
+
+  void _onDepartures(({RideKey key, GoTracker tracker, int step}) of, AsyncValue<List<Ride>> departures) {
+    final rides = departures.value;
+    final latest = state;
+    if (departures.hasError) {
+      debugPrint('GO departures unavailable: ${departures.error}');
+    }
+    if (rides == null || latest == null || latest.tracker != of.tracker) {
+      return;
+    }
+    // The planned vehicle: same scheduled time (a few minutes of tolerance)
+    final ride = of.tracker.steps[of.step];
+    final vehicle = plannedRide(rides, of.tracker.plannedDeparture(ride, latest.progress))?.departure;
+    state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => of.step);
   }
 
   Future<void> _save() async {
