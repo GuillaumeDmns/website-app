@@ -1273,5 +1273,12 @@
   "@goMarginAheadOf": {"placeholders": {"minutes": {"type": "int"}, "line": {"type": "String"}, "time": {"type": "String"}}},
   "goOnTimeLive": "À l'heure, suivi en temps réel",
   "goNextStopShort": "Prochain arrêt {stop}",
-  "@goNextStopShort": {"placeholders": {"stop": {"type": "String"}}}
+  "@goNextStopShort": {"placeholders": {"stop": {"type": "String"}}},
+  "trafficNormal": "Trafic normal",
+  "trafficDisrupted": "Trafic perturbé",
+  "trafficInterrupted": "Trafic interrompu",
+  "leaveBefore": "Partez avant {time}",
+  "@leaveBefore": {"placeholders": {"time": {"type": "String"}}},
+  "lineTrafficNotice": "{line} : {title}",
+  "@lineTrafficNotice": {"placeholders": {"line": {"type": "String"}, "title": {"type": "String"}}}
 }

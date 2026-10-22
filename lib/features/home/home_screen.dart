@@ -11,13 +11,13 @@ import '../../core/location/location_providers.dart';
 import '../../app/theme.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/utils/geo.dart';
-import '../../core/utils/time_format.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
+import '../daily_trips/daily_trips.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import '../home_widget/home_widget_sync.dart';
@@ -36,6 +36,8 @@ class HomeScreen extends ConsumerWidget {
     final bikes = ref.watch(nearbyBikesProvider(bikeKey)).value ?? const <BikeStation>[];
     final filter = ref.watch(nearbyFilterProvider);
     final theme = Theme.of(context);
+    final place = suggestedPlace(ref, ref.watch(nowProvider).value ?? DateTime.now());
+    final commute = place == null ? null : tripTo(ref.watch(dailyTripsProvider).value ?? const [], place);
 
     return MapOverlayScope(
       // Stops above the stations; only what the filter shows
@@ -64,10 +66,11 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
-              sliver: SliverToBoxAdapter(child: _Suggestion()),
-            ),
+            if (place != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                sliver: SliverToBoxAdapter(child: _Suggestion(place: place, trip: commute)),
+              ),
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
@@ -76,9 +79,9 @@ class HomeScreen extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
             ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
-              sliver: SliverToBoxAdapter(child: DailyTripsSection()),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              sliver: SliverToBoxAdapter(child: DailyTripsSection(except: commute?.id)),
             ),
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -108,7 +111,6 @@ class HomeScreen extends ConsumerWidget {
                           label: Text(issue == LocationIssue.serviceDisabled ? context.l10n.locationTurnOn : context.l10n.locationAllow),
                           onPressed: () => fixLocationIssue(ref, issue),
                         ),
-                    const NearbyFilterBar(),
                   ],
                 ),
               ),
@@ -133,39 +135,49 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// What the user likely wants now, in one tap: home in the evening, work in the morning (when saved, and away from it)
+/// The place the user likely heads to now: home in the evening, work in the morning (when saved, and away from it)
+Favorite? suggestedPlace(WidgetRef ref, DateTime now) {
+  final hour = now.toLocal().hour;
+  final kind = hour >= 16 || hour < 3
+      ? FavoriteKind.home
+      : hour >= 5 && hour < 11
+          ? FavoriteKind.work
+          : null;
+  final favorites = ref.watch(favoritesProvider).value ?? const <Favorite>[];
+  final place = kind == null ? null : favorites.where((favorite) => favorite.kind == kind).firstOrNull;
+  final user = ref.watch(userLocationProvider).value;
+  if (place == null || place.lat == null || (user != null && metersBetween(user, LatLng(place.lat!, place.lon!)) < 300)) {
+    return null;
+  }
+  return place;
+}
+
+/// What the user likely wants now, in one tap. With a daily trip there, one card: the suggestion and the trip become
+/// the same thing, with GO and what threatens the trip ([DailyTripCard]); else a chip searching the way there.
 class _Suggestion extends ConsumerWidget {
-  const _Suggestion();
+  const _Suggestion({required this.place, required this.trip});
+
+  final Favorite place;
+  final DailyTrip? trip;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = ref.watch(nowProvider).value ?? DateTime.now();
-    final hour = now.toLocal().hour;
-    final kind = hour >= 16 || hour < 3
-        ? FavoriteKind.home
-        : hour >= 5 && hour < 11
-            ? FavoriteKind.work
-            : null;
-    final favorites = ref.watch(favoritesProvider).value ?? const <Favorite>[];
-    final place = kind == null ? null : favorites.where((favorite) => favorite.kind == kind).firstOrNull;
-    final user = ref.watch(userLocationProvider).value;
-    if (place == null ||
-        place.lat == null ||
-        (user != null && metersBetween(user, LatLng(place.lat!, place.lon!)) < 300)) {
-      return const SizedBox.shrink();
+    final home = place.kind == FavoriteKind.home;
+    final icon = home ? Icons.home_rounded : Icons.work_rounded;
+    final title = home ? context.l10n.homeSuggestHome : context.l10n.homeSuggestWork;
+    if (trip case final trip?) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: DailyTripCard(key: ValueKey('commute-${trip.id}-${place.kind}'), trip: trip, heading: (icon: icon, title: title)),
+      );
     }
-    final next = nextTripTo(ref, place, now);
-    final leaveIn = next?.departure.difference(now);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Align(
         alignment: Alignment.centerLeft,
         child: ActionChip(
-          avatar: Icon(kind == FavoriteKind.home ? Icons.home_rounded : Icons.work_rounded, size: 18),
-          label: Text([
-            kind == FavoriteKind.home ? context.l10n.homeSuggestHome : context.l10n.homeSuggestWork,
-            if (leaveIn != null) leaveInLabel(leaveIn),
-          ].join(' · ')),
+          avatar: Icon(icon, size: 18),
+          label: Text(title),
           onPressed: () => goToPlace(context, ref, place),
         ),
       ),

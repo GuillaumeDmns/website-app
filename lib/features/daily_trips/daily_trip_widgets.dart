@@ -19,6 +19,7 @@ import '../journey/journey_preferences.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/widgets/journey_card.dart';
+import '../traffic/traffic_providers.dart';
 import 'daily_trips.dart';
 import '../../app/theme.dart';
 
@@ -148,15 +149,19 @@ bool startsReversed(DailyTrip trip, List<Favorite> favorites, DateTime now) {
 
 /// The daily trips on the home page; with home and work saved but no trip between them, an invitation to choose one
 class DailyTripsSection extends ConsumerWidget {
-  const DailyTripsSection({super.key});
+  const DailyTripsSection({super.key, this.except});
+
+  /// Shown above already, as the commute card
+  final String? except;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final trips = ref.watch(dailyTripsProvider).value ?? const <DailyTrip>[];
+    final all = ref.watch(dailyTripsProvider).value ?? const <DailyTrip>[];
+    final trips = [for (final trip in all) if (trip.id != except) trip];
     final favorites = ref.watch(favoritesProvider).value ?? const <Favorite>[];
     final home = favorites.where((favorite) => favorite.kind == FavoriteKind.home).firstOrNull;
     final work = favorites.where((favorite) => favorite.kind == FavoriteKind.work).firstOrNull;
-    final names = [for (final trip in trips) {tripPlaceName(trip.start, favorites), tripPlaceName(trip.end, favorites)}];
+    final names = [for (final trip in all) {tripPlaceName(trip.start, favorites), tripPlaceName(trip.end, favorites)}];
     final commuteSaved = names.any((pair) => pair.contains(context.l10n.home) && pair.contains(context.l10n.work));
 
     if (trips.isEmpty && (home == null || work == null || commuteSaved)) {
@@ -213,19 +218,25 @@ class _CommuteHint extends ConsumerWidget {
   }
 }
 
-/// A daily trip: when to leave for its next departures and when it arrives, from the departures of its lines; the
-/// last metro of the night announced an hour ahead
+/// A daily trip: when to leave for its next departures (large, green) and when it arrives, from the departures of its
+/// lines, GO in one tap, its lines, then what threatens it: a disrupted line, the last metro of the night (an hour
+/// ahead it becomes the main information: "Partez avant 00:33")
 class DailyTripCard extends ConsumerStatefulWidget {
-  const DailyTripCard({super.key, required this.trip});
+  const DailyTripCard({super.key, required this.trip, this.heading});
 
+  /// As given when [heading] is set (already the way to the suggested place), else turned by [startsReversed]
   final DailyTrip trip;
+
+  /// The home page's suggestion this card answers ("Aller au travail" and its icon), instead of the trip's name
+  final ({IconData icon, String title})? heading;
 
   @override
   ConsumerState<DailyTripCard> createState() => _DailyTripCardState();
 }
 
 class _DailyTripCardState extends ConsumerState<DailyTripCard> {
-  late bool _reversed = startsReversed(widget.trip, ref.read(favoritesProvider).value ?? const [], DateTime.now());
+  late bool _reversed =
+      widget.heading == null && startsReversed(widget.trip, ref.read(favoritesProvider).value ?? const [], DateTime.now());
 
   late DailyTrip _back = widget.trip.reversed();
 
@@ -250,11 +261,14 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final options = upcomingTrips(trip.journey, lookup: watchRides(ref, now), now: now);
     final next = options.first;
-    final alert = lastTripText(lastTripAlert(trip.journey, watchSpans(ref), now), now);
+    final last = lastTripAlert(trip.journey, watchSpans(ref), now);
+    // The last ride close: when to leave at the latest is what matters now
+    final leaveBy = last?.leaveBy;
+    final night = leaveBy != null && leaveBy.difference(now) <= lastRideWarning;
+    final alert = night ? null : lastTripText(last, now);
     final theme = Theme.of(context);
     final colors = context.colors;
     final leaveIn = next.departure.difference(now);
-    final live = next.rides.firstOrNull?.realtime == true;
     final startName = tripPlaceName(trip.start, favorites);
     final endName = tripPlaceName(trip.end, favorites);
     final name = context.l10n.dailyTripName(startName, endName);
@@ -263,9 +277,17 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
         : endName == context.l10n.work
         ? Icons.work_rounded
         : Icons.route;
+    // A disrupted line of the trip, with what happens on it
+    final traffic = {for (final line in ref.watch(trafficProvider).value ?? const <LineTraffic>[]) line.line.id: line};
+    final disrupted = next.rides
+        .map((ride) => traffic[ride.line?.id])
+        .where((line) => line?.severity != null && line!.severity != DisruptionSeverity.info)
+        .firstOrNull;
+    final large = theme.textTheme.headlineSmall?.copyWith(fontSize: 22, height: 1.2);
+    final heading = widget.heading;
 
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(16, 6, 4, 14),
+      padding: const EdgeInsets.fromLTRB(16, 4, 4, 14),
       onTap: () {
         ref.read(selectedJourneyProvider.notifier).select(next, trip.request);
         context.push(Routes.journeyDetailOf(trip.request, next));
@@ -275,17 +297,23 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
         children: [
           Row(
             children: [
-              IconBubble(icon, color: theme.colorScheme.primary, size: 28),
-              const SizedBox(width: 10),
-              Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall)),
+              if (heading != null)
+                Icon(heading.icon, size: 18, color: heading.icon == Icons.work_rounded ? theme.colorScheme.secondary : theme.colorScheme.primary)
+              else
+                IconBubble(icon, color: theme.colorScheme.primary, size: 28),
+              SizedBox(width: heading != null ? 8 : 10),
+              Expanded(
+                child: Text(heading?.title ?? name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontSize: 14)),
+              ),
               IconButton(
                 tooltip: context.l10n.dailyTripReverse,
-                icon: Icon(Icons.swap_horiz, color: colors.muted),
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.swap_horiz, size: 20, color: colors.muted),
                 onPressed: () => setState(() => _reversed = !_reversed),
               ),
               PopupMenuButton<void>(
                 tooltip: context.l10n.dailyTripMenu,
-                icon: Icon(Icons.more_vert, color: colors.muted),
+                icon: Icon(Icons.more_vert, size: 20, color: colors.muted),
                 itemBuilder: (context) => [
                   PopupMenuItem(onTap: _remove, child: Text(context.l10n.dailyTripRemove)),
                 ],
@@ -293,36 +321,63 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
             ],
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 12, top: 2),
+            padding: const EdgeInsets.only(right: 12),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        leaveInLabel(leaveIn),
-                        style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null),
-                      ),
+                      if (night)
+                        Row(
+                          children: [
+                            Icon(Icons.nightlight_round, size: 20, color: colors.warning),
+                            const SizedBox(width: 6),
+                            Flexible(child: Text(context.l10n.leaveBefore(formatClock(leaveBy)), style: large?.copyWith(color: colors.warning))),
+                          ],
+                        )
+                      else
+                        Text(
+                          switch (leaveIn.inMinutes) {
+                            <= 0 => context.l10n.leaveNowShort,
+                            final minutes when minutes < 60 => context.l10n.leaveInMinutes(minutes),
+                            _ => leaveInLabel(leaveIn),
+                          },
+                          style: large?.copyWith(color: colors.live),
+                        ),
                       const SizedBox(height: 2),
                       Text(
-                        [
-                          '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
-                          if (options.length > 1)
-                            context.l10n.dailyTripThen(options.skip(1).map((option) => formatClock(option.departure)).join(', ')),
-                        ].join(' · '),
+                        night
+                            ? [
+                                context.l10n.goArrivesIn(formatDuration(leaveBy.difference(now).inSeconds)),
+                                if (last!.ride.line case final line? when last.lastDeparture != null)
+                                  context.l10n.lastRideOf(modeNoun(line.mode), line.name ?? '', formatClock(last.lastDeparture!)),
+                              ].join(' · ')
+                            : [
+                                '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
+                                if (options.length > 1)
+                                  context.l10n.dailyTripThen(options.skip(1).map((option) => formatClock(option.departure)).join(', ')),
+                              ].join(' · '),
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(formatDuration(next.duration), style: theme.textTheme.titleLarge),
-                const SizedBox(width: 10),
+                // At night, when to leave takes the room
+                if (night)
+                  const SizedBox.shrink()
+                else if (next.duration < 3600)
+                  Text.rich(TextSpan(children: [
+                    TextSpan(text: '${(next.duration / 60).round()}', style: large),
+                    TextSpan(text: '\u00a0min', style: theme.textTheme.labelMedium),
+                  ]))
+                else
+                  Text(formatDuration(next.duration), style: large),
+                const SizedBox(width: 12),
                 // Straight to GO on the next departure: the usual gesture for a daily trip
                 FilledButton(
-                  style: FilledButton.styleFrom(minimumSize: const Size(56, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
+                  style: FilledButton.styleFrom(minimumSize: const Size(60, 44), padding: const EdgeInsets.symmetric(horizontal: 18)),
                   onPressed: () {
                     HapticFeedback.mediumImpact();
                     ref.read(goControllerProvider.notifier).start(next, trip.request);
@@ -334,10 +389,26 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
             ),
           ),
           Padding(padding: const EdgeInsets.only(top: 10, right: 12), child: SectionsStrip(journey: next)),
+          if (disrupted != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, right: 12),
+              child: NoticeLine(
+                icon: disrupted.severity == DisruptionSeverity.blocking ? Icons.block : Icons.warning_rounded,
+                color: disrupted.severity == DisruptionSeverity.blocking ? colors.cancelled : colors.warning,
+                text: switch (disrupted.titles.firstOrNull) {
+                  // Titles often name the line already
+                  final title? when title.contains(disrupted.line.label) => title,
+                  final title => context.l10n.lineTrafficNotice(
+                      disrupted.line.label,
+                      title ?? (disrupted.severity == DisruptionSeverity.blocking ? context.l10n.trafficInterrupted : context.l10n.trafficDisrupted),
+                    ),
+                },
+              ),
+            ),
           if (alert != null)
             Padding(
               padding: const EdgeInsets.only(top: 10, right: 12),
-              child: NoticeLine(icon: Icons.nightlight_round, text: alert),
+              child: NoticeLine(icon: last?.over == true ? Icons.bedtime_outlined : Icons.nightlight_round, text: alert),
             ),
         ],
       ),
