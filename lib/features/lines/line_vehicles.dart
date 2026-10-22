@@ -46,6 +46,70 @@ double vehicleProgress(Vehicle vehicle, DateTime fetchedAt, DateTime now) {
   return (1 - remaining / segment).clamp(vehicle.progress, 1.0);
 }
 
+/// How long a vehicle stands at a stop when the real time gives no departure there
+Duration standingTime(TransportMode mode) => switch (mode) {
+      TransportMode.rer || TransportMode.transilien || TransportMode.ter => const Duration(seconds: 40),
+      TransportMode.metro || TransportMode.tram => const Duration(seconds: 20),
+      _ => const Duration(seconds: 15),
+    };
+
+/// When [vehicle] leaves the stop of its call [index]: the departure the real time gives, else after [standingTime];
+/// where its trip starts, at the time given (its departure)
+DateTime leavesAt(Vehicle vehicle, int index, TransportMode mode) {
+  final call = vehicle.calls[index];
+  if (call.departureAt case final departure?) {
+    return departure;
+  }
+  return index == 0 && vehicle.fromStopId == null ? call.expectedAt : call.expectedAt.add(standingTime(mode));
+}
+
+/// [vehicle] at [now], as fetched at [fetchedAt]: along its segment at the pace of the fetch ([vehicleProgress]), then
+/// standing at its next stop until it leaves ([leavesAt]), then on to its following stops on their expected times, as
+/// far as its calls go; the next fetch puts it back where the real time says. Calls at stops [serves] doesn't know
+/// (not on the branch drawn) are skipped.
+({Vehicle vehicle, double progress}) vehicleAt(
+  Vehicle vehicle,
+  DateTime fetchedAt,
+  DateTime now,
+  TransportMode mode, {
+  bool Function(String stopId)? serves,
+}) {
+  var progress = vehicleProgress(vehicle, fetchedAt, now);
+  final calls = [
+    for (final (index, call) in vehicle.calls.indexed)
+      if (index == 0 || (serves?.call(call.stopId) ?? true)) call,
+  ];
+  if (calls.length < 2 || calls.first.stopId != vehicle.toStopId) {
+    return (vehicle: vehicle, progress: progress);
+  }
+  var current = vehicle;
+  var ahead = calls;
+  while (ahead.length >= 2) {
+    final leaves = leavesAt(current.copyWith(calls: ahead), 0, mode);
+    if (!now.isAfter(leaves)) {
+      break;
+    }
+    final left = ahead.first;
+    final next = ahead[1];
+    final ride = next.expectedAt.difference(leaves).inMilliseconds;
+    progress = ride <= 0 ? 1.0 : (now.difference(leaves).inMilliseconds / ride).clamp(0.0, 1.0);
+    ahead = ahead.sublist(1);
+    current = current.copyWith(
+      fromStopId: left.stopId,
+      toStopId: next.stopId,
+      toStopName: next.stopName,
+      expectedAt: next.expectedAt,
+      delaySeconds: next.delaySeconds ?? current.delaySeconds,
+      progress: progress,
+      calls: ahead,
+    );
+  }
+  return (vehicle: current, progress: progress);
+}
+
+/// `à quai`, `à l'arrêt` for a bus
+String atStopLabel(TransportMode mode) => mode.hasPlatforms ? currentL10n.vehicleAtPlatform : currentL10n.vehicleAtStop;
+
 /// Path of a branch with the distance of each of its stops along it, to place vehicles
 class BranchPath {
   BranchPath(LineBranch branch)
@@ -234,12 +298,12 @@ class _PointerPainter extends CustomPainter {
   bool shouldRepaint(_PointerPainter old) => old.radius != radius;
 }
 
-/// `→ Saint-Denis - Pleyel · Madeleine dans 2 min`
-String vehicleLabel(Vehicle vehicle, DateTime now) {
+/// `→ Saint-Denis - Pleyel · Madeleine dans 2 min`, `… · Madeleine à quai`
+String vehicleLabel(Vehicle vehicle, DateTime now, TransportMode mode) {
   final minutes = vehicle.expectedAt.difference(now).inSeconds / 60;
   final next = vehicle.toStopName ?? '';
   final when = minutes < 0.5
-      ? currentL10n.vehicleAtStop
+      ? atStopLabel(mode)
       : minutes < 60
           ? currentL10n.inMinutes(minutes.ceil())
           : formatClock(vehicle.expectedAt);

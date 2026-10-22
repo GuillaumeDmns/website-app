@@ -84,21 +84,40 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     );
   }
 
-  /// Vehicles of the direction shown, moved along between two fetches (every second while there are some)
+  /// Vehicles of the direction shown, moved along between two fetches (every second while there are some): on their
+  /// segment, standing at the stop, then on to the following stops of their branch
   ({List<({Vehicle vehicle, double progress})> vehicles, DateTime now}) _vehicles(WidgetRef ref, LineDetail? detail) {
     final fetched = ref.watch(lineVehiclesProvider(widget.lineId)).value;
     final now = (fetched?.vehicles.isNotEmpty ?? false)
         ? ref.watch(vehicleClockProvider).value ?? DateTime.now()
         : ref.watch(nowProvider).value ?? DateTime.now();
+    if (fetched == null || detail == null) {
+      return (vehicles: const [], now: now);
+    }
+    final direction = _direction.clamp(0, detail.directions.length - 1);
     return (
       vehicles: [
-        if (fetched != null)
-          for (final vehicle in fetched.vehicles)
-            if (vehicle.direction == _direction.clamp(0, (detail?.directions.length ?? 1) - 1))
-              (vehicle: vehicle, progress: vehicleProgress(vehicle, fetched.fetchedAt, now)),
+        for (final vehicle in fetched.vehicles)
+          if (vehicle.direction == direction)
+            vehicleAt(
+              vehicle,
+              fetched.fetchedAt,
+              now,
+              detail.line.mode,
+              serves: _branchStops(detail, vehicle)?.contains,
+            ),
       ],
       now: now,
     );
+  }
+
+  /// Stop areas of the branch [vehicle] runs on, null when the line has no such branch
+  static Set<String>? _branchStops(LineDetail detail, Vehicle vehicle) {
+    if (vehicle.direction >= detail.directions.length) {
+      return null;
+    }
+    final branches = detail.directions[vehicle.direction].branches;
+    return vehicle.branch < branches.length ? {for (final stop in branches[vehicle.branch].stops) stop.id} : null;
   }
 
   MapOverlay _overlay(
@@ -141,7 +160,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           MapPin(
             point: place.point,
             color: color,
-            label: vehicleLabel(vehicle, now),
+            label: vehicleLabel(vehicle, now, line.mode),
             onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle, onFollow: () => _follow(vehicle)),
             childSize: Size.square(VehicleMarker.boxSize(_vehicleSize)),
             child: VehicleMarker(

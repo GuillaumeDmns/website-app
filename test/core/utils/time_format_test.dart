@@ -18,8 +18,11 @@ void main() {
     setUp(() => useLocale(const Locale('fr')));
 
     test('labels departures', () {
-      expect(departureLabel(at(const Duration(seconds: 20)), now), 'À quai');
-      expect(departureLabel(at(const Duration(minutes: 5), atStop: true), now), 'À quai');
+      // At the stop: on a platform for a metro, a train, a tram, at the curb for a bus (or a line unknown)
+      expect(departureLabel(at(const Duration(seconds: 20)), now, mode: TransportMode.metro), 'À quai');
+      expect(departureLabel(at(const Duration(minutes: 5), atStop: true), now, mode: TransportMode.tram), 'À quai');
+      expect(departureLabel(at(const Duration(seconds: 20)), now, mode: TransportMode.bus), "À l'arrêt");
+      expect(departureLabel(at(const Duration(seconds: 20)), now), "À l'arrêt");
       expect(departureLabel(at(const Duration(seconds: 45)), now), '< 1 min');
       expect(departureLabel(at(const Duration(minutes: 3, seconds: 50)), now), '3 min');
       expect(departureLabel(at(const Duration(minutes: 75)), now), '09:15');

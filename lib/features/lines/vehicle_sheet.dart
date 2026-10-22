@@ -76,9 +76,10 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final theme = Theme.of(context);
     final color = parseHexColor(widget.line.color, theme.colorScheme.primary);
+    // The stops it hasn't left yet
     final calls = [
-      for (final call in _vehicle.calls)
-        if (call.expectedAt.isAfter(now.subtract(const Duration(seconds: 30)))) call,
+      for (final (index, call) in _vehicle.calls.indexed)
+        if (leavesAt(_vehicle, index, widget.line.mode).isAfter(now)) call,
     ];
     final subtitle = [
       widget.line.label,
@@ -160,6 +161,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                   itemBuilder: (context, i) => _CallRow(
                     call: calls[i],
                     now: now,
+                    mode: widget.line.mode,
                     color: color,
                     isFirst: i == 0,
                     isLast: i == calls.length - 1,
@@ -189,6 +191,7 @@ class _CallRow extends StatelessWidget {
   const _CallRow({
     required this.call,
     required this.now,
+    required this.mode,
     required this.color,
     required this.isFirst,
     required this.isLast,
@@ -199,6 +202,7 @@ class _CallRow extends StatelessWidget {
 
   final VehicleCall call;
   final DateTime now;
+  final TransportMode mode;
   final Color color;
   final bool isFirst;
   final bool isLast;
@@ -209,7 +213,7 @@ class _CallRow extends StatelessWidget {
     final theme = Theme.of(context);
     final seconds = call.expectedAt.difference(now).inSeconds;
     final until = seconds <= 30
-        ? context.l10n.vehicleAtStop
+        ? atStopLabel(mode)
         : seconds < 3600
         ? context.l10n.minutesShort((seconds / 60).ceil())
         : null;
@@ -234,7 +238,12 @@ class _CallRow extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()]),
                     ),
                     if (until != null)
-                      Text(until, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.live)),
+                      // "à l'arrêt", "at the platform": smaller rather than over the line
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(until, maxLines: 1, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.live)),
+                      ),
                   ],
                 ),
               ),

@@ -5,9 +5,13 @@
     "description": "Name of the app"
   },
   "departureCancelled": "Supprimé",
-  "departureAtStop": "À quai",
+  "departureAtStop": "À l'arrêt",
   "@departureAtStop": {
-    "description": "The vehicle is at the stop"
+    "description": "The vehicle is at the stop (bus)"
+  },
+  "departureAtPlatform": "À quai",
+  "@departureAtPlatform": {
+    "description": "The vehicle is at the platform (metro, train, tram)"
   },
   "departureUnderOneMinute": "< 1 min",
   "minutesShort": "{minutes} min",
@@ -364,7 +368,8 @@
       }
     }
   },
-  "vehicleAtStop": "à quai",
+  "vehicleAtStop": "à l'arrêt",
+  "vehicleAtPlatform": "à quai",
   "inMinutes": "dans {minutes} min",
   "@inMinutes": {
     "placeholders": {

@@ -318,6 +318,7 @@ class _RideDepartures extends ConsumerWidget {
         RideDepartureList(
           rides: rides,
           now: now,
+          mode: step.section.line?.mode,
           selected: selected,
           earliest: earliest,
           onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),

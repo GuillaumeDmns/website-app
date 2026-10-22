@@ -11,15 +11,16 @@ String formatClock(DateTime time) {
   return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }
 
-/// Short label of a departure as shown in lists: `À quai`, `3 min`, `14:52`, `Supprimé`.
-String departureLabel(Departure departure, DateTime now) {
+/// Short label of a departure as shown in lists: `À quai` (`À l'arrêt` for a bus, or when [mode] is unknown), `3 min`,
+/// `14:52`, `Supprimé`.
+String departureLabel(Departure departure, DateTime now, {TransportMode? mode}) {
   final l10n = currentL10n;
   if (departure.cancelled) {
     return l10n.departureCancelled;
   }
   final seconds = departure.time.difference(now).inSeconds;
   if (departure.atStop == true || seconds <= 30) {
-    return l10n.departureAtStop;
+    return mode?.hasPlatforms ?? false ? l10n.departureAtPlatform : l10n.departureAtStop;
   }
   final minutes = seconds ~/ 60;
   if (minutes < 1) {

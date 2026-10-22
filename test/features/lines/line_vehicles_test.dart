@@ -43,6 +43,80 @@ void main() {
     });
   });
 
+  group('vehicleAt', () {
+    // Halfway to Gare de Lyon (in a minute), then Bastille 2 min later, then Nation 2 min after that
+    VehicleCall call(String stopId, String name, Duration fromFetch, {Duration? departure}) => VehicleCall(
+          stopId: stopId,
+          stopName: name,
+          expectedAt: fetchedAt.add(fromFetch),
+          departureAt: departure == null ? null : fetchedAt.add(departure),
+        );
+    final calls = [
+      call('IDFM:2', 'Gare de Lyon', const Duration(minutes: 1)),
+      call('IDFM:3', 'Bastille', const Duration(minutes: 3)),
+      call('IDFM:4', 'Nation', const Duration(minutes: 5)),
+    ];
+    final moving = vehicle().copyWith(calls: calls);
+    ({Vehicle vehicle, double progress}) at(Duration fromFetch, {Vehicle? of, TransportMode mode = TransportMode.metro}) =>
+        vehicleAt(of ?? moving, fetchedAt, fetchedAt.add(fromFetch), mode);
+
+    test('moves along its segment, then stands at the stop a while', () {
+      expect(at(const Duration(seconds: 30)).vehicle.toStopId, 'IDFM:2');
+      expect(at(const Duration(seconds: 30)).progress, closeTo(0.75, 0.001));
+      // Arrived; a metro stands 20 s
+      final standing = at(const Duration(minutes: 1, seconds: 15));
+      expect(standing.vehicle.toStopId, 'IDFM:2');
+      expect(standing.progress, 1);
+      expect(vehicleLabel(standing.vehicle, fetchedAt.add(const Duration(minutes: 1, seconds: 15)), TransportMode.metro),
+          '→ Nation · Gare de Lyon à quai');
+    });
+
+    test('moves on to the following stops by itself, on their times', () {
+      // Left Gare de Lyon at 1:20, at Bastille at 3:00: halfway at 2:10
+      final on = at(const Duration(minutes: 2, seconds: 10));
+      expect(on.vehicle.id, 'v1');
+      expect(on.vehicle.fromStopId, 'IDFM:2');
+      expect(on.vehicle.toStopId, 'IDFM:3');
+      expect(on.vehicle.toStopName, 'Bastille');
+      expect(on.vehicle.calls.map((call) => call.stopName), ['Bastille', 'Nation']);
+      expect(on.progress, closeTo(0.5, 0.001));
+      // Then towards Nation, and at the last stop it stays
+      expect(at(const Duration(minutes: 4)).vehicle.toStopId, 'IDFM:4');
+      expect(at(const Duration(minutes: 9)).vehicle.toStopId, 'IDFM:4');
+      expect(at(const Duration(minutes: 9)).progress, 1);
+    });
+
+    test('stands until the departure the real time gives, or longer for a train', () {
+      final standing = moving.copyWith(calls: [
+        call('IDFM:2', 'Gare de Lyon', const Duration(minutes: 1), departure: const Duration(minutes: 2)),
+        ...calls.skip(1),
+      ]);
+      expect(at(const Duration(minutes: 1, seconds: 50), of: standing).vehicle.toStopId, 'IDFM:2');
+      expect(at(const Duration(minutes: 2, seconds: 10), of: standing).vehicle.toStopId, 'IDFM:3');
+      // A RER stands 40 s without a departure given
+      expect(at(const Duration(minutes: 1, seconds: 30), mode: TransportMode.rer).vehicle.toStopId, 'IDFM:2');
+      expect(at(const Duration(minutes: 1, seconds: 50), mode: TransportMode.rer).vehicle.toStopId, 'IDFM:3');
+    });
+
+    test('leaves where its trip starts at the time given, and skips stops off its branch', () {
+      final waiting = vehicle(from: null, toNext: Duration.zero).copyWith(calls: [
+        call('IDFM:2', 'Gare de Lyon', Duration.zero),
+        ...calls.skip(1),
+      ]);
+      expect(at(const Duration(seconds: 5), of: waiting).vehicle.toStopId, 'IDFM:3');
+
+      final offBranch = vehicleAt(moving, fetchedAt, fetchedAt.add(const Duration(minutes: 2)), TransportMode.metro,
+          serves: (stopId) => stopId != 'IDFM:3');
+      expect(offBranch.vehicle.toStopId, 'IDFM:4');
+      expect(offBranch.vehicle.fromStopId, 'IDFM:2');
+    });
+
+    test('stays as fetched without its calls', () {
+      expect(at(const Duration(minutes: 3), of: vehicle()).vehicle, vehicle());
+      expect(at(const Duration(minutes: 3), of: vehicle()).progress, 1);
+    });
+  });
+
   group('BranchPath', () {
     const branch = LineBranch(headsign: 'Nation', tripCount: 10, stops: [
       StopRef(id: 'IDFM:1', name: 'Châtelet', lat: 48.8584, lon: 2.3470),
@@ -160,7 +234,10 @@ void main() {
   });
 
   test('labels a vehicle with its next stop', () {
-    expect(vehicleLabel(vehicle(toNext: const Duration(minutes: 2)), fetchedAt), '→ Nation · Gare de Lyon dans 2 min');
-    expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt), startsWith('→ Nation · Gare de Lyon'));
+    expect(vehicleLabel(vehicle(toNext: const Duration(minutes: 2)), fetchedAt, TransportMode.metro),
+        '→ Nation · Gare de Lyon dans 2 min');
+    // At the stop: "à quai" on a platform, "à l'arrêt" for a bus
+    expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt, TransportMode.rer), '→ Nation · Gare de Lyon à quai');
+    expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt, TransportMode.bus), "→ Nation · Gare de Lyon à l'arrêt");
   });
 }

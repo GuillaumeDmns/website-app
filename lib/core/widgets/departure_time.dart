@@ -6,12 +6,16 @@ import '../api/models.dart';
 import '../utils/time_format.dart';
 
 /// Time until a departure, Citymapper-like: the minutes in large figures, "min" small beside, green with the
-/// real-time signal when it comes from real time, plain from the schedule; `À quai`, a clock time or `Supprimé` as text.
+/// real-time signal when it comes from real time, plain from the schedule; `À quai` (`À l'arrêt` for a bus), a clock
+/// time or `Supprimé` as text.
 class DepartureTime extends StatelessWidget {
-  const DepartureTime(this.departure, {super.key, required this.now, this.emphasized = false});
+  const DepartureTime(this.departure, {super.key, required this.now, this.mode, this.emphasized = false});
 
   final Departure departure;
   final DateTime now;
+
+  /// Of the line: whether it stops "à quai"
+  final TransportMode? mode;
 
   /// First departure of a row: bigger
   final bool emphasized;
@@ -31,7 +35,7 @@ class DepartureTime extends StatelessWidget {
         ? scheme.onSurface
         : colors.muted;
 
-    final label = departureLabel(departure, now);
+    final label = departureLabel(departure, now, mode: mode);
     // "12 min": the figure large, the unit small
     final minutes = RegExp(r'^(\d+)\s*(min)$').firstMatch(label.replaceAll(' ', ' '));
     final size = emphasized ? 22.0 : 15.0;

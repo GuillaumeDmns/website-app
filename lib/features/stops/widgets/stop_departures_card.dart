@@ -123,10 +123,10 @@ class LineDeparturesRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           for (final departure in departures.skip(1).take(more).toList().reversed) ...[
-            DepartureTime(departure, now: now),
+            DepartureTime(departure, now: now, mode: row.line.mode),
             const SizedBox(width: 10),
           ],
-          if (departures.isNotEmpty) DepartureTime(departures.first, now: now, emphasized: true),
+          if (departures.isNotEmpty) DepartureTime(departures.first, now: now, mode: row.line.mode, emphasized: true),
         ],
       ),
     );
