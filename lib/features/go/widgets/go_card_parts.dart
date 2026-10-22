@@ -195,7 +195,14 @@ class _MarginPill extends ConsumerWidget {
 
 /// `Vous allez le rater · suivant à 14:38 (+6 min)`: walking too slowly to the ride, its next departure the user can
 /// still catch, from the ride's departures
-String? goMissedNextText(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) {
+String? goMissedNextText(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) => switch (goNextCatchable(ref, state, margin, now)) {
+      (:final time, :final later) => currentL10n.goMarginLateNext(formatClock(time), later),
+      null => null,
+    };
+
+/// Walking to the ride: its next departure after the one aimed at that the user can still catch at their pace, and
+/// how many minutes later it leaves; null when the departures don't say
+({DateTime time, int later})? goNextCatchable(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) {
   final tracker = state.tracker;
   final index = state.progress.step + 1;
   final ride = tracker.steps[index];
@@ -212,8 +219,7 @@ String? goMissedNextText(WidgetRef ref, GoState state, WalkMargin margin, DateTi
   if (next == null) {
     return null;
   }
-  final later = next.departure.time.difference(margin.departure).roundedMinutes;
-  return currentL10n.goMarginLateNext(formatClock(next.departure.time), later);
+  return (time: next.departure.time, later: next.departure.time.difference(margin.departure).roundedMinutes);
 }
 
 class _Pill extends StatelessWidget {

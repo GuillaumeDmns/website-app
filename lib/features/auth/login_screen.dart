@@ -60,12 +60,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: 16),
           const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
         ],
-        const SizedBox(height: 16),
-        FormErrorText(_error),
-        TextButton(
+        const SizedBox(height: 12),
+        // Without an account, at the same level as Google: both are fine choices
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 15),
+          ),
           onPressed: _loading ? null : () => context.go(GoRouterState.of(context).uri.queryParameters['from'] ?? Routes.home),
           child: Text(context.l10n.continueAsGuest),
         ),
+        const SizedBox(height: 8),
+        FormErrorText(_error),
         TextButton(
           onPressed: () => context.push(Routes.privacy),
           child: Text(context.l10n.privacy, style: theme.textTheme.bodySmall),

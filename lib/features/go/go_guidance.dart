@@ -168,3 +168,10 @@ MapFollow? goFollow(GoState state, int shownStep) {
   }
   return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
 }
+
+/// The departure to take instead of a missed or cancelled one: the next one still to come, not cancelled (for a
+/// cancellation, one leaving after the planned time, the cancelled one aside); null when the departures don't say
+Ride? replacementRide(List<Ride> rides, GoIssue issue, DateTime planned, DateTime now) => rides
+    .where((ride) => ride.departure.time.isAfter(now) && ride.departure.cancelled != true)
+    .where((ride) => issue != GoIssue.cancelled || ride.departure.time.isAfter(planned.add(const Duration(seconds: 30))))
+    .firstOrNull;

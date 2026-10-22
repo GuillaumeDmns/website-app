@@ -65,8 +65,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     super.dispose();
   }
 
-  void _show(int page) =>
-      _pages?.animateToPage(page, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+  void _show(int page) => _pages?.animateToPage(page, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
 
   @override
   Widget build(BuildContext context) {
@@ -113,70 +112,83 @@ class _GoScreenState extends ConsumerState<GoScreen> {
 
     return MapOverlayScope(
       overlay: _overlay(state, live),
-      child: Column(
-        children: [
-          SizeReporter(
-            onSize: (size) {
-              _top = size.height;
-              _fitSheet();
-            },
-            child: Column(
-              children: [
-                GoHeader(state: state, onBack: back),
-                if (AppConfig.isDev) const GoGpsStats(),
-                GoStepStrip(state: state, shown: _shown, onTap: _show),
-                if (progress.issue case final issue? when issue != GoIssue.offRoute) GoIssueCard(state: state, issue: issue),
-                if (progress.issue == GoIssue.offRoute) GoOffRouteBanner(state: state),
-              ],
-            ),
-          ),
-          Expanded(
-            // Swipe with a mouse or a trackpad too (desktop, web)
-            child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(dragDevices: PointerDeviceKind.values.toSet()),
-              child: PageView.builder(
-                controller: _pages,
-                itemCount: pageCount,
-                onPageChanged: (page) {
-                  setState(() => _shown = page);
-                  _newCard = true;
-                  _fitSheet();
-                },
-                itemBuilder: (context, page) {
-                  final isLive = page == live && !arrived;
-                  final Widget card = page >= tracker.steps.length
-                      ? GoArrivalCard(state: state)
-                      : tracker.steps[page].isRide
-                          ? GoRideCard(state: state, index: page, compact: isLive)
-                          : GoMoveCard(state: state, index: page, compact: isLive);
-                  void onSize(Size size) {
-                    _cards[page] = size.height + 16;
-                    if (page == _shown) {
-                      _fitSheet();
-                    }
-                  }
-
-                  return SingleChildScrollView(
-                    // The bottom sheet is dragged by the list of the page shown only
-                    controller: page == _shown ? PanelScrollScope.of(context) : null,
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    // In progress, the sheet fits the context only: the map keeps most of the screen
-                    child: isLive
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizeReporter(onSize: onSize, child: GoNowCard(state: state)),
-                              const SizedBox(height: 16),
-                              card,
-                            ],
-                          )
-                        : SizeReporter(onSize: onSize, child: card),
-                  );
-                },
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          children: [
+            // Clipped, never overflowing, for the frame where it grew (an issue shown) before the sheet fits it
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+              child: SingleChildScrollView(
+                primary: false,
+                physics: const NeverScrollableScrollPhysics(),
+                child: SizeReporter(
+                  onSize: (size) {
+                    _top = size.height;
+                    _fitSheet();
+                  },
+                  child: Column(
+                    children: [
+                      GoHeader(state: state, onBack: back),
+                      if (AppConfig.isDev) const GoGpsStats(),
+                      GoStepStrip(state: state, shown: _shown, onTap: _show),
+                      if (progress.issue case final issue? when issue != GoIssue.offRoute) GoIssueCard(state: state, issue: issue),
+                      if (progress.issue == GoIssue.offRoute) GoOffRouteBanner(state: state),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+            Expanded(
+              // Swipe with a mouse or a trackpad too (desktop, web)
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(dragDevices: PointerDeviceKind.values.toSet()),
+                child: PageView.builder(
+                  controller: _pages,
+                  itemCount: pageCount,
+                  onPageChanged: (page) {
+                    setState(() => _shown = page);
+                    _newCard = true;
+                    _fitSheet();
+                  },
+                  itemBuilder: (context, page) {
+                    final isLive = page == live && !arrived;
+                    final Widget card = page >= tracker.steps.length
+                        ? GoArrivalCard(state: state)
+                        : tracker.steps[page].isRide
+                        ? GoRideCard(state: state, index: page, compact: isLive)
+                        : GoMoveCard(state: state, index: page, compact: isLive);
+                    void onSize(Size size) {
+                      _cards[page] = size.height + 16;
+                      if (page == _shown) {
+                        _fitSheet();
+                      }
+                    }
+
+                    return SingleChildScrollView(
+                      // The bottom sheet is dragged by the list of the page shown only
+                      controller: page == _shown ? PanelScrollScope.of(context) : null,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      // In progress, the sheet fits the context only: the map keeps most of the screen
+                      child: isLive
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizeReporter(
+                                  onSize: onSize,
+                                  child: GoNowCard(state: state),
+                                ),
+                                const SizedBox(height: 16),
+                                card,
+                              ],
+                            )
+                          : SizeReporter(onSize: onSize, child: card),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -199,16 +211,13 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     final step = tracker.stepOf(progress);
     if (step != null && progress.phase == GoPhase.onBoard && _shown == live) {
       final stops = step.section.stops;
-      final left = [
-        for (var k = math.min(progress.stopIndex, stops.length - 1); k < stops.length; k++) LatLng(stops[k].lat, stops[k].lon),
-      ];
+      final left = [for (var k = math.min(progress.stopIndex, stops.length - 1); k < stops.length; k++) LatLng(stops[k].lat, stops[k].lon)];
       final next = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1] : null;
       final color = parseHexColor(step.section.line?.color, Theme.of(context).colorScheme.primary);
       return MapOverlay(
         pins: [
           ...overlay.pins,
-          if (next != null)
-            MapPin(point: LatLng(next.lat, next.lon), color: color, size: 18, label: next.name, above: false),
+          if (next != null) MapPin(point: LatLng(next.lat, next.lon), color: color, size: 18, label: next.name, above: false),
         ],
         paths: overlay.paths,
         fit: left.length >= 2 ? left : overlay.fit,

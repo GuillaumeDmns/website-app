@@ -18,6 +18,7 @@ import 'journey_request.dart';
 import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_options_sheet.dart';
+import 'widgets/journey_time_sheet.dart';
 import '../../app/theme.dart';
 
 /// Option shown on the map, per search (the first one, "Suggéré", until another is chosen)
@@ -167,6 +168,10 @@ class JourneyScreen extends ConsumerWidget {
                         context,
                         request.copyWith(datetime: () => cursor.datetime, arriveBy: cursor.arriveBy),
                       ),
+                      onShift: (by) => _update(
+                        context,
+                        request.copyWith(datetime: () => (request.datetime ?? DateTime.now()).add(by)),
+                      ),
                     ),
                   ),
               ],
@@ -297,7 +302,6 @@ class _PlaceField extends StatelessWidget {
   }
 }
 
-enum _TimeChoice { now, departAt, arriveBy }
 
 /// Narrower than the theme's outlined buttons: the time and the options fit on a phone
 final _compact = OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12));
@@ -431,49 +435,18 @@ class _TimeButton extends StatelessWidget {
     return request.arriveBy ? currentL10n.arriveByTime(time) : currentL10n.leaveAtTime(time);
   }
 
-  Future<void> _choose(BuildContext context, _TimeChoice choice) async {
-    if (choice == _TimeChoice.now) {
-      onChanged(request.copyWith(datetime: () => null, arriveBy: false));
-      return;
-    }
-
-    final initial = (request.datetime ?? DateTime.now()).toLocal();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-    if (date == null || !context.mounted) {
-      return;
-    }
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial));
-    if (time == null) {
-      return;
-    }
-    final datetime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    onChanged(request.copyWith(datetime: () => datetime, arriveBy: choice == _TimeChoice.arriveBy));
-  }
-
   @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      builder: (context, controller, child) => OutlinedButton.icon(
+  Widget build(BuildContext context) => OutlinedButton.icon(
         style: _compact,
         icon: const Icon(Icons.schedule, size: 18),
         label: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        onPressed: () => controller.isOpen ? controller.close() : controller.open(),
-      ),
-      menuChildren: [
-        for (final (choice, label) in [
-          (_TimeChoice.now, context.l10n.leaveNow),
-          (_TimeChoice.departAt, context.l10n.leaveAtMenu),
-          (_TimeChoice.arriveBy, context.l10n.arriveByMenu),
-        ])
-          MenuItemButton(onPressed: () => _choose(context, choice), child: Text(label)),
-      ],
-    );
-  }
+        onPressed: () async {
+          final next = await showJourneyTimeSheet(context, request);
+          if (next != null) {
+            onChanged(next);
+          }
+        },
+      );
 }
 
 /// Phone: the sheet may have been scrolled up over the map; lower it so that the option shows on the map, and keep
@@ -499,6 +472,7 @@ class _Results extends StatelessWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onPage,
+    required this.onShift,
   });
 
   final JourneyPlan plan;
@@ -510,13 +484,42 @@ class _Results extends StatelessWidget {
   final ValueChanged<JourneyOption> onOpen;
   final ValueChanged<PageCursor> onPage;
 
+  /// Moves the search in time (no result: an hour earlier or later)
+  final ValueChanged<Duration> onShift;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (plan.journeys.isEmpty) {
+      // Nothing at this time (the night, mostly): another time in one tap
+      final hour = DateTime.now().hour;
       return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(context.l10n.noJourneyFound, textAlign: TextAlign.center),
+        padding: const EdgeInsets.fromLTRB(12, 28, 12, 24),
+        child: Column(
+          children: [
+            Icon(hour >= 1 && hour < 5 ? Icons.bedtime_outlined : Icons.search_off, size: 32, color: context.colors.muted),
+            const SizedBox(height: 10),
+            Text(context.l10n.noJourneyFound, textAlign: TextAlign.center, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.chevron_left, size: 18),
+                  label: Text(context.l10n.journeyEarlier),
+                  onPressed: () => plan.earlier != null ? onPage(plan.earlier!) : onShift(const Duration(hours: -1)),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.chevron_right, size: 18),
+                  label: Text(context.l10n.journeyLater),
+                  onPressed: () => plan.later != null ? onPage(plan.later!) : onShift(const Duration(hours: 1)),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     }
 

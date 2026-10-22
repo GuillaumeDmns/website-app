@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/features/go/go_glance.dart';
 import 'package:website_app/features/go/go_live.dart';
@@ -94,5 +94,43 @@ void main() {
     expect(update.title, glance.action);
     expect(update.chip, glance.heroText);
     expect(update.status, glance.place);
+  });
+
+  test('walking too slowly: hurry is the instruction, with how far and the train', () {
+    final glance = goGlance(state(tracker.initial()), at(4));
+    expect(glance.action, anyOf(currentL10n.goMarginHurry, currentL10n.goMarginLate));
+    expect(glance.icon, Icons.directions_run);
+    expect(glance.heroUnit, anyOf('m', 'km'));
+    expect(glance.place, startsWith('RER A'));
+    expect(glance.tone, GoTone.warn);
+  });
+
+  test('off the way: said first, with the recalculation coming', () {
+    final off = tracker.initial().copyWith(issue: () => GoIssue.offRoute);
+    final glance = goGlance(state(off).copyWith(recalculateAt: () => at(1).add(const Duration(seconds: 8))), at(1));
+    expect(glance.action, currentL10n.goOffRoute);
+    expect(glance.place, currentL10n.goRecalculateIn(8));
+    expect(glance.tone, GoTone.warn);
+  });
+
+  test('a missed train replaced by the next one: said, with how much later', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    final glance = goGlance(
+        state(waiting).copyWith(retained: () => (step: 1, later: const Duration(minutes: 8), cancelled: false)), at(2));
+    expect(glance.action, currentL10n.goMissedShort('RER A'));
+    expect(glance.hero, '+8');
+    expect(glance.place, currentL10n.goRetained);
+    expect(glance.tone, GoTone.warn);
+  });
+
+  test('a platform change: the new platform is the instruction, the old one recalled', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1).copyWith(fired: {'platform-1-3'});
+    final glance = goGlance(state(waiting, platform: '5'), at(2));
+    expect(glance.kicker, currentL10n.goPlatformChangedKicker);
+    expect(glance.action, currentL10n.goGoToPlatform('voie 5'));
+    expect(glance.place, contains(currentL10n.goPlatformInsteadOf('voie 5', 'voie 3')));
+    // Announced once, without a change: the usual moment
+    final announced = tracker.jumpTo(tracker.initial(), 1).copyWith(fired: {'platform-1-5'});
+    expect(goGlance(state(announced, platform: '5'), at(2)).action, currentL10n.goTake('RER A'));
   });
 }

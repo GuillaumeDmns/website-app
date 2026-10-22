@@ -74,6 +74,15 @@ class GoNowCard extends ConsumerWidget {
               ],
             ),
           ),
+        if (state.retained != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(context.l10n.goRecalculateJourney),
+              onPressed: state.recalculating ? null : ref.read(goControllerProvider.notifier).recalculate,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 0, 0),
           child: Row(
@@ -128,7 +137,11 @@ class GoNowCard extends ConsumerWidget {
                 ].join(' · '),
                 color: colors.live,
               ),
-            MarginLevel.hurry => (icon: Icons.directions_run, text: context.l10n.goMarginHurry, color: colors.warning),
+            // The banner says to hurry: here, the plan B
+            MarginLevel.hurry => switch (goNextCatchable(ref, state, margin, now)) {
+                (:final time, :final later) => (icon: Icons.update, text: context.l10n.goIfMissed(formatClock(time), later), color: text),
+                null => (icon: Icons.directions_run, text: context.l10n.goMarginHurry, color: colors.warning),
+              },
             MarginLevel.late => (
                 icon: Icons.warning_amber,
                 text: goMissedNextText(ref, state, margin, now) ?? context.l10n.goMarginLate,
