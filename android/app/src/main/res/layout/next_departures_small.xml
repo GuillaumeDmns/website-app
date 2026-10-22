@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget at its smallest (2 x 2 cells, design 2k1): the stop and its next departure, or, before any stop is
+     known, what to do. Chosen by NextDepartures from the size the launcher gives (every Android version). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/next_departures_background"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <ImageView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:background="@drawable/widget_icon_background"
+        android:importantForAccessibility="no"
+        android:padding="5dp"
+        android:src="@drawable/ic_subway"
+        android:tint="#FFFFFF" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/tv_stop_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:id="@+id/departure_row_1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="22dp">
+
+            <ImageView
+                android:id="@+id/iv_line_1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_badge_rail" />
+
+            <TextView
+                android:id="@+id/tv_line_1"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="1"
+                android:minWidth="22dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tv_time_1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/widget_text"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_status_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="3"
+        android:text="@string/widget_tap_to_load"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="13sp" />
+</LinearLayout>

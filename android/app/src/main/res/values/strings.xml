@@ -8,7 +8,7 @@
     <string name="widget_loading">Loading…</string>
     <string name="widget_last_updated_placeholder">Updated --:--</string>
     <string name="widget_no_stop">No stop</string>
-    <string name="widget_tap_to_load">Tap to load</string>
+    <string name="widget_tap_to_load">Open the app to choose a stop</string>
     <string name="widget_no_departure">No departure</string>
     <string name="journey_channel">Journey in progress</string>
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>

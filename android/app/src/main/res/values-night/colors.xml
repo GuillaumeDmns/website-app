@@ -2,4 +2,7 @@
     <color name="widget_surface">#FF1E1F23</color>
     <color name="widget_text">#FFECEDEF</color>
     <color name="widget_text_muted">#FF9A9EA6</color>
+    <color name="widget_brand">#FF0A8F4E</color>
+    <color name="widget_live">#FF3DD68C</color>
+    <color name="widget_late">#FFFB923C</color>
 </resources>

@@ -29,36 +29,48 @@ Future<void> pushDeparturesToWidget(StopDepartures departures) async {
   if (!homeWidgetSupported) {
     return;
   }
-  final rows = [
-    for (final line in departures.lines)
-      for (final departure in line.departures.where((departure) => !departure.cancelled))
-        (line: line.line, destination: line.destination, departure: departure),
-  ]..sort((a, b) => a.departure.time.compareTo(b.departure.time));
-  // Clock times rather than "3 min": the widget is not refreshed every minute
-  // `line|background|text color|time|destination` (see NextDepartures.kt)
-  String field(String? value) => (value ?? '').replaceAll('|', '/');
-  final json = rows
-      .take(_rows)
-      .map((row) => [
-            field(row.line.name),
-            field(row.line.color),
-            field(row.line.textColor),
-            formatClock(row.departure.time),
-            field(row.destination),
-          ].join('|'))
-      .join('||');
+  final json = widgetRows(departures);
   try {
     await Future.wait([
       HomeWidget.saveWidgetData<String>('stop_id', departures.stop.id),
       HomeWidget.saveWidgetData<String>('stop_name', departures.stop.name),
-      HomeWidget.saveWidgetData<String>('departures_json', rows.isEmpty ? null : json),
-      HomeWidget.saveWidgetData<String>('departures_list', rows.isEmpty ? currentL10n.widgetNoDeparture : null),
+      HomeWidget.saveWidgetData<String>('departures_json', json.isEmpty ? null : json),
+      HomeWidget.saveWidgetData<String>('departures_list', json.isEmpty ? currentL10n.widgetNoDeparture : null),
       HomeWidget.saveWidgetData<String>('last_updated', currentL10n.widgetUpdated(formatClock(DateTime.now()))),
     ]);
     await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedAndroidName);
   } catch (e) {
     debugPrint('Home widget update failed: $e');
   }
+}
+
+/// The widget's rows (design 2k1): one per line and direction, the soonest first, at most [_rows], one per line of
+/// text, each `line|background|text color|time|destination|mode|state|next` (see `NextDepartures.kt`): clock times
+/// rather than "3 min", the widget not being refreshed every minute; `state` is `live` (real time), `late` or empty;
+/// `next` the following departure, or empty. Rows were joined with `||` before (five fields): the widget reads both.
+@visibleForTesting
+String widgetRows(StopDepartures departures) {
+  String field(String? value) => (value ?? '').replaceAll('|', '/').replaceAll('\n', ' ');
+  final groups = [
+    for (final line in departures.lines)
+      if (line.departures.where((departure) => !departure.cancelled).toList() case final upcoming when upcoming.isNotEmpty)
+        (line: line, upcoming: upcoming),
+  ]..sort((a, b) => a.upcoming.first.time.compareTo(b.upcoming.first.time));
+  return groups.take(_rows).map((group) {
+    final first = group.upcoming.first;
+    final next = group.upcoming.length > 1 ? group.upcoming[1] : null;
+    return [
+      field(group.line.line.name),
+      field(group.line.line.color),
+      field(group.line.line.textColor),
+      formatClock(first.time),
+      field(group.line.destination),
+      group.line.line.mode.name,
+      first.delayed ? 'late' : (first.realtime ? 'live' : ''),
+      if (next != null) formatClock(next.time) else '',
+    ].join('|');
+    // Every row ends with a new line, even a single one: the widget tells this format from the older one by it
+  }).map((row) => '$row\n').join();
 }
 
 /// Refresh button of the widget, run in a background isolate (the app may be closed): renews the account's access

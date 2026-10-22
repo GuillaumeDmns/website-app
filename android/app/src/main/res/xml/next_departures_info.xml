@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 4 x 2 cells at first, resizable down to 2 x 2 (the small layout, NextDepartures) on every launcher:
+     minResizeWidth/Height since Android 3.1, targetCell* and previewLayout read from Android 12 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/app_widget_description"
     android:initialKeyguardLayout="@layout/next_departures"
     android:initialLayout="@layout/next_departures"
     android:minWidth="250dp"
     android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
     android:previewLayout="@layout/next_departures"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
