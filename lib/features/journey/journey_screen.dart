@@ -16,6 +16,7 @@ import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'widgets/journey_card.dart';
+import 'widgets/journey_time_bar.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_options_sheet.dart';
 import '../../app/theme.dart';
@@ -520,9 +521,12 @@ class _Results extends StatelessWidget {
       );
     }
 
+    // One time axis for all the results: their bars compare at a glance
+    final axis = TimeAxis.of(plan.journeys, now);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 0), child: TimeAxisHeader(axis: axis)),
         for (final (index, journey) in plan.journeys.indexed) ...[
           // Category header only when it changes (Navitia returns several "rapid" options in a row)
           if (index == 0 || journeyTypeLabel(plan.journeys[index - 1].type) != journeyTypeLabel(journey.type))
@@ -537,6 +541,7 @@ class _Results extends StatelessWidget {
             builder: (cardContext) => JourneyCard(
               journey: journey,
               now: now,
+              axis: axis,
               selected: index == selectedIndex,
               onTap: () {
                 if (index == selectedIndex) {
@@ -552,6 +557,8 @@ class _Results extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
+        const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: TimeBarLegend()),
+        const SizedBox(height: 4),
         Row(
           children: [
             if (plan.earlier != null)

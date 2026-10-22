@@ -14,13 +14,16 @@ import '../go_tracker.dart';
 import 'go_card_parts.dart';
 
 /// A move on foot or by bike. In progress: what to do now (the next turn, else where to go), how far, the time to
-/// spare; the turns folded under it so that the panel stays low. Otherwise where to, how long and its turns. Then what
-/// comes next.
+/// spare (the banner and [GoNowCard] when [compact]); the turns folded under it so that the panel stays low.
+/// Otherwise where to, how long and its turns. Then what comes next.
 class GoMoveCard extends ConsumerWidget {
-  const GoMoveCard({super.key, required this.state, required this.index});
+  const GoMoveCard({super.key, required this.state, required this.index, this.compact = false});
 
   final GoState state;
   final int index;
+
+  /// The step in progress under the banner and [GoNowCard], which tell what to do: only the turns and what follows
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,12 +87,12 @@ class GoMoveCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        title,
+        if (!compact) title,
         // The turns: folded while walking (the next one is the title), open on a step looked at
         if (turns.length > 1) _Turns(initiallyExpanded: !isLive, children: turns),
         if (!isDone && index + 1 < tracker.steps.length) GoNextStep(state: state, index: index + 1),
         const SizedBox(height: 8),
-        if (!isDone && index != progress.step)
+        if (!isDone && index != progress.step && !compact)
           GoSmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),
       ],
     );

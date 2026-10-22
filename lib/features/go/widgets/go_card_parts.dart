@@ -185,34 +185,35 @@ class _MarginPill extends ConsumerWidget {
         ),
       MarginLevel.late => _Pill(
           icon: Icons.warning_amber,
-          text: _nextOne(context, ref) ?? context.l10n.goMarginLate,
+          text: goMissedNextText(ref, state, margin, now) ?? context.l10n.goMarginLate,
           color: scheme.error,
           textColor: scheme.onError,
         ),
     };
   }
+}
 
-  /// `Vous allez le rater · suivant à 14:38 (+6 min)`, from the ride's departures
-  String? _nextOne(BuildContext context, WidgetRef ref) {
-    final tracker = state.tracker;
-    final index = state.progress.step + 1;
-    final ride = tracker.steps[index];
-    final earliest = earliestBoarding(state.journey, ride.sectionIndex, now).add(state.progress.shift);
-    final key = rideKey(ride.section, earliest, now);
-    if (key == null) {
-      return null;
-    }
-    final walk = Duration(seconds: (metersToGo(state) / movePace(state, tracker.steps[state.progress.step])).round());
-    final reachable = now.add(walk);
-    final next = (ref.watch(rideOptionsProvider(key)).value ?? const [])
-        .where((ride) => ride.departure.time.isAfter(reachable) && ride.departure.time.isAfter(margin.departure))
-        .firstOrNull;
-    if (next == null) {
-      return null;
-    }
-    final later = next.departure.time.difference(margin.departure).roundedMinutes;
-    return context.l10n.goMarginLateNext(formatClock(next.departure.time), later);
+/// `Vous allez le rater · suivant à 14:38 (+6 min)`: walking too slowly to the ride, its next departure the user can
+/// still catch, from the ride's departures
+String? goMissedNextText(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) {
+  final tracker = state.tracker;
+  final index = state.progress.step + 1;
+  final ride = tracker.steps[index];
+  final earliest = earliestBoarding(state.journey, ride.sectionIndex, now).add(state.progress.shift);
+  final key = rideKey(ride.section, earliest, now);
+  if (key == null) {
+    return null;
   }
+  final walk = Duration(seconds: (metersToGo(state) / movePace(state, tracker.steps[state.progress.step])).round());
+  final reachable = now.add(walk);
+  final next = (ref.watch(rideOptionsProvider(key)).value ?? const [])
+      .where((ride) => ride.departure.time.isAfter(reachable) && ride.departure.time.isAfter(margin.departure))
+      .firstOrNull;
+  if (next == null) {
+    return null;
+  }
+  final later = next.departure.time.difference(margin.departure).roundedMinutes;
+  return currentL10n.goMarginLateNext(formatClock(next.departure.time), later);
 }
 
 class _Pill extends StatelessWidget {

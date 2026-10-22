@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme.dart';
+
 /// Row of the journey detail's timeline: time on the left, a vertical line (solid or dotted) with an optional stop dot, content
 class TimelineRow extends StatelessWidget {
   const TimelineRow({super.key, 
@@ -38,7 +40,7 @@ class TimelineRow extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       time!,
-                      style: theme.textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                      style: theme.textTheme.titleSmall?.copyWith(fontSize: 13, fontFeatures: const [FontFeature.tabularFigures()]),
                     ),
                   ),
           ),
@@ -67,11 +69,12 @@ class TimelineRow extends StatelessWidget {
                   ),
                 if (dot)
                   Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    width: 14,
-                    height: 14,
+                    margin: const EdgeInsets.only(top: 1),
+                    width: 16,
+                    height: 16,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
+                      // Where the journey ends: filled
+                      color: isLast ? color : context.colors.card,
                       shape: BoxShape.circle,
                       border: Border.all(color: color, width: 3),
                     ),

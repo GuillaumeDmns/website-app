@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
+import 'package:website_app/features/journey/widgets/journey_time_bar.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/fake_backend.dart';
@@ -22,6 +23,9 @@ void main() {
     expect(request.queryParameters['from'], '48.8584,2.347');
     expect(request.queryParameters['to'], 'IDFM:70001');
     expect(find.byType(JourneyCard), findsNWidgets(2));
+    // On one time axis, to compare them at a glance
+    expect(find.byType(TimeAxisHeader), findsOneWidget);
+    expect(find.byType(JourneyTimeBar), findsNWidgets(2));
     // Each option with the next departures of its first ride
     expect(find.textContaining(currentL10n.alsoAt('').trim()), findsWidgets);
 

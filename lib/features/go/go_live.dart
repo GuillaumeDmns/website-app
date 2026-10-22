@@ -5,19 +5,21 @@ import '../../core/platform/live_journey.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import 'go_guidance.dart';
+import 'go_glance.dart';
 import 'go_instruction.dart';
 import 'go_state.dart';
 import 'go_tracker.dart';
 
-/// What the system notification (Android) shows of [state]: the instruction, the platform, the progress along the
-/// steps, a short chip and the arrival. Not for an arrived journey: the notification is gone then.
+/// What the system notification (Android) shows of [state], like a live activity: the same moment as GO's banner
+/// ([goGlance]: what to do, where, its figure as the chip), the platform, the progress along the steps and the
+/// arrival. Not for an arrived journey: the notification is gone then.
 LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
-  final instruction = goInstruction(state, now);
+  final glance = goGlance(state, now);
   final tracker = state.tracker;
   final progress = state.progress;
   final step = tracker.stepOf(progress);
 
-  final chip = switch (progress.phase) {
+  final chip = glance.heroText ?? switch (progress.phase) {
     GoPhase.onBoard =>
       tracker.stopsLeft(progress) <= 1 ? currentL10n.goChipGetOff : currentL10n.stopsCount(tracker.stopsLeft(progress)),
     GoPhase.waiting when step != null =>
@@ -28,12 +30,12 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
   // The platform as soon as it is known: the subtitle while waiting, the next ride's otherwise
   final platform = goPlatformText(state);
   final status = [
-    if (instruction.subtitle case final subtitle? when subtitle.isNotEmpty) subtitle,
-    ?platform,
+    if (glance.place case final place? when place.isNotEmpty) place,
+    if (platform != null && !(glance.place ?? '').contains(platform) && !glance.kicker.toLowerCase().contains(platform)) platform,
   ].join(' · ');
 
   return LiveJourneyUpdate(
-    title: instruction.title,
+    title: glance.action,
     status: status,
     progress: journeySecondsDone(tracker, progress).round(),
     mode: _liveMode(step?.section),

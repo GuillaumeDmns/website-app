@@ -14,13 +14,12 @@ import '../../../core/widgets/line_badge.dart';
 import '../../../l10n/l10n.dart';
 import '../../journey/journey_providers.dart';
 import '../../journey/journey_retime.dart';
-import '../../journey/widgets/journey_card.dart';
+import '../../journey/journey_labels.dart';
 import '../go_controller.dart';
-import '../go_guidance.dart';
 import '../go_state.dart';
 import '../go_tracker.dart';
 
-/// The arrival, in how long and against the plan; screen, sound and stop
+/// The capsule's first line: the arrival, against the plan and in how long; screen, sound and stop kept small
 class GoHeader extends ConsumerWidget {
   const GoHeader({super.key, required this.state, required this.onBack});
 
@@ -30,59 +29,65 @@ class GoHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colors = context.colors;
     final controller = ref.read(goControllerProvider.notifier);
     final arrived = state.progress.phase == GoPhase.arrived;
     final now = DateTime.now();
     final eta = state.tracker.eta(state.progress, state.currentVehicle);
     final late = eta.difference(state.journey.arrival).inMinutes;
     final left = eta.difference(now);
+    final compact = MediaQuery.textScalerOf(context).scale(10) > 13;
+    final small = IconButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: colors.muted);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+      padding: const EdgeInsets.fromLTRB(2, 0, 4, 0),
       child: Row(
         children: [
-          IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: onBack),
+          IconButton(tooltip: context.l10n.back, style: small, icon: const Icon(Icons.arrow_back, size: 22), onPressed: onBack),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: arrived ? context.l10n.goFinished : context.l10n.goArrival(formatClock(eta))),
-                      if (!arrived && late.abs() >= 1)
-                        TextSpan(
-                          text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: late >= 3 ? context.colors.warning : theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
-                  ),
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                if (!arrived && left > Duration.zero)
-                  Text(context.l10n.goArrivesIn(formatDuration(left.inSeconds)),
-                      style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
-              ],
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: arrived ? context.l10n.goFinished : context.l10n.goArrival(formatClock(eta))),
+                  if (!arrived && late.abs() >= 1)
+                    TextSpan(
+                      text: '  ${late > 0 ? '+' : ''}${context.l10n.minutesShort(late)}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: late >= 3 ? colors.warning : colors.muted,
+                      ),
+                    ),
+                  if (!arrived && left > Duration.zero && !compact)
+                    TextSpan(
+                      text: ' · ${context.l10n.goArrivesIn(formatDuration(left.inSeconds))}',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, color: colors.muted),
+                    ),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium,
             ),
           ),
           IconButton(
             tooltip: state.keepAwake ? context.l10n.goLetScreenSleep : context.l10n.goKeepScreenOn,
+            style: small,
             isSelected: state.keepAwake,
-            icon: const Icon(Icons.light_mode_outlined),
-            selectedIcon: const Icon(Icons.light_mode),
+            icon: const Icon(Icons.light_mode_outlined, size: 20),
+            selectedIcon: Icon(Icons.light_mode, size: 20, color: theme.colorScheme.primary),
             onPressed: controller.toggleKeepAwake,
           ),
           IconButton(
             tooltip: state.muted ? context.l10n.goUnmute : context.l10n.goMute,
-            icon: Icon(state.muted ? Icons.volume_off_outlined : Icons.volume_up_outlined),
+            style: small,
+            icon: Icon(state.muted ? Icons.volume_off_outlined : Icons.volume_up_outlined, size: 20),
             onPressed: controller.toggleMute,
           ),
           IconButton(
             tooltip: context.l10n.goStop,
-            icon: const Icon(Icons.close),
+            style: small,
+            icon: const Icon(Icons.close, size: 22),
             onPressed: () => _confirmStop(context, ref),
           ),
         ],
@@ -110,27 +115,6 @@ class GoHeader extends ConsumerWidget {
   }
 }
 
-/// A thin bar: the share of the journey done
-class GoJourneyProgress extends StatelessWidget {
-  const GoJourneyProgress({super.key, required this.state});
-
-  final GoState state;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
-            value: journeyFraction(state),
-            minHeight: 4,
-            color: AppTheme.brand,
-            backgroundColor: context.colors.subtle,
-          ),
-        ),
-      );
-}
-
 /// How the fixes come (development builds): is the device's GPS giving one a second?
 class GoGpsStats extends ConsumerWidget {
   const GoGpsStats({super.key});
@@ -155,8 +139,8 @@ class GoGpsStats extends ConsumerWidget {
   }
 }
 
-/// The steps of the journey in a row, like the journey results (walks with their minutes, rides with their line):
-/// the one in progress outlined, the one shown filled, the ones done faded with a check. Tap one to look at it.
+/// The steps of the journey in a row, small (walks with their minutes, rides with their line, a short dash between):
+/// the one in progress filled, the one looked at outlined, the ones done faded. Tap one to look at it.
 class GoStepStrip extends StatelessWidget {
   const GoStepStrip({super.key, required this.state, required this.shown, required this.onTap});
 
@@ -172,6 +156,7 @@ class GoStepStrip extends StatelessWidget {
     final progress = state.progress;
     final arrived = progress.phase == GoPhase.arrived;
     final live = arrived ? steps.length : progress.step;
+    final primary = theme.colorScheme.primary;
 
     Widget item(int index, Widget child, String label) {
       final done = index < live;
@@ -180,47 +165,49 @@ class GoStepStrip extends StatelessWidget {
         label: label,
         selected: index == shown,
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(9),
           onTap: () => onTap(index),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
             decoration: BoxDecoration(
-              color: index == shown ? theme.colorScheme.primary.withValues(alpha: 0.14) : null,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: index == live && index != shown ? theme.colorScheme.primary : Colors.transparent, width: 1.5),
+              color: index == live ? primary.withValues(alpha: theme.brightness == Brightness.light ? 0.14 : 0.22) : null,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: index == shown && index != live ? primary : Colors.transparent, width: 1.5),
             ),
-            child: Opacity(
-              opacity: done ? 0.45 : 1,
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                child,
-                if (done) Padding(padding: const EdgeInsets.only(left: 2), child: Icon(Icons.check, size: 14, color: colors.live)),
-              ]),
-            ),
+            child: Opacity(opacity: done ? 0.4 : 1, child: child),
           ),
         ),
       );
     }
 
+    Widget dash() => Container(width: 10, height: 2, margin: const EdgeInsets.symmetric(horizontal: 2), color: theme.colorScheme.outline);
+
     final items = <Widget>[];
     for (final (index, step) in steps.indexed) {
       final section = step.section;
       if (items.isNotEmpty) {
-        items.add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline));
+        items.add(dash());
       }
       items.add(step.isRide && section.line != null
-          ? item(index, LineBadge(section.line!, size: 24), section.line!.label)
-          : item(index, MoveMinutes(section: section), context.l10n.goVerbTo(context.l10n.goVerbWalk, section.to?.name ?? '')));
+          ? item(index, LineBadge(section.line!, size: 20), section.line!.label)
+          : item(
+              index,
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(moveIcon(section.kind), size: 17, color: colors.muted),
+                Text('${math.max(1, (section.duration / 60).round())}', style: TextStyle(fontSize: 11, color: colors.muted)),
+              ]),
+              context.l10n.goVerbTo(context.l10n.goVerbWalk, section.to?.name ?? '')));
     }
     items
-      ..add(Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.outline))
-      ..add(item(steps.length, Icon(Icons.flag, size: 20, color: theme.colorScheme.error), context.l10n.goArrivalTitle));
+      ..add(dash())
+      ..add(item(steps.length, Icon(Icons.flag, size: 17, color: theme.colorScheme.error), context.l10n.goArrivalTitle));
 
     return SizedBox(
-      height: 44,
+      height: MediaQuery.textScalerOf(context).scale(14) + 26,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
         children: [Row(children: items)],
       ),
     );

@@ -71,34 +71,43 @@ class JourneySectionTile extends StatelessWidget {
           SectionKind.transfer => context.l10n.sectionTransfer,
           _ => context.l10n.sectionWalk,
         };
-        final distance = section.length == null || section.length == 0 ? '' : ' (${formatDistance(section.length!)})';
+        // `Marche · 6 min · 450 m`, its icon first
+        final label = [
+          verb,
+          formatDuration(section.duration),
+          if ((section.length ?? 0) > 0) formatDistance(section.length!),
+        ].join(' · ');
+        final icon = section.kind == SectionKind.transfer ? Icons.transfer_within_a_station : moveIcon(section.kind);
+        final title = Row(
+          children: [
+            Icon(icon, size: 18, color: muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+          ],
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (section.from != null && isFirst)
               TimelineRow(
-                color: muted,
+                color: theme.colorScheme.onSurface,
                 time: formatClock(section.departure),
                 dot: true,
-                child: Text(section.from!.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                dotted: true,
+                child: Text(section.from!.name, style: theme.textTheme.titleSmall),
               ),
             TimelineRow(
               color: muted,
               dotted: true,
               child: section.steps.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('$verb ${formatDuration(section.duration)}$distance', style: TextStyle(color: muted)),
-                    )
+                  ? Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: title)
                   : Theme(
                       data: theme.copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
                         tilePadding: EdgeInsets.zero,
                         dense: true,
-                        title: Text(
-                          '$verb ${formatDuration(section.duration)}$distance',
-                          style: TextStyle(color: muted),
-                        ),
+                        visualDensity: VisualDensity.compact,
+                        title: title,
                         children: [
                           for (final step in section.steps)
                             ListTile(
@@ -213,7 +222,7 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.from?.stopAreaId == null ? null : () => context.push(Routes.stop(section.from!.stopAreaId!)),
-            child: Text(section.from?.name ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(section.from?.name ?? '', style: theme.textTheme.titleSmall),
           ),
         ),
         TimelineRow(
@@ -234,7 +243,7 @@ class _RideTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         context.l10n.direction(section.headsign ?? ''),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
@@ -251,15 +260,11 @@ class _RideTile extends StatelessWidget {
                         text: delay >= 60 ? context.l10n.delayMinutes(Duration(seconds: delay).roundedMinutes) : context.l10n.realtime,
                       ),
                     if (hasLine) LastRideTag(ride: section),
-                    if (section.boardingPositions.isNotEmpty)
-                      PillTag(
-                        icon: Icons.train,
-                        color: theme.colorScheme.primary,
-                        text: boardingLabel(section.boardingPositions),
-                      ),
-                    // The platform of the departure taken, once announced
+                    // The platform of the departure taken, once announced, and where to board: what to do, in plain chips
                     if (platformLabel(line, plan?.ride?.departure.platform) case final platform?)
-                      PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.primary, text: platform),
+                      PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.onSurface, text: platform),
+                    if (section.boardingPositions.isNotEmpty)
+                      PillTag(icon: Icons.train, color: theme.colorScheme.onSurface, text: boardingLabel(section.boardingPositions)),
                   ],
                 ),
                 if (hasLine) RideDisruptions(lineId: lineId),
@@ -316,10 +321,7 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.to?.stopAreaId == null ? null : () => context.push(Routes.stop(section.to!.stopAreaId!)),
-            child: Text(
-              context.l10n.getOffAt(section.to?.name ?? ''),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            child: Text(context.l10n.getOffAt(section.to?.name ?? ''), style: theme.textTheme.titleSmall),
           ),
         ),
       ],

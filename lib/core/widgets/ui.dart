@@ -39,7 +39,7 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppTheme.radius),
-      side: border == null ? BorderSide.none : BorderSide(color: border!, width: 2),
+      side: border == null ? BorderSide.none : BorderSide(color: border!, width: 1.5),
     );
     return Card(
       color: color,
