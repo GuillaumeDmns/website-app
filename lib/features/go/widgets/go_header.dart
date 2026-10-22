@@ -16,6 +16,7 @@ import '../../journey/journey_providers.dart';
 import '../../journey/journey_retime.dart';
 import '../../journey/journey_labels.dart';
 import '../go_controller.dart';
+import '../go_guidance.dart';
 import '../go_state.dart';
 import '../go_tracker.dart';
 
@@ -222,24 +223,30 @@ class GoOffRouteBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final controller = ref.read(goControllerProvider.notifier);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.only(left: 12),
-      decoration: BoxDecoration(color: theme.colorScheme.tertiaryContainer, borderRadius: BorderRadius.circular(12)),
+    // What happened is over the map (with the countdown): here, beat it or ignore it
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
         children: [
-          Icon(Icons.wrong_location_outlined, size: 20, color: theme.colorScheme.onTertiaryContainer),
+          Expanded(
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+              icon: state.recalculating
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.refresh, size: 20),
+              label: Text(context.l10n.recalculate),
+              onPressed: state.recalculating ? null : controller.recalculate,
+            ),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(context.l10n.goOffRoute, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
-          state.recalculating
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              : TextButton(onPressed: controller.recalculate, child: Text(context.l10n.recalculate)),
-          IconButton(tooltip: context.l10n.dismiss, icon: const Icon(Icons.close, size: 18), onPressed: controller.dismissIssue),
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              onPressed: controller.dismissIssue,
+              child: Text(context.l10n.dismiss),
+            ),
+          ),
         ],
       ),
     );
@@ -266,12 +273,7 @@ class GoIssueCard extends ConsumerWidget {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     final key = step == null || !step.isRide ? null : rideKey(step.section, now, now);
     final planned = step == null ? now : state.tracker.expectedDeparture(step, progress, state.currentVehicle);
-    final next = key == null
-        ? null
-        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
-            .where((ride) => ride.departure.time.isAfter(now) && ride.departure.cancelled != true)
-            .where((ride) => issue != GoIssue.cancelled || ride.departure.time.isAfter(planned.add(const Duration(seconds: 30))))
-            .firstOrNull;
+    final next = key == null ? null : replacementRide(ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[], issue, planned, now);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),

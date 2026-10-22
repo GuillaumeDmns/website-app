@@ -25,6 +25,8 @@ class GoState {
     this.alertAt,
     this.recalculating = false,
     this.error,
+    this.retained,
+    this.recalculateAt,
   });
 
   final GoTracker tracker;
@@ -61,6 +63,13 @@ class GoState {
   /// Last recalculation failure
   final String? error;
 
+  /// The vehicle of the ride [step] was missed or cancelled and the next one was taken on its own: how much later
+  /// the arrival is. Kept while the user waits for it.
+  final ({int step, Duration later, bool cancelled})? retained;
+
+  /// Off the way: when the journey is recalculated on its own, unless the user does it first or ignores it
+  final DateTime? recalculateAt;
+
   JourneyOption get journey => tracker.journey;
 
   /// Vehicle of the current ride (null when the next ride is not the current step)
@@ -78,6 +87,8 @@ class GoState {
     DateTime? alertAt,
     bool? recalculating,
     String? Function()? error,
+    ({int step, Duration later, bool cancelled})? Function()? retained,
+    DateTime? Function()? recalculateAt,
   }) =>
       GoState(
         tracker: tracker,
@@ -95,6 +106,8 @@ class GoState {
         alertAt: alertAt ?? this.alertAt,
         recalculating: recalculating ?? this.recalculating,
         error: error != null ? error() : this.error,
+        retained: retained != null ? retained() : this.retained,
+        recalculateAt: recalculateAt != null ? recalculateAt() : this.recalculateAt,
       );
 }
 

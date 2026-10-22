@@ -87,6 +87,33 @@ GoGlance goGlance(GoState state, DateTime now) {
       final minutes = minutesLeft(departure.difference(now));
       final platform = platformLabel(line, state.currentVehicle?.platform);
       final boarding = section.boardingPositions;
+      final towards = currentL10n.direction(section.headsign ?? '');
+      // The vehicle missed (or cancelled) and the next one kept: said first, with how much later the arrival is
+      if (state.retained case final retained? when retained.step == progress.step) {
+        final later = retained.later.roundedMinutes;
+        return GoGlance(
+          line: line,
+          kicker: [section.from?.name ?? '', ?platform?._capitalized].where((part) => part.isNotEmpty).join(' · '),
+          action: retained.cancelled ? currentL10n.goCancelledShort(line?.label ?? '') : currentL10n.goMissedShort(line?.label ?? ''),
+          hero: later > 0 ? '+$later' : null,
+          heroUnit: later > 0 ? currentL10n.minutesUnit : null,
+          place: currentL10n.goRetained,
+          tone: GoTone.warn,
+        );
+      }
+      // A train's platform changed: the new one is what to do, the old one recalled
+      final previous = platform == null ? null : previousPlatform(state);
+      if (platform != null && previous != null) {
+        return GoGlance(
+          line: line,
+          kicker: currentL10n.goPlatformChangedKicker,
+          action: currentL10n.goGoToPlatform(platform),
+          hero: minutes == 0 ? currentL10n.now : '$minutes',
+          heroUnit: minutes == 0 ? null : currentL10n.minutesUnit,
+          place: '${line?.label ?? ''} · $towards · ${currentL10n.goPlatformInsteadOf(platform, platformLabel(line, previous) ?? previous)}',
+          tone: GoTone.warn,
+        );
+      }
       return GoGlance(
         line: line,
         icon: Icons.directions_transit,
@@ -95,7 +122,7 @@ GoGlance goGlance(GoState state, DateTime now) {
         hero: departure.isBefore(now) && minutes == 0 ? null : (minutes == 0 ? currentL10n.now : '$minutes'),
         heroUnit: minutes == 0 ? null : currentL10n.minutesUnit,
         place: [
-          currentL10n.direction(section.headsign ?? ''),
+          towards,
           if (boarding.isNotEmpty && boarding.length < 3) currentL10n.goBoard(boardingPositionNames(boarding)),
         ].join(' · '),
         tone: issue ? GoTone.warn : (instruction.urgent ? GoTone.urgent : GoTone.ok),
@@ -130,7 +157,41 @@ GoGlance goGlance(GoState state, DateTime now) {
       final towards = section.to?.name ?? '';
       final meters = metersToGo(state);
 
+      // Off the way: said first, with the recalculation coming on its own
+      if (progress.issue == GoIssue.offRoute) {
+        final at = state.recalculateAt;
+        return GoGlance(
+          icon: Icons.wrong_location,
+          kicker: currentL10n.goKickerTowards(mode, towards),
+          action: currentL10n.goOffRoute,
+          place: state.recalculating
+              ? currentL10n.recalculate
+              : at == null
+                  ? null
+                  : currentL10n.goRecalculateIn(math.max(0, at.difference(now).inSeconds)),
+          tone: GoTone.warn,
+        );
+      }
       final maneuver = nextManeuver(step, progress.along);
+      // Too slow for the ride: walking faster is what to do, unless a turn is right there
+      if (late && nextLine != null && (maneuver == null || maneuver.meters > 30)) {
+        final (figure, unit) = _distance(meters);
+        final vehicle = state.vehicleStep == progress.step + 1 ? state.vehicle : null;
+        return GoGlance(
+          icon: Icons.directions_run,
+          kicker: currentL10n.goKickerTowards(mode, towards),
+          action: margin.level == MarginLevel.hurry ? currentL10n.goMarginHurry : currentL10n.goMarginLate,
+          hero: figure,
+          heroUnit: unit,
+          place: [
+            // The same meters as the figure
+            currentL10n.alertHurryBody(
+                nextLine.label, math.max(0, margin.departure.difference(now).inMinutes), unit == 'm' ? int.parse(figure) : meters.round()),
+            ?platformLabel(nextLine, vehicle?.platform),
+          ].join(' · '),
+          tone: GoTone.warn,
+        );
+      }
       if (maneuver != null && maneuver.meters <= maneuverAhead) {
         final (figure, unit) = _distance(maneuver.meters);
         return GoGlance(
@@ -169,6 +230,21 @@ GoGlance goGlance(GoState state, DateTime now) {
     case GoPhase.arrived:
       throw StateError('handled above');
   }
+}
+
+/// The platform announced before the current one for the ride waited for, when it changed (from the platform
+/// alerts given: `platform-<step>-<platform>`); null otherwise
+String? previousPlatform(GoState state) {
+  final step = state.progress.step;
+  final current = state.currentVehicle?.platform?.trim();
+  if (current == null || current.isEmpty) {
+    return null;
+  }
+  final prefix = 'platform-$step-';
+  return state.progress.fired
+      .where((id) => id.startsWith(prefix) && id != '$prefix$current')
+      .map((id) => id.substring(prefix.length))
+      .lastOrNull;
 }
 
 extension on String {

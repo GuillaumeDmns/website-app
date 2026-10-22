@@ -101,4 +101,41 @@ void main() {
 
     await closeApp(tester);
   });
+
+  testWidgets('when to leave: arrive by tomorrow at a time, in one sheet and one button', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+
+    await tapOn(tester, find.text(currentL10n.leaveNow));
+    expect(find.text(currentL10n.timeSheetTitle), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.timeArriveBy));
+    await tapOn(tester, find.text(currentL10n.timeTomorrowCapital));
+    expect(find.textContaining(' ${currentL10n.tomorrow}'), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.apply));
+
+    final request = backend.requestsTo('/api/v2/journeys').last.queryParameters;
+    expect(request['arriveBy'], isTrue);
+    final datetime = DateTime.parse(request['datetime'] as String).toLocal();
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    expect((datetime.year, datetime.month, datetime.day), (tomorrow.year, tomorrow.month, tomorrow.day));
+
+    await closeApp(tester);
+  });
+
+  testWidgets('no journey at this time: an hour later in one tap', (tester) async {
+    final backend = standardBackend();
+    backend.on('GET', '/api/v2/journeys', (_) => FakeResponse(const JourneyPlan(journeys: []).toJson()));
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+
+    expect(find.text(currentL10n.noJourneyFound), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.journeyLater));
+    final datetime = DateTime.parse(backend.requestsTo('/api/v2/journeys').last.queryParameters['datetime'] as String);
+    expect(datetime.difference(DateTime.now()).inMinutes, inInclusiveRange(55, 61));
+
+    await closeApp(tester);
+  });
 }

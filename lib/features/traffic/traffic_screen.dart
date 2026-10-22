@@ -7,13 +7,15 @@ import '../../app/shell.dart';
 import '../../core/api/models.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import 'disruption_widgets.dart';
 import 'traffic_providers.dart';
 
-/// Traffic state: a grid of badges per main mode (colored dot when disrupted), the disrupted lines with their
-/// disruption titles, then the disrupted bus lines.
+/// Traffic state, what goes wrong first (design 2i1): the disrupted main lines with their disruption titles (interrupted
+/// ones on top), the disrupted bus lines and the lines with an information folded, then the grid of every main line per
+/// mode (colored dot when disrupted).
 class TrafficScreen extends ConsumerWidget {
   const TrafficScreen({super.key});
 
@@ -40,6 +42,7 @@ class TrafficScreen extends ConsumerWidget {
               Expanded(
                 child: Text(context.l10n.trafficTitle, style: theme.textTheme.headlineSmall),
               ),
+              UpdatedAgo(value: traffic),
             ],
           ),
           Padding(
@@ -51,7 +54,9 @@ class TrafficScreen extends ConsumerWidget {
                 final disrupted = lines
                     .where((line) => line.severity != null && line.severity != DisruptionSeverity.info)
                     .toList();
-                final main = disrupted.where((line) => _mainModes.contains(line.line.mode)).toList();
+                final main = disrupted.where((line) => _mainModes.contains(line.line.mode)).toList()
+                  // Interrupted before disrupted
+                  ..sort((a, b) => b.severity!.index.compareTo(a.severity!.index));
                 final others = disrupted.where((line) => !_mainModes.contains(line.line.mode)).toList();
                 final informations = lines.where((line) => line.severity == DisruptionSeverity.info).toList();
 
@@ -59,19 +64,6 @@ class TrafficScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 8),
-                    AppCard(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final mode in _mainModes)
-                            if (lines.where((line) => line.line.mode == mode).toList() case final modeLines
-                                when modeLines.isNotEmpty)
-                              _ModeGrid(mode: mode, lines: modeLines),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     AppCard(
                       padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
                       child: Column(
@@ -115,6 +107,19 @@ class TrafficScreen extends ConsumerWidget {
                           children: [for (final line in informations) _LineTrafficTile(traffic: line)],
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    AppCard(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final mode in _mainModes)
+                            if (lines.where((line) => line.line.mode == mode).toList() case final modeLines
+                                when modeLines.isNotEmpty)
+                              _ModeGrid(mode: mode, lines: modeLines),
+                        ],
+                      ),
+                    ),
                   ],
                 );
               },

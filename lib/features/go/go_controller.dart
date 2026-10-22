@@ -55,9 +55,18 @@ class GoController extends Notifier<GoState?> {
   String? _lastLive;
   int _lastLiveProgress = -1;
 
-  /// Departures of the next ride listened to, and for which ride (step and tracker) of which key
+  /// Departures of the next ride listened to, and for which ride (step and tracker) of which key; the last ones
+  /// received, to replace a missed vehicle at once
   ProviderSubscription<AsyncValue<List<Ride>>>? _departures;
   ({RideKey key, GoTracker tracker, int step})? _departuresOf;
+  List<Ride>? _rides;
+
+  /// A missed or cancelled vehicle being replaced by the next one
+  bool _retaining = false;
+
+  /// Off the way: the recalculation on its own, after a countdown the user can beat or cancel
+  Timer? _recalculateTimer;
+  static const _recalculateAfter = Duration(seconds: 10);
 
   @override
   GoState? build() {
@@ -93,15 +102,28 @@ class GoController extends Notifier<GoState?> {
 
   void jumpTo(int step) => _setProgress((tracker, progress) => tracker.jumpTo(progress, step));
 
-  void dismissIssue() => _setProgress((tracker, progress) => tracker.dismissIssue(progress));
+  void dismissIssue() {
+    _cancelRecalculation();
+    _setProgress((tracker, progress) => tracker.dismissIssue(progress));
+  }
+
+  void _cancelRecalculation() {
+    _recalculateTimer?.cancel();
+    _recalculateTimer = null;
+    if (state?.recalculateAt != null) {
+      state = state!.copyWith(recalculateAt: () => null);
+    }
+  }
 
   /// Takes [ride] for the ride [step] (in progress or to come) instead of the planned departure (missed, cancelled,
-  /// or another one preferred): the journey moves to it from there, the following connections included.
-  Future<void> choose(int step, Ride ride) async {
+  /// or another one preferred): the journey moves to it from there, the following connections included. [retained]:
+  /// taken on its own for a missed or cancelled vehicle, said as such with how much later the arrival is.
+  Future<void> choose(int step, Ride ride, {bool retained = false, bool cancelled = false}) async {
     final current = state;
     if (current == null || step < current.progress.step || step >= current.tracker.steps.length) {
       return;
     }
+    final previousEta = current.tracker.eta(current.progress, current.currentVehicle);
     final sectionIndex = current.tracker.steps[step].sectionIndex;
     final api = ref.read(mobilityApiProvider);
     final now = DateTime.now();
@@ -135,15 +157,17 @@ class GoController extends Notifier<GoState?> {
       journey = shiftJourney(journey, from: sectionIndex, by: -progress.shift);
     }
     final tracker = GoTracker(journey);
+    final chosen = tracker.chosen(progress, step);
     state = GoState(
       tracker: tracker,
       request: latest.request,
-      progress: tracker.chosen(progress, step),
+      progress: chosen,
       startedAt: latest.startedAt,
       plannedArrival: latest.plannedArrival,
       muted: latest.muted,
       keepAwake: latest.keepAwake,
       position: latest.position,
+      retained: retained ? (step: step, later: tracker.eta(chosen, null).difference(previousEta), cancelled: cancelled) : null,
     );
     _save();
     _watchDepartures();
@@ -170,6 +194,8 @@ class GoController extends Notifier<GoState?> {
   /// New journey from the current position to the same destination with the same options; the first option is
   /// followed.
   Future<void> recalculate() async {
+    _recalculateTimer?.cancel();
+    _recalculateTimer = null;
     final current = state;
     if (current == null || current.recalculating) {
       return;
@@ -181,7 +207,7 @@ class GoController extends Notifier<GoState?> {
       return;
     }
 
-    state = current.copyWith(recalculating: true, error: () => null);
+    state = current.copyWith(recalculating: true, error: () => null, recalculateAt: () => null);
     try {
       final request = current.request;
       final plan = await ref.read(mobilityApiProvider).journeys(
@@ -259,6 +285,8 @@ class GoController extends Notifier<GoState?> {
     }
     state = current.copyWith(progress: change(current.tracker, current.progress));
     _save();
+    // A correction: the ride whose departures matter may have changed
+    _watchDepartures();
     _update();
   }
 
@@ -406,6 +434,9 @@ class GoController extends Notifier<GoState?> {
     _departures?.close();
     _departures = null;
     _departuresOf = null;
+    _rides = null;
+    _recalculateTimer?.cancel();
+    _recalculateTimer = null;
   }
 
   void _update() {
@@ -437,6 +468,21 @@ class GoController extends Notifier<GoState?> {
       _walkSpeed = null;
     }
     var next = current.copyWith(progress: progress, position: position, walkSpeed: _walkSpeed);
+    // The vehicle kept on its own is said until the user is on board (or elsewhere)
+    if (current.retained case final retained?
+        when progress.step != retained.step || progress.phase != GoPhase.waiting) {
+      next = next.copyWith(retained: () => null);
+    }
+    // Off the way: recalculated on its own after a countdown; back on it, nothing to do
+    if (progress.issue == GoIssue.offRoute && current.progress.issue != GoIssue.offRoute && !current.recalculating) {
+      _recalculateTimer?.cancel();
+      _recalculateTimer = Timer(_recalculateAfter, recalculate);
+      next = next.copyWith(recalculateAt: () => DateTime.now().add(_recalculateAfter));
+    } else if (progress.issue != GoIssue.offRoute && current.recalculateAt != null) {
+      _recalculateTimer?.cancel();
+      _recalculateTimer = null;
+      next = next.copyWith(recalculateAt: () => null);
+    }
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
@@ -455,10 +501,12 @@ class GoController extends Notifier<GoState?> {
 
     if (changed) {
       _save();
-      if (progress.step != current.progress.step) {
+      // On board, the departures watched are the next ride's; back at the stop (a correction), this one's again
+      if (progress.step != current.progress.step || progress.phase != current.progress.phase) {
         _watchDepartures();
       }
     }
+    _replaceMissed(next);
     if (progress.phase == GoPhase.arrived) {
       _stopFeeds();
       _lastLive = null;
@@ -471,6 +519,26 @@ class GoController extends Notifier<GoState?> {
         }
       });
     }
+  }
+
+  /// A missed or cancelled vehicle: the next departure of the line is taken on its own (another one can be chosen,
+  /// or the journey recalculated), so that the user never has to act to know what to do next
+  void _replaceMissed(GoState state) {
+    final issue = state.progress.issue;
+    final rides = _rides;
+    final step = state.tracker.stepOf(state.progress);
+    if (_retaining || (issue != GoIssue.missed && issue != GoIssue.cancelled) || step == null || !step.isRide ||
+        rides == null || _departuresOf?.step != state.progress.step || _departuresOf?.tracker != state.tracker) {
+      return;
+    }
+    final now = DateTime.now();
+    final planned = state.tracker.expectedDeparture(step, state.progress, state.currentVehicle);
+    final ride = replacementRide(rides, issue!, planned, now);
+    if (ride == null) {
+      return;
+    }
+    _retaining = true;
+    choose(state.progress.step, ride, retained: true, cancelled: issue == GoIssue.cancelled).whenComplete(() => _retaining = false);
   }
 
   /// Progress in the system notification (Android), when its text changes or every 15 s of progress
@@ -537,6 +605,7 @@ class GoController extends Notifier<GoState?> {
     }
     _departures?.close();
     _departuresOf = of;
+    _rides = null;
     _departures = ref.listen(
       rideOptionsProvider(key),
       (_, departures) => _onDepartures(of, departures),
@@ -553,6 +622,7 @@ class GoController extends Notifier<GoState?> {
     if (rides == null || latest == null || latest.tracker != of.tracker) {
       return;
     }
+    _rides = rides;
     // The planned vehicle: same scheduled time (a few minutes of tolerance)
     final ride = of.tracker.steps[of.step];
     final vehicle = plannedRide(rides, of.tracker.plannedDeparture(ride, latest.progress))?.departure;

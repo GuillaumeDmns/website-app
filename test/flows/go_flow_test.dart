@@ -168,6 +168,56 @@ void main() {
 
     await closeApp(tester);
   });
+
+  testWidgets('missed at the stop: the next departure is kept on its own and said over the map', (tester) async {
+    // The métro left 2 min ago; the user is still on the platform
+    final missedPlan = journey([
+      walk(inMinutes(-6), 240),
+      transit(inMinutes(-2), 480, via: [gareDeLyon]),
+    ]);
+    final messenger = tester.binding.defaultBinaryMessenger;
+    const updates = EventChannel('flutter.baseflow.com/geolocator_updates');
+    const geolocator = MethodChannel('flutter.baseflow.com/geolocator');
+    final fix = {
+      'latitude': chatelet.lat,
+      'longitude': chatelet.lon,
+      'timestamp': DateTime.now().millisecondsSinceEpoch.toDouble(),
+      'accuracy': 5.0,
+      'altitude': 0.0,
+      'altitude_accuracy': 0.0,
+      'heading': 0.0,
+      'heading_accuracy': 0.0,
+      'speed': 0.0,
+      'speed_accuracy': 0.0,
+      'is_mocked': false,
+    };
+    messenger.setMockStreamHandler(updates, MockStreamHandler.inline(onListen: (_, sink) => sink.success(fix)));
+    messenger.setMockMethodCallHandler(geolocator, (_) async => null);
+    addTearDown(() {
+      messenger.setMockStreamHandler(updates, null);
+      messenger.setMockMethodCallHandler(geolocator, null);
+    });
+    final backend = standardBackend();
+    await pumpApp(tester, backend, overrides: [liveJourneyProvider.overrideWithValue(_NoLiveJourney())]);
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    container.read(goControllerProvider.notifier).start(missedPlan, const JourneyRequest());
+    // The first fix, GO open, then the user says they are at the stop
+    await settle(tester, const Duration(seconds: 1));
+    await tapOn(tester, find.text(currentL10n.go).first);
+    container.read(goControllerProvider.notifier).jumpTo(1);
+    await settle(tester, const Duration(seconds: 8));
+
+    final state = container.read(goControllerProvider)!;
+    // The next métro (in 7 min) is now the plan, without a tap
+    expect(state.retained, isNotNull);
+    expect(state.progress.issue, isNull);
+    expect(state.journey.rides.single.departure.isAfter(DateTime.now().toUtc()), isTrue);
+    expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
+    expect(find.descendant(of: find.byType(GoBanner), matching: find.text(currentL10n.goMissedShort('Métro 1'))), findsOneWidget);
+    expect(find.text(currentL10n.goRecalculateJourney), findsOneWidget);
+
+    await closeApp(tester);
+  });
 }
 
 /// No notification nor screen kept on in the tests
