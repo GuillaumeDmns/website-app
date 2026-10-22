@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Next departures of a stop: name, then one line per departure (line, destination, time). Tapping it opens the app. -->
+<!-- Next departures of a stop (design 2k1): its name, then one row per line and direction (badge in the line's IDFM
+     shape, destination, the following departure muted, the next one green with real time, orange when late), when it
+     was updated. Tapping it opens the app. Plain RemoteViews: the same on every Android version the app runs on. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -7,9 +9,9 @@
     android:background="@drawable/next_departures_background"
     android:orientation="vertical"
     android:paddingStart="16dp"
-    android:paddingTop="10dp"
+    android:paddingTop="8dp"
     android:paddingEnd="8dp"
-    android:paddingBottom="12dp">
+    android:paddingBottom="10dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,24 +19,34 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/widget_icon_background"
+            android:importantForAccessibility="no"
+            android:padding="3dp"
+            android:src="@drawable/ic_subway"
+            android:tint="#FFFFFF" />
+
         <TextView
             android:id="@+id/tv_stop_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
             android:text="@string/widget_stop_placeholder"
             android:textColor="@color/widget_text"
-            android:textSize="16sp" />
+            android:textSize="14sp"
 
         <ImageView
             android:id="@+id/btn_refresh"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:contentDescription="@string/widget_refresh"
-            android:padding="9dp"
+            android:padding="8dp"
             android:src="@drawable/ic_refresh"
             android:tint="@color/widget_text_muted" />
     </LinearLayout>
@@ -53,13 +65,13 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
             <FrameLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_height="22dp">
 
                 <ImageView
                     android:id="@+id/iv_line_1"
@@ -67,22 +79,20 @@
                     android:layout_height="match_parent"
                     android:importantForAccessibility="no"
                     android:scaleType="fitXY"
-                    android:src="@drawable/widget_line_pill" />
+                    android:src="@drawable/widget_badge_rail" />
 
                 <TextView
                     android:id="@+id/tv_line_1"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:minWidth="30dp"
-                    android:paddingStart="5dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="5dp"
-                    android:paddingBottom="1dp"
+                    android:minWidth="22dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </FrameLayout>
 
             <TextView
@@ -98,28 +108,38 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tv_next_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:fontFamily="sans-serif-medium"
+                android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/tv_time_1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="14sp" />
+                android:textSize="16sp"
         </LinearLayout>
-
         <LinearLayout
             android:id="@+id/departure_row_2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
             <FrameLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_height="22dp">
 
                 <ImageView
                     android:id="@+id/iv_line_2"
@@ -127,22 +147,20 @@
                     android:layout_height="match_parent"
                     android:importantForAccessibility="no"
                     android:scaleType="fitXY"
-                    android:src="@drawable/widget_line_pill" />
+                    android:src="@drawable/widget_badge_rail" />
 
                 <TextView
                     android:id="@+id/tv_line_2"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:minWidth="30dp"
-                    android:paddingStart="5dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="5dp"
-                    android:paddingBottom="1dp"
+                    android:minWidth="22dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </FrameLayout>
 
             <TextView
@@ -158,28 +176,38 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tv_next_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:fontFamily="sans-serif-medium"
+                android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/tv_time_2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="14sp" />
+                android:textSize="16sp"
         </LinearLayout>
-
         <LinearLayout
             android:id="@+id/departure_row_3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
             <FrameLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_height="22dp">
 
                 <ImageView
                     android:id="@+id/iv_line_3"
@@ -187,22 +215,20 @@
                     android:layout_height="match_parent"
                     android:importantForAccessibility="no"
                     android:scaleType="fitXY"
-                    android:src="@drawable/widget_line_pill" />
+                    android:src="@drawable/widget_badge_rail" />
 
                 <TextView
                     android:id="@+id/tv_line_3"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:minWidth="30dp"
-                    android:paddingStart="5dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="5dp"
-                    android:paddingBottom="1dp"
+                    android:minWidth="22dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </FrameLayout>
 
             <TextView
@@ -218,28 +244,38 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tv_next_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:fontFamily="sans-serif-medium"
+                android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/tv_time_3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="14sp" />
+                android:textSize="16sp"
         </LinearLayout>
-
         <LinearLayout
             android:id="@+id/departure_row_4"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
             <FrameLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_height="22dp">
 
                 <ImageView
                     android:id="@+id/iv_line_4"
@@ -247,22 +283,20 @@
                     android:layout_height="match_parent"
                     android:importantForAccessibility="no"
                     android:scaleType="fitXY"
-                    android:src="@drawable/widget_line_pill" />
+                    android:src="@drawable/widget_badge_rail" />
 
                 <TextView
                     android:id="@+id/tv_line_4"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:minWidth="30dp"
-                    android:paddingStart="5dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="5dp"
-                    android:paddingBottom="1dp"
+                    android:minWidth="22dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </FrameLayout>
 
             <TextView
@@ -278,13 +312,24 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tv_next_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:fontFamily="sans-serif-medium"
+                android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/tv_time_4"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="14sp" />
+                android:textSize="16sp"
         </LinearLayout>
 
         <TextView
