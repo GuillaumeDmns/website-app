@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -63,11 +64,17 @@ class OfflineCacheInterceptor extends Interceptor {
     await store.remove(_indexKey);
   }
 
+  /// Saves one at a time: each one rewrites the index, two at once would lose entries (never cleared then)
+  Future<void> _saving = Future.value();
+
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     onOnline();
-    if (_cacheable(response.requestOptions) && response.statusCode == 200 && response.data != null) {
-      _save(_key(response.requestOptions), response.data);
+    final data = response.data;
+    if (_cacheable(response.requestOptions) && response.statusCode == 200 && data != null) {
+      final key = _key(response.requestOptions);
+      // Once the answer is handed over: encoding a big one must not delay it
+      Timer.run(() => _saving = _saving.then((_) => _save(key, data)));
     }
     handler.next(response);
   }
@@ -93,10 +100,11 @@ class OfflineCacheInterceptor extends Interceptor {
   }
 
   Future<void> _save(String key, Object data) async {
-    if (jsonEncode(data).length > _maxLength) {
+    final entry = jsonEncode({'at': DateTime.now().toIso8601String(), 'data': data});
+    if (entry.length > _maxLength) {
       return;
     }
-    await store.writeJson(key, {'at': DateTime.now().toIso8601String(), 'data': data});
+    await store.writeEncoded(key, entry);
     final index = await store.readJson(_indexKey);
     final keys = [key, ...(index is List ? index.map((item) => '$item').where((item) => item != key) : const <String>[])];
     for (final old in keys.skip(_maxEntries)) {

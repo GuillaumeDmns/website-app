@@ -98,6 +98,20 @@ void main() {
     expect(cached, contains('http_cache:/api/v2/lines/C64?'));
   });
 
+  test('indexes answers that come together, so that sign-out forgets them all', () async {
+    // The device's store answers later, as the platform does
+    store = _SlowStore();
+    dio = backend.dio()..interceptors.add(OfflineCacheInterceptor(store: store, onOffline: (_) {}, onOnline: () {}));
+    backend.on('GET', '/api/v2/lines/*', (request) => FakeResponse({'id': request.uri.pathSegments.last}));
+    await Future.wait([for (var i = 0; i < 3; i++) dio.get<Object>('/api/v2/lines/C$i')]);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(store.values.keys.where((key) => key.startsWith('http_cache:')), hasLength(3));
+
+    await OfflineCacheInterceptor.clear(store);
+
+    expect(store.values, isEmpty);
+  });
+
   test('shows the oldest data while offline, nothing once online', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -112,4 +126,12 @@ void main() {
     offline.online();
     expect(container.read(offlineProvider), isNull);
   });
+}
+
+class _SlowStore extends MemoryStore {
+  @override
+  Future<Object?> readJson(String key) async {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    return super.readJson(key);
+  }
 }

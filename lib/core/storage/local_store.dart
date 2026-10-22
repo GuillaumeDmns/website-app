@@ -25,9 +25,12 @@ class LocalStore {
     }
   }
 
-  Future<void> writeJson(String key, Object value) async {
+  Future<void> writeJson(String key, Object value) => writeEncoded(key, jsonEncode(value));
+
+  /// Writes a document already encoded as JSON (by [jsonEncode]), when its text is needed anyway
+  Future<void> writeEncoded(String key, String json) async {
     try {
-      await _preferences.setString(_stored(key), jsonEncode(value));
+      await _preferences.setString(_stored(key), json);
     } catch (e) {
       debugPrint('LocalStore write $key failed: $e');
     }

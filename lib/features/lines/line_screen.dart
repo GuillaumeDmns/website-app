@@ -67,25 +67,37 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       }
     }
 
-    // Vehicles of the direction shown, moved along between two fetches (every second while there are some)
+    // The vehicles move every second: only the map and the stop list follow them, the rest of the page is kept
+    return Consumer(
+      builder: (context, ref, content) {
+        final (:vehicles, :now) = _vehicles(ref, value);
+        return MapOverlayScope(
+          overlay: value == null ? MapOverlay.empty : _overlay(value, direction, branch, vehicles, now),
+          child: content!,
+        );
+      },
+      child: AsyncView(
+        value: detail,
+        onRetry: () => ref.invalidate(lineDetailProvider(widget.lineId)),
+        data: (detail) => _content(context, detail, direction, branch),
+      ),
+    );
+  }
+
+  /// Vehicles of the direction shown, moved along between two fetches (every second while there are some)
+  ({List<({Vehicle vehicle, double progress})> vehicles, DateTime now}) _vehicles(WidgetRef ref, LineDetail? detail) {
     final fetched = ref.watch(lineVehiclesProvider(widget.lineId)).value;
     final now = (fetched?.vehicles.isNotEmpty ?? false)
         ? ref.watch(vehicleClockProvider).value ?? DateTime.now()
         : ref.watch(nowProvider).value ?? DateTime.now();
-    final vehicles = [
-      if (fetched != null)
-        for (final vehicle in fetched.vehicles)
-          if (vehicle.direction == _direction.clamp(0, (value?.directions.length ?? 1) - 1))
-            (vehicle: vehicle, progress: vehicleProgress(vehicle, fetched.fetchedAt, now)),
-    ];
-
-    return MapOverlayScope(
-      overlay: value == null ? MapOverlay.empty : _overlay(value, direction, branch, vehicles, now),
-      child: AsyncView(
-        value: detail,
-        onRetry: () => ref.invalidate(lineDetailProvider(widget.lineId)),
-        data: (detail) => _content(context, detail, direction, branch, vehicles),
-      ),
+    return (
+      vehicles: [
+        if (fetched != null)
+          for (final vehicle in fetched.vehicles)
+            if (vehicle.direction == _direction.clamp(0, (detail?.directions.length ?? 1) - 1))
+              (vehicle: vehicle, progress: vehicleProgress(vehicle, fetched.fetchedAt, now)),
+      ],
+      now: now,
     );
   }
 
@@ -169,11 +181,9 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     LineDetail detail,
     LineDirection? direction,
     LineBranch? branch,
-    List<({Vehicle vehicle, double progress})> vehicles,
   ) {
     // A stop area served twice in a row (two of its quays) shows once
     final shown = branch?.copyWith(stops: stopsOnce(branch));
-    final positions = stopListPositions(shown, vehicles);
     final closed = ref.watch(lineClosedStopsProvider(detail.line.id)).value ?? const <String>{};
 
     final theme = Theme.of(context);
@@ -281,21 +291,24 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
             child: AppCard(
               padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
-              child: Column(
-                children: [
-                  for (var i = 0; i < shown.stops.length; i++)
-                    LineStopTile(
-                      stop: shown.stops[i],
-                      color: color,
-                      isFirst: i == 0,
-                      isLast: i == shown.stops.length - 1,
-                      line: line,
-                      vehicles: positions[i] ?? const [],
-                      closed: closed.contains(shown.stops[i].id),
-                      onFollow: _follow,
-                    ),
-                ],
-              ),
+              child: Consumer(builder: (context, ref, _) {
+                final positions = stopListPositions(shown, _vehicles(ref, detail).vehicles);
+                return Column(
+                  children: [
+                    for (var i = 0; i < shown.stops.length; i++)
+                      LineStopTile(
+                        stop: shown.stops[i],
+                        color: color,
+                        isFirst: i == 0,
+                        isLast: i == shown.stops.length - 1,
+                        line: line,
+                        vehicles: positions[i] ?? const [],
+                        closed: closed.contains(shown.stops[i].id),
+                        onFollow: _follow,
+                      ),
+                  ],
+                );
+              }),
             ),
           ),
       ],
