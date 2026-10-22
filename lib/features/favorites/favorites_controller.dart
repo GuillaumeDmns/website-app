@@ -143,9 +143,6 @@ class FavoritesController extends AsyncNotifier<List<Favorite>> {
 
   Favorite? lineFavorite(String lineId) =>
       _current.where((favorite) => favorite.kind == FavoriteKind.line && favorite.line?.id == lineId).firstOrNull;
-
-  /// Forgets the device copy (sign-out)
-  Future<void> clearCache() => ref.read(localStoreProvider).remove(_cacheKey);
 }
 
 final favoritesProvider = AsyncNotifierProvider<FavoritesController, List<Favorite>>(FavoritesController.new);

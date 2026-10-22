@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../storage/local_store.dart';
 
 /// When the app last fell back on cached data because the server could not be reached; null while online
-class OfflineState extends Notifier<DateTime?> {
+class OfflineController extends Notifier<DateTime?> {
   @override
   DateTime? build() => null;
 
@@ -24,7 +24,7 @@ class OfflineState extends Notifier<DateTime?> {
 }
 
 /// Oldest cached data shown since the server stopped answering, null when online
-final offlineProvider = NotifierProvider<OfflineState, DateTime?>(OfflineState.new);
+final offlineProvider = NotifierProvider<OfflineController, DateTime?>(OfflineController.new);
 
 /// Light offline mode: the last answers of the read endpoints (stops, lines, timetables, favorites, traffic,
 /// journeys…) are kept on the device, and served when the server can't be reached. Real-time-only endpoints

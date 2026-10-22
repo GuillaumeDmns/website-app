@@ -8,8 +8,6 @@ import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng;
 
-import '../../l10n/l10n.dart';
-import '../location/device_heading.dart';
 import '../location/location_providers.dart';
 import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
@@ -33,6 +31,7 @@ class FlutterMainMap extends ConsumerStatefulWidget {
 class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProviderStateMixin {
   late final _controller = AnimatedMapController(vsync: this, duration: const Duration(milliseconds: 500));
   bool _ready = false;
+
   /// Points framed last: pages republish their overlay when their data refreshes, the camera only moves when the
   /// points to frame change
   List<LatLng>? _framedFit;
@@ -129,14 +128,12 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     );
   }
 
-  /// A new heading of the device: the camera turns with it (at most 10 times a second)
-  void _onDeviceHeading(double heading) {
-    _heading.update(heading, () {
-      final follow = _following;
-      if (mounted && follow != null && follow.compass) {
-        _follow(follow);
-      }
-    });
+  /// The device turned: the camera turns with it
+  void _turn() {
+    final follow = _following;
+    if (mounted && follow != null && follow.compass) {
+      _follow(follow);
+    }
   }
 
   void _stopFollowing() {
@@ -175,7 +172,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         }) {
       setState(() => _followPaused = true);
     }
-    // Moves by hand, and framings (the scale of a page's map)
+    // Moves by hand, and framings: the center nearby searches start from without a position
     if (event is MapEventMove || event is MapEventMoveEnd || event is MapEventFlingAnimationEnd ||
         event is MapEventDoubleTapZoomEnd || event is MapEventScrollWheelZoom) {
       _centerDebounce?.cancel();
@@ -190,28 +187,12 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final location = ref.watch(routerLocationProvider);
-    final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
-    // Followed (GO on foot): the smoothed position when there is one, so that the camera and the dot agree
-    final precise = ref.watch(preciseUserPositionProvider);
-    final pageFollow = page.follow;
-    final overlay = pageFollow != null && precise != null ? page.withFollow(pageFollow.withPosition(precise)) : page;
-    final user = overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value;
+    final (:overlay, :user) = watchMapView(ref);
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
 
-    // GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile)
-    if (overlay.follow?.compass ?? false) {
-      ref.listen(deviceHeadingProvider, (_, next) {
-        final heading = next.value;
-        if (heading != null) {
-          _onDeviceHeading(heading);
-        }
-      });
-    } else {
-      _heading.device = null;
-    }
+    _heading.watch(ref, overlay.follow, _turn);
 
     // First fix: go to the user unless a page already framed something
     ref.listen(userLocationProvider, (previous, next) {
@@ -290,19 +271,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
               ),
           ],
         ),
-        if (_following != null && _followPaused)
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Padding(
-              padding: EdgeInsets.only(right: 16, bottom: widget.padding.bottom + 16),
-              child: FloatingActionButton.small(
-                heroTag: null,
-                tooltip: context.l10n.recenter,
-                onPressed: _recenter,
-                child: const Icon(Icons.navigation),
-              ),
-            ),
-          ),
+        if (_following != null && _followPaused) RecenterButton(bottom: widget.padding.bottom, onPressed: _recenter),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
           // Full credits on the About page

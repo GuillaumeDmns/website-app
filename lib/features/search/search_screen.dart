@@ -227,7 +227,7 @@ class _Suggestions extends ConsumerWidget {
             else if (recent.line case final line?)
               ListTile(
                 leading: SizedBox(width: 40, child: Center(child: LineBadge(line, size: 28))),
-                title: Text('${line.mode.label} ${line.name ?? ''}'),
+                title: Text(line.label),
                 onTap: () => onLine(line),
               ),
         ],

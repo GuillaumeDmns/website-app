@@ -5,7 +5,6 @@ import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
-import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
@@ -22,6 +21,7 @@ import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import 'line_vehicles.dart';
 import 'vehicle_sheet.dart';
+import 'widgets/line_stop_tile.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
@@ -98,9 +98,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
   ) {
     final line = detail.line;
     final color = parseHexColor(line.color, Colors.grey);
-    List<LatLng> points(LineBranch b) => b.shape.isNotEmpty
-        ? [for (final point in b.shape) LatLng(point[1], point[0])]
-        : [for (final stop in b.stops) LatLng(stop.lat, stop.lon)];
+    List<LatLng> points(LineBranch branch) => _pathOf(branch).line.points;
 
     final selected = branch == null ? const <LatLng>[] : points(branch);
     final placed = [
@@ -196,7 +194,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               icon: const Icon(Icons.ios_share),
               onPressed: () => shareLink(
                 context,
-                title: '${line.mode.label} ${line.name ?? ''}'.trim(),
+                title: line.label,
                 location: Routes.line(line.id),
               ),
             ),
@@ -212,8 +210,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${line.mode.label} ${line.name ?? ''}', style: theme.textTheme.headlineSmall),
-                    if (line.longName != null && line.longName != line.name && line.longName != '${line.mode.label} ${line.name ?? ''}')
+                    Text(line.label, style: theme.textTheme.headlineSmall),
+                    if (line.longName != null && line.longName != line.name && line.longName != line.label)
                       Text(line.longName!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
                   ],
                 ),
@@ -286,7 +284,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
               child: Column(
                 children: [
                   for (var i = 0; i < shown.stops.length; i++)
-                    _StopTimelineTile(
+                    LineStopTile(
                       stop: shown.stops[i],
                       color: color,
                       isFirst: i == 0,
@@ -345,103 +343,5 @@ class _LineDisruptions extends ConsumerWidget {
       AsyncValue(:final error?) => Text(context.l10n.trafficUnavailable('$error'), style: theme.textTheme.bodySmall),
       _ => const LinearProgressIndicator(),
     };
-  }
-}
-
-/// Stop of the line drawn on a vertical line of the line's color
-class _StopTimelineTile extends StatelessWidget {
-  const _StopTimelineTile({
-    required this.stop,
-    required this.color,
-    required this.isFirst,
-    required this.isLast,
-    required this.line,
-    this.vehicles = const [],
-    this.closed = false,
-    required this.onFollow,
-  });
-
-  /// "Suivre" in a vehicle's sheet
-  final ValueChanged<Vehicle> onFollow;
-
-  static const _height = 44.0;
-
-  /// The line doesn't stop there now (station closed, stop not served)
-  final bool closed;
-
-  final StopRef stop;
-  final Color color;
-  final bool isFirst;
-  final bool isLast;
-  final LineSummary line;
-
-  /// Vehicles around this stop, offset in stops (-0.5: halfway from the previous one, 0: at the stop)
-  final List<({double offset, Vehicle vehicle})> vehicles;
-
-  @override
-  Widget build(BuildContext context) {
-    final terminus = isFirst || isLast;
-    // Taller with a larger text size
-    final height = MediaQuery.textScalerOf(context).scale(_height);
-
-    return InkWell(
-      onTap: () => context.push(Routes.stop(stop.id)),
-      child: SizedBox(
-        height: height,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 48,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  Column(
-                    children: [
-                      Expanded(child: Container(width: 6, color: isFirst ? Colors.transparent : color)),
-                      Expanded(child: Container(width: 6, color: isLast ? Colors.transparent : color)),
-                    ],
-                  ),
-                  Container(
-                    width: terminus ? 16 : 12,
-                    height: terminus ? 16 : 12,
-                    decoration: BoxDecoration(
-                      color: context.colors.card,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: color, width: 3),
-                    ),
-                  ),
-                  for (final (:offset, :vehicle) in vehicles)
-                    Positioned(
-                      top: height / 2 + offset * height - 10,
-                      left: 14,
-                      child: GestureDetector(
-                        onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle, onFollow: () => onFollow(vehicle)),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: VehicleMarker(line: line, size: 20, punctuality: Punctuality.of(vehicle), stale: vehicle.stale),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Text(
-                stop.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: terminus ? FontWeight.w600 : FontWeight.w400,
-                  color: closed ? context.colors.muted : null,
-                  decoration: closed ? TextDecoration.lineThrough : null,
-                ),
-              ),
-            ),
-            if (closed) PillTag(icon: Icons.block, color: Theme.of(context).colorScheme.error, text: context.l10n.notServed),
-          ],
-        ),
-      ),
-    );
   }
 }

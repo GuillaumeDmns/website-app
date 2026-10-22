@@ -81,7 +81,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
         if (call.expectedAt.isAfter(now.subtract(const Duration(seconds: 30)))) call,
     ];
     final subtitle = [
-      '${widget.line.mode.label} ${widget.line.name ?? ''}'.trim(),
+      widget.line.label,
       if (_vehicle.name != null) _vehicle.name!,
     ].join(' · ');
 

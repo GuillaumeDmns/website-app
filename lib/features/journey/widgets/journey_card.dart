@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,23 +9,11 @@ import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../traffic/disruption_widgets.dart';
+import '../journey_labels.dart';
 import '../journey_providers.dart';
 import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
-
-/// User-facing name of a Navitia journey type
-String journeyTypeLabel(String? type) => switch (type) {
-      'best' => currentL10n.journeyBest,
-      'rapid' => currentL10n.journeyRapid,
-      'comfort' => currentL10n.journeyComfort,
-      'less_fallback_walk' => currentL10n.journeyLessWalk,
-      'non_pt_walk' => currentL10n.journeyWalk,
-      'non_pt_bike' || 'non_pt_bss' => currentL10n.journeyBike,
-      'bike_share' => currentL10n.journeyBikeShare,
-      'car' => currentL10n.journeyCar,
-      _ => currentL10n.journeyOther,
-    };
 
 /// Result row, like Citymapper: when to leave in large (green with real time), the duration in large figures, the
 /// chain of lines, the next departures of its first ride, then the details.
@@ -85,7 +75,7 @@ class JourneyCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      leaveIn.inMinutes <= 0 ? context.l10n.leaveNowShort : context.l10n.leaveIn(formatDuration(leaveIn.inSeconds)),
+                      leaveInLabel(leaveIn),
                       style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null, fontWeight: FontWeight.w600),
                     ),
                     Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
@@ -176,14 +166,7 @@ class SectionsStrip extends ConsumerWidget {
             dotSize: 12,
             child: LineBadge(section.line!, size: 24),
           ),
-        SectionKind.walk || SectionKind.bike when section.duration >= 60 => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
-                  size: 20, color: scheme.onSurfaceVariant),
-              Text('${(section.duration / 60).round()}', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-            ],
-          ),
+        SectionKind.walk || SectionKind.bike when section.duration >= 60 => MoveMinutes(section: section),
         _ => null,
       };
       if (item != null) {
@@ -195,5 +178,24 @@ class SectionsStrip extends ConsumerWidget {
     }
 
     return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 2, runSpacing: 6, children: items);
+  }
+}
+
+/// A move in a chain of steps: its icon and its minutes (at least 1)
+class MoveMinutes extends StatelessWidget {
+  const MoveMinutes({super.key, required this.section});
+
+  final JourneySection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.colors.muted;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(moveIcon(section.kind), size: 20, color: muted),
+        Text('${math.max(1, (section.duration / 60).round())}', style: TextStyle(fontSize: 12, color: muted)),
+      ],
+    );
   }
 }

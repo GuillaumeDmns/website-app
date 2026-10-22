@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
-import 'go_controller.dart';
+import '../journey/journey_labels.dart';
+import 'go_state.dart';
 import 'go_guidance.dart';
 import 'go_tracker.dart';
 
@@ -39,17 +40,6 @@ class GoInstruction {
   final bool urgent;
 }
 
-String _lineLabel(LineSummary? line) => '${line?.mode.label ?? ''} ${line?.name ?? ''}'.trim();
-
-/// `voie 2` for a train, `quai B` otherwise; null when the real time doesn't say
-String? platformLabel(LineSummary? line, String? platform) {
-  final value = platform?.trim();
-  if (value == null || value.isEmpty) {
-    return null;
-  }
-  return line?.mode.isRail ?? false ? currentL10n.goPlatform(value) : currentL10n.goQuay(value);
-}
-
 /// Platform of the vehicle of the ride being waited for, or of the next ride (walking there, or on board the previous
 /// one): `voie 2`, or `RER A voie 2` when it is not the current step
 String? goPlatformText(GoState state) {
@@ -64,14 +54,14 @@ String? goPlatformText(GoState state) {
     return null;
   }
   final waitingForIt = index == state.progress.step && state.progress.phase == GoPhase.waiting;
-  return waitingForIt ? label : '${_lineLabel(line)} $label';
+  return waitingForIt ? label : '${line?.label ?? ''} $label';
 }
 
 /// Like the departure lists: whole minutes left (rounded down), "now" within 30 s
-String _minutes(Duration duration) {
-  final seconds = duration.inSeconds;
-  return seconds <= 30 ? currentL10n.now : currentL10n.inMinutes(math.max(1, seconds ~/ 60));
-}
+String _minutes(Duration duration) => switch (minutesLeft(duration)) {
+      0 => currentL10n.now,
+      final minutes => currentL10n.inMinutes(minutes),
+    };
 
 GoInstruction goInstruction(GoState state, DateTime now) {
   final tracker = state.tracker;
@@ -100,7 +90,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       return GoInstruction(
         line: section.line,
         icon: Icons.directions_transit,
-        title: currentL10n.goTake(_lineLabel(section.line)),
+        title: currentL10n.goTake(section.line?.label ?? ''),
         subtitle: currentL10n.direction(section.headsign ?? ''),
         detail: [
           departure.isBefore(now.subtract(const Duration(seconds: 30)))
@@ -108,7 +98,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
               : currentL10n.goDeparture(_minutes(departure.difference(now)), formatClock(departure)),
           if (vehicle == null) currentL10n.goScheduled,
           ?platform,
-          if (boarding.isNotEmpty && boarding.length < 3) currentL10n.goBoard(boardingPositions(boarding)),
+          if (boarding.isNotEmpty && boarding.length < 3) currentL10n.goBoard(boardingPositionNames(boarding)),
         ].join(' · '),
         urgent: departure.difference(now) <= const Duration(minutes: 1),
       );
@@ -136,23 +126,17 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       final meters = metersToGo(state);
       final nextStep = progress.step + 1 < tracker.steps.length ? tracker.steps[progress.step + 1] : null;
       final walkMinutes = math.max(1, (meters / movePace(state, step) / 60).ceil());
-      final verb = switch (section.kind) {
-        SectionKind.bike => currentL10n.goVerbBike,
-        SectionKind.car => currentL10n.goVerbCar,
-        SectionKind.transfer => currentL10n.goVerbTransferWalk,
-        _ => currentL10n.goVerbWalk,
-      };
       String? detail;
       if (nextStep != null && nextStep.isRide) {
         final vehicle = state.vehicleStep == progress.step + 1 ? state.vehicle : null;
         final departure = tracker.expectedDeparture(nextStep, progress, vehicle);
         final platform = platformLabel(nextStep.section.line, vehicle?.platform);
         detail = [
-          '${_lineLabel(nextStep.section.line)} ${_minutes(departure.difference(now))} (${formatClock(departure)})',
+          '${nextStep.section.line?.label ?? ''} ${_minutes(departure.difference(now))} (${formatClock(departure)})',
           ?platform,
         ].join(' · ');
       }
-      final goTo = currentL10n.goVerbTo(verb, section.to?.name ?? '');
+      final goTo = currentL10n.goVerbTo(moveVerb(section.kind), section.to?.name ?? '');
       final toGo = meters >= 1 ? '${formatDistance(meters.round())} · ${currentL10n.minutesShort(walkMinutes)}' : null;
       // A turn coming: what to do there first, like a navigation app
       final maneuver = nextManeuver(step, progress.along);
@@ -166,7 +150,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
         );
       }
       return GoInstruction(
-        icon: section.kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk,
+        icon: moveIcon(section.kind),
         title: goTo,
         subtitle: toGo,
         detail: detail,
@@ -176,13 +160,3 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       throw StateError('handled above');
   }
 }
-
-/// `à l'avant ou au milieu`: where to board along the train
-String boardingPositions(List<String> positions) => positions
-    .map((position) => switch (position) {
-          'front' => currentL10n.boardFront,
-          'middle' => currentL10n.boardMiddle,
-          'back' => currentL10n.boardBack,
-          _ => position,
-        })
-    .join(' ${currentL10n.or} ');

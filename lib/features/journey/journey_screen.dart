@@ -12,6 +12,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
+import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'widgets/journey_card.dart';

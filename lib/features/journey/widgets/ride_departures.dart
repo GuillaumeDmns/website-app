@@ -174,10 +174,8 @@ class _RideRow extends StatelessWidget {
     final muted = theme.colorScheme.onSurfaceVariant;
     final departure = ride.departure;
     final arrival = ride.arrivalAt;
-    final late = departure.aimedTime == null
-        ? 0
-        : (departure.time.difference(departure.aimedTime!).inSeconds / 60).round();
-    final minutes = arrival == null ? null : (arrival.difference(departure.time).inSeconds / 60).round();
+    final late = departure.aimedTime == null ? 0 : departure.time.difference(departure.aimedTime!).roundedMinutes;
+    final minutes = arrival?.difference(departure.time).roundedMinutes;
     const figures = [FontFeature.tabularFigures()];
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
 
@@ -292,6 +290,30 @@ class _RideRow extends StatelessWidget {
           onTap: onTap,
           child: tooEarly && !selected ? Opacity(opacity: 0.45, child: content) : content,
         ),
+      ),
+    );
+  }
+}
+
+/// Under a ride's departures: when the one after the [taken] one leaves, in case it is missed
+class IfMissedLine extends StatelessWidget {
+  const IfMissedLine({super.key, required this.rides, required this.taken});
+
+  final List<Ride> rides;
+  final Ride? taken;
+
+  @override
+  Widget build(BuildContext context) {
+    final taken = this.taken;
+    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).firstOrNull;
+    if (taken == null || after == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 4),
+      child: Text(
+        context.l10n.goIfMissed(formatClock(after.departure.time), after.departure.time.difference(taken.departure.time).roundedMinutes),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
       ),
     );
   }

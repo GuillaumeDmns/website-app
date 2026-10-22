@@ -76,7 +76,7 @@ enum NearbyFilter {
   };
 }
 
-class _NearbyFilterState extends Notifier<NearbyFilter> {
+class _NearbyFilterController extends Notifier<NearbyFilter> {
   @override
   NearbyFilter build() => NearbyFilter.all;
 
@@ -84,7 +84,7 @@ class _NearbyFilterState extends Notifier<NearbyFilter> {
 }
 
 /// The kind of departures shown around, for the time the app runs
-final nearbyFilterProvider = NotifierProvider<_NearbyFilterState, NearbyFilter>(_NearbyFilterState.new);
+final nearbyFilterProvider = NotifierProvider<_NearbyFilterController, NearbyFilter>(_NearbyFilterController.new);
 
 /// Chips choosing [nearbyFilterProvider], scrolled sideways
 class NearbyFilterBar extends ConsumerWidget {

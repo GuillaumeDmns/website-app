@@ -52,18 +52,18 @@ void main() {
     final path = BranchPath(branch);
 
     test('places a vehicle between its stops', () {
-      final halfway = path.position(vehicle(), 0.5)!;
+      final halfway = path.place(vehicle(), 0.5)!.point;
 
       expect(halfway.latitude, closeTo((48.8584 + 48.8443) / 2, 0.0005));
-      expect(path.position(vehicle(), 1)!.latitude, closeTo(48.8443, 0.0001));
+      expect(path.place(vehicle(), 1)!.point.latitude, closeTo(48.8443, 0.0001));
     });
 
     test('places a vehicle waiting at the first stop on it', () {
-      expect(path.position(vehicle(from: null, to: 'IDFM:1'), 1)!.latitude, closeTo(48.8584, 0.0001));
+      expect(path.place(vehicle(from: null, to: 'IDFM:1'), 1)!.point.latitude, closeTo(48.8584, 0.0001));
     });
 
     test('takes the previous stop when the one left is not on the branch', () {
-      expect(path.position(vehicle(from: 'IDFM:9', to: 'IDFM:3'), 0)!.latitude, closeTo(48.8443, 0.0001));
+      expect(path.place(vehicle(from: 'IDFM:9', to: 'IDFM:3'), 0)!.point.latitude, closeTo(48.8443, 0.0001));
     });
 
     test('tells which way a vehicle goes', () {
@@ -81,7 +81,7 @@ void main() {
     });
 
     test('ignores vehicles of another branch', () {
-      expect(path.position(vehicle(to: 'IDFM:99'), 0.5), isNull);
+      expect(path.place(vehicle(to: 'IDFM:99'), 0.5), isNull);
     });
   });
 

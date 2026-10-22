@@ -149,7 +149,7 @@ class _ModeGrid extends StatelessWidget {
               for (final line in lines)
                 Tooltip(
                   message: context.l10n.lineSeverity(
-                    '${line.line.mode.label} ${line.line.name ?? ''}',
+                    line.line.label,
                     severityLabel(line.severity).toLowerCase(),
                   ),
                   child: InkWell(

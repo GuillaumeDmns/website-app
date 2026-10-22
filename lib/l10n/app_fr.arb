@@ -65,14 +65,6 @@
       }
     }
   },
-  "dailyTripArrival": "Arrivée {time}",
-  "@dailyTripArrival": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
   "dailyTripThen": "Puis {times}",
   "@dailyTripThen": {
     "placeholders": {
@@ -281,7 +273,6 @@
     }
   },
   "serviceOver": "Plus de départ aujourd'hui",
-  "serviceFrequencies": "Fréquences",
   "periodEarlyMorning": "Tôt le matin",
   "periodMorningPeak": "Pointe du matin",
   "periodDaytime": "Journée",
@@ -948,14 +939,6 @@
       }
     }
   },
-  "goNextShort": "prochain : {stop}",
-  "@goNextShort": {
-    "placeholders": {
-      "stop": {
-        "type": "String"
-      }
-    }
-  },
   "goFromTo": "De {from} à {to}",
   "@goFromTo": {
     "placeholders": {
@@ -967,7 +950,6 @@
       }
     }
   },
-  "goVerbTransfer": "Correspondance",
   "goImOnBoard": "Je suis à bord",
   "goImAtThisStep": "Je suis à cette étape",
   "goPlannedDeparture": "Départ prévu à {time}",

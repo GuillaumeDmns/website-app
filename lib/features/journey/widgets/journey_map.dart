@@ -37,12 +37,7 @@ MapOverlay journeyOverlay(
   var sectionPoints = const <LatLng>[];
 
   for (final (index, section) in journey.sections.indexed) {
-    final shape = section.shape.isNotEmpty
-        ? [for (final point in section.shape) LatLng(point[1], point[0])]
-        : [
-            if (section.from != null) LatLng(section.from!.lat, section.from!.lon),
-            if (section.to != null) LatLng(section.to!.lat, section.to!.lon),
-          ];
+    final shape = sectionPath(section);
     if (shape.length < 2) {
       continue;
     }
@@ -106,7 +101,7 @@ MapOverlay journeyOverlay(
         badges.add(MapPin(
           point: shape.first,
           color: color,
-          label: '${section.line!.mode.label} ${section.line!.name ?? ''} · ${section.from?.name ?? ''}',
+          label: '${section.line!.label} · ${section.from?.name ?? ''}',
           above: true,
           childSize: const Size(56, 34),
           child: _BadgeCallout(line: section.line!),

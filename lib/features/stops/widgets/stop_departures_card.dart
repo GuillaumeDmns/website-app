@@ -9,7 +9,7 @@ import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
-import '../../go/go_instruction.dart';
+import '../../journey/journey_labels.dart';
 
 /// Minutes on foot for [meters] (about 80 m a minute)
 int walkingMinutes(int meters) => (meters / 80).ceil().clamp(1, 999);

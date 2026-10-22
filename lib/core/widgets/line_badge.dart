@@ -51,7 +51,7 @@ class LineBadge extends StatelessWidget {
 
   Widget _box({double? width, double? minWidth, required Decoration decoration, required Widget child}) {
     return Semantics(
-      label: '${line.mode.label} ${line.name ?? ''}',
+      label: line.label,
       excludeSemantics: true,
       // Sized to its content: an aligned Container would otherwise take all the width given by a Wrap
       child: IntrinsicWidth(

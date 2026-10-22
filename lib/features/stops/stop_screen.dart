@@ -158,7 +158,7 @@ class _StopContent extends ConsumerWidget {
               child: NoticeLine(
                 icon: Icons.block,
                 text: context.l10n.notServedLines(
-                  detail.lines.where((line) => closedLines.contains(line.id)).map((line) => '${line.mode.label} ${line.name ?? ''}'.trim()).join(', '),
+                  detail.lines.where((line) => closedLines.contains(line.id)).map((line) => line.label).join(', '),
                 ),
               ),
             ),

@@ -4,8 +4,8 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/utils/geo.dart';
-import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_smoother.dart';
+import 'package:website_app/features/go/go_state.dart';
 
 void main() {
   const start = LatLng(48.8584, 2.3470);
