@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../app/routes.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
@@ -58,14 +59,24 @@ class MapPlaceSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The address, its town under it: `21 Rue Jeanne-d'Arc` / `Paris`
             Row(
               children: [
-                Icon(Icons.place, color: theme.colorScheme.primary),
+                IconBubble(Icons.location_on, color: theme.colorScheme.error, size: 40),
                 const SizedBox(width: 12),
                 Expanded(
                   child: name == null
                       ? const LinearProgressIndicator()
-                      : Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                      : switch (RegExp(r'^(.*) \(([^)]*)\)$').firstMatch(name)) {
+                          final match? => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(match.group(1)!, style: theme.textTheme.titleMedium),
+                                Text(match.group(2)!, style: theme.textTheme.bodySmall),
+                              ],
+                            ),
+                          _ => Text(name, style: theme.textTheme.titleMedium),
+                        },
                 ),
               ],
             ),

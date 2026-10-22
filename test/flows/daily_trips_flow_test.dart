@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/daily_trips/daily_trip_widgets.dart';
 import 'package:website_app/features/daily_trips/daily_trips.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_screen.dart';
@@ -39,7 +40,8 @@ void main() {
     // Named after the saved places, timed from the métro's departures (the next one in 7 min, 5 min on foot)
     expect(find.text(currentL10n.dailyTripsTitle), findsOneWidget);
     expect(find.text(currentL10n.dailyTripName('10 Rue de Rivoli', currentL10n.work)), findsOneWidget);
-    expect(find.text(currentL10n.leaveIn('2 min')), findsOneWidget);
+    // The last métro within the hour: when to leave at the latest is the main information
+    expect(find.textContaining(currentL10n.leaveBefore('').trim()), findsOneWidget);
     expect(backend.requestsTo('/api/v2/lines/C01371/rides').first.queryParameters, containsPair('to', 'IDFM:70003'));
     expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
     // The last métro in 40 min, 5 min from the start
@@ -106,7 +108,7 @@ void main() {
     await tapOn(tester, find.byTooltip(currentL10n.back));
     await tapOn(tester, find.byTooltip(currentL10n.back));
     expect(find.text(currentL10n.dailyTripChoose), findsNothing);
-    expect(find.textContaining(' → '), findsWidgets);
+    expect(find.byType(DailyTripCard), findsOneWidget);
     expect(backend.requestsTo('/api/v2/journeys'), hasLength(1));
 
     await closeApp(tester);

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
+import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
@@ -173,12 +174,34 @@ Future<void> showBikeStationSheet(BuildContext context, BikeStation station) {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(context.l10n.bikeStation, style: theme.textTheme.labelLarge?.copyWith(color: velibColor)),
-                Text(station.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                _SheetCount(icon: Icons.pedal_bike, color: velibColor, value: station.mechanical, label: context.l10n.bikesMechanicalCount(station.mechanical)),
-                _SheetCount(icon: Icons.electric_bike, color: Colors.blue.shade600, value: station.electric, label: context.l10n.bikesElectricCount(station.electric)),
-                _SheetCount(icon: Icons.local_parking, color: Colors.indigo.shade400, value: station.docks, label: context.l10n.bikeDocksCount(station.docks)),
+                Text(context.l10n.bikeStation, style: theme.textTheme.labelLarge?.copyWith(fontSize: 13, color: velibColor)),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Expanded(child: Text(station.name, style: theme.textTheme.titleLarge?.copyWith(fontSize: 22, height: 1.25))),
+                    if (station.distance case final distance?) ...[
+                      const SizedBox(width: 8),
+                      Text(formatDistance(distance), style: theme.textTheme.bodySmall?.copyWith(fontSize: 14)),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Three figures read at a glance
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (index, (icon, color, value, label)) in [
+                      (Icons.pedal_bike, velibColor, station.mechanical, context.l10n.bikesMechanicalCount(station.mechanical)),
+                      (Icons.electric_bike, Colors.blue.shade600, station.electric, context.l10n.bikesElectricCount(station.electric)),
+                      (Icons.local_parking, Colors.indigo.shade400, station.docks, context.l10n.bikeDocksCount(station.docks)),
+                    ].indexed) ...[
+                      if (index > 0) const SizedBox(width: 8),
+                      Expanded(child: _SheetCount(icon: icon, color: color, value: value, label: label)),
+                    ],
+                  ],
+                ),
                 if (!station.renting || !station.returning)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -193,7 +216,7 @@ Future<void> showBikeStationSheet(BuildContext context, BikeStation station) {
                   ),
                 if (station.reportedAt != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: 12),
                     child: Text(context.l10n.updatedAt(formatClock(station.reportedAt!)),
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   ),
@@ -218,6 +241,7 @@ Future<void> showBikeStationSheet(BuildContext context, BikeStation station) {
   );
 }
 
+/// A figure of the station sheet: its icon, the number in large, what it counts
 class _SheetCount extends StatelessWidget {
   const _SheetCount({required this.icon, required this.color, required this.value, required this.label});
 
@@ -227,16 +251,20 @@ class _SheetCount extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          children: [
-            Icon(icon, color: value > 0 ? color : Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(width: 10),
-            Text('$value', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
-            const SizedBox(width: 6),
-            Text(label),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: context.colors.subtle, borderRadius: BorderRadius.circular(14)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: value > 0 ? color : context.colors.muted),
+          const SizedBox(height: 6),
+          Text('$value', style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28, height: 1.1, color: value > 0 ? null : context.colors.muted)),
+          Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 12, height: 1.3)),
+        ],
+      ),
+    );
+  }
 }

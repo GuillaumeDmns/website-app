@@ -444,5 +444,10 @@
   "goCorrectTitle": "Where are you?",
   "goMarginAheadOf": "{minutes} min to spare for the {line} at {time}",
   "goOnTimeLive": "On time, followed in real time",
-  "goNextStopShort": "Next stop {stop}"
+  "goNextStopShort": "Next stop {stop}",
+  "trafficNormal": "Normal service",
+  "trafficDisrupted": "Disrupted",
+  "trafficInterrupted": "Interrupted",
+  "leaveBefore": "Leave before {time}",
+  "lineTrafficNotice": "{line}: {title}"
 }

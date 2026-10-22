@@ -10,10 +10,8 @@ import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../daily_trips/daily_trip_widgets.dart';
-import '../../core/utils/time_format.dart';
 import '../journey/journey_request.dart';
 import '../stops/stop_screen.dart';
-import '../traffic/disruption_widgets.dart';
 import '../traffic/traffic_providers.dart';
 import '../stops/widgets/stop_departures_card.dart';
 import 'favorites_controller.dart';
@@ -100,7 +98,8 @@ Future<void> chooseFavoritePlace(BuildContext context, WidgetRef ref, FavoriteKi
   await _runFavoriteAction(messenger, () => favorites.savePlace(kind, place), success: currentL10n.favoriteSaved(title));
 }
 
-/// Home, work and saved places as tiles, like Citymapper's: tap to go there, long press (or the menu) to change them.
+/// Home, work and saved places as pills, scrolled sideways: tap to go there, long press (or right click) to change
+/// them. When to leave for home or work is told by the commute card above them (see `HomeScreen`).
 class FavoriteShortcuts extends ConsumerWidget {
   const FavoriteShortcuts({super.key});
 
@@ -109,86 +108,106 @@ class FavoriteShortcuts extends ConsumerWidget {
     final favorites = ref.watch(favoritesProvider).value ?? const <Favorite>[];
     Favorite? find(FavoriteKind kind) => favorites.where((favorite) => favorite.kind == kind).firstOrNull;
     final places = favorites.where((favorite) => favorite.kind == FavoriteKind.place);
+    final theme = Theme.of(context);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_rounded, title: context.l10n.home, favorite: find(FavoriteKind.home)),
+      child: Row(
+        children: [
+          _PlaceShortcut(kind: FavoriteKind.home, icon: Icons.home_rounded, title: context.l10n.home, favorite: find(FavoriteKind.home)),
+          const SizedBox(width: 8),
+          _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_rounded, title: context.l10n.work, favorite: find(FavoriteKind.work)),
+          for (final place in places) ...[
             const SizedBox(width: 8),
-            _PlaceShortcut(kind: FavoriteKind.work, icon: Icons.work_rounded, title: context.l10n.work, favorite: find(FavoriteKind.work)),
-            for (final place in places) ...[
-              const SizedBox(width: 8),
-              _PlaceShortcut(kind: FavoriteKind.place, icon: Icons.star_rounded, title: place.label ?? '', favorite: place),
-            ],
-            const SizedBox(width: 8),
-            _ShortcutTile(
-              icon: Icons.add,
-              title: context.l10n.place,
-              subtitle: context.l10n.shortcutAdd,
-              tooltip: context.l10n.favoritePlaceAdd,
-              onTap: () => chooseFavoritePlace(context, ref, FavoriteKind.place),
-            ),
+            _PlaceShortcut(kind: FavoriteKind.place, icon: Icons.star_rounded, title: place.label ?? '', favorite: place),
           ],
-        ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: context.l10n.favoritePlaceAdd,
+            child: Material(
+              color: Colors.transparent,
+              shape: StadiumBorder(side: BorderSide(color: theme.colorScheme.outline)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => chooseFavoritePlace(context, ref, FavoriteKind.place),
+                child: SizedBox(
+                  height: MediaQuery.textScalerOf(context).scale(14) + 26,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 14, 0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 18, color: context.colors.muted),
+                        const SizedBox(width: 6),
+                        Text(context.l10n.place, style: theme.textTheme.labelLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w500, color: context.colors.muted)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// A tile of the shortcuts: an icon in a bubble, a name and a line below
-class _ShortcutTile extends StatelessWidget {
-  const _ShortcutTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.onLongPress,
-    this.color,
-    this.tooltip,
-    this.subtitleColor,
-  });
+/// A pill of the shortcuts: the place's icon in a tinted bubble, its name
+class _ShortcutPill extends StatelessWidget {
+  const _ShortcutPill({required this.icon, required this.title, required this.color, required this.onTap, this.onLongPress, this.tooltip, this.muted = false});
 
   final IconData icon;
   final String title;
-  final String subtitle;
-  final Color? subtitleColor;
+  final Color color;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
-  final Color? color;
   final String? tooltip;
+
+  /// Not set yet
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final width = MediaQuery.textScalerOf(context).scale(112);
-    final tile = SizedBox(
-      width: width,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onSecondaryTap: onLongPress,
+    final pill = Material(
+      color: context.colors.card,
+      shape: StadiumBorder(side: BorderSide(color: theme.colorScheme.outline, width: 0.5)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        onSecondaryTap: onLongPress,
+        child: SizedBox(
+          height: MediaQuery.textScalerOf(context).scale(14) + 26,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(6, 0, 14, 0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                IconBubble(icon, color: color, size: 34),
-                const SizedBox(height: 8),
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
-                Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: subtitleColor)),
+                IconBubble(icon, color: color, size: 28),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: muted ? context.colors.muted : null,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     );
-    return tooltip == null ? tile : Tooltip(message: tooltip, child: tile);
+    return tooltip == null ? pill : Tooltip(message: tooltip, child: pill);
   }
 }
 
@@ -200,9 +219,8 @@ class _PlaceShortcut extends ConsumerWidget {
   final String title;
   final Favorite? favorite;
 
-  void _go(BuildContext context, WidgetRef ref) => goToPlace(context, ref, favorite!);
-
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    HapticFeedback.mediumImpact();
     final action = await showModalBottomSheet<String>(
       context: context,
       // Above the whole app, not inside the panel or the bottom sheet
@@ -212,7 +230,10 @@ class _PlaceShortcut extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(title: Text(favorite!.label ?? title), subtitle: Text(title)),
+            ListTile(
+              title: Text(favorite!.label ?? title, style: Theme.of(context).textTheme.titleSmall),
+              subtitle: Text(title),
+            ),
             if (kind != FavoriteKind.place)
               ListTile(
                 leading: const Icon(Icons.edit_location_alt_outlined),
@@ -220,8 +241,8 @@ class _PlaceShortcut extends ConsumerWidget {
                 onTap: () => Navigator.pop(context, 'edit'),
               ),
             ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: Text(context.l10n.delete),
+              leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+              title: Text(context.l10n.delete, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -247,45 +268,25 @@ class _PlaceShortcut extends ConsumerWidget {
       _ => context.colors.warning,
     };
     if (favorite == null) {
-      return _ShortcutTile(
+      return _ShortcutPill(
         icon: icon,
         title: title,
-        subtitle: context.l10n.shortcutSet,
-        tooltip: context.l10n.addPlace(title),
         color: color,
+        muted: true,
+        tooltip: context.l10n.addPlace(title),
         onTap: () => chooseFavoritePlace(context, ref, kind),
       );
     }
-    // A trip saved there: when to leave, live, like Citymapper's home and work
-    final now = ref.watch(nowProvider).value ?? DateTime.now();
-    final next = nextTripTo(ref, favorite!, now);
-    final leaveIn = next?.departure.difference(now);
-    return Stack(
-      children: [
-        _ShortcutTile(
-          icon: icon,
-          title: title,
-          subtitle: next == null || leaveIn == null
-              ? favorite!.label ?? ''
-              : '${leaveInLabel(leaveIn)} · ${formatClock(next.arrival)}',
-          subtitleColor: next?.rides.firstOrNull?.realtime == true ? context.colors.live : null,
-          color: color,
-          tooltip: favorite!.label,
-          onTap: () => _go(context, ref),
-          onLongPress: () => _edit(context, ref),
-        ),
-        Positioned(
-          top: 0,
-          right: 0,
-          child: IconButton(
-            tooltip: context.l10n.edit,
-            visualDensity: VisualDensity.compact,
-            iconSize: 18,
-            icon: Icon(Icons.more_horiz, color: context.colors.muted),
-            onPressed: () => _edit(context, ref),
-          ),
-        ),
-      ],
+    return Semantics(
+      onLongPressHint: context.l10n.edit,
+      child: _ShortcutPill(
+        icon: icon,
+        title: title,
+        color: color,
+        tooltip: favorite!.label,
+        onTap: () => goToPlace(context, ref, favorite!),
+        onLongPress: () => _edit(context, ref),
+      ),
     );
   }
 }
@@ -328,7 +329,8 @@ class FavoriteStopsSection extends ConsumerWidget {
   }
 }
 
-/// Favorite lines as badges
+/// Favorite lines, one row each with its traffic: normal in green, disrupted in orange (or red when interrupted)
+/// with the first disruption's title
 class FavoriteLinesSection extends ConsumerWidget {
   const FavoriteLinesSection({super.key});
 
@@ -341,27 +343,77 @@ class FavoriteLinesSection extends ConsumerWidget {
     if (lines.isEmpty) {
       return const SizedBox.shrink();
     }
-    final severities = ref.watch(lineSeveritiesProvider);
+    final traffic = ref.watch(trafficProvider);
+    final byLine = {for (final line in traffic.value ?? const <LineTraffic>[]) line.line.id: line};
+    final theme = Theme.of(context);
+    final colors = context.colors;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionTitle(context.l10n.myLines),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final line in lines)
-              Tooltip(
-                message: line.label,
-                child: InkWell(
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
+          child: Column(
+            children: [
+              for (final (index, line) in lines.indexed) ...[
+                if (index > 0) const Divider(indent: 40),
+                InkWell(
                   onTap: () => context.push(Routes.line(line.id)),
-                  child: WithSeverity(severity: severities[line.id], child: LineBadge(line, size: 34)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 40, child: Align(alignment: Alignment.centerLeft, child: LineBadge(line, size: 28))),
+                        Expanded(
+                          child: switch (byLine[line.id]) {
+                            // Not known yet: nothing rather than a wrong "normal"
+                            _ when !traffic.hasValue => Text(line.label, style: theme.textTheme.bodyMedium),
+                            LineTraffic(severity: final severity?, :final titles) when severity != DisruptionSeverity.info =>
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _TrafficState(
+                                    icon: severity == DisruptionSeverity.blocking ? Icons.block : Icons.warning_rounded,
+                                    text: severity == DisruptionSeverity.blocking ? context.l10n.trafficInterrupted : context.l10n.trafficDisrupted,
+                                    color: severity == DisruptionSeverity.blocking ? colors.cancelled : colors.warning,
+                                  ),
+                                  if (titles.isNotEmpty)
+                                    Text(titles.first, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                                ],
+                              ),
+                            _ => _TrafficState(icon: Icons.check_circle, text: context.l10n.trafficNormal, color: colors.live),
+                          },
+                        ),
+                        Icon(Icons.chevron_right, color: colors.muted),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-          ],
+              ],
+            ],
+          ),
         ),
       ],
     );
   }
+}
+
+class _TrafficState extends StatelessWidget {
+  const _TrafficState({required this.icon, required this.text, required this.color});
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14, color: color)),
+          ),
+        ],
+      );
 }
