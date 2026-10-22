@@ -1273,9 +1273,5 @@
   "@goMarginAheadOf": {"placeholders": {"minutes": {"type": "int"}, "line": {"type": "String"}, "time": {"type": "String"}}},
   "goOnTimeLive": "À l'heure, suivi en temps réel",
   "goNextStopShort": "Prochain arrêt {stop}",
-  "@goNextStopShort": {"placeholders": {"stop": {"type": "String"}}},
-  "arrivalShort": "arr.",
-  "timeAxisWalk": "marche",
-  "timeAxisWait": "attente",
-  "leaveNowCompact": "Maintenant"
+  "@goNextStopShort": {"placeholders": {"stop": {"type": "String"}}}
 }

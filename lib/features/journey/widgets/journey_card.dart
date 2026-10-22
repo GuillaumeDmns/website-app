@@ -14,18 +14,15 @@ import '../journey_providers.dart';
 import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
-import 'journey_time_bar.dart';
 
-/// Result row: the duration in large figures, when to leave (green with real time) and the arrival on one line, then
-/// the journey as a bar on the time axis shared by the results ([JourneyTimeBar]: waits, walks and connections compare
-/// at a glance), the next departures of its first ride and the details. Without an axis, the chain of lines.
+/// Result row, like Citymapper: when to leave in large and green, the duration in large figures, the
+/// chain of lines, the next departures of its first ride, then the details.
 class JourneyCard extends ConsumerWidget {
   const JourneyCard({
     super.key,
     required this.journey,
     required this.now,
     required this.onTap,
-    this.axis,
     this.selected = false,
     this.onOpen,
     this.onHover,
@@ -34,9 +31,6 @@ class JourneyCard extends ConsumerWidget {
   final JourneyOption journey;
   final DateTime now;
   final VoidCallback onTap;
-
-  /// Shared by the results shown together
-  final TimeAxis? axis;
 
   /// Shown on the map
   final bool selected;
@@ -55,7 +49,6 @@ class JourneyCard extends ConsumerWidget {
     final firstRide = journey.rides.firstOrNull;
     final later = _laterDepartures(ref, firstRide);
     final leaveIn = journey.departure.difference(now);
-    final live = firstRide?.realtime == true;
 
     final details = [
       if (firstRide != null)
@@ -66,71 +59,65 @@ class JourneyCard extends ConsumerWidget {
     ].join(' · ');
     final minutes = (journey.duration / 60).round();
 
-    final duration = theme.textTheme.headlineSmall?.copyWith(fontSize: 22, height: 1, letterSpacing: -0.4);
     final card = AppCard(
       onTap: onTap,
       border: selected ? scheme.primary : null,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 4, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Like Citymapper: the duration in large figures
-              if (minutes < 60)
-                Text.rich(TextSpan(children: [
-                  TextSpan(text: '$minutes', style: duration),
-                  TextSpan(text: '\u00a0min', style: theme.textTheme.labelMedium),
-                ]))
-              else
-                Text(formatDuration(journey.duration), style: duration),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  // Short, beside the duration: `Dans 2 min`
-                  switch (leaveIn.inMinutes) {
-                    <= 0 => context.l10n.leaveNowCompact,
-                    final minutes when minutes < 60 => context.l10n.leaveInMinutes(minutes),
-                    _ => leaveInLabel(leaveIn),
-                  },
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 14, color: live ? colors.live : null),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      leaveInLabel(leaveIn),
+                      style: theme.textTheme.titleMedium?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
+                    ),
+                    Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Text('${context.l10n.arrivalShort} ', style: theme.textTheme.bodySmall),
-              Text(formatClock(journey.arrival), style: theme.textTheme.titleSmall?.copyWith(fontSize: 16)),
-              if (onOpen != null)
-                SizedBox(
-                  width: 28,
-                  height: 20,
-                  child: IconButton(
-                    tooltip: context.l10n.details,
-                    padding: EdgeInsets.zero,
-                    iconSize: 20,
-                    icon: Icon(Icons.chevron_right, color: colors.muted),
-                    onPressed: onOpen,
-                  ),
+              // Like Citymapper: the duration in large figures
+              if (minutes < 60) ...[
+                Text('$minutes', style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28, height: 1.05)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 12),
+                  child: Text('min', style: theme.textTheme.labelMedium),
                 ),
+              ] else
+                Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge),
+              if (onOpen != null)
+                IconButton(
+                  tooltip: context.l10n.details,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.chevron_right, color: colors.muted),
+                  onPressed: onOpen,
+                )
+              else
+                const SizedBox(width: 12),
             ],
           ),
-          if (axis case final axis?)
-            Padding(padding: const EdgeInsets.fromLTRB(0, 12, 0, 8), child: JourneyTimeBar(journey: journey, axis: axis))
-          else
-            Padding(padding: const EdgeInsets.only(top: 10, bottom: 2), child: SectionsStrip(journey: journey)),
-          if (details.isNotEmpty)
-            Text(details, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(fontSize: 12.5, height: 1.4)),
+          const SizedBox(height: 10),
+          Padding(padding: const EdgeInsets.only(right: 12), child: SectionsStrip(journey: journey)),
           if (later.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(Icons.update, size: 16, color: colors.muted),
                 const SizedBox(width: 6),
-                Text(context.l10n.alsoAt(later.map(formatClock).join(' · ')), style: theme.textTheme.bodySmall?.copyWith(fontSize: 12.5)),
+                Text(context.l10n.alsoAt(later.map(formatClock).join(' · ')), style: theme.textTheme.bodySmall),
               ],
+            ),
+          ],
+          if (details.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Text(details, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
             ),
           ],
         ],

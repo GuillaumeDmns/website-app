@@ -444,9 +444,5 @@
   "goCorrectTitle": "Where are you?",
   "goMarginAheadOf": "{minutes} min to spare for the {line} at {time}",
   "goOnTimeLive": "On time, followed in real time",
-  "goNextStopShort": "Next stop {stop}",
-  "arrivalShort": "arr.",
-  "timeAxisWalk": "walk",
-  "timeAxisWait": "wait",
-  "leaveNowCompact": "Now"
+  "goNextStopShort": "Next stop {stop}"
 }
