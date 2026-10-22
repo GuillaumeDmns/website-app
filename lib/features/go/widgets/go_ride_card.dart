@@ -26,10 +26,14 @@ import 'go_card_parts.dart';
 /// A ride: waiting for it (countdown, where to board, departures, the next one if missed), on board
 /// (the stops left with their times, where to get off), or to come (its departures)
 class GoRideCard extends ConsumerWidget {
-  const GoRideCard({super.key, required this.state, required this.index});
+  const GoRideCard({super.key, required this.state, required this.index, this.compact = false});
 
   final GoState state;
   final int index;
+
+  /// The step in progress under the banner and [GoNowCard], which tell what to do, the countdown and where to board:
+  /// only the departures or the stops left, and what follows
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -66,6 +70,7 @@ class GoRideCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (!compact)
         GoCardTitle(
           leading: section.line != null ? LineBadge(section.line!, size: 36) : const Icon(Icons.directions_transit, size: 34),
           title: title,
@@ -79,23 +84,25 @@ class GoRideCard extends ConsumerWidget {
           done: isDone,
           urgent: urgent,
         ),
-        if (waiting) GoPills(state: state, now: now),
+        if (waiting && !compact) GoPills(state: state, now: now),
         if (onBoard) ...[
-          const SizedBox(height: 12),
+          if (!compact) const SizedBox(height: 12),
           _StopsLeft(state: state, step: step),
         ] else if (!isDone) ...[
-          if (positions.isNotEmpty && positions.length < 3) ...[
+          if (positions.isNotEmpty && positions.length < 3 && !compact) ...[
             const SizedBox(height: 12),
             TrainPositions(positions: positions, color: parseHexColor(section.line?.color, Theme.of(context).colorScheme.primary)),
           ],
-          const SizedBox(height: 14),
+          if (!compact) const SizedBox(height: 14),
           _RideDepartures(state: state, step: step, index: index),
         ],
         if (!isDone) RideDisruptions(lineId: section.line?.id, max: 1, top: 10),
         if (!isDone && index + 1 < tracker.steps.length) GoNextStep(state: state, index: index + 1),
         const SizedBox(height: 8),
         // Manual corrections, kept discreet
-        if (isLive && progress.phase == GoPhase.waiting)
+        if (compact)
+          const SizedBox.shrink()
+        else if (isLive && progress.phase == GoPhase.waiting)
           GoSmallAction(label: context.l10n.goImOnBoard, onPressed: () => ref.read(goControllerProvider.notifier).next())
         else if (!isLive && !isDone)
           GoSmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),

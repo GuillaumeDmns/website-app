@@ -15,7 +15,7 @@ import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
 
-/// Result row, like Citymapper: when to leave in large (green with real time), the duration in large figures, the
+/// Result row, like Citymapper: when to leave in large and green, the duration in large figures, the
 /// chain of lines, the next departures of its first ride, then the details.
 class JourneyCard extends ConsumerWidget {
   const JourneyCard({
@@ -49,7 +49,6 @@ class JourneyCard extends ConsumerWidget {
     final firstRide = journey.rides.firstOrNull;
     final later = _laterDepartures(ref, firstRide);
     final leaveIn = journey.departure.difference(now);
-    final live = firstRide?.realtime == true;
 
     final details = [
       if (firstRide != null)
@@ -76,7 +75,7 @@ class JourneyCard extends ConsumerWidget {
                   children: [
                     Text(
                       leaveInLabel(leaveIn),
-                      style: theme.textTheme.titleMedium?.copyWith(color: live ? colors.live : null, fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
                     ),
                     Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
                   ],

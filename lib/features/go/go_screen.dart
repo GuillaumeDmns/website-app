@@ -21,12 +21,14 @@ import 'go_tracker.dart';
 import 'widgets/go_arrival_card.dart';
 import 'widgets/go_header.dart';
 import 'widgets/go_move_card.dart';
+import 'widgets/go_now_card.dart';
 import 'widgets/go_ride_card.dart';
 
-/// GO mode, like Citymapper: in the panel the arrival with the journey's progress, the strip of its steps (tap one to
-/// look at it) and one card per step, swiped horizontally, the one in progress telling what to do now (the next turn,
-/// the time to spare, the countdown to the departure). The panel stays low, the map above it free: the page follows
-/// the step in progress; the map frames the step shown (on a ride, what is left of it) or follows the user on foot.
+/// GO mode, map first: what to do now floats over the map ([GoBanner], from [GoBar]); the panel is a low capsule with
+/// the arrival, the strip of the steps (tap one to look at it) and one card per step, swiped horizontally. The card of
+/// the step in progress opens on its context ([GoNowCard]: the stops ahead, where to board, one line of context, the
+/// manual correction); its details (departures, stops left, turns) are a drag of the sheet away. The page follows the
+/// step in progress; the map frames the step shown (on a ride, what is left of it) or follows the user on foot.
 class GoScreen extends ConsumerStatefulWidget {
   const GoScreen({super.key});
 
@@ -121,7 +123,6 @@ class _GoScreenState extends ConsumerState<GoScreen> {
             child: Column(
               children: [
                 GoHeader(state: state, onBack: back),
-                GoJourneyProgress(state: state),
                 if (AppConfig.isDev) const GoGpsStats(),
                 GoStepStrip(state: state, shown: _shown, onTap: _show),
                 if (progress.issue case final issue? when issue != GoIssue.offRoute) GoIssueCard(state: state, issue: issue),
@@ -142,24 +143,34 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                   _fitSheet();
                 },
                 itemBuilder: (context, page) {
+                  final isLive = page == live && !arrived;
                   final Widget card = page >= tracker.steps.length
                       ? GoArrivalCard(state: state)
                       : tracker.steps[page].isRide
-                          ? GoRideCard(state: state, index: page)
-                          : GoMoveCard(state: state, index: page);
+                          ? GoRideCard(state: state, index: page, compact: isLive)
+                          : GoMoveCard(state: state, index: page, compact: isLive);
+                  void onSize(Size size) {
+                    _cards[page] = size.height + 16;
+                    if (page == _shown) {
+                      _fitSheet();
+                    }
+                  }
+
                   return SingleChildScrollView(
                     // The bottom sheet is dragged by the list of the page shown only
                     controller: page == _shown ? PanelScrollScope.of(context) : null,
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: SizeReporter(
-                      onSize: (size) {
-                        _cards[page] = size.height + 16;
-                        if (page == _shown) {
-                          _fitSheet();
-                        }
-                      },
-                      child: card,
-                    ),
+                    // In progress, the sheet fits the context only: the map keeps most of the screen
+                    child: isLive
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizeReporter(onSize: onSize, child: GoNowCard(state: state)),
+                              const SizedBox(height: 16),
+                              card,
+                            ],
+                          )
+                        : SizeReporter(onSize: onSize, child: card),
                   );
                 },
               ),

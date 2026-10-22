@@ -10,6 +10,7 @@ import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/share.dart';
+import '../../core/utils/colors.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../daily_trips/daily_trip_widgets.dart';
@@ -18,7 +19,6 @@ import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
-import 'widgets/journey_card.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_sections.dart';
 import 'widgets/journey_timeline.dart';
@@ -113,10 +113,8 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
       // Citymapper's big green GO stays at hand at the bottom, whatever is scrolled
       child: Column(
         children: [
-          Expanded(child: _content(context, journey, retimed, planned, request, back)),
+          Expanded(child: _content(context, journey, retimed, planned, request, back, now)),
           _GoFooter(
-            journey: journey,
-            now: now,
             onGo: () {
               ref.read(goControllerProvider.notifier).start(journey, request);
               context.push(Routes.go);
@@ -128,16 +126,37 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   }
 
   Widget _content(BuildContext context, JourneyOption journey, RetimedJourney retimed, JourneyOption planned, JourneyRequest? request,
-      VoidCallback back) {
+      VoidCallback back, DateTime now) {
     final theme = Theme.of(context);
     return ListView(
         controller: PanelScrollScope.of(context),
-        padding: const EdgeInsets.fromLTRB(4, 0, 16, 32),
+        padding: const EdgeInsets.fromLTRB(4, 0, 16, 24),
         children: [
+          // The essentials on one line with the back button: the duration, when, when to leave; saving and sharing
           Row(
             children: [
               IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: back),
-              const Spacer(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge),
+                    Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: '${formatClock(journey.departure)} → ${formatClock(journey.arrival)} · '),
+                        TextSpan(
+                          text: leaveInLabel(journey.departure.difference(now)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: journey.rides.firstOrNull?.realtime == true ? context.colors.live : null,
+                          ),
+                        ),
+                      ]),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
               SaveDailyTripButton(journey: planned, request: request),
               IconButton(
                 tooltip: context.l10n.share,
@@ -153,35 +172,7 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(formatDuration(journey.duration), style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28)),
-                      Text(
-                        [
-                          '${formatClock(journey.departure)} → ${formatClock(journey.arrival)}',
-                          journeyTypeLabel(journey.type),
-                          if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
-                          if (journey.co2 != null) context.l10n.co2(journey.co2!.round()),
-                        ].join(' · '),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 0, 16),
-            child: SectionsStrip(journey: journey),
-          ),
+          const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Column(
@@ -198,13 +189,26 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                   ),
                 if (journey.sections.lastOrNull?.to case final end?)
                   TimelineRow(
-                    color: theme.colorScheme.error,
+                    color: _endColor(context, journey),
                     time: formatClock(journey.arrival),
                     dot: true,
                     isLast: true,
-                    child: Text(end.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text(end.name, style: theme.textTheme.titleSmall),
                   ),
               ],
+            ),
+          ),
+          // What the journey is and costs, under it
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
+            child: Text(
+              [
+                journeyTypeLabel(journey.type),
+                if (journey.transfers > 0) context.l10n.transfersShort(journey.transfers),
+                if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
+                if (journey.co2 != null) context.l10n.co2(journey.co2!.round()),
+              ].join(' · '),
+              style: theme.textTheme.bodySmall,
             ),
           ),
         ],
@@ -212,58 +216,41 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
   }
 }
 
-/// At the bottom of the detail: when to leave, the duration and arrival, the big green GO
-class _GoFooter extends StatelessWidget {
-  const _GoFooter({required this.journey, required this.now, required this.onGo});
+/// The last ride's color, for where the journey ends (the walk's dark grey after it, red without any ride)
+Color _endColor(BuildContext context, JourneyOption journey) {
+  final last = journey.sections.lastOrNull;
+  if (last?.kind == SectionKind.transit) {
+    return parseHexColor(last?.line?.color, Theme.of(context).colorScheme.primary);
+  }
+  return Theme.of(context).colorScheme.onSurface;
+}
 
-  final JourneyOption journey;
-  final DateTime now;
+/// At the bottom of the detail, whatever is scrolled: the big green GO, all the width
+class _GoFooter extends StatelessWidget {
+  const _GoFooter({required this.onGo});
+
   final VoidCallback onGo;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final leaveIn = journey.departure.difference(now);
-    final live = journey.rides.firstOrNull?.realtime == true;
-    return Material(
-      color: context.colors.card,
-      elevation: 8,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outline, width: 0.5)),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      leaveInLabel(leaveIn),
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: live ? context.colors.live : null),
-                    ),
-                    Text(
-                      '${formatDuration(journey.duration)} · ${context.l10n.arrivalAt(formatClock(journey.arrival))}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              // The theme makes filled buttons full width
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(112, 52),
-                  textStyle: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1),
-                ),
-                icon: const Icon(Icons.navigation),
-                label: Text(context.l10n.go),
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  onGo();
-                },
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(textStyle: theme.textTheme.titleMedium?.copyWith(fontSize: 16, letterSpacing: 0.5)),
+            icon: const Icon(Icons.navigation, size: 22),
+            label: Text(context.l10n.go),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onGo();
+            },
           ),
         ),
       ),

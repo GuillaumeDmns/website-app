@@ -547,10 +547,10 @@
       }
     }
   },
-  "sectionBike": "Pédaler",
-  "sectionCar": "Rouler",
-  "sectionTransfer": "Correspondance à pied",
-  "sectionWalk": "Marcher",
+  "sectionBike": "Vélo",
+  "sectionCar": "Voiture",
+  "sectionTransfer": "Correspondance",
+  "sectionWalk": "Marche",
   "bikePickUp": "Prendre un vélo : {station}",
   "@bikePickUp": {
     "placeholders": {
@@ -1253,5 +1253,25 @@
   "@updatedSecondsAgo": {"placeholders": {"seconds": {"type": "int"}}},
   "updatedMinutesAgo": "Il y a {minutes} min",
   "@updatedMinutesAgo": {"placeholders": {"minutes": {"type": "int"}}},
-  "goTurnByTurn": "Itinéraire détaillé"
+  "goTurnByTurn": "Itinéraire détaillé",
+  "goKickerOnFoot": "À pied",
+  "goKickerByBike": "À vélo",
+  "goKickerTowards": "{mode} · vers {place}",
+  "@goKickerTowards": {"placeholders": {"mode": {"type": "String"}, "place": {"type": "String"}}},
+  "goKickerTransfer": "{stop} · correspondance",
+  "@goKickerTransfer": {"placeholders": {"stop": {"type": "String"}}},
+  "goFollowLine": "Suivez {line}",
+  "@goFollowLine": {"placeholders": {"line": {"type": "String"}}},
+  "goGetOffAtStop": "Descendez à {stop}",
+  "@goGetOffAtStop": {"placeholders": {"stop": {"type": "String"}}},
+  "goStopsUnit": "{count, plural, =1{arrêt} other{arrêts}}",
+  "@goStopsUnit": {"placeholders": {"count": {"type": "int"}}},
+  "goTracking": "Suivi GPS",
+  "goCorrect": "Corriger",
+  "goCorrectTitle": "Où en êtes-vous ?",
+  "goMarginAheadOf": "{minutes} min d'avance sur le {line} de {time}",
+  "@goMarginAheadOf": {"placeholders": {"minutes": {"type": "int"}, "line": {"type": "String"}, "time": {"type": "String"}}},
+  "goOnTimeLive": "À l'heure, suivi en temps réel",
+  "goNextStopShort": "Prochain arrêt {stop}",
+  "@goNextStopShort": {"placeholders": {"stop": {"type": "String"}}}
 }

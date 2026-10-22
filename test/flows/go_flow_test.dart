@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/platform/live_journey.dart';
+import 'package:website_app/features/go/go_bar.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_screen.dart';
 import 'package:website_app/features/go/go_state.dart';
@@ -59,17 +60,22 @@ void main() {
     expect(find.byType(GoScreen), findsOneWidget);
   }
 
-  testWidgets('walking: the next turn in the panel, the turns folded under it, what comes next', (tester) async {
+  testWidgets('walking: the next turn over the map, the time to spare under it, the turns folded, what comes next', (tester) async {
     final along = tracker.steps.first.line.length * 260 / 500;
     await openGo(tester, followed(GoProgress(step: 0, phase: GoPhase.moving, along: along), position: LatLng(chatelet.lat, chatelet.lon)));
 
-    // Once, in the card: nothing over the map
+    // Once, in the banner over the map: what to do, its distance, where
+    final banner = find.byType(GoBanner);
+    expect(banner, findsOneWidget);
     expect(find.text(currentL10n.goTurnLeft), findsOneWidget);
-    expect(find.textContaining('Rue des Halles'), findsWidgets);
-    expect(find.textContaining(currentL10n.goVerbTo(currentL10n.goVerbWalk, 'Châtelet')), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text(currentL10n.goKickerTowards(currentL10n.goKickerOnFoot, 'Châtelet'))),
+        findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text('Rue des Halles')), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text('m')), findsOneWidget);
+    // In the capsule: the time to spare on the metro, the following step, the correction at hand
+    expect(find.textContaining("d'avance sur le Métro 1 de"), findsOneWidget);
     expect(find.text(currentL10n.goThen), findsOneWidget);
-    // The steps' strip and the journey's progress
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text(currentL10n.goTracking), findsOneWidget);
     expect(find.byIcon(Icons.flag), findsWidgets);
 
     // The turns, folded so that the panel stays low
@@ -77,25 +83,38 @@ void main() {
     await tapOn(tester, find.textContaining(currentL10n.goTurnByTurn));
     expect(find.text('Tournez à gauche sur Rue des Halles'), findsOneWidget);
 
+    // GO got it wrong: the user says where they are
+    await tapOn(tester, find.text(currentL10n.goCorrect));
+    expect(find.text(currentL10n.goCorrectTitle), findsOneWidget);
+    expect(find.text(currentL10n.goImArrived), findsOneWidget);
+    expect(find.text('Métro 1 → ${tracker.steps[1].section.headsign}'), findsOneWidget);
+
     await closeApp(tester);
   });
 
-  testWidgets('waiting: the countdown, where to board, the departures and the next one if missed', (tester) async {
+  testWidgets('waiting: the countdown over the map, where to board, the departures and the next one if missed', (tester) async {
     await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon)));
 
-    expect(find.textContaining('Métro 1 →'), findsOneWidget);
-    // The countdown to the departure (in 6 min): a ring emptying
-    expect(find.byWidgetPredicate((widget) => widget is CircularProgressIndicator && widget.value != null), findsOneWidget);
+    // The banner: the line to take and the minutes left (6 at most)
+    final banner = find.byType(GoBanner);
+    expect(find.descendant(of: banner, matching: find.text(currentL10n.goTake('Métro 1'))), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text(currentL10n.minutesUnit)), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.textContaining(currentL10n.goBoard(currentL10n.boardFront))), findsOneWidget);
+    // Where to board along the train, once, in the capsule
     expect(find.byType(TrainPositions), findsOneWidget);
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
 
     await closeApp(tester);
   });
 
-  testWidgets('on board: the stops left with their times, where to get off', (tester) async {
+  testWidgets('on board: the stops left counted over the map, on a rail, then with their times', (tester) async {
     await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 0)));
 
-    expect(find.text(currentL10n.goGetOffIn(2)), findsWidgets);
+    final banner = find.byType(GoBanner);
+    expect(find.descendant(of: banner, matching: find.text(currentL10n.goGetOffAtStop('Nation'))), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text('2')), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.text(currentL10n.goStopsUnit(2))), findsOneWidget);
+    expect(find.descendant(of: banner, matching: find.textContaining(currentL10n.goNextStopShort('Gare de Lyon'))), findsOneWidget);
     expect(find.text(currentL10n.goNextStopLabel), findsOneWidget);
     expect(find.text(currentL10n.goGetOffHere), findsOneWidget);
     expect(find.text('Nation'), findsWidgets);
