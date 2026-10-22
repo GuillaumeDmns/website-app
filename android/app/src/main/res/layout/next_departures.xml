@@ -39,7 +39,7 @@
             android:maxLines="1"
             android:text="@string/widget_stop_placeholder"
             android:textColor="@color/widget_text"
-            android:textSize="14sp"
+            android:textSize="14sp" />
 
         <ImageView
             android:id="@+id/btn_refresh"
@@ -125,7 +125,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="16sp"
+                android:textSize="16sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/departure_row_2"
@@ -193,7 +193,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="16sp"
+                android:textSize="16sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/departure_row_3"
@@ -261,7 +261,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="16sp"
+                android:textSize="16sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/departure_row_4"
@@ -329,7 +329,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_text"
-                android:textSize="16sp"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <TextView
