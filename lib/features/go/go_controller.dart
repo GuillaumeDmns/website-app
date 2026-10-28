@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show AppLifecycleListener, AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,7 +10,9 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../core/location/position_feed.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/app_shown.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
 import '../../l10n/l10n.dart';
@@ -26,20 +28,36 @@ import 'go_tracker.dart';
 
 const _storageKey = 'go_session';
 
-/// GO session: feeds the [GoTracker] with high-accuracy positions, a 5 s clock and the real-time departures of the
-/// next ride (`rideOptionsProvider`, every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it survives a restart.
+/// How often GO needs a position fix at the moment of [state]: every second on foot or by bike while the app is on
+/// screen (the map follows the user), every two seconds in the background (the turns are still felt ahead); less while
+/// waiting at the stop or riding, where the tracker only needs to see the vehicle leave and the stops go by. Null once
+/// arrived: the app's regular positions.
+LocationNeed? goLocationNeed(GoState? state, {required bool shown}) => switch (state?.progress.phase) {
+      null || GoPhase.arrived => null,
+      GoPhase.moving => LocationNeed(Duration(seconds: shown ? 1 : 2)),
+      GoPhase.waiting => const LocationNeed(Duration(seconds: 5)),
+      GoPhase.onBoard => const LocationNeed(Duration(seconds: 3)),
+    };
+
+/// The speed [fix] is sure of (m/s): its speed less its accuracy, null when unknown. A phone lying indoors reports
+/// 2.5 ± 2.1 m/s: still for GO (no smoothed walk, no boarding seen, no pace)
+double? sureSpeed(Position fix) => fix.speed < 0 ? null : math.max(0, fix.speed - math.max(0, fix.speedAccuracy));
+
+/// GO session: feeds the [GoTracker] with high-accuracy positions (the app's [PositionFeed], asked as often as the
+/// moment needs, [goLocationNeed]), a 5 s clock and the real-time departures of the next ride (`rideOptionsProvider`,
+/// every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it
+/// survives a restart.
 class GoController extends Notifier<GoState?> {
+  PositionFeed? _feed;
   StreamSubscription<Position>? _positions;
   Timer? _tick;
   Timer? _departuresTimer;
   Position? _lastFix;
 
-  /// What the map shows of the fixes, redrawn every [_smoothInterval] while it moves and the app is shown
+  /// What the map shows of the fixes, redrawn ([GoSmoother.redrawInterval]) while it moves and the app is on screen
   final _smoother = GoSmoother();
   Timer? _smoothTimer;
-  AppLifecycleListener? _lifecycle;
-  bool _foreground = true;
-  static const _smoothInterval = Duration(milliseconds: 100);
+  bool _shown = true;
 
   /// The user's pace on the moves (m/s), averaged over the fixes
   double? _walkSpeed;
@@ -76,6 +94,13 @@ class GoController extends Notifier<GoState?> {
         _stopFeeds();
         state = null;
       }
+    });
+    // Off screen (screen off, app in the background): nothing to draw, fewer fixes
+    _shown = ref.read(appShownProvider);
+    ref.listen(appShownProvider, (_, shown) {
+      _shown = shown;
+      _smoothen();
+      _askPositions();
     });
     ref.onDispose(_stopFeeds);
     _restore();
@@ -292,14 +317,10 @@ class GoController extends Notifier<GoState?> {
 
   void _startFeeds() {
     _stopFeeds();
-    _positions = Geolocator.getPositionStream(locationSettings: _locationSettings()).listen(
-      _onFix,
-      onError: (Object e) => debugPrint('GO positions unavailable: $e'),
-    );
-    _lifecycle = AppLifecycleListener(onStateChange: (lifecycle) {
-      _foreground = lifecycle == AppLifecycleState.resumed;
-      _smoothen();
-    });
+    final feed = ref.read(positionFeedProvider);
+    _feed = feed;
+    _positions = feed.fixes.listen(_onFix, onError: (Object e) => debugPrint('GO positions unavailable: $e'));
+    _askPositions();
     unawaited(_seed());
     _tick = Timer.periodic(const Duration(seconds: 5), (_) => _update());
     _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) => _watchDepartures());
@@ -313,15 +334,16 @@ class GoController extends Notifier<GoState?> {
     ref.read(goFixStatsProvider.notifier).record(now, position.accuracy);
     final current = state;
     final step = current?.tracker.stepOf(current.progress);
+    final speed = sureSpeed(position);
     // The pace on foot or by bike, from decent fixes while moving
-    if (step != null && !step.isRide && position.speed >= 0.5 && position.speed <= 9 && position.accuracy <= 30) {
+    if (step != null && !step.isRide && speed != null && speed >= 0.5 && speed <= 9 && position.accuracy <= 30) {
       final pace = _walkSpeed;
-      _walkSpeed = pace == null ? position.speed : pace + (position.speed - pace) * 0.2;
+      _walkSpeed = pace == null ? speed : pace + (speed - pace) * 0.2;
     }
     _smoother.fix(
       LatLng(position.latitude, position.longitude),
       now,
-      speed: position.speed < 0 ? null : position.speed,
+      speed: speed,
       accuracy: position.accuracy,
       // Going on along the way on foot or by bike only
       path: step == null || step.isRide ? null : step.line,
@@ -364,48 +386,22 @@ class GoController extends Notifier<GoState?> {
     }
   }
 
-  /// Shows the smoothed position, redrawn while it moves and the app is shown (nothing drawn screen off)
-  void _smoothen() {
-    void show() {
-      final position = _smoother.at(DateTime.now());
-      if (position != null) {
-        ref.read(preciseUserPositionProvider.notifier).set(position);
-      }
-    }
+  /// The positions GO needs now from the app's feed
+  void _askPositions() => _feed?.need = goLocationNeed(state, shown: _shown);
 
-    show();
-    if (_smoothTimer != null || !_foreground || !_smoother.moving(DateTime.now())) {
+  /// Shows the smoothed position, redrawn while it moves and the app is on screen (nothing drawn screen off)
+  void _smoothen() {
+    final position = _smoother.at(DateTime.now());
+    if (position != null) {
+      ref.read(preciseUserPositionProvider.notifier).set(position);
+    }
+    if (_smoothTimer != null || !_shown || !_smoother.moving(DateTime.now())) {
       return;
     }
-    _smoothTimer = Timer.periodic(_smoothInterval, (_) {
-      show();
-      if (!_foreground || !_smoother.moving(DateTime.now())) {
-        _smoothTimer?.cancel();
-        _smoothTimer = null;
-      }
+    _smoothTimer = Timer(_smoother.redrawInterval, () {
+      _smoothTimer = null;
+      _smoothen();
     });
-  }
-
-  /// Regular fixes even when not moving: a user waiting at a stop must not look like one without GPS (underground)
-  static LocationSettings _locationSettings() {
-    if (kIsWeb) {
-      return WebSettings(accuracy: LocationAccuracy.best, distanceFilter: 0, maximumAge: Duration.zero);
-    }
-    return switch (defaultTargetPlatform) {
-      TargetPlatform.android => AndroidSettings(
-          accuracy: LocationAccuracy.best,
-          distanceFilter: 0,
-          // The GPS gives one a second: all of them (it runs anyway, taking them costs little more)
-          intervalDuration: const Duration(seconds: 1),
-        ),
-      TargetPlatform.iOS || TargetPlatform.macOS => AppleSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 0,
-          activityType: ActivityType.otherNavigation,
-          pauseLocationUpdatesAutomatically: false,
-        ),
-      _ => const LocationSettings(accuracy: LocationAccuracy.best, distanceFilter: 0),
-    };
   }
 
   void _stopFeeds() {
@@ -421,12 +417,12 @@ class GoController extends Notifier<GoState?> {
     });
     _positions?.cancel();
     _positions = null;
+    // The app's regular positions again
+    _feed?.need = null;
+    _feed = null;
     _smoothTimer?.cancel();
     _smoothTimer = null;
     _smoother.reset();
-    _lifecycle?.dispose();
-    _lifecycle = null;
-    _foreground = true;
     _tick?.cancel();
     _tick = null;
     _departuresTimer?.cancel();
@@ -450,7 +446,7 @@ class GoController extends Notifier<GoState?> {
       now: DateTime.now(),
       position: position,
       accuracy: fix?.accuracy,
-      speed: fix == null || fix.speed < 0 ? null : fix.speed,
+      speed: fix == null ? null : sureSpeed(fix),
       fixAt: fix?.timestamp,
       vehicle: current.vehicle,
       vehicleStep: current.vehicleStep,
@@ -496,6 +492,7 @@ class GoController extends Notifier<GoState?> {
       }
     }
     state = next;
+    _askPositions();
     _publishLive(next);
     _feelTurn(next);
 

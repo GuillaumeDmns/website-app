@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
@@ -30,7 +30,7 @@ class MapLibreMainMap extends ConsumerStatefulWidget {
   ConsumerState<MapLibreMainMap> createState() => _MapLibreMainMapState();
 }
 
-class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTickerProviderStateMixin {
+class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   MapController? _controller;
   bool _ready = false;
 
@@ -54,22 +54,23 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
   /// Size of the map last laid out: a frame computed at another size (the page still being laid out) is done again
   Size? _size;
 
-  /// Small steps of the follow camera (the smoothed position, the compass) are eased frame by frame towards the last
-  /// view asked, so that the camera glides whatever the rate views come at; the ticker only runs until it is there
-  late final Ticker _glide = createTicker(_onGlideFrame);
+  /// Small steps of the follow camera (the smoothed position, the compass) are eased step by step towards the last
+  /// view asked ([MapFollow.glideStepTo]), so that the camera glides whatever the rate views come at, until it is
+  /// there. A timer, not a ticker: a ticker draws every frame of the screen (up to 120 a second) while it runs.
+  Timer? _glide;
 
   /// What the camera shows now, and where it glides to
   MapFollow? _camera;
   MapFollow? _target;
   EdgeInsets _followPadding = EdgeInsets.zero;
-  Duration? _lastGlideFrame;
+  DateTime? _lastGlide;
 
   /// An animation to the follow is running until then: the glide waits for it
   DateTime _animatedUntil = DateTime(0);
 
   @override
   void dispose() {
-    _glide.dispose();
+    _glide?.cancel();
     _centerDebounce?.cancel();
     _heading.dispose();
     super.dispose();
@@ -151,17 +152,17 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     final height = context.size?.height ?? 0;
     final visible = height - widget.padding.bottom;
     _followPadding = EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom);
-    // A small step (the smoothed position, the compass): glided to, frame by frame
+    // A small step (the smoothed position, the compass): glided to, step by step
     if (shown != null && shown.closeTo(view)) {
       _camera ??= shown;
       _target = view;
-      if (!_glide.isActive) {
-        _lastGlideFrame = null;
-        _glide.start();
+      if (_glide == null) {
+        _lastGlide = null;
+        _glide = Timer(Duration.zero, _glideStep);
       }
       return;
     }
-    _glide.stop();
+    _stopGlide();
     const duration = Duration(milliseconds: 700);
     _camera = view;
     _target = view;
@@ -175,26 +176,27 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     ));
   }
 
-  /// A frame of the glide: the camera goes part of the way to the target (more the longer the frame), at most 60 times
-  /// a second, and stops once there
-  void _onGlideFrame(Duration elapsed) {
+  /// A step of the glide: the camera goes part of the way to the target (more the longer since the last step), then
+  /// the next step is due ([MapFollow.glideStepTo]), until it is there
+  void _glideStep() {
+    _glide = null;
     final camera = _camera;
     final target = _target;
     final controller = _controller;
-    if (camera == null || target == null || controller == null || _following == null || _followPaused) {
-      _glide.stop();
+    if (!mounted || camera == null || target == null || controller == null || _following == null || _followPaused) {
       return;
     }
-    final last = _lastGlideFrame;
-    if (DateTime.now().isBefore(_animatedUntil)) {
-      _lastGlideFrame = elapsed;
+    final now = DateTime.now();
+    // An animation to the follow is running: the glide goes on after it
+    final animating = _animatedUntil.difference(now);
+    if (animating > Duration.zero) {
+      _lastGlide = null;
+      _glide = Timer(animating, _glideStep);
       return;
     }
-    if (last != null && elapsed - last < const Duration(milliseconds: 15)) {
-      return;
-    }
-    _lastGlideFrame = elapsed;
-    final shown = camera.glideTo(target, last == null ? 1 / 60 : (elapsed - last).inMicroseconds / 1e6);
+    final last = _lastGlide;
+    _lastGlide = now;
+    final shown = camera.glideTo(target, last == null ? 1 / 60 : math.min(0.1, now.difference(last).inMicroseconds / 1e6));
     _camera = shown;
     unawaited(controller.moveCamera(
       center: _geo(shown.position),
@@ -202,9 +204,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
       bearing: shown.bearing,
       padding: _followPadding,
     ));
-    if (shown == target) {
-      _glide.stop();
+    if (shown != target) {
+      _glide = Timer(shown.glideStepTo(target), _glideStep);
     }
+  }
+
+  void _stopGlide() {
+    _glide?.cancel();
+    _glide = null;
   }
 
   /// The device turned: the camera turns with it
@@ -236,7 +243,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     _following = null;
     _shown = null;
     _camera = null;
-    _glide.stop();
+    _stopGlide();
     _frame(_overlay);
   }
 
@@ -244,7 +251,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
     _following = null;
     _shown = null;
     _camera = null;
-    _glide.stop();
+    _stopGlide();
     _followPaused = false;
     // North up again, then the page's points are framed
     _framedFit = null;
@@ -260,7 +267,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> with SingleTi
       _following = null;
       _shown = null;
       _camera = null;
-      _glide.stop();
+      _stopGlide();
       _follow(follow);
     }
   }

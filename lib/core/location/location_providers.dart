@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../utils/geo.dart';
+import 'position_feed.dart';
+
 /// Châtelet, used before the map or the position is known
 const parisCenter = LatLng(48.8584, 2.3470);
 
@@ -43,6 +46,7 @@ Future<void> fixLocationIssue(WidgetRef ref, LocationIssue issue) async {
 /// User position, null when unavailable (permission denied, no location service, desktop without GeoClue…).
 final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
   void report(LocationIssue? issue) => Future.microtask(() => ref.read(locationIssueProvider.notifier).set(issue));
+  final feed = ref.watch(positionFeedProvider);
 
   try {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -62,16 +66,22 @@ final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
     }
     report(null);
 
+    LatLng? shown;
     if (!kIsWeb) {
       final last = await Geolocator.getLastKnownPosition();
       if (last != null) {
-        yield LatLng(last.latitude, last.longitude);
+        yield shown = LatLng(last.latitude, last.longitude);
       }
     }
 
-    yield* Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 25),
-    ).map<LatLng?>((position) => LatLng(position.latitude, position.longitude));
+    // The app's single feed (GO may ask it a fix a second): a new position every 25 m here, as without GO
+    yield* feed.fixes.map((fix) => LatLng(fix.latitude, fix.longitude)).where((position) {
+      final moved = shown == null || metersBetween(shown!, position) >= regularDistanceFilter;
+      if (moved) {
+        shown = position;
+      }
+      return moved;
+    });
   } catch (e) {
     debugPrint('Location unavailable: $e');
     yield null;

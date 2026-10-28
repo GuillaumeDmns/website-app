@@ -93,6 +93,14 @@ class MapFollow {
   static const turnLag = 0.07;
   static const moveLag = 0.12;
 
+  /// Time between two steps of [glideTo]: while turning, a frame (the edges of the screen move fast); otherwise 25 a
+  /// second, under a pixel each at a walking pace (each step draws the map, and the markers over it, again)
+  static const turnStep = Duration(milliseconds: 16);
+  static const moveStep = Duration(milliseconds: 40);
+
+  /// When the step after this view, on the way to [target], is due: see [turnStep]
+  Duration glideStepTo(MapFollow target) => headingDelta(bearing, target.bearing).abs() > 1 ? turnStep : moveStep;
+
   /// The camera showing this view [seconds] later on its way to [target]: part of the way (more the longer), [target]
   /// itself once there
   MapFollow glideTo(MapFollow target, double seconds) {
@@ -118,11 +126,23 @@ class MapFollow {
 /// The heading of the follow camera, for the maps: the device's (kept from [deviceHeadingProvider] while the follow
 /// asks for it) or the way's
 class FollowHeading {
-  /// New headings for the camera at most this often (they come about 50 times a second; the map glides between them)
-  static const turnInterval = Duration(milliseconds: 20);
+  /// New headings for the camera at most this often (they come about 16 times a second; the map glides between them)
+  static const turnInterval = Duration(milliseconds: 50);
 
-  /// The device's last heading, null without compass or while nothing is followed with it
+  /// The device turning less than this from the heading shown doesn't turn the map (degrees): a phone held still never
+  /// gives quite the same heading twice (indoors, lying on a table, it wanders by 15°), and each turn of the camera
+  /// has the map drawn for a good part of a second
+  static const deadBand = 6.0;
+
+  /// Headings this far apart from one to the next (degrees, about 25° a second) are a real turn: followed closely,
+  /// without [deadBand]
+  static const turnStep = 1.5;
+
+  /// The device's heading the camera shows, null without compass or while nothing is followed with it
   double? device;
+
+  /// The device's last heading, shown or not
+  double? _last;
 
   Timer? _wait;
   bool _pending = false;
@@ -131,9 +151,21 @@ class FollowHeading {
   MapFollow apply(MapFollow follow) => follow.compass && device != null ? follow.withBearing(device!) : follow;
 
   /// Keeps the device's [heading] and calls [turn] now, or at the end of the current [turnInterval]: the last heading
-  /// is always shown, even when the device stops turning in between
+  /// is always shown, even when the device stops turning in between. Within [deadBand] of the heading shown, nothing,
+  /// unless the device is turning.
   void update(double heading, void Function() turn) {
+    final last = _last;
+    _last = heading;
+    final shown = device;
+    final turning = last != null && headingDelta(last, heading).abs() >= turnStep;
+    if (shown != null && !turning && headingDelta(shown, heading).abs() < deadBand) {
+      return;
+    }
     device = heading;
+    _turn(turn);
+  }
+
+  void _turn(void Function() turn) {
     if (_wait != null) {
       _pending = true;
       return;
@@ -143,13 +175,14 @@ class FollowHeading {
       _wait = null;
       if (_pending) {
         _pending = false;
-        update(device ?? heading, turn);
+        _turn(turn);
       }
     });
   }
 
-  /// GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile). Called while the map
-  /// builds; [turn] moves the camera to the follow again, with the new heading
+  /// GO on foot or by bike: the device's heading turns the map (the sensor only runs meanwhile, and while the app is on
+  /// screen: [deviceHeadingProvider]). Called while the map builds; [turn] moves the camera to the follow again, with
+  /// the new heading
   void watch(WidgetRef ref, MapFollow? follow, void Function() turn) {
     if (follow?.compass ?? false) {
       ref.listen(deviceHeadingProvider, (_, next) {
@@ -160,6 +193,7 @@ class FollowHeading {
       });
     } else {
       device = null;
+      _last = null;
     }
   }
 
