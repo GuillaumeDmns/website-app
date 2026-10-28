@@ -27,8 +27,9 @@ import 'widgets/go_ride_card.dart';
 /// GO mode, map first: what to do now floats over the map ([GoBanner], from [GoBar]); the panel is a low capsule with
 /// the arrival, the strip of the steps (tap one to look at it) and one card per step, swiped horizontally. The card of
 /// the step in progress opens on its context ([GoNowCard]: the stops ahead, where to board, one line of context, the
-/// manual correction); its details (departures, stops left, turns) are a drag of the sheet away. The page follows the
-/// step in progress; the map frames the step shown (on a ride, what is left of it) or follows the user on foot.
+/// manual correction); its details (departures, stops left, turns) are a drag of the sheet away. The sheet fits that
+/// context: looking at another step's card doesn't move it (its card scrolls in it). The page follows the step in
+/// progress; the map frames the step shown (on a ride, what is left of it) or follows the user on foot.
 class GoScreen extends ConsumerStatefulWidget {
   const GoScreen({super.key});
 
@@ -45,13 +46,13 @@ class _GoScreenState extends ConsumerState<GoScreen> {
   /// Step in progress when the page last followed it
   int? _followed;
 
-  /// Heights of the parts of the page, to fit the bottom sheet to the card shown
+  /// Heights of the parts of the page, to fit the bottom sheet to the context of the step in progress
   double _top = 0;
   final _cards = <int, double>{};
   bool _newCard = true;
 
   void _fitSheet() {
-    final card = _cards[_shown];
+    final card = _cards[_followed];
     if (card == null || !mounted) {
       return;
     }
@@ -106,7 +107,9 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       _followed = live;
       _pages = PageController(initialPage: live);
     } else if (_followed != live) {
+      // Another step in progress: the sheet fits its context
       _followed = live;
+      _newCard = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _show(live));
     }
 
@@ -145,11 +148,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                 child: PageView.builder(
                   controller: _pages,
                   itemCount: pageCount,
-                  onPageChanged: (page) {
-                    setState(() => _shown = page);
-                    _newCard = true;
-                    _fitSheet();
-                  },
+                  onPageChanged: (page) => setState(() => _shown = page),
                   itemBuilder: (context, page) {
                     final isLive = page == live && !arrived;
                     final Widget card = page >= tracker.steps.length
@@ -159,7 +158,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                         : GoMoveCard(state: state, index: page, compact: isLive);
                     void onSize(Size size) {
                       _cards[page] = size.height + 16;
-                      if (page == _shown) {
+                      if (page == _followed) {
                         _fitSheet();
                       }
                     }

@@ -70,7 +70,9 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
         context.canPop() ? context.pop() : context.go(request == null ? Routes.home : Routes.journey(request));
 
     if (planned == null) {
-      return Column(
+      // A list, for the bottom sheet to move with
+      return ListView(
+        controller: PanelScrollScope.of(context),
         children: [
           Align(
             alignment: Alignment.centerLeft,

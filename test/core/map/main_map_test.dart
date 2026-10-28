@@ -10,12 +10,17 @@ import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/map/map_overlay.dart';
+import 'package:website_app/core/map/map_panel.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 void main() {
   const user = LatLng(48.8584, 2.3470);
+  // The panel hides the lower 300 px of the 800
+  late MapPanel panel;
 
   Future<ProviderContainer> pumpMap(WidgetTester tester, {Stream<double> headings = const Stream.empty()}) async {
+    panel = MapPanel(height: 300);
+    addTearDown(panel.dispose);
     useLocale(const Locale('fr'));
     tester.view.physicalSize = const Size(400, 800) * tester.view.devicePixelRatio;
     addTearDown(tester.view.reset);
@@ -27,12 +32,11 @@ void main() {
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(
-        locale: Locale('fr'),
-        localizationsDelegates: [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
+      child: MaterialApp(
+        locale: const Locale('fr'),
+        localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
         supportedLocales: AppLocalizations.supportedLocales,
-        // The panel hides the lower 300 px
-        home: MainMap(padding: EdgeInsets.only(bottom: 300)),
+        home: MainMap(panel: panel),
       ),
     ));
     await tester.pump(const Duration(seconds: 1));
@@ -115,6 +119,54 @@ void main() {
     headings.add(45);
     await animate(tester);
     expect(camera(tester).rotation % 360, closeTo(0, 0.5));
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('what is framed stays in the middle of the part above the panel while it moves, at once', (tester) async {
+    final container = await pumpMap(tester);
+    const stop = LatLng(48.8600, 2.3500);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(fit: [stop]));
+    await animate(tester);
+    // In the middle of the 500 px left above the panel
+    expect(camera(tester).latLngToScreenOffset(stop).dy, closeTo(250, 2));
+    final zoom = camera(tester).zoom;
+
+    // Lowered: half of its move, the same frame, the zoom kept
+    panel.update(live: 100, resting: 100);
+    await tester.pump();
+    await tester.pump();
+    expect(camera(tester).latLngToScreenOffset(stop).dy, closeTo(350, 2));
+    expect(camera(tester).zoom, zoom);
+    // Raised past 70 % of the map: the map isn't looked at any more, the camera stops there
+    panel.update(live: 700, resting: 700);
+    await tester.pump();
+    await tester.pump();
+    expect(camera(tester).latLngToScreenOffset(stop).dy, closeTo((800 - 560) / 2, 2));
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('framing aims at where the panel goes to rest, the user followed at 72 % of what is left above it',
+      (tester) async {
+    final container = await pumpMap(tester);
+    const stop = LatLng(48.8600, 2.3500);
+
+    // The page changes: its sheet is on its way to 200 px
+    panel.update(live: 300, resting: 200);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(fit: [stop]));
+    panel.update(live: 200, resting: 200);
+    await animate(tester);
+    expect(camera(tester).latLngToScreenOffset(stop).dy, closeTo(300, 2));
+
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow(position: user, bearing: 0)));
+    await animate(tester);
+    expect(camera(tester).latLngToScreenOffset(user).dy, closeTo(600 * 0.72, 4));
+    // The sheet dragged up: the user stays at 72 % of what is left
+    panel.update(live: 400, resting: 400);
+    await tester.pump();
+    await tester.pump();
+    expect(camera(tester).latLngToScreenOffset(user).dy, closeTo(400 * 0.72, 4));
 
     await tester.pumpWidget(const SizedBox());
   });

@@ -107,6 +107,34 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('looking at the other steps leaves the sheet where it is: it fits the step in progress', (tester) async {
+    await openGo(tester, followed(GoProgress(step: 0, phase: GoPhase.moving, along: 40), position: LatLng(chatelet.lat, chatelet.lon)));
+    double sheetTop() => tester
+        .getTopLeft(find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Material)).first)
+        .dy;
+    final top = sheetTop();
+    // The map keeps at least half of the screen
+    expect(top, greaterThanOrEqualTo(915 * 0.5 - 1));
+
+    // The metro's card, then the arrival's: swiped to, the sheet stays
+    for (var card = 0; card < 3; card++) {
+      await tester.drag(find.byType(PageView), const Offset(-300, 0));
+      await settle(tester);
+      expect(sheetTop(), closeTo(top, 1));
+    }
+    // The arrival's card shown
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 3);
+    // Back to the step in progress
+    for (var card = 0; card < 3; card++) {
+      await tester.drag(find.byType(PageView), const Offset(300, 0));
+      await settle(tester);
+    }
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 0);
+    expect(sheetTop(), closeTo(top, 1));
+
+    await closeApp(tester);
+  });
+
   testWidgets('on board: the stops left counted over the map, on a rail, then with their times', (tester) async {
     await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 0)));
 

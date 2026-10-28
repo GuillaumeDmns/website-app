@@ -65,6 +65,7 @@ class StopScreen extends ConsumerWidget {
       child: AsyncView(
         value: stop,
         onRetry: () => ref.invalidate(stopAreaProvider(stopAreaId)),
+        page: true,
         data: (detail) => _StopContent(detail: detail),
       ),
     );

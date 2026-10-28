@@ -3,12 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
 
 import '../location/location_providers.dart';
 import 'map_overlay.dart';
+import 'map_panel.dart';
 import 'map_pins.dart';
 
 /// OpenFreeMap's Liberty style (free, no key, OpenStreetMap data), in dark mode too: its dark style (Fiord) showed too
@@ -19,11 +21,13 @@ const _style = 'https://tiles.openfreemap.org/styles/liberty';
 const _webResizeDelay = Duration(milliseconds: 50);
 
 /// The map with MapLibre (native SDK on Android and iOS, maplibre-gl-js on the web): OpenFreeMap's vector tiles drawn
-/// by the GPU. Paths are style layers, pins and the user position Flutter widgets over the map. See [MainMap].
+/// by the GPU. Paths are style layers, pins and the user position Flutter widgets over the map. The part hidden by the
+/// [panel] is the camera's padding: changing it without animation keeps what is in the middle of the part left above
+/// (MapLibre's camera center is that of its padded area). See [MainMap].
 class MapLibreMainMap extends ConsumerStatefulWidget {
-  const MapLibreMainMap({super.key, this.padding = EdgeInsets.zero, this.onLongPress});
+  const MapLibreMainMap({super.key, this.panel, this.onLongPress});
 
-  final EdgeInsets padding;
+  final MapPanel? panel;
   final void Function(BuildContext context, LatLng position)? onLongPress;
 
   @override
@@ -65,15 +69,41 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   EdgeInsets _followPadding = EdgeInsets.zero;
   DateTime? _lastGlide;
 
-  /// An animation to the follow is running until then: the glide waits for it
-  DateTime _animatedUntil = DateTime(0);
+  /// A camera animation runs until this timer ends: the glide and the panel's moves wait for it (a move would stop it)
+  Timer? _animation;
+
+  /// The padding the camera was given last, and the panel's moves to follow once per frame
+  EdgeInsets _cameraPadding = EdgeInsets.zero;
+  bool _panelScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.panel?.addListener(_onPanel);
+  }
 
   @override
   void dispose() {
+    widget.panel?.removeListener(_onPanel);
     _glide?.cancel();
+    _animation?.cancel();
     _centerDebounce?.cancel();
     _heading.dispose();
     super.dispose();
+  }
+
+  double get _height => _size?.height ?? context.size?.height ?? 0;
+  double get _livePanel => widget.panel?.live ?? 0;
+  double get _restingPanel => widget.panel?.resting ?? 0;
+
+  /// A camera animation of [duration] towards [padding] starts; the panel's moves meanwhile are followed after it
+  void _animating(Duration duration, EdgeInsets padding) {
+    _cameraPadding = padding;
+    _animation?.cancel();
+    _animation = Timer(duration, () {
+      _animation = null;
+      _followPanel();
+    });
   }
 
   static Geographic _geo(LatLng point) => Geographic(lon: point.longitude, lat: point.latitude);
@@ -92,7 +122,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     _framedFit = overlay.fit;
-    final padding = widget.padding + const EdgeInsets.all(48);
+    // Where the panel goes to rest: the page just changed, the sheet is on its way
+    final padding = framePadding(_restingPanel, _height);
+    _animating(const Duration(milliseconds: 500), padding);
     if (overlay.fit.length == 1) {
       unawaited(controller.animateCamera(
         center: _geo(overlay.fit.single),
@@ -149,9 +181,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     _shown = view;
-    final height = context.size?.height ?? 0;
-    final visible = height - widget.padding.bottom;
-    _followPadding = EdgeInsets.only(top: visible * 0.44, bottom: widget.padding.bottom);
+    _followPadding = followPadding(_livePanel, _height);
     // A small step (the smoothed position, the compass): glided to, step by step
     if (shown != null && shown.closeTo(view)) {
       _camera ??= shown;
@@ -166,12 +196,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     const duration = Duration(milliseconds: 700);
     _camera = view;
     _target = view;
-    _animatedUntil = DateTime.now().add(duration);
+    final padding = followPadding(_restingPanel, _height);
+    _animating(duration, padding);
     unawaited(controller.animateCamera(
       center: _geo(view.position),
       zoom: view.zoom,
       bearing: view.bearing,
-      padding: _followPadding,
+      padding: padding,
       nativeDuration: duration,
     ));
   }
@@ -186,18 +217,18 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     if (!mounted || camera == null || target == null || controller == null || _following == null || _followPaused) {
       return;
     }
-    final now = DateTime.now();
     // An animation to the follow is running: the glide goes on after it
-    final animating = _animatedUntil.difference(now);
-    if (animating > Duration.zero) {
+    if (_animation != null) {
       _lastGlide = null;
-      _glide = Timer(animating, _glideStep);
+      _glide = Timer(MapFollow.moveStep, _glideStep);
       return;
     }
+    final now = DateTime.now();
     final last = _lastGlide;
     _lastGlide = now;
     final shown = camera.glideTo(target, last == null ? 1 / 60 : math.min(0.1, now.difference(last).inMicroseconds / 1e6));
     _camera = shown;
+    _cameraPadding = _followPadding;
     unawaited(controller.moveCamera(
       center: _geo(shown.position),
       zoom: shown.zoom,
@@ -225,16 +256,49 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   @override
   void didUpdateWidget(covariant MapLibreMainMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The panel opened higher or lower (GO's turns unfolded): the user followed kept low above it
-    final following = _following;
-    if (following != null && widget.padding != oldWidget.padding) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _following == following) {
-          _shown = null;
-          _follow(following);
-        }
-      });
+    if (widget.panel != oldWidget.panel) {
+      oldWidget.panel?.removeListener(_onPanel);
+      widget.panel?.addListener(_onPanel);
+      _onPanel();
     }
+  }
+
+  /// The panel moved: followed once a frame
+  void _onPanel() {
+    if (_panelScheduled) {
+      return;
+    }
+    _panelScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _panelScheduled = false;
+      _followPanel();
+    });
+  }
+
+  /// The camera keeps its center in the middle of the part of the map left above the panel (the user at 72 % of it when
+  /// followed), at once: what is there stays there while the sheet moves. After the camera's own animation, which aims
+  /// at where the panel rests.
+  void _followPanel() {
+    final controller = _controller;
+    if (!mounted || !_ready || controller == null || _animation != null) {
+      return;
+    }
+    final following = _following != null;
+    final padding = following ? followPadding(_livePanel, _height) : framePadding(_livePanel, _height);
+    if (following) {
+      _followPadding = padding;
+    }
+    // The glide's next step takes it
+    if (padding == _cameraPadding || (following && !_followPaused && _glide != null)) {
+      return;
+    }
+    final camera = following && !_followPaused ? _camera ?? _shown : null;
+    final center = camera != null ? _geo(camera.position) : controller.camera?.center;
+    if (center == null) {
+      return;
+    }
+    _cameraPadding = padding;
+    unawaited(controller.moveCamera(center: center, zoom: camera?.zoom, bearing: camera?.bearing, padding: padding));
   }
 
   /// Frames (or follows) the overlay again, even if it is the one framed last
@@ -256,7 +320,10 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     // North up again, then the page's points are framed
     _framedFit = null;
     if (_ready) {
-      unawaited(_controller?.animateCamera(bearing: 0, nativeDuration: const Duration(milliseconds: 500)));
+      const duration = Duration(milliseconds: 500);
+      final padding = framePadding(_restingPanel, _height);
+      _animating(duration, padding);
+      unawaited(_controller?.animateCamera(bearing: 0, padding: padding, nativeDuration: duration));
     }
   }
 
@@ -315,7 +382,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       if (position != null && !_centeredOnUser && _ready && overlay.follow == null) {
         _centeredOnUser = true;
         if (_framedFit == null) {
-          unawaited(_controller?.animateCamera(center: _geo(position), zoom: 16, nativeDuration: const Duration(milliseconds: 500)));
+          // In the middle of the part of the map above the panel, not behind its edge
+          const duration = Duration(milliseconds: 500);
+          final padding = framePadding(_restingPanel, _height);
+          _animating(duration, padding);
+          unawaited(_controller?.animateCamera(center: _geo(position), zoom: 16, padding: padding, nativeDuration: duration));
         }
       }
     });
@@ -389,7 +460,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
               ),
           ],
         ),
-        if (_following != null && _followPaused) RecenterButton(bottom: widget.padding.bottom, onPressed: _recenter),
+        if (_following != null && _followPaused)
+          ListenableBuilder(
+            listenable: widget.panel ?? const AlwaysStoppedAnimation(0),
+            builder: (context, _) => RecenterButton(bottom: panelInset(_livePanel, _height), onPressed: _recenter),
+          ),
         const _Attribution(),
       ],
     );

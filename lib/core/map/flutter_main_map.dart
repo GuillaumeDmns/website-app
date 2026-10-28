@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,15 +12,18 @@ import 'package:latlong2/latlong.dart' show Distance, LatLng;
 import '../location/location_providers.dart';
 import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
+import 'map_panel.dart';
 import 'map_pins.dart';
 
 /// The map with flutter_map and the Plan IGN raster tiles (Géoplateforme, free, no key; light in dark mode too): on
-/// desktop, where MapLibre doesn't run, and in the tests (the tiles off). See [MainMap].
+/// desktop, where MapLibre doesn't run, and in the tests (the tiles off). flutter_map has no padding: the camera's
+/// center is moved by half the panel's moves instead, so that what is in the middle of the part left above stays
+/// there. See [MainMap].
 class FlutterMainMap extends ConsumerStatefulWidget {
-  const FlutterMainMap({super.key, this.padding = EdgeInsets.zero, this.onLongPress});
+  const FlutterMainMap({super.key, this.panel, this.onLongPress});
 
-  /// Part of the map hidden by the panel, kept out of the framed area
-  final EdgeInsets padding;
+  /// The bottom sheet over the map
+  final MapPanel? panel;
 
   /// Long press (right click on desktop) on a point of the map
   final void Function(BuildContext context, LatLng position)? onLongPress;
@@ -46,8 +50,22 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
   MapFollow? _shown;
   final _heading = FollowHeading();
 
+  /// The part hidden by the panel the camera was placed for, and its animation running until this timer ends (the
+  /// panel's moves are followed after it)
+  double _cameraInset = 0;
+  Timer? _animation;
+  bool _panelScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.panel?.addListener(_onPanel);
+  }
+
   @override
   void dispose() {
+    widget.panel?.removeListener(_onPanel);
+    _animation?.cancel();
     _centerDebounce?.cancel();
     _heading.dispose();
     _controller.dispose();
@@ -57,16 +75,76 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
   @override
   void didUpdateWidget(covariant FlutterMainMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The panel opened higher or lower (GO's turns unfolded): the user followed kept low above it
-    final following = _following;
-    if (following != null && widget.padding != oldWidget.padding) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _following == following) {
-          _shown = null;
-          _follow(following);
-        }
-      });
+    if (widget.panel != oldWidget.panel) {
+      oldWidget.panel?.removeListener(_onPanel);
+      widget.panel?.addListener(_onPanel);
+      _onPanel();
     }
+  }
+
+  double get _height => _controller.mapController.camera.nonRotatedSize.height;
+  double _inset(double? extent) => panelInset(extent ?? 0, _height);
+
+  /// The panel moved: followed once a frame
+  void _onPanel() {
+    if (_panelScheduled) {
+      return;
+    }
+    _panelScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _panelScheduled = false;
+      _followPanel();
+    });
+  }
+
+  /// The camera keeps what is in the middle of the part of the map left above the panel there (the user at 72 % of it
+  /// when followed), at once. After the camera's own animation, which aims at where the panel rests.
+  void _followPanel() {
+    if (!mounted || !_ready || _animation != null) {
+      return;
+    }
+    final inset = _inset(widget.panel?.live);
+    if ((inset - _cameraInset).abs() < 0.5) {
+      return;
+    }
+    final shown = _shown;
+    if (_following != null && !_followPaused && shown != null) {
+      _cameraInset = inset;
+      _controller.mapController.moveAndRotate(_followCenter(shown, inset), shown.zoom, -shown.bearing);
+      return;
+    }
+    final camera = _controller.mapController.camera;
+    final shift = visibleCenterShift(_cameraInset, inset, _height);
+    _cameraInset = inset;
+    _controller.mapController.move(camera.screenOffsetToLatLng(camera.nonRotatedSize.center(Offset.zero) - Offset(0, shift)), camera.zoom);
+  }
+
+  /// The camera's center putting [view]'s position at 72 % of the part of the map left above a panel hiding [inset] px
+  LatLng _followCenter(MapFollow view, double inset) {
+    final size = _controller.mapController.camera.nonRotatedSize;
+    // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
+    // animation's own offset doesn't work with a rotation)
+    final below = (size.height - inset) * 0.72 - size.height / 2;
+    final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
+    return const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
+  }
+
+  /// A camera animation of [duration] starts
+  void _animating(Duration duration) {
+    _animation?.cancel();
+    _animation = Timer(duration, () {
+      _animation = null;
+      _followPanel();
+    });
+  }
+
+  /// Frames [points] in the part of the map left above where the panel rests
+  void _fit(List<LatLng> points, {required double maxZoom}) {
+    _cameraInset = _inset(widget.panel?.resting);
+    _animating(const Duration(milliseconds: 500));
+    _controller.animatedFitCamera(
+      cameraFit: CameraFit.coordinates(coordinates: points, padding: framePadding(widget.panel?.resting ?? 0, _height), maxZoom: maxZoom),
+    );
   }
 
   void _frame(MapOverlay overlay) {
@@ -84,13 +162,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     _framedFit = overlay.fit;
 
     // Also for a single point, so that it is centered in the part of the map not hidden by the panel
-    _controller.animatedFitCamera(
-      cameraFit: CameraFit.coordinates(
-        coordinates: overlay.fit,
-        padding: widget.padding + const EdgeInsets.all(48),
-        maxZoom: overlay.fit.length == 1 ? 16 : 17,
-      ),
-    );
+    _fit(overlay.fit, maxZoom: overlay.fit.length == 1 ? 16 : 17);
   }
 
   /// The user low in the visible part (above the panel), the way ahead up
@@ -109,22 +181,19 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final step = shown != null && shown.closeTo(view);
     // Only turning (the phone in the hand): quickly, the map stays with the hand
     final turning = shown != null && shown.position == view.position && shown.zoom == view.zoom;
-    final size = _controller.mapController.camera.nonRotatedSize;
-    final visibleHeight = size.height - widget.padding.bottom;
-    // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
-    // animation's own offset doesn't work with a rotation)
-    final below = visibleHeight * 0.72 - size.height / 2;
-    final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
-    final center = const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
     if (step) {
-      _controller.mapController.moveAndRotate(center, view.zoom, -view.bearing);
+      _cameraInset = _inset(widget.panel?.live);
+      _controller.mapController.moveAndRotate(_followCenter(view, _cameraInset), view.zoom, -view.bearing);
       return;
     }
+    final duration = Duration(milliseconds: turning ? 250 : 700);
+    _cameraInset = _inset(widget.panel?.resting);
+    _animating(duration);
     _controller.animateTo(
-      dest: center,
+      dest: _followCenter(view, _cameraInset),
       zoom: view.zoom,
       rotation: _closestRotation(-view.bearing),
-      duration: Duration(milliseconds: turning ? 250 : 700),
+      duration: duration,
     );
   }
 
@@ -143,6 +212,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     // North up again, then the page's points are framed
     _framedFit = null;
     if (_ready) {
+      _animating(const Duration(milliseconds: 500));
       _controller.animateTo(rotation: _closestRotation(0));
     }
   }
@@ -200,7 +270,8 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
       if (position != null && !_centeredOnUser && _ready && overlay.follow == null) {
         _centeredOnUser = true;
         if (_framedFit == null) {
-          _controller.animateTo(dest: position, zoom: 16);
+          // In the middle of the part of the map above the panel, not behind its edge
+          _fit([position], maxZoom: 16);
         }
       }
     });
@@ -271,7 +342,11 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
               ),
           ],
         ),
-        if (_following != null && _followPaused) RecenterButton(bottom: widget.padding.bottom, onPressed: _recenter),
+        if (_following != null && _followPaused)
+          ListenableBuilder(
+            listenable: widget.panel ?? const AlwaysStoppedAnimation(0),
+            builder: (context, _) => RecenterButton(bottom: _inset(widget.panel?.live), onPressed: _recenter),
+          ),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
           // Full credits on the About page
