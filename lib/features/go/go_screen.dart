@@ -197,8 +197,9 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     );
   }
 
-  /// The journey on the map, framing the step shown; on the ride in progress, what is left of it (from the last stop
-  /// passed to where to get off), the next stop marked
+  /// The journey on the map, framing the step shown; waiting for the ride in progress, the stop where to board (and the
+  /// user close to it), like Citymapper; on board, what is left of the ride (from the last stop passed to where to get
+  /// off), the next stop marked
   MapOverlay _overlay(GoState state, int live) {
     final tracker = state.tracker;
     final progress = state.progress;
@@ -213,6 +214,9 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       fitSection: shownStep?.sectionIndex,
     );
     final step = tracker.stepOf(progress);
+    if (step != null && progress.phase == GoPhase.waiting && _shown == live) {
+      return MapOverlay(pins: overlay.pins, paths: overlay.paths, fit: goWaitingFit(step, state.position));
+    }
     if (step != null && progress.phase == GoPhase.onBoard && _shown == live) {
       final stops = step.section.stops;
       final left = [for (var k = math.min(progress.stopIndex, stops.length - 1); k < stops.length; k++) LatLng(stops[k].lat, stops[k].lon)];

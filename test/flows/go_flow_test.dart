@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_bar.dart';
 import 'package:website_app/features/go/go_controller.dart';
@@ -104,6 +106,9 @@ void main() {
     expect(find.descendant(of: banner, matching: find.textContaining(currentL10n.goBoard(currentL10n.boardFront))), findsOneWidget);
     // Where to board along the train, once, in the capsule
     expect(find.byType(TrainPositions), findsOneWidget);
+    // The map frames the stop where to board, the user there, not the whole ride
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    expect(container.read(mapOverlaysProvider)[Routes.go]!.fit, [LatLng(chatelet.lat, chatelet.lon), LatLng(chatelet.lat, chatelet.lon)]);
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
 
     await closeApp(tester);
