@@ -15,6 +15,8 @@ void main() {
     expect(home.max, closeTo(875 / 915, 1e-9));
     expect(home.locked, isFalse);
     expect(sizesOf('/journey?from=here&to=IDFM:70003').min, closeTo(150 / 915, 1e-9));
+    // The journey's options first, like Citymapper, the map a strip above
+    expect(sizesOf('/journey?from=here&to=IDFM:70003').middle, 0.85);
     // A stop: its departures at once
     expect(sizesOf('/stops/IDFM%3A70001').middle, 0.62);
     expect(sizesOf('/stops/IDFM%3A70001/timetable').middle, 0.5);

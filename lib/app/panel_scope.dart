@@ -35,15 +35,6 @@ class PanelSheetScope extends InheritedWidget {
 
   final void Function(double height, {required bool reset}) onFit;
 
-  /// Lowers the sheet to its middle size when it is above, so that the map shows what the page just changed
-  static void showMap(BuildContext context) {
-    final scope = context.getInheritedWidgetOfExactType<PanelSheetScope>();
-    final controller = scope?.controller;
-    if (controller != null && controller.isAttached && controller.size > scope!.middle + 0.05) {
-      controller.animateTo(scope.middle, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
-    }
-  }
-
   /// Pages sized to their content (GO mode): the sheet's middle size becomes [height] pixels (page content, its
   /// handle aside). The sheet goes there the first time, when [reset] (another content shown), or when it was at the
   /// previous height; a sheet the user moved elsewhere stays there.

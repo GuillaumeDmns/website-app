@@ -31,8 +31,9 @@ class SheetProfile {
       return const SheetProfile(peek: 84, middle: 0.4, maxMiddle: 0.5);
     }
     if (location.startsWith(Routes.journeyPath) && !location.startsWith(Routes.journeyDetail)) {
-      // Start and end fields stay
-      return const SheetProfile(peek: 150);
+      // Like Citymapper, the options first, the map a strip above (an option opens on its own map); lowered, the start
+      // and end fields stay
+      return const SheetProfile(peek: 150, middle: 0.85);
     }
     if (location.startsWith('/stops/') && !location.endsWith('/timetable')) {
       // Like Citymapper, its departures at once under the header and actions; the stop on the map above

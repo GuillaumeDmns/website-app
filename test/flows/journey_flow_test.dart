@@ -36,6 +36,24 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('like Citymapper, the options fill the screen and a tap opens one', (tester) async {
+    await pumpApp(tester, standardBackend());
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+    double sheetTop() => tester
+        .getTopLeft(find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Material)).first)
+        .dy;
+    expect(sheetTop(), closeTo(915 * (1 - 0.85), 2));
+
+    // The second option, at once: its detail, the map showing it
+    await tapOn(tester, find.byType(JourneyCard).at(1));
+    expect(find.byType(JourneyCard), findsNothing);
+    expect(find.widgetWithText(FilledButton, currentL10n.go), findsOneWidget);
+    expect(sheetTop(), closeTo(915 * 0.5, 2));
+
+    await closeApp(tester);
+  });
+
   testWidgets('a ride of the detail shows its stops between in the timeline, not on the map', (tester) async {
     final backend = standardBackend();
     backend.on('GET', '/api/v2/journeys', (_) {
