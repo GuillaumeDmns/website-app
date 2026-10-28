@@ -76,10 +76,15 @@ void main() {
     expect(glance.place, startsWith(currentL10n.goNextStopShort('Nation')));
     expect(glance.tone, GoTone.ok);
 
-    final last = goGlance(state(onBoard.copyWith(stopIndex: 1)), at(9));
+    // The last stretch counts the minutes, red once the stop is close
+    final last = goGlance(state(onBoard.copyWith(stopIndex: 1)), at(7));
     expect(last.action, currentL10n.goGetOffNext);
-    expect(last.heroUnit, currentL10n.goStopsUnit(1));
-    expect(last.tone, GoTone.urgent);
+    expect((last.hero, last.heroUnit), ('4', currentL10n.minutesUnit));
+    expect(last.tone, GoTone.ok);
+    final close = goGlance(state(onBoard.copyWith(stopIndex: 1)), at(9));
+    expect((close.hero, close.heroUnit), ('2', currentL10n.minutesUnit));
+    expect(close.tone, GoTone.urgent);
+    expect(goGlance(state(onBoard.copyWith(stopIndex: 1)), at(11)).hero, currentL10n.now);
   });
 
   test('a missed vehicle needs attention', () {

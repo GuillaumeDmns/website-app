@@ -828,7 +828,7 @@
   },
   "goGetOffNext": "Descendez au prochain arrêt",
   "goStayOnBoard": "Restez à bord",
-  "goGetOffInAt": "Descendez dans {count} arrêts à {stop}",
+  "goGetOffInAt": "Descendez dans {count, plural, =1{1 arrêt} other{{count} arrêts}} à {stop}",
   "@goGetOffInAt": {
     "placeholders": {
       "count": {
@@ -1269,7 +1269,6 @@
   "@goGetOffAtStop": {"placeholders": {"stop": {"type": "String"}}},
   "goStopsUnit": "{count, plural, =1{arrêt} other{arrêts}}",
   "@goStopsUnit": {"placeholders": {"count": {"type": "int"}}},
-  "goTracking": "Suivi GPS",
   "goCorrect": "Corriger",
   "goCorrectTitle": "Où en êtes-vous ?",
   "goMarginAheadOf": "{minutes} min d'avance sur le {line} de {time}",

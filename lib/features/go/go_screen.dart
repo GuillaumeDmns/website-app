@@ -133,7 +133,12 @@ class _GoScreenState extends ConsumerState<GoScreen> {
                     children: [
                       GoHeader(state: state, onBack: back),
                       if (AppConfig.isDev) const GoGpsStats(),
-                      GoStepStrip(state: state, shown: _shown, onTap: _show),
+                      Row(
+                        children: [
+                          Expanded(child: GoStepStrip(state: state, shown: _shown, onTap: _show)),
+                          Padding(padding: const EdgeInsets.only(right: 12), child: GoCorrectButton(state: state)),
+                        ],
+                      ),
                       if (progress.issue case final issue? when issue != GoIssue.offRoute) GoIssueCard(state: state, issue: issue),
                       if (progress.issue == GoIssue.offRoute) GoOffRouteBanner(state: state),
                     ],

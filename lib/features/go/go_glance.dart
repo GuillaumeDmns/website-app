@@ -53,6 +53,9 @@ class GoGlance {
   String? get heroText => hero == null ? null : [hero!, ?heroUnit].join(' ');
 }
 
+/// On the last stretch of a ride, getting off is what to do now (red) from this long before the arrival
+const getOffSoon = Duration(minutes: 2);
+
 /// `120` `m`, `1,2` `km`: a distance as a figure and its unit, rounded as people read it while walking
 (String, String) _distance(double meters) {
   if (meters < 1000) {
@@ -133,18 +136,22 @@ GoGlance goGlance(GoState state, DateTime now) {
       final stops = section.stops;
       final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
       final arrival = section.arrival.add(progress.shift);
+      // The last stretch counts the minutes left, red once the stop is close: a direct train's ten minutes to its only
+      // stop are no emergency
+      final last = left <= 1;
+      final minutes = minutesLeft(arrival.difference(now));
       return GoGlance(
         line: line,
         icon: Icons.directions_transit,
         kicker: currentL10n.direction(section.headsign ?? ''),
-        action: left <= 1 ? currentL10n.goGetOffNext : currentL10n.goGetOffAtStop(section.to?.name ?? ''),
-        hero: '$left',
-        heroUnit: currentL10n.goStopsUnit(left),
+        action: last ? currentL10n.goGetOffNext : currentL10n.goGetOffAtStop(section.to?.name ?? ''),
+        hero: last ? (minutes == 0 ? currentL10n.now : '$minutes') : '$left',
+        heroUnit: last ? (minutes == 0 ? null : currentL10n.minutesUnit) : currentL10n.goStopsUnit(left),
         place: [
-          if (left <= 1) section.to?.name ?? '' else if (nextStop != null) currentL10n.goNextStopShort(nextStop),
+          if (last) section.to?.name ?? '' else if (nextStop != null) currentL10n.goNextStopShort(nextStop),
           currentL10n.arrivalAt(formatClock(arrival)),
         ].where((part) => part.isNotEmpty).join(' · '),
-        tone: left <= 1 ? GoTone.urgent : (issue ? GoTone.warn : GoTone.ok),
+        tone: last && arrival.difference(now) <= getOffSoon ? GoTone.urgent : (issue ? GoTone.warn : GoTone.ok),
       );
 
     case GoPhase.moving:

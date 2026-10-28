@@ -72,10 +72,12 @@ void main() {
         findsOneWidget);
     expect(find.descendant(of: banner, matching: find.text('Rue des Halles')), findsOneWidget);
     expect(find.descendant(of: banner, matching: find.text('m')), findsOneWidget);
-    // In the capsule: the time to spare on the metro, the following step, the correction at hand
+    // In the capsule: the time to spare on the metro, the following step, the correction at hand; nothing about the
+    // GPS while it works
     expect(find.textContaining("d'avance sur le Métro 1 de"), findsOneWidget);
     expect(find.text(currentL10n.goThen), findsOneWidget);
-    expect(find.text(currentL10n.goTracking), findsOneWidget);
+    expect(find.text(currentL10n.goCorrect), findsOneWidget);
+    expect(find.text(currentL10n.goNoGps), findsNothing);
     expect(find.byIcon(Icons.flag), findsWidgets);
 
     // The turns, folded so that the panel stays low
@@ -103,6 +105,26 @@ void main() {
     // Where to board along the train, once, in the capsule
     expect(find.byType(TrainPositions), findsOneWidget);
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("the latest alert under the banner, unless the system's notification shows it", (tester) async {
+    const alert = GoAlert(id: 'soon-1', title: 'Métro 1 dans 2 min', body: 'Direction Nation');
+    final state = followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon))
+        .copyWith(alert: alert, alertAt: DateTime.now());
+
+    // Android: its notification comes over the banner
+    await openGo(tester, state);
+    expect(find.textContaining('Métro 1 dans 2 min'), findsNothing);
+    await closeApp(tester);
+
+    await pumpApp(tester, standardBackend(), overrides: [
+      goControllerProvider.overrideWith(() => _FollowedJourney(state)),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+    ]);
+    await tapOn(tester, find.text(currentL10n.go).first);
+    expect(find.text('Métro 1 dans 2 min · Direction Nation'), findsOneWidget);
 
     await closeApp(tester);
   });

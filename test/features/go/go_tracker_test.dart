@@ -90,6 +90,20 @@ void main() {
     expect(progress.step, 2);
   });
 
+  test('a direct train: get ready a few minutes before its only stop, not when boarding', () {
+    // RER A from Châtelet to Nation without a stop, 12 min
+    final direct = GoTracker(journey([transit(at(0), 720, line: rerA)]));
+    final onBoard = direct.initial().copyWith(phase: GoPhase.onBoard);
+
+    var (progress, alerts) = direct.update(onBoard, GoInput(now: at(1)));
+    expect(direct.stopsLeft(progress), 1);
+    expect(alerts, isEmpty);
+    (progress, alerts) = direct.update(progress, GoInput(now: at(7)));
+    expect(alerts, isEmpty);
+    (progress, alerts) = direct.update(progress, GoInput(now: at(8, 30)));
+    expect(alerts.map((alert) => alert.id), ['prepare-0']);
+  });
+
   test('underground, a stop is left a little after its time', () {
     final onBoard = tracker.jumpTo(tracker.initial(), 1).copyWith(phase: GoPhase.onBoard);
 

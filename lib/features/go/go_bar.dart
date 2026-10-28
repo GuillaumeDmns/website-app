@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/live_journey.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
 import 'go_controller.dart';
@@ -15,7 +16,8 @@ import 'go_state.dart';
 import 'go_tracker.dart';
 
 /// Floating bar over the map while a journey is followed: on the other pages, the current instruction (tap to open GO);
-/// on the GO page, the moment at a glance in large ([GoBanner]), the latest alert under it for a few seconds.
+/// on the GO page, the moment at a glance in large ([GoBanner]), the latest alert under it for a few seconds where the
+/// system doesn't show it already (Android's notification comes over the banner: the same words twice otherwise).
 class GoBar extends ConsumerWidget {
   const GoBar({super.key});
 
@@ -34,12 +36,13 @@ class GoBar extends ConsumerWidget {
         ? state.alert
         : null;
     if (onGoPage) {
+      final strip = alert != null && !ref.watch(liveJourneyProvider).systemAlerts;
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           GoBanner(glance: goGlance(state, now), urgentAlert: alert?.urgent ?? false),
-          if (alert != null) ...[const SizedBox(height: 8), _AlertStrip(alert: alert)],
+          if (strip) ...[const SizedBox(height: 8), _AlertStrip(alert: alert)],
         ],
       );
     }
