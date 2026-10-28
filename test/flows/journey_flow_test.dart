@@ -22,8 +22,8 @@ void main() {
     expect(request.queryParameters['from'], '48.8584,2.347');
     expect(request.queryParameters['to'], 'IDFM:70001');
     expect(find.byType(JourneyCard), findsNWidgets(2));
-    // Each option with the next departures of its first ride
-    expect(find.textContaining(currentL10n.alsoAt('').trim()), findsWidgets);
+    // Each option with its first ride's departure and the next ones, on one line
+    expect(find.textContaining(RegExp(r'à \d\d:\d\d · \d\d:\d\d')), findsWidgets);
 
     await tapOn(tester, find.byType(JourneyCard));
     // The ride with its next departures from the boarding stop, and the next one in case it is missed
