@@ -133,3 +133,97 @@ class LineDeparturesRow extends StatelessWidget {
     return onTap == null ? content : InkWell(onTap: onTap, child: content);
   }
 }
+
+/// A train line's departures from a stop as one board in time order, its destinations mixed, like a station's (and
+/// Citymapper's): up to where every destination's departures are known, since the feed gives [perDestination] of each
+/// and a frequent destination's run out sooner
+List<({Departure departure, String destination})> trainBoard(List<LineDepartures> rows, {required int perDestination}) {
+  DateTime? horizon;
+  for (final row in rows) {
+    if (row.departures.length >= perDestination) {
+      final last = row.departures.last.time;
+      horizon = horizon == null || last.isBefore(horizon) ? last : horizon;
+    }
+  }
+  return [
+    for (final row in rows)
+      for (final departure in row.departures)
+        if (horizon == null || !departure.time.isAfter(horizon)) (departure: departure, destination: row.destination),
+  ]..sort((a, b) => a.departure.time.compareTo(b.departure.time));
+}
+
+/// A train of a station's board: its time and delay, mission code and destination, then the time until it leaves
+/// and its platform on the right
+class TrainDepartureRow extends StatelessWidget {
+  const TrainDepartureRow({super.key, required this.line, required this.departure, required this.destination, required this.now, this.onTap});
+
+  final LineSummary line;
+  final Departure departure;
+  final String destination;
+  final DateTime now;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = context.colors;
+    final late = departure.aimedTime == null ? 0 : departure.time.difference(departure.aimedTime!).roundedMinutes;
+    const figures = [FontFeature.tabularFigures()];
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(width: 40, child: Align(alignment: Alignment.centerLeft, child: LineBadge(line, size: 28))),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      formatClock(departure.aimedTime ?? departure.time),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        fontFeatures: figures,
+                        decoration: departure.cancelled ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                    if (late >= 1 && !departure.cancelled)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                          context.l10n.delayedTo(formatClock(departure.time)),
+                          style: TextStyle(color: colors.delayed, fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    if (departure.mission case final mission?)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(mission, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                      ),
+                    Expanded(child: Text(destination, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              DepartureTime(departure, now: now, mode: line.mode, emphasized: true),
+              if (platformLabel(line, departure.platform) case final label?)
+                Text('${label[0].toUpperCase()}${label.substring(1)}', style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+            ],
+          ),
+        ],
+      ),
+    );
+    return onTap == null ? content : InkWell(onTap: onTap, child: content);
+  }
+}

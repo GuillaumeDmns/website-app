@@ -5,6 +5,8 @@
     "description": "Name of the app"
   },
   "departureCancelled": "Supprimé",
+  "delayedTo": "Retardé {time}",
+  "@delayedTo": {"placeholders": {"time": {"type": "String"}}},
   "departureAtStop": "À l'arrêt",
   "@departureAtStop": {
     "description": "The vehicle is at the stop (bus)"

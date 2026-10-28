@@ -2,6 +2,7 @@
   "@@locale": "en",
   "appTitle": "Guillaume",
   "departureCancelled": "Cancelled",
+  "delayedTo": "Delayed {time}",
   "departureAtStop": "Now",
   "departureAtPlatform": "Now",
   "departureUnderOneMinute": "< 1 min",
