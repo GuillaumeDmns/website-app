@@ -29,6 +29,9 @@ enum TransportMode {
   /// Trains, where the platform ("voie") is announced late and may change
   bool get isRail => this == rer || this == transilien || this == ter;
 
+  /// Stops at platforms ("à quai"); buses stop at the curb ("à l'arrêt")
+  bool get hasPlatforms => this != bus && this != noctilien;
+
   String get label => switch (this) {
         metro => currentL10n.modeMetro,
         rer => 'RER',
@@ -634,7 +637,12 @@ abstract class VehicleCall with _$VehicleCall {
   const factory VehicleCall({
     required String stopId,
     String? stopName,
+
+    /// Arrival (its departure where the trip starts)
     required DateTime expectedAt,
+
+    /// Departure when the real time gives one later than the arrival (a train standing there), else null
+    DateTime? departureAt,
     int? delaySeconds,
     String? platform,
   }) = _VehicleCall;

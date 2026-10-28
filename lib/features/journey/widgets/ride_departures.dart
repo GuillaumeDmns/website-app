@@ -15,6 +15,7 @@ class RideDepartureList extends StatefulWidget {
     super.key,
     required this.rides,
     required this.now,
+    this.mode,
     this.selected,
     this.earliest,
     this.onSelect,
@@ -23,6 +24,9 @@ class RideDepartureList extends StatefulWidget {
 
   final List<Ride> rides;
   final DateTime now;
+
+  /// Of the line: whether it stops "à quai"
+  final TransportMode? mode;
   final Ride? selected;
 
   /// When the traveller can be at the stop: departures before are faded
@@ -122,6 +126,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
                 return _RideRow(
                   ride: ride,
                   now: widget.now,
+                  mode: widget.mode,
                   selected: isSelected,
                   tooEarly:
                       earliest != null && ride.departure.time.isBefore(earliest.subtract(const Duration(minutes: 1))),
@@ -158,10 +163,18 @@ class _RideDepartureListState extends State<RideDepartureList> {
 
 /// `20:56 → 21:03 (6 min)` / `PEBU Paris Saint-Lazare`, time until it leaves and platform on the right
 class _RideRow extends StatelessWidget {
-  const _RideRow({required this.ride, required this.now, required this.selected, required this.tooEarly, this.onTap});
+  const _RideRow({
+    required this.ride,
+    required this.now,
+    this.mode,
+    required this.selected,
+    required this.tooEarly,
+    this.onTap,
+  });
 
   final Ride ride;
   final DateTime now;
+  final TransportMode? mode;
   final bool selected;
 
   /// Leaves before the traveller can be at the stop
@@ -265,7 +278,7 @@ class _RideRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              DepartureTime(departure, now: now, emphasized: true),
+              DepartureTime(departure, now: now, mode: mode, emphasized: true),
               if (departure.platform != null)
                 Text(
                   context.l10n.platform(departure.platform!),

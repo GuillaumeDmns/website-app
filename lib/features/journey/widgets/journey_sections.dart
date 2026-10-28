@@ -272,7 +272,7 @@ class _RideTile extends StatelessWidget {
                 for (final point in [section.from, section.to])
                   if (point?.stopAreaId case final stopAreaId?)
                     _StopElevators(stopAreaId: stopAreaId, name: point!.name),
-                if (plan != null) _RideDepartures(plan: plan!, onChoose: onChoose),
+                if (plan != null) _RideDepartures(plan: plan!, mode: section.line?.mode, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   // The stops between, like Citymapper: below, on the line
                   InkWell(
@@ -391,9 +391,10 @@ class _StopElevators extends ConsumerWidget {
 /// Departures of the ride's line at the boarding stop that stop at the alighting one, from when the traveller can
 /// be there: the one taken is highlighted, choosing another one moves the journey to it.
 class _RideDepartures extends ConsumerWidget {
-  const _RideDepartures({required this.plan, required this.onChoose});
+  const _RideDepartures({required this.plan, this.mode, required this.onChoose});
 
   final RidePlan plan;
+  final TransportMode? mode;
   final ValueChanged<Ride> onChoose;
 
   @override
@@ -412,6 +413,7 @@ class _RideDepartures extends ConsumerWidget {
           RideDepartureList(
             rides: rides,
             now: now,
+            mode: mode,
             selected: taken,
             earliest: plan.earliest,
             onSelect: onChoose,
