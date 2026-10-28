@@ -15,6 +15,9 @@ void main() {
     expect(home.max, closeTo(875 / 915, 1e-9));
     expect(home.locked, isFalse);
     expect(sizesOf('/journey?from=here&to=IDFM:70003').min, closeTo(150 / 915, 1e-9));
+    // A stop: its departures at once
+    expect(sizesOf('/stops/IDFM%3A70001').middle, 0.62);
+    expect(sizesOf('/stops/IDFM%3A70001/timetable').middle, 0.5);
     // Search: locked at its highest
     final search = sizesOf(Routes.search);
     expect((search.min, search.middle, search.locked), (search.max, search.max, true));

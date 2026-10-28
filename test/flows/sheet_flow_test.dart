@@ -28,10 +28,10 @@ void main() {
     final raised = sheetTop(tester);
     expect(raised, lessThan(200));
 
-    // The nearby stop: at its middle, the map showing it
+    // The nearby stop: at its middle, the map showing it above
     await tapOn(tester, find.text('Châtelet'));
     expect(find.text(currentL10n.walkingConnections), findsOneWidget);
-    expect(sheetTop(tester), closeTo(915 * 0.5, 2));
+    expect(sheetTop(tester), closeTo(915 * (1 - 0.62), 2));
 
     // Back: home raised again
     await tapOn(tester, find.byTooltip(currentL10n.back));

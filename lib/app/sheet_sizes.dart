@@ -34,6 +34,10 @@ class SheetProfile {
       // Start and end fields stay
       return const SheetProfile(peek: 150);
     }
+    if (location.startsWith('/stops/') && !location.endsWith('/timetable')) {
+      // Like Citymapper, its departures at once under the header and actions; the stop on the map above
+      return const SheetProfile(middle: 0.62);
+    }
     return _default;
   }
 }
