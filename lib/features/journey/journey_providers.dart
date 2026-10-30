@@ -37,11 +37,17 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
 });
 
 /// Next departures of a ride's line from its boarding stop that stop at its alighting stop, with their arrival there,
-/// from the time the traveller gets there (now when null), refreshed every 30 s while shown
+/// from the time the traveller gets there (now when null), refreshed while shown: see [rideRefreshPeriod]
 final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, RideKey>((ref, key) async {
-  ref.refreshEvery(const Duration(seconds: 30));
+  ref.refreshEvery(rideRefreshPeriod(key.after, DateTime.now()));
   return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
 });
+
+/// How often the departures of a ride are asked again: every 30 s, every 2 min while they start more than 15 min from
+/// [now] (GO's connection at the end of a long ride, a journey for later): their real time matters closer, and each
+/// request keeps the phone's radio awake for seconds
+Duration rideRefreshPeriod(DateTime? after, DateTime now) =>
+    after != null && after.difference(now) > const Duration(minutes: 15) ? const Duration(minutes: 2) : const Duration(seconds: 30);
 
 /// Departures of a ride for [retimeJourney], from a widget: watched, so that the journey follows real time. Lists
 /// are only asked within the next 12 hours (the API's limit).

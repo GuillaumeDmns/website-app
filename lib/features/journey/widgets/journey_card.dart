@@ -15,8 +15,9 @@ import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
 
-/// Result row, like Citymapper: when to leave in large and green, the duration in large figures, the
-/// chain of lines, the next departures of its first ride, then the details.
+/// Result row, like Citymapper, in three lines: the chain of lines and the duration in large figures; when to leave
+/// (green), the times and the fare; the first ride's departures and where it leaves from. The transfers and the walks
+/// are in the chain.
 class JourneyCard extends ConsumerWidget {
   const JourneyCard({
     super.key,
@@ -49,43 +50,25 @@ class JourneyCard extends ConsumerWidget {
     final firstRide = journey.rides.firstOrNull;
     final later = _laterDepartures(ref, firstRide);
     final leaveIn = journey.departure.difference(now);
-
-    final details = [
-      if (firstRide != null)
-        context.l10n.firstRide(firstRide.line?.name ?? '', formatClock(firstRide.departure), firstRide.from?.name ?? ''),
-      if (journey.transfers > 0) context.l10n.transfersShort(journey.transfers),
-      if ((journey.walkingDuration ?? 0) >= 60) context.l10n.walkingDuration(formatDuration(journey.walkingDuration!)),
-      if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
-    ].join(' · ');
     final minutes = (journey.duration / 60).round();
+    final fare = journey.fare;
 
     final card = AppCard(
       onTap: onTap,
       border: selected ? scheme.primary : null,
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      leaveInLabel(leaveIn),
-                      style: theme.textTheme.titleMedium?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
-                    ),
-                    Text('${formatClock(journey.departure)} → ${formatClock(journey.arrival)}', style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
+              Expanded(child: SectionsStrip(journey: journey)),
+              const SizedBox(width: 8),
               // Like Citymapper: the duration in large figures
               if (minutes < 60) ...[
                 Text('$minutes', style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28, height: 1.05)),
                 Padding(
-                  padding: const EdgeInsets.only(left: 2, top: 12),
+                  padding: const EdgeInsets.only(left: 2, top: 10),
                   child: Text('min', style: theme.textTheme.labelMedium),
                 ),
               ] else
@@ -101,23 +84,47 @@ class JourneyCard extends ConsumerWidget {
                 const SizedBox(width: 12),
             ],
           ),
-          const SizedBox(height: 10),
-          Padding(padding: const EdgeInsets.only(right: 12), child: SectionsStrip(journey: journey)),
-          if (later.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Row(
               children: [
-                Icon(Icons.update, size: 16, color: colors.muted),
-                const SizedBox(width: 6),
-                Text(context.l10n.alsoAt(later.map(formatClock).join(' · ')), style: theme.textTheme.bodySmall),
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                        text: leaveInLabel(leaveIn),
+                        style: theme.textTheme.titleSmall?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(text: '  ${formatClock(journey.departure)} → ${formatClock(journey.arrival)}'),
+                    ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                if (fare != null && fare > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(formatFare(fare), style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+                ],
               ],
             ),
-          ],
-          if (details.isNotEmpty) ...[
-            const SizedBox(height: 8),
+          ),
+          if (firstRide != null) ...[
+            const SizedBox(height: 4),
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Text(details, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+              child: Text(
+                // `L à 20:30 · 20:45 · 21:00 de Asnières-sur-Seine`: the departure taken, then the next ones
+                context.l10n.firstRide(
+                  firstRide.line?.name ?? '',
+                  [firstRide.departure, ...later].map(formatClock).join(' · '),
+                  firstRide.from?.name ?? '',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.muted),
+              ),
             ),
           ],
         ],

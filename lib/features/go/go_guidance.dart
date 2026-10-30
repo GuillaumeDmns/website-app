@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../core/api/models.dart';
 import '../../core/utils/geo.dart';
@@ -167,6 +168,16 @@ MapFollow? goFollow(GoState state, int shownStep) {
     return null;
   }
   return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
+}
+
+/// Waiting for [ride]: the map frames where to board, with the user at [position] when they are close to it (on their
+/// way in, at the other end of a platform), not the whole ride
+List<LatLng> goWaitingFit(GoStep ride, LatLng? position) {
+  final start = ride.start;
+  if (start == null) {
+    return const [];
+  }
+  return [start, if (position != null && metersBetween(position, start) <= 400) position];
 }
 
 /// The departure to take instead of a missed or cancelled one: the next one still to come, not cancelled (for a

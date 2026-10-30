@@ -20,7 +20,8 @@ import 'go_ride_card.dart';
 
 /// Under the banner, in the capsule, for the step in progress: one card of context (on board the stops ahead on a
 /// rail, waiting where to board along the train, then a single line: the time to spare, the delay, what comes next),
-/// and how GO follows the user with the manual correction at hand. The banner says what to do; this says why it's fine.
+/// and, only when it does, that GO follows the schedule for want of GPS. The banner says what to do; this says why it's
+/// fine.
 class GoNowCard extends ConsumerWidget {
   const GoNowCard({super.key, required this.state});
 
@@ -83,33 +84,19 @@ class GoNowCard extends ConsumerWidget {
               onPressed: state.recalculating ? null : ref.read(goControllerProvider.notifier).recalculate,
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 0, 0),
-          child: Row(
-            children: [
-              Icon(noGps ? Icons.gps_off : Icons.my_location, size: 16, color: noGps ? colors.muted : theme.colorScheme.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  noGps ? context.l10n.goNoGps : context.l10n.goTracking,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
+        if (noGps)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 0, 0),
+            child: Row(
+              children: [
+                Icon(Icons.gps_off, size: 16, color: colors.muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(context.l10n.goNoGps, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
                 ),
-              ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
-                  visualDensity: VisualDensity.compact,
-                ),
-                onPressed: () => showGoCorrection(context, state),
-                child: Text(context.l10n.goCorrect),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -293,6 +280,25 @@ class _StopsRail extends StatelessWidget {
 }
 
 enum _Dot { done, me, next, stop, end }
+
+/// "Corriger", next to the steps' strip, whatever card is shown: GO got where the user is wrong
+class GoCorrectButton extends StatelessWidget {
+  const GoCorrectButton({super.key, required this.state});
+
+  final GoState state;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 32),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
+          visualDensity: VisualDensity.compact,
+        ),
+        onPressed: () => showGoCorrection(context, state),
+        child: Text(context.l10n.goCorrect),
+      );
+}
 
 /// "Corriger": where the user is, when GO got it wrong. On board, at a step, arrived: GO goes on from there.
 Future<void> showGoCorrection(BuildContext context, GoState state) {

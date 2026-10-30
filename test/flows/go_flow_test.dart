@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_bar.dart';
 import 'package:website_app/features/go/go_controller.dart';
@@ -72,10 +74,12 @@ void main() {
         findsOneWidget);
     expect(find.descendant(of: banner, matching: find.text('Rue des Halles')), findsOneWidget);
     expect(find.descendant(of: banner, matching: find.text('m')), findsOneWidget);
-    // In the capsule: the time to spare on the metro, the following step, the correction at hand
+    // In the capsule: the time to spare on the metro, the following step, the correction at hand; nothing about the
+    // GPS while it works
     expect(find.textContaining("d'avance sur le Métro 1 de"), findsOneWidget);
     expect(find.text(currentL10n.goThen), findsOneWidget);
-    expect(find.text(currentL10n.goTracking), findsOneWidget);
+    expect(find.text(currentL10n.goCorrect), findsOneWidget);
+    expect(find.text(currentL10n.goNoGps), findsNothing);
     expect(find.byIcon(Icons.flag), findsWidgets);
 
     // The turns, folded so that the panel stays low
@@ -102,7 +106,58 @@ void main() {
     expect(find.descendant(of: banner, matching: find.textContaining(currentL10n.goBoard(currentL10n.boardFront))), findsOneWidget);
     // Where to board along the train, once, in the capsule
     expect(find.byType(TrainPositions), findsOneWidget);
+    // The map frames the stop where to board, the user there, not the whole ride
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    expect(container.read(mapOverlaysProvider)[Routes.go]!.fit, [LatLng(chatelet.lat, chatelet.lon), LatLng(chatelet.lat, chatelet.lon)]);
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("the latest alert under the banner, unless the system's notification shows it", (tester) async {
+    const alert = GoAlert(id: 'soon-1', title: 'Métro 1 dans 2 min', body: 'Direction Nation');
+    final state = followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon))
+        .copyWith(alert: alert, alertAt: DateTime.now());
+
+    // Android: its notification comes over the banner
+    await openGo(tester, state);
+    expect(find.textContaining('Métro 1 dans 2 min'), findsNothing);
+    await closeApp(tester);
+
+    await pumpApp(tester, standardBackend(), overrides: [
+      goControllerProvider.overrideWith(() => _FollowedJourney(state)),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+    ]);
+    await tapOn(tester, find.text(currentL10n.go).first);
+    expect(find.text('Métro 1 dans 2 min · Direction Nation'), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('looking at the other steps leaves the sheet where it is: it fits the step in progress', (tester) async {
+    await openGo(tester, followed(GoProgress(step: 0, phase: GoPhase.moving, along: 40), position: LatLng(chatelet.lat, chatelet.lon)));
+    double sheetTop() => tester
+        .getTopLeft(find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Material)).first)
+        .dy;
+    final top = sheetTop();
+    // The map keeps at least half of the screen
+    expect(top, greaterThanOrEqualTo(915 * 0.5 - 1));
+
+    // The metro's card, then the arrival's: swiped to, the sheet stays
+    for (var card = 0; card < 3; card++) {
+      await tester.drag(find.byType(PageView), const Offset(-300, 0));
+      await settle(tester);
+      expect(sheetTop(), closeTo(top, 1));
+    }
+    // The arrival's card shown
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 3);
+    // Back to the step in progress
+    for (var card = 0; card < 3; card++) {
+      await tester.drag(find.byType(PageView), const Offset(300, 0));
+      await settle(tester);
+    }
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 0);
+    expect(sheetTop(), closeTo(top, 1));
 
     await closeApp(tester);
   });

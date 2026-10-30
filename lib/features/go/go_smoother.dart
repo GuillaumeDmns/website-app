@@ -6,7 +6,8 @@ import '../../core/utils/geo.dart';
 
 /// The user's position as shown in GO between two fixes (a fix comes every second at best, often less): it glides to
 /// each new fix instead of jumping there, then goes on along the way at the measured speed until the next one, a few
-/// meters at most. The fixes themselves still drive the tracker: this is only what the map shows.
+/// meters at most. Standing still, the GPS noise is left out: the dot and the camera following it stay put. The fixes
+/// themselves still drive the tracker: this is only what the map shows.
 class GoSmoother {
   /// Time to glide from where the user was shown to a new fix
   static const glide = Duration(milliseconds: 900);
@@ -23,6 +24,15 @@ class GoSmoother {
 
   /// Farther from the way than this, the user doesn't follow it: no going on along it (m)
   static const nearPath = 25.0;
+
+  /// Standing still, a fix closer to where the user is shown than its accuracy (from 3 m, up to this; 3 m when not
+  /// known) is the GPS wandering, indoors by 10 to 20 m: nothing moves (m)
+  static const stillNoise = 25.0;
+
+  /// How often the position shown is drawn again while it moves: on foot it moves a pixel or so in that time (and the
+  /// camera glides between), faster by bike
+  static const walkRedraw = Duration(milliseconds: 200);
+  static const rideRedraw = Duration(milliseconds: 100);
 
   LatLng? _from;
   LatLng? _fix;
@@ -45,8 +55,13 @@ class GoSmoother {
 
   /// A new fix received at [at]; [path]: the way being walked or ridden by bike, if any
   void fix(LatLng position, DateTime at, {double? speed, double? accuracy, MeasuredPolyline? path}) {
+    final shown = _shown;
+    final still = speed == null || speed < minSpeed;
+    if (shown != null && still && metersBetween(shown, position) < (accuracy ?? 0).clamp(3.0, stillNoise)) {
+      return;
+    }
     // The first one is shown at once
-    _from = _shown ?? position;
+    _from = shown ?? position;
     _fix = position;
     _fixAt = at;
     final usable = speed != null && speed >= minSpeed && speed <= maxSpeed && (accuracy == null || accuracy <= maxAccuracy);
@@ -92,6 +107,9 @@ class GoSmoother {
     final elapsed = now.difference(fixAt);
     return elapsed < glide || (_path != null && _speed > 0 && _ahead(elapsed) < maxAhead);
   }
+
+  /// See [walkRedraw]
+  Duration get redrawInterval => _speed > 2 ? rideRedraw : walkRedraw;
 
   double _ahead(Duration elapsed) =>
       _path == null || elapsed.isNegative ? 0 : math.min(_speed * elapsed.inMilliseconds / 1000, maxAhead);

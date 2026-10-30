@@ -22,8 +22,8 @@ void main() {
     expect(request.queryParameters['from'], '48.8584,2.347');
     expect(request.queryParameters['to'], 'IDFM:70001');
     expect(find.byType(JourneyCard), findsNWidgets(2));
-    // Each option with the next departures of its first ride
-    expect(find.textContaining(currentL10n.alsoAt('').trim()), findsWidgets);
+    // Each option with its first ride's departure and the next ones, on one line
+    expect(find.textContaining(RegExp(r'à \d\d:\d\d · \d\d:\d\d')), findsWidgets);
 
     await tapOn(tester, find.byType(JourneyCard));
     // The ride with its next departures from the boarding stop, and the next one in case it is missed
@@ -32,6 +32,24 @@ void main() {
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsWidgets);
     // GO at hand at the bottom
     expect(find.widgetWithText(FilledButton, currentL10n.go), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('like Citymapper, the options fill the screen and a tap opens one', (tester) async {
+    await pumpApp(tester, standardBackend());
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+    double sheetTop() => tester
+        .getTopLeft(find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Material)).first)
+        .dy;
+    expect(sheetTop(), closeTo(915 * (1 - 0.85), 2));
+
+    // The second option, at once: its detail, the map showing it
+    await tapOn(tester, find.byType(JourneyCard).at(1));
+    expect(find.byType(JourneyCard), findsNothing);
+    expect(find.widgetWithText(FilledButton, currentL10n.go), findsOneWidget);
+    expect(sheetTop(), closeTo(915 * 0.5, 2));
 
     await closeApp(tester);
   });

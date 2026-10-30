@@ -54,6 +54,30 @@ void main() {
     }
   });
 
+  test('standing still, the GPS wandering around moves nothing; walking away does', () {
+    final smoother = GoSmoother()..fix(start, t0, speed: 0, accuracy: 6);
+    expect(smoother.at(after(1000)), start);
+
+    for (final (index, north) in [2.0, -3.0, 4.5, -1.0].indexed) {
+      smoother.fix(east(1, north: north), after(1000 * (index + 2)), speed: 0.1, accuracy: 6);
+      expect(smoother.at(after(1000 * (index + 2) + 500)), start);
+      expect(smoother.moving(after(1000 * (index + 2) + 500)), isFalse);
+    }
+    // Further than the fix's accuracy, or on the move
+    smoother.fix(east(9), after(7000), speed: 0.1, accuracy: 6);
+    expect(smoother.moving(after(7100)), isTrue);
+    final walking = GoSmoother()..fix(start, t0, speed: 0);
+    walking.fix(east(2), after(1000), speed: 1.3, accuracy: 6);
+    expect(metersBetween(walking.at(after(2000))!, east(2)), lessThan(0.1));
+  });
+
+  test('drawn again 5 times a second on foot, 10 by bike', () {
+    final smoother = GoSmoother()..fix(start, t0, speed: 1.4, accuracy: 5, path: way);
+    expect(smoother.redrawInterval, GoSmoother.walkRedraw);
+    smoother.fix(east(5), after(1000), speed: 5, accuracy: 5, path: way);
+    expect(smoother.redrawInterval, GoSmoother.rideRedraw);
+  });
+
   test('forgets the fixes for a new session', () {
     final smoother = GoSmoother()..fix(start, t0);
     smoother.reset();
@@ -89,6 +113,14 @@ void main() {
       view = view.glideTo(target, 1 / 60);
     }
     expect(view, same(target));
+  });
+
+  test('the glide steps every frame while turning, 25 times a second when only moving', () {
+    const camera = MapFollow(position: start, bearing: 90);
+
+    expect(camera.glideStepTo(camera.withBearing(120)), MapFollow.turnStep);
+    expect(camera.glideStepTo(camera.withPosition(east(2))), MapFollow.moveStep);
+    expect(camera.glideStepTo(camera.withBearing(90.5).withPosition(east(2))), MapFollow.moveStep);
   });
 
   test('counts the time between fixes', () {

@@ -25,6 +25,9 @@ void main() {
     expect(backend.requestsTo('/api/v2/stops/IDFM:70001'), hasLength(1));
     // The bus 38 doesn't stop here now
     expect(find.text(currentL10n.notServedLines('Bus 38')), findsOneWidget);
+    // The RER as a station's board: its mission, its platform
+    expect(find.text('UPAC'), findsOneWidget);
+    expect(find.text('Voie A'), findsOneWidget);
 
     // Today's service of its lines, from the schedule: the last metro soon; a direction unfolds its frequencies
     expect(find.text(currentL10n.serviceHoursTitle), findsOneWidget);

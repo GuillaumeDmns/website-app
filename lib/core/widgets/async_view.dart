@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/panel_scope.dart';
 import '../../app/routes.dart';
 import '../../l10n/l10n.dart';
 import '../api/api_exception.dart';
@@ -11,21 +12,26 @@ import 'skeleton.dart';
 /// Renders an [AsyncValue]: grey cards of the content's shape while loading the first time ([loading] instead), error
 /// with retry, then [data]. Keeps showing the previous data while refreshing.
 class AsyncView<T> extends StatelessWidget {
-  const AsyncView({super.key, required this.value, required this.data, this.onRetry, this.loading});
+  const AsyncView({super.key, required this.value, required this.data, this.onRetry, this.loading, this.page = false});
 
   final AsyncValue<T> value;
   final Widget Function(T data) data;
   final VoidCallback? onRetry;
   final Widget? loading;
 
+  /// The whole of a page: loading or failed, it is still a list for the bottom sheet, which can't move without one (not
+  /// even by its handle)
+  final bool page;
+
   @override
   Widget build(BuildContext context) {
+    Widget paged(Widget child) => page ? ListView(controller: PanelScrollScope.of(context), children: [child]) : child;
     return value.when(
       skipLoadingOnRefresh: true,
       skipLoadingOnReload: true,
       data: data,
-      loading: () => loading ?? const SkeletonCards(),
-      error: (error, _) => ErrorMessage(message: error.toString(), error: error, onRetry: onRetry),
+      loading: () => paged(loading ?? const SkeletonCards()),
+      error: (error, _) => paged(ErrorMessage(message: error.toString(), error: error, onRetry: onRetry)),
     );
   }
 }

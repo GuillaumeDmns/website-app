@@ -120,6 +120,18 @@ void main() {
     });
   });
 
+  test('waiting, the map frames where to board, with the user when close to it', () {
+    final ride = GoTracker(plan).steps[1];
+    final stop = LatLng(chatelet.lat, chatelet.lon);
+
+    expect(goWaitingFit(ride, null), [stop]);
+    // On the platform's other end, 200 m away: both
+    const along = LatLng(48.8602, 2.3470);
+    expect(goWaitingFit(ride, along), [stop, along]);
+    // Still far (a correction, no GPS): the stop alone
+    expect(goWaitingFit(ride, LatLng(nation.lat, nation.lon)), [stop]);
+  });
+
   test('tells the share of the journey done, by the planned durations', () {
     expect(journeyFraction(state(tracker.initial())), 0);
     // Walk done, halfway through the ride (stop 1 of 2)

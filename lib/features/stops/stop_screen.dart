@@ -29,9 +29,12 @@ final stopAreaProvider = FutureProvider.autoDispose.family<StopAreaDetail, Strin
 );
 
 /// Departures of a stop area, refreshed every 30 s while shown
+/// Departures asked per line and destination (the API's most): enough for a station's board of its trains
+const stopDeparturesLimit = 5;
+
 final stopDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, String>((ref, stopAreaId) async {
   ref.refreshEvery(const Duration(seconds: 30));
-  return ref.watch(mobilityApiProvider).stopDepartures(stopAreaId, limit: 3);
+  return ref.watch(mobilityApiProvider).stopDepartures(stopAreaId, limit: stopDeparturesLimit);
 });
 
 class StopScreen extends ConsumerWidget {
@@ -65,6 +68,7 @@ class StopScreen extends ConsumerWidget {
       child: AsyncView(
         value: stop,
         onRetry: () => ref.invalidate(stopAreaProvider(stopAreaId)),
+        page: true,
         data: (detail) => _StopContent(detail: detail),
       ),
     );
@@ -290,11 +294,40 @@ class _DepartureList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ),
-        for (final (index, row) in rows.indexed) ...[
+        for (final (index, item) in _items(rows).indexed) ...[
           if (index > 0) const Divider(indent: 40),
-          LineDeparturesRow(row: row, now: now, onTap: () => context.push(Routes.line(row.line.id))),
+          switch (item) {
+            (final LineDepartures row, null) =>
+              LineDeparturesRow(row: row, now: now, onTap: () => context.push(Routes.line(row.line.id))),
+            (final LineDepartures row, (:final departure, :final destination)) => TrainDepartureRow(
+                line: row.line,
+                departure: departure,
+                destination: destination,
+                now: now,
+                onTap: () => context.push(Routes.line(row.line.id)),
+              ),
+          },
         ],
       ],
     );
   }
+
+  /// Like Citymapper, a train line's departures as a board in time order (a station's way), with their mission and
+  /// platform; the other lines one row per destination, their next departures in it. Lines in their order.
+  static List<(LineDepartures, ({Departure departure, String destination})?)> _items(List<LineDepartures> rows) {
+    final lines = <String, List<LineDepartures>>{};
+    for (final row in rows) {
+      lines.putIfAbsent(row.line.id, () => []).add(row);
+    }
+    return [
+      for (final rows in lines.values)
+        if (rows.first.line.mode.isRail)
+          for (final train in trainBoard(rows, perDestination: stopDeparturesLimit).take(_trainsShown)) (rows.first, train)
+        else
+          for (final row in rows) (row, null),
+    ];
+  }
+
+  /// At most, per train line: the timetable has the others
+  static const _trainsShown = 10;
 }

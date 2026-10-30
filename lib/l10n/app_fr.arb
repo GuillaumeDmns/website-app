@@ -5,6 +5,8 @@
     "description": "Name of the app"
   },
   "departureCancelled": "Supprimé",
+  "delayedTo": "Retardé {time}",
+  "@delayedTo": {"placeholders": {"time": {"type": "String"}}},
   "departureAtStop": "À l'arrêt",
   "@departureAtStop": {
     "description": "The vehicle is at the stop (bus)"
@@ -690,14 +692,6 @@
       }
     }
   },
-  "walkingDuration": "{duration} à pied",
-  "@walkingDuration": {
-    "placeholders": {
-      "duration": {
-        "type": "String"
-      }
-    }
-  },
   "details": "Détails",
   "leaveNowShort": "Partez maintenant",
   "leaveIn": "Partez dans {duration}",
@@ -828,7 +822,7 @@
   },
   "goGetOffNext": "Descendez au prochain arrêt",
   "goStayOnBoard": "Restez à bord",
-  "goGetOffInAt": "Descendez dans {count} arrêts à {stop}",
+  "goGetOffInAt": "Descendez dans {count, plural, =1{1 arrêt} other{{count} arrêts}} à {stop}",
   "@goGetOffInAt": {
     "placeholders": {
       "count": {
@@ -1238,8 +1232,6 @@
   "@arrivalAt": {"placeholders": {"time": {"type": "String"}}},
   "leaveInMinutes": "Dans {minutes} min",
   "@leaveInMinutes": {"placeholders": {"minutes": {"type": "int"}}},
-  "alsoAt": "Aussi à {times}",
-  "@alsoAt": {"placeholders": {"times": {"type": "String"}}},
   "favoriteStopRemoved": "{name} retiré des favoris",
   "@favoriteStopRemoved": {"placeholders": {"name": {"type": "String"}}},
   "homeSuggestHome": "Rentrer à la maison",
@@ -1269,7 +1261,6 @@
   "@goGetOffAtStop": {"placeholders": {"stop": {"type": "String"}}},
   "goStopsUnit": "{count, plural, =1{arrêt} other{arrêts}}",
   "@goStopsUnit": {"placeholders": {"count": {"type": "int"}}},
-  "goTracking": "Suivi GPS",
   "goCorrect": "Corriger",
   "goCorrectTitle": "Où en êtes-vous ?",
   "goMarginAheadOf": "{minutes} min d'avance sur le {line} de {time}",

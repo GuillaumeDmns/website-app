@@ -39,7 +39,7 @@ void main() {
     expect(heading.apply(const MapFollow(position: LatLng(48.85, 2.35), bearing: 90)).bearing, 90);
   });
 
-  testWidgets('turns at most 10 times a second, always to the last heading', (tester) async {
+  testWidgets('turns at most 20 times a second, always to the last heading', (tester) async {
     final heading = FollowHeading();
     addTearDown(heading.dispose);
     final turns = <double>[];
@@ -54,6 +54,30 @@ void main() {
     expect(turns, [10, 30]);
     await tester.pump(FollowHeading.turnInterval);
     expect(turns, [10, 30]);
+  });
+
+  testWidgets('a phone held still never turns the map; a real turn is followed closely', (tester) async {
+    final heading = FollowHeading();
+    addTearDown(heading.dispose);
+    final turns = <double>[];
+    void turn() => turns.add(heading.device!);
+    Future<void> headings(List<double> values) async {
+      for (final value in values) {
+        heading.update(value, turn);
+        await tester.pump(FollowHeading.turnInterval);
+      }
+    }
+
+    // Lying on a table: the smoothed heading wanders a few degrees, a degree at a time
+    await headings([90, 91, 92.2, 93, 92, 91, 89.8, 88.5, 89.5, 90.5]);
+    expect(turns, [90]);
+    // Turned by hand: every heading on the way, across north too
+    await headings([92.5, 96, 100]);
+    await headings([358, 357.5]);
+    expect(turns, [90, 92.5, 96, 100, 358]);
+    // Drifting slowly: once far enough from what is shown
+    await headings([358.5, 359.5, 0.5, 1.5, 2.5, 3.5, 4.5]);
+    expect(turns, [90, 92.5, 96, 100, 358, 4.5]);
   });
 
   test('a view less than half a degree away needs no move', () {

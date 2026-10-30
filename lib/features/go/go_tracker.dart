@@ -559,6 +559,10 @@ class GoTracker {
   /// The alighting stop is reached a little before it (the vehicle brakes, the doors are near)
   static const _arrivingMeters = 40.0;
 
+  /// "Get ready" comes once the stop before is left and the arrival is this close: a direct train's stop before is
+  /// where it was boarded, ten minutes away
+  static const prepareAhead = Duration(minutes: 4);
+
   /// On board. [GoProgress.stopIndex] is the last stop the vehicle has left, so that "next stop" is only said once
   /// it is really the next one: not while the vehicle pulls in to the one before.
   GoProgress _ride(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
@@ -599,8 +603,8 @@ class GoTracker {
     final alightName = ride.section.to?.name ?? '';
     final left = withStops ? last - current.stopIndex : 1;
     final untilArrival = shiftedArrival.difference(input.now);
-    // Get ready once the stop before has been left (without the stops: two minutes before the arrival)
-    if (!arrived && (withStops ? left == 1 : untilArrival <= const Duration(minutes: 2))) {
+    // Get ready once the stop before has been left and the arrival is near (without the stops: two minutes before it)
+    if (!arrived && (withStops ? left == 1 && untilArrival <= prepareAhead : untilArrival <= const Duration(minutes: 2))) {
       alerts.add(GoAlert(id: 'prepare-${current.step}', title: currentL10n.alertPrepare, body: currentL10n.goNextStop(alightName)));
     }
     if (arrived) {

@@ -87,7 +87,7 @@ class JourneyScreen extends ConsumerWidget {
               fit: [?point(request.from), ?point(request.to)],
             ),
       // The search stays at the top, like Citymapper; the options scroll below it inside the sheet (not the sheet's
-      // controller: the sheet stays low enough to see them on the map, it only moves with its handle)
+      // controller: it only moves with its handle, lowered to see the map)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -449,21 +449,6 @@ class _TimeButton extends StatelessWidget {
       );
 }
 
-/// Phone: the sheet may have been scrolled up over the map; lower it so that the option shows on the map, and keep
-/// the tapped card in view
-void _revealOnMap(BuildContext cardContext) {
-  PanelSheetScope.showMap(cardContext);
-  Future.delayed(const Duration(milliseconds: 280), () {
-    if (cardContext.mounted) {
-      Scrollable.ensureVisible(
-        cardContext,
-        duration: const Duration(milliseconds: 200),
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-      );
-    }
-  });
-}
-
 class _Results extends StatelessWidget {
   const _Results({
     required this.plan,
@@ -489,6 +474,7 @@ class _Results extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
     final theme = Theme.of(context);
     if (plan.journeys.isEmpty) {
       // Nothing at this time (the night, mostly): another time in one tap
@@ -535,23 +521,14 @@ class _Results extends StatelessWidget {
             )
           else
             const SizedBox(height: 8),
-          // First tap shows the option on the map, a second one (or "Détails") opens it; hovering shows it too
-          Builder(
-            builder: (cardContext) => JourneyCard(
-              journey: journey,
-              now: now,
-              selected: index == selectedIndex,
-              onTap: () {
-                if (index == selectedIndex) {
-                  onOpen(journey);
-                } else {
-                  onSelect(index);
-                  _revealOnMap(cardContext);
-                }
-              },
-              onOpen: () => onOpen(journey),
-              onHover: () => onSelect(index),
-            ),
+          // Like Citymapper, a tap opens the option, its detail showing it on the map; next to the map (wide layout),
+          // hovering shows it there first
+          JourneyCard(
+            journey: journey,
+            now: now,
+            selected: wide && index == selectedIndex,
+            onTap: () => onOpen(journey),
+            onHover: () => onSelect(index),
           ),
         ],
         const SizedBox(height: 12),

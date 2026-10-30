@@ -79,6 +79,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       child: AsyncView(
         value: detail,
         onRetry: () => ref.invalidate(lineDetailProvider(widget.lineId)),
+        page: true,
         data: (detail) => _content(context, detail, direction, branch),
       ),
     );
