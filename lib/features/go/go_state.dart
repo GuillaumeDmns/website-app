@@ -81,6 +81,7 @@ class GoState {
   Departure? get currentVehicle => vehicleStep == progress.step ? vehicle : null;
 
   GoState copyWith({
+    GoTracker? tracker,
     GoProgress? progress,
     bool? muted,
     bool? keepAwake,
@@ -97,7 +98,7 @@ class GoState {
     DateTime? Function()? recalculateAt,
   }) =>
       GoState(
-        tracker: tracker,
+        tracker: tracker ?? this.tracker,
         request: request,
         progress: progress ?? this.progress,
         startedAt: startedAt,

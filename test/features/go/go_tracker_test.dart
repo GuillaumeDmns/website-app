@@ -266,6 +266,29 @@ void main() {
     expect(tracker.chosen(missed, 2), missed);
   });
 
+  test('on board, another vehicle guessed: the stops left counted on its own, its times from when the user left', () {
+    // On the metro 300 m past Gare de Lyon, left a minute late
+    final onBoard = tracker.next(tracker.jumpTo(tracker.initial(), 1));
+    final past = onBoard.copyWith(along: tracker.steps[1].stopAlongs[1] + 300, stopIndex: 1, shift: const Duration(minutes: 1));
+    // The journey now follows a train on the same tracks straight to Nation, leaving at 8:06:30 by its real time
+    final direct = GoTracker(plan.copyWith(sections: [
+      plan.sections[0],
+      transit(at(6, 30), 300).copyWith(shape: plan.sections[1].shape),
+      plan.sections[2],
+    ]));
+
+    final followed = direct.onAnotherVehicle(past, at(7));
+
+    expect(followed.phase, GoPhase.onBoard);
+    expect(followed.along, past.along);
+    expect(followed.stopIndex, 0);
+    expect(direct.stopsLeft(followed), 1);
+    // Seen leaving at 8:07, about when its real time said: that one holds
+    expect(followed.shift, Duration.zero);
+    // Seen leaving 3 min after it: from then on
+    expect(direct.onAnotherVehicle(past, at(9, 30)).shift, const Duration(minutes: 3));
+  });
+
   test('counts what is left', () {
     final onBoard = tracker.next(tracker.jumpTo(tracker.initial(), 1));
 

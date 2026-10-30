@@ -347,6 +347,25 @@ class GoTracker {
     return progress.copyWith(phase: GoPhase.waiting, shift: Duration.zero, issue: () => null, fired: fired);
   }
 
+  /// On board, the journey now follows another vehicle for the ride in progress, guessed (see [GoController]): the user
+  /// is where they were on the way, the stops left are counted on that vehicle's, and its times are shifted from
+  /// [departed], when the user was seen to leave, unless its real time says about the same (the more precise)
+  GoProgress onAnotherVehicle(GoProgress progress, DateTime departed) {
+    final ride = stepOf(progress);
+    if (ride == null || progress.phase != GoPhase.onBoard) {
+      return progress;
+    }
+    var index = 0;
+    for (var k = 0; k < ride.stopAlongs.length - 1; k++) {
+      if (ride.stopAlongs[k] + _leftStopMeters <= progress.along) {
+        index = k;
+      }
+    }
+    final gap = departed.difference(ride.section.departure);
+    final shift = gap.abs() <= const Duration(minutes: 1) ? Duration.zero : Duration(seconds: gap.inSeconds.clamp(-1800, 3600));
+    return progress.copyWith(stopIndex: index, shift: shift);
+  }
+
   GoProgress dismissIssue(GoProgress progress) => progress.copyWith(issue: () => null, offRouteSince: () => null);
 
   // Automatic progress
