@@ -450,6 +450,7 @@ class GoController extends Notifier<GoState?> {
       fixAt: fix?.timestamp,
       vehicle: current.vehicle,
       vehicleStep: current.vehicleStep,
+      realtimeDepartures: current.realtimeDepartures,
     );
     final (progress, alerts) = current.tracker.update(current.progress, input);
 
@@ -593,7 +594,7 @@ class GoController extends Notifier<GoState?> {
       _departures?.close();
       _departures = null;
       _departuresOf = null;
-      state = current.copyWith(vehicle: () => null, vehicleStep: () => null);
+      state = current.copyWith(vehicle: () => null, vehicleStep: () => null, realtimeDepartures: false);
       return;
     }
     final of = (key: key, tracker: current.tracker, step: index);
@@ -623,7 +624,11 @@ class GoController extends Notifier<GoState?> {
     // The planned vehicle: same scheduled time (a few minutes of tolerance)
     final ride = of.tracker.steps[of.step];
     final vehicle = plannedRide(rides, of.tracker.plannedDeparture(ride, latest.progress))?.departure;
-    state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => of.step);
+    state = latest.copyWith(
+      vehicle: () => vehicle,
+      vehicleStep: () => of.step,
+      realtimeDepartures: rides.any((ride) => ride.departure.realtime),
+    );
   }
 
   Future<void> _save() async {

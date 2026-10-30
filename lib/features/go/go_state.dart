@@ -21,6 +21,7 @@ class GoState {
     this.walkSpeed,
     this.vehicle,
     this.vehicleStep,
+    this.realtimeDepartures = false,
     this.alert,
     this.alertAt,
     this.recalculating = false,
@@ -55,6 +56,10 @@ class GoState {
   final Departure? vehicle;
   final int? vehicleStep;
 
+  /// The departures of the ride [vehicleStep] come with real time: one gone from them has left. Without it, only the
+  /// schedule tells when a vehicle should come.
+  final bool realtimeDepartures;
+
   /// Last alert given, and when
   final GoAlert? alert;
   final DateTime? alertAt;
@@ -83,6 +88,7 @@ class GoState {
     double? walkSpeed,
     Departure? Function()? vehicle,
     int? Function()? vehicleStep,
+    bool? realtimeDepartures,
     GoAlert? alert,
     DateTime? alertAt,
     bool? recalculating,
@@ -102,6 +108,7 @@ class GoState {
         walkSpeed: walkSpeed ?? this.walkSpeed,
         vehicle: vehicle != null ? vehicle() : this.vehicle,
         vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
+        realtimeDepartures: realtimeDepartures ?? this.realtimeDepartures,
         alert: alert ?? this.alert,
         alertAt: alertAt ?? this.alertAt,
         recalculating: recalculating ?? this.recalculating,

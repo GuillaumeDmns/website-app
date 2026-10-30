@@ -211,6 +211,8 @@ void main() {
     // The card lists them, the controller follows the planned vehicle in them
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
     expect(backend.requests.where((request) => request.uri.path.endsWith('/rides')), hasLength(1));
+    // With real time: a vehicle gone from them has left (the tracker gives it up sooner than one only scheduled)
+    expect(container.read(goControllerProvider)?.realtimeDepartures, isTrue);
 
     await closeApp(tester);
   });
