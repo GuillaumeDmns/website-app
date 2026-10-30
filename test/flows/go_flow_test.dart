@@ -16,6 +16,7 @@ import 'package:website_app/features/go/widgets/go_ride_card.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';
 
+import '../support/fake_backend.dart';
 import '../support/samples.dart';
 import '../support/standard_backend.dart';
 import '../support/test_app.dart';
@@ -211,6 +212,8 @@ void main() {
     // The card lists them, the controller follows the planned vehicle in them
     expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
     expect(backend.requests.where((request) => request.uri.path.endsWith('/rides')), hasLength(1));
+    // With real time: a vehicle gone from them has left (the tracker gives it up sooner than one only scheduled)
+    expect(container.read(goControllerProvider)?.realtimeDepartures, isTrue);
 
     await closeApp(tester);
   });
@@ -225,10 +228,10 @@ void main() {
   });
 
   testWidgets('missed at the stop: the next departure is kept on its own and said over the map', (tester) async {
-    // The métro left 2 min ago; the user is still on the platform
+    // The RER left 2 min ago; the user is still on the platform
     final missedPlan = journey([
       walk(inMinutes(-6), 240),
-      transit(inMinutes(-2), 480, via: [gareDeLyon]),
+      transit(inMinutes(-2), 480, line: rerA, via: [gareDeLyon]),
     ]);
     final messenger = tester.binding.defaultBinaryMessenger;
     const updates = EventChannel('flutter.baseflow.com/geolocator_updates');
@@ -253,6 +256,14 @@ void main() {
       messenger.setMockMethodCallHandler(geolocator, null);
     });
     final backend = standardBackend();
+    // The next train, in 7 min, is an express straight to Nation
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
+          ride(inMinutes(7)).copyWith(stops: [
+            JourneyStop(name: 'Châtelet', lat: chatelet.lat, lon: chatelet.lon, time: inMinutes(7)),
+            JourneyStop(name: 'Nation', lat: nation.lat, lon: nation.lon, time: inMinutes(15)),
+          ]).toJson(),
+          for (final minutes in [12, 17]) ride(inMinutes(minutes)).toJson(),
+        ]));
     await pumpApp(tester, backend, overrides: [liveJourneyProvider.overrideWithValue(_NoLiveJourney())]);
     final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
     container.read(goControllerProvider.notifier).start(missedPlan, const JourneyRequest());
@@ -263,12 +274,13 @@ void main() {
     await settle(tester, const Duration(seconds: 8));
 
     final state = container.read(goControllerProvider)!;
-    // The next métro (in 7 min) is now the plan, without a tap
+    // The next train (in 7 min) is now the plan, without a tap, where it stops too
     expect(state.retained, isNotNull);
     expect(state.progress.issue, isNull);
     expect(state.journey.rides.single.departure.isAfter(DateTime.now().toUtc()), isTrue);
+    expect(state.journey.rides.single.stops.map((stop) => stop.name), ['Châtelet', 'Nation']);
     expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
-    expect(find.descendant(of: find.byType(GoBanner), matching: find.text(currentL10n.goMissedShort('Métro 1'))), findsOneWidget);
+    expect(find.descendant(of: find.byType(GoBanner), matching: find.text(currentL10n.goMissedShort('RER A'))), findsOneWidget);
     expect(find.text(currentL10n.goRecalculateJourney), findsOneWidget);
 
     await closeApp(tester);

@@ -23,8 +23,17 @@ void main() {
 
   LatLng position(StopAreaSummary stop) => LatLng(stop.lat, stop.lon);
 
-  GoInput input(DateTime now, {LatLng? position, double speed = 0, Departure? vehicle, int? vehicleStep}) =>
-      GoInput(now: now, position: position, accuracy: 10, speed: speed, fixAt: now, vehicle: vehicle, vehicleStep: vehicleStep);
+  GoInput input(DateTime now, {LatLng? position, double speed = 0, Departure? vehicle, int? vehicleStep, bool realtime = false}) =>
+      GoInput(
+        now: now,
+        position: position,
+        accuracy: 10,
+        speed: speed,
+        fixAt: now,
+        vehicle: vehicle,
+        vehicleStep: vehicleStep,
+        realtimeDepartures: realtime,
+      );
 
   test('has a step per walk and ride', () {
     expect(tracker.steps.map((step) => step.isRide), [false, true, false]);
@@ -143,11 +152,23 @@ void main() {
   test('says when the vehicle was missed', () {
     final waiting = tracker.jumpTo(tracker.initial(), 1);
 
-    final (progress, alerts) = tracker.update(waiting, input(at(8), position: position(chatelet)));
+    // The line's departures have real time: gone from them, the vehicle has left
+    final (progress, alerts) = tracker.update(waiting, input(at(8), position: position(chatelet), vehicleStep: 1, realtime: true));
 
     expect(progress.issue, GoIssue.missed);
     expect(progress.phase, GoPhase.waiting);
     expect(alerts.map((alert) => alert.id), ['missed-1']);
+  });
+
+  test('a vehicle only scheduled may come a few minutes late: given up 3 min after its time', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+
+    final (late, alerts) = tracker.update(waiting, input(at(8), position: position(chatelet)));
+    expect(late.issue, isNull);
+    expect(alerts, isEmpty);
+
+    final (given, _) = tracker.update(waiting, input(at(9), position: position(chatelet)));
+    expect(given.issue, GoIssue.missed);
   });
 
   test('detects boarding from a fast move along the line', () {
@@ -162,6 +183,46 @@ void main() {
     // Left two minutes late: the rest of the journey follows
     expect(progress.shift, const Duration(minutes: 2));
     expect(tracker.eta(progress, null), plan.arrival.add(const Duration(minutes: 2)));
+  });
+
+  test('boarding another vehicle than the one expected: the times follow the one taken', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    // 150 m along the line at 10 m/s: seen leaving 15 s before
+    final nearStop = tracker.steps[1].line.pointAt(150);
+
+    // The one before the planned one (8:06)
+    final (earlier, _) = tracker.update(waiting, input(at(1), position: nearStop, speed: 10));
+    expect(earlier.phase, GoPhase.onBoard);
+    expect(earlier.shift, -const Duration(minutes: 5, seconds: 15));
+
+    // The planned one, late without its real time saying so
+    final (late, _) = tracker.update(waiting, input(at(7, 45), position: nearStop, speed: 10, vehicle: departure(at(6)), vehicleStep: 1));
+    expect(late.shift, const Duration(minutes: 1, seconds: 30));
+
+    // About when its real time said: that time, the more precise
+    final (onTime, _) = tracker.update(waiting, input(at(6, 30), position: nearStop, speed: 10, vehicle: departure(at(6, 10)), vehicleStep: 1));
+    expect(onTime.shift, const Duration(seconds: 10));
+  });
+
+  test('the late vehicle taken after the next one was retained in its place: followed, not the next one', () {
+    // The metro of 8:06 given up for missed: the journey moved to the next one, at 8:14
+    final retainedPlan = journey([
+      walk(at(0), 240),
+      transit(at(14), 480, via: [gareDeLyon]),
+      walk(at(22), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+    ]);
+    final retained = GoTracker(retainedPlan);
+    final waiting = retained.chosen(retained.jumpTo(retained.initial(), 1), 1);
+
+    // The late one comes at 8:08 and is taken
+    final (progress, _) = retained.update(
+        waiting, input(at(8, 15), position: retained.steps[1].line.pointAt(150), speed: 10, vehicle: departure(at(14)), vehicleStep: 1));
+
+    expect(progress.phase, GoPhase.onBoard);
+    expect(progress.shift, -const Duration(minutes: 6));
+    expect(retained.eta(progress, null), retainedPlan.arrival.subtract(const Duration(minutes: 6)));
+    // Its stops come on its own times: Gare de Lyon at 8:12, not 8:18
+    expect(retained.steps[1].stopTime(1).add(progress.shift), at(12));
   });
 
   test('says when the walk goes away from the path for a minute', () {
@@ -203,6 +264,29 @@ void main() {
     expect(chosen.issue, isNull);
     expect(chosen.fired, {'soon-0'});
     expect(tracker.chosen(missed, 2), missed);
+  });
+
+  test('on board, another vehicle guessed: the stops left counted on its own, its times from when the user left', () {
+    // On the metro 300 m past Gare de Lyon, left a minute late
+    final onBoard = tracker.next(tracker.jumpTo(tracker.initial(), 1));
+    final past = onBoard.copyWith(along: tracker.steps[1].stopAlongs[1] + 300, stopIndex: 1, shift: const Duration(minutes: 1));
+    // The journey now follows a train on the same tracks straight to Nation, leaving at 8:06:30 by its real time
+    final direct = GoTracker(plan.copyWith(sections: [
+      plan.sections[0],
+      transit(at(6, 30), 300).copyWith(shape: plan.sections[1].shape),
+      plan.sections[2],
+    ]));
+
+    final followed = direct.onAnotherVehicle(past, at(7));
+
+    expect(followed.phase, GoPhase.onBoard);
+    expect(followed.along, past.along);
+    expect(followed.stopIndex, 0);
+    expect(direct.stopsLeft(followed), 1);
+    // Seen leaving at 8:07, about when its real time said: that one holds
+    expect(followed.shift, Duration.zero);
+    // Seen leaving 3 min after it: from then on
+    expect(direct.onAnotherVehicle(past, at(9, 30)).shift, const Duration(minutes: 3));
   });
 
   test('counts what is left', () {

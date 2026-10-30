@@ -310,9 +310,10 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
                 points: path.points,
                 color: path.color,
                 strokeWidth: path.width,
+                // Walks: the dots alone on the map, like Citymapper's
                 pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
                 borderColor: Colors.white.withValues(alpha: path.color.a),
-                borderStrokeWidth: 1.5,
+                borderStrokeWidth: path.dotted ? 0 : 1.5,
               ),
           ],
         ),
