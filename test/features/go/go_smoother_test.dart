@@ -90,6 +90,13 @@ void main() {
 
   test('a small step of the followed position moves the camera at once', () {
     const follow = MapFollow(position: start, bearing: 90);
+    // Tilted, or overhead: another view, animated to
+    expect(follow.closeTo(const MapFollow(position: start, bearing: 90, pitch: MapFollow.firstPersonPitch)), isFalse);
+    expect(follow.closeTo(const MapFollow.overhead(start)), isFalse);
+    // The tilt kept along the way
+    const tilted = MapFollow(position: start, bearing: 90, pitch: MapFollow.firstPersonPitch);
+    expect(tilted.withPosition(east(2)).pitch, MapFollow.firstPersonPitch);
+    expect(tilted.glideTo(tilted.withBearing(100), 1 / 60).pitch, MapFollow.firstPersonPitch);
 
     expect(follow.closeTo(follow.withPosition(east(1)).withBearing(100)), isTrue);
     expect(follow.closeTo(follow.withPosition(east(30))), isTrue);

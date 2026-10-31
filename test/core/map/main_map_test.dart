@@ -164,6 +164,18 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('a vehicle followed from overhead: north up, in the middle of what is left above the panel', (tester) async {
+    final container = await pumpMap(tester);
+
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow.overhead(user)));
+    await animate(tester);
+    expect(camera(tester).latLngToScreenOffset(user).dy, closeTo(250, 4));
+    expect(camera(tester).rotation % 360, closeTo(0, 0.5));
+    expect(camera(tester).zoom, 15);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('framing aims at where the panel goes to rest, the user followed at 72 % of what is left above it',
       (tester) async {
     final container = await pumpMap(tester);

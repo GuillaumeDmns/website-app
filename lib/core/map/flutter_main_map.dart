@@ -124,7 +124,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     final size = _controller.mapController.camera.nonRotatedSize;
     // The user shown this many pixels below the center of the map, which is then that far ahead of them (the
     // animation's own offset doesn't work with a rotation)
-    final below = (size.height - inset) * 0.72 - size.height / 2;
+    final below = (size.height - inset) * (view.overhead ? 0.5 : 0.72) - size.height / 2;
     final metersPerPixel = 156543.03392 * math.cos(view.position.latitudeInRad) / math.pow(2, view.zoom);
     return const Distance().offset(view.position, below.abs() * metersPerPixel, below >= 0 ? view.bearing : view.bearing + 180);
   }
@@ -337,7 +337,9 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
                 // Upright marker: the heading on the screen is the map's rotation plus the heading
                 child: Builder(
                   builder: (context) => UserDot(
-                    screenHeading: overlay.follow == null ? null : _heading.apply(overlay.follow!).bearing + MapCamera.of(context).rotation,
+                    screenHeading: overlay.follow == null || overlay.follow!.overhead
+                        ? null
+                        : _heading.apply(overlay.follow!).bearing + MapCamera.of(context).rotation,
                   ),
                 ),
               ),

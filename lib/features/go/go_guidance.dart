@@ -167,7 +167,62 @@ MapFollow? goFollow(GoState state, int shownStep) {
   if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
     return null;
   }
-  return MapFollow(position: position, bearing: step.headingFrom(position, progress.along), compass: true);
+  // First person on foot and by bike, tilted to see the way ahead; overhead in a car, or in whatever goes faster than
+  // the move (followed close up, a vehicle is a blur)
+  final firstPerson = !state.inVehicle &&
+      switch (step.section.kind) {
+        SectionKind.walk || SectionKind.transfer || SectionKind.bike => true,
+        _ => false,
+      };
+  if (!firstPerson) {
+    return MapFollow.overhead(position);
+  }
+  return MapFollow(
+    position: position,
+    bearing: step.headingFrom(position, progress.along),
+    compass: true,
+    pitch: MapFollow.firstPersonPitch,
+  );
+}
+
+/// Whether a move is ridden in a vehicle the journey doesn't know of: faster than on foot (4.5 m/s) or by bike (9 m/s)
+/// two fixes in a row; back on foot after fifteen slower than 60 % of that (a red light doesn't make a car a walk)
+class GoVehicleSpeed {
+  int _fast = 0;
+  int _slow = 0;
+  bool _inVehicle = false;
+
+  bool get inVehicle => _inVehicle;
+
+  /// Faster than this on a move of [kind] (m/s): a vehicle
+  static double limitOn(SectionKind kind) => kind == SectionKind.bike ? 9 : 4.5;
+
+  /// A fix's [speed] (the one it is sure of, `sureSpeed`) on a move of [kind]
+  bool add(SectionKind kind, double? speed) {
+    if (speed == null) {
+      return _inVehicle;
+    }
+    final limit = limitOn(kind);
+    if (speed > limit) {
+      _fast++;
+      _slow = 0;
+    } else if (speed < limit * 0.6) {
+      _slow++;
+      _fast = 0;
+    }
+    if (_fast >= 2) {
+      _inVehicle = true;
+    } else if (_slow >= 15) {
+      _inVehicle = false;
+    }
+    return _inVehicle;
+  }
+
+  void reset() {
+    _fast = 0;
+    _slow = 0;
+    _inVehicle = false;
+  }
 }
 
 /// Waiting for [ride]: the map frames where to board, with the user at [position] when they are close to it (on their
