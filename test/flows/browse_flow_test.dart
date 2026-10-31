@@ -81,6 +81,25 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('a place found shows its kind, its street and how far it is, and leads there', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+
+    await tapOn(tester, find.text(currentL10n.homeSearchHint));
+    await tester.enterText(find.byType(TextField), 'pharmacie');
+    await settle(tester);
+    // From where the user is, about 10 m: an address only how far
+    expect(find.byIcon(Icons.local_pharmacy_outlined), findsOneWidget);
+    expect(find.text('Boulevard de Sébastopol · 140 m'), findsOneWidget);
+    expect(find.text('410 m'), findsOneWidget);
+
+    // Like Citymapper: the way there
+    await tapOn(tester, find.text('Pharmacie des Halles (Paris 1er)'));
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters['to'], '48.8597,2.347');
+
+    await closeApp(tester);
+  });
+
   testWidgets('the traffic summary leads to the traffic of every line', (tester) async {
     final backend = standardBackend();
     await pumpApp(tester, backend);
