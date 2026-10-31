@@ -23,13 +23,14 @@ void main() {
 
   LatLng position(StopAreaSummary stop) => LatLng(stop.lat, stop.lon);
 
-  GoInput input(DateTime now, {LatLng? position, double speed = 0, Departure? vehicle, int? vehicleStep, bool realtime = false}) =>
+  GoInput input(DateTime now,
+          {LatLng? position, double speed = 0, double accuracy = 10, DateTime? fixAt, Departure? vehicle, int? vehicleStep, bool realtime = false}) =>
       GoInput(
         now: now,
         position: position,
-        accuracy: 10,
+        accuracy: accuracy,
         speed: speed,
-        fixAt: now,
+        fixAt: fixAt ?? now,
         vehicle: vehicle,
         vehicleStep: vehicleStep,
         realtimeDepartures: realtime,
@@ -169,6 +170,85 @@ void main() {
 
     final (given, _) = tracker.update(waiting, input(at(9), position: position(chatelet)));
     expect(given.issue, GoIssue.missed);
+  });
+
+  test('underground, positions staying at the station never say the vehicle was missed: on board once it left', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+
+    // The network's positions (Wi-Fi, cell towers) stay at Châtelet while the metro takes the user away
+    var (progress, alerts) = tracker.update(waiting, input(at(8), position: position(chatelet), accuracy: 60, vehicleStep: 1, realtime: true));
+    expect(progress.issue, isNull);
+    expect(progress.phase, GoPhase.onBoard);
+    expect(alerts, isEmpty);
+
+    // Gare de Lyon left by its time though they stay there: Nation is next
+    (progress, alerts) = tracker.update(progress, input(at(10, 30), position: position(chatelet), accuracy: 60));
+    expect(progress.stopIndex, 1);
+    expect(alerts.map((alert) => alert.id), ['prepare-1']);
+
+    // The last precise position given again since before the departure is as old as then (see positionSince)
+    final (seen, _) = tracker.update(waiting, input(at(5, 50), position: position(chatelet)));
+    final (given, again) = tracker.update(seen, input(at(8), position: position(chatelet), fixAt: at(5, 50), vehicleStep: 1, realtime: true));
+    expect(given.issue, isNull);
+    expect(given.phase, GoPhase.onBoard);
+    expect(again, isEmpty);
+  });
+
+  test('back from a tunnel, seen far along the line: on board whatever the speed, past the stops gone by', () {
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    final ride = tracker.steps[1];
+
+    // No speed: the network's positions have none
+    final (progress, _) = tracker.update(waiting, input(at(10, 40), position: ride.line.pointAt(ride.stopAlongs[1] + 200)));
+
+    expect(progress.phase, GoPhase.onBoard);
+    expect(progress.stopIndex, 1);
+    // The planned metro: there about when it should be
+    expect(progress.shift, Duration.zero);
+
+    // Nobody waits down the line, but its stop may be passed again by the line: not there
+    final (atStop, _) = tracker.update(waiting, input(at(5), position: ride.line.pointAt(100)));
+    expect(atStop.phase, GoPhase.waiting);
+  });
+
+  test('back from a tunnel on the metro given up for missed: followed on its own times, not on the one retained', () {
+    // The metro of 8:06 given up for missed at Châtelet: the journey moved to the next one, at 8:14
+    final retainedPlan = journey([
+      walk(at(0), 240),
+      transit(at(14), 480, via: [gareDeLyon]),
+      walk(at(22), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+    ]);
+    final retained = GoTracker(retainedPlan);
+    final waiting = retained.chosen(retained.jumpTo(retained.initial(), 1), 1);
+    final ride = retained.steps[1];
+
+    // Past Gare de Lyon at 8:10:40: on the 8:06, by the ride's times
+    final (progress, _) = retained.update(
+        waiting, input(at(10, 40), position: ride.line.pointAt(ride.stopAlongs[1] + 200), vehicle: departure(at(14)), vehicleStep: 1));
+
+    expect(progress.phase, GoPhase.onBoard);
+    expect(progress.stopIndex, 1);
+    expect(progress.shift.inSeconds, closeTo(-8 * 60, 30));
+    expect(ride.scheduledTo(ride.stopAlongs[1]), const Duration(minutes: 4));
+  });
+
+  test('walking to the stop along the line is no ride; seen far along it off the walk, the user rides it', () {
+    final line = tracker.steps[1].line;
+    // Walking to Châtelet from 800 m down the metro line, along it
+    final downTheLine = line.pointAt(800);
+    final along = GoTracker(journey([
+      walk(at(0), 600, from: JourneyPoint(name: 'Quai de la Rapée', lat: downTheLine.latitude, lon: downTheLine.longitude)),
+      transit(at(10), 480, via: [gareDeLyon]),
+    ]));
+    final (walking, _) = along.update(along.initial(), input(at(2), position: line.pointAt(600), speed: 1.3));
+    expect(walking.step, 0);
+    expect(walking.phase, GoPhase.moving);
+
+    // The walk never seen done (underground), the GPS back past Gare de Lyon: on board
+    final ride = tracker.steps[1];
+    final (riding, _) = tracker.update(tracker.initial(), input(at(10, 40), position: ride.line.pointAt(ride.stopAlongs[1] + 200)));
+    expect(riding.step, 1);
+    expect(riding.phase, GoPhase.onBoard);
   });
 
   test('detects boarding from a fast move along the line', () {
