@@ -40,23 +40,16 @@ class LiveJourneyUpdate {
   final List<LiveJourneySegment> segments;
 }
 
-/// System side of GO mode: ongoing notification with the progress, alerts while the app is in the background, and
-/// keeping the journey followed with the screen off. Android: foreground service + Live Update. Web: browser
-/// notifications when the tab is hidden, screen kept on with the Wake Lock API. Nothing elsewhere, where GO works
-/// while the app is open.
+/// System side of GO mode: ongoing notification with the progress and what to do now, and keeping the journey
+/// followed with the screen off. Android: foreground service + Live Update. Web: screen kept on with the Wake Lock
+/// API. Nothing elsewhere, where GO works while the app is open. No notification per alert: the app shows them.
 abstract class LiveJourney {
   /// Asks what is needed before starting (notification permission)
   Future<void> prepare();
 
   Future<void> update(LiveJourneyUpdate update);
 
-  /// [kind]: how it is felt (`GoAlert.kind`: `prepare`, `alight`, `platform`, `urgent`, `info`)
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'});
-
   Future<void> stop();
-
-  /// Whether alerts are given by the system (no need for an in-app sound)
-  bool get systemAlerts;
 
   /// Keeps the screen on (or not) while GO mode is shown
   Future<void> keepScreenOn(bool on);
@@ -64,9 +57,6 @@ abstract class LiveJourney {
 
 class _AndroidLiveJourney implements LiveJourney {
   static const _channel = MethodChannel('com.guillaumedamiens.live_notification/bridge');
-
-  @override
-  bool get systemAlerts => true;
 
   Future<void> _call(String method, [Map<String, Object?>? arguments]) async {
     try {
@@ -93,10 +83,6 @@ class _AndroidLiveJourney implements LiveJourney {
       });
 
   @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) =>
-      _call('alert', {'title': title, 'body': body, 'urgent': urgent, 'kind': kind});
-
-  @override
   Future<void> stop() async {
     await _call('keepScreenOn', {'on': false});
     await _call('stopNotification');
@@ -108,16 +94,10 @@ class _AndroidLiveJourney implements LiveJourney {
 
 class _NoLiveJourney implements LiveJourney {
   @override
-  bool get systemAlerts => false;
-
-  @override
   Future<void> prepare() async {}
 
   @override
   Future<void> update(LiveJourneyUpdate update) async {}
-
-  @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
 
   @override
   Future<void> stop() async {}
@@ -126,23 +106,13 @@ class _NoLiveJourney implements LiveJourney {
   Future<void> keepScreenOn(bool on) async {}
 }
 
-/// Browser: notifications only when the tab is hidden (the app shows its own banner otherwise)
+/// Browser: the screen kept on only
 class _WebLiveJourney implements LiveJourney {
   @override
-  bool get systemAlerts => false;
-
-  @override
-  Future<void> prepare() => browser.requestNotifications();
+  Future<void> prepare() async {}
 
   @override
   Future<void> update(LiveJourneyUpdate update) async {}
-
-  @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {
-    if (browser.pageHidden) {
-      browser.notify(title, body);
-    }
-  }
 
   @override
   Future<void> stop() => browser.keepScreenOn(false);

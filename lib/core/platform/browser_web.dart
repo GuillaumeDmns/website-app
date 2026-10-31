@@ -1,6 +1,5 @@
-// Browser features used by GO mode: notifications (Notification API) and keeping the screen on (Screen Wake Lock
-// API), through JS interop; both are missing in some browsers (e.g. Safari outside an installed app), then nothing
-// happens.
+// Browser features used by GO mode: keeping the screen on (Screen Wake Lock API), through JS interop; missing in some
+// browsers, then nothing happens.
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
@@ -26,42 +25,6 @@ extension type _WakeLockSentinel._(JSObject _) implements JSObject {
   external bool get released;
 
   external JSPromise<JSAny?> release();
-}
-
-@JS('Notification')
-extension type _Notification._(JSObject _) implements JSObject {
-  external factory _Notification(String title, _NotificationOptions options);
-
-  external static String get permission;
-
-  external static JSPromise<JSString> requestPermission();
-}
-
-extension type _NotificationOptions._(JSObject _) implements JSObject {
-  external factory _NotificationOptions({String body, String tag});
-}
-
-bool get _hasNotifications => globalContext.has('Notification');
-
-bool get pageHidden => _document.hidden;
-
-Future<void> requestNotifications() async {
-  if (!_hasNotifications || _Notification.permission != 'default') {
-    return;
-  }
-  try {
-    await _Notification.requestPermission().toDart;
-  } catch (e) {
-    debugPrint('Notification permission failed: $e');
-  }
-}
-
-void notify(String title, String body) {
-  if (!_hasNotifications || _Notification.permission != 'granted') {
-    return;
-  }
-  // Same tag: a new alert replaces the previous one
-  _Notification(title, _NotificationOptions(body: body, tag: 'go'));
 }
 
 _WakeLockSentinel? _sentinel;

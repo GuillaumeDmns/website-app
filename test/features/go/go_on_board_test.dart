@@ -96,16 +96,10 @@ void main() {
 /// No notification nor screen kept on in the tests
 class _NoLiveJourney implements LiveJourney {
   @override
-  bool get systemAlerts => false;
-
-  @override
   Future<void> prepare() async {}
 
   @override
   Future<void> update(LiveJourneyUpdate update) async {}
-
-  @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
 
   @override
   Future<void> stop() async {}

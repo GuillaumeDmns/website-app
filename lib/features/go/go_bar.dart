@@ -6,7 +6,6 @@ import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/map/map_overlay.dart';
-import '../../core/platform/live_journey.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
 import 'go_controller.dart';
@@ -36,7 +35,7 @@ class GoBar extends ConsumerWidget {
         ? state.alert
         : null;
     if (onGoPage) {
-      final strip = alert != null && !ref.watch(liveJourneyProvider).systemAlerts;
+      final strip = alert != null;
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -63,7 +63,7 @@ String _liveMode(JourneySection? section) => switch (section?.kind) {
       _ => 'walk',
     };
 
-/// An alert felt in the app (where the system doesn't give it): each kind its own pattern, as the Android channels
+/// An alert felt in the app: each kind its own pattern
 void feelGoAlert(GoAlert alert) {
   SystemSound.play(SystemSoundType.alert);
   void pulses(int count, Duration gap, void Function() pulse) {

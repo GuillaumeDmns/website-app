@@ -67,16 +67,6 @@ class MainActivity: FlutterFragmentActivity() {
                     }
                     result.success(null)
                 }
-                "alert" -> {
-                    LiveJourneyNotification.alert(
-                        this,
-                        title = call.argument<String>("title") ?: "",
-                        body = call.argument<String>("body") ?: "",
-                        urgent = call.argument<Boolean>("urgent") ?: false,
-                        kind = call.argument<String>("kind") ?: "info",
-                    )
-                    result.success(null)
-                }
                 "stopNotification" -> {
                     GoService.stop(this)
                     LiveJourneyNotification.cancelJourney(this)

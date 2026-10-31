@@ -556,16 +556,12 @@ class GoController extends Notifier<GoState?> {
       _recalculateTimer = null;
       next = next.copyWith(recalculateAt: () => null);
     }
+    // In the app only: no notification of its own (the ongoing one says what to do now)
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
       if (!current.muted) {
-        final live = ref.read(liveJourneyProvider);
-        if (!live.systemAlerts) {
-          feelGoAlert(alert);
-        }
-        // Web: a notification when the tab is hidden
-        live.alert(alert.title, alert.body ?? '', urgent: alert.urgent, kind: alert.kind);
+        feelGoAlert(alert);
       }
     }
     state = next;
