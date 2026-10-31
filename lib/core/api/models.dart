@@ -313,7 +313,7 @@ abstract class PlaceResult with _$PlaceResult {
   const factory PlaceResult({
     @JsonKey(unknownEnumValue: PlaceType.poi) required PlaceType type,
 
-    /// Stop area id for stop areas, Navitia id otherwise
+    /// Stop area id for stop areas, else the source's (`address:…`, `poi:…` from the IGN, `osm:N123` from OpenStreetMap, Navitia's)
     required String id,
 
     /// With the town, e.g. `Mairie de Montreuil (Montreuil)`
@@ -321,6 +321,12 @@ abstract class PlaceResult with _$PlaceResult {
     required double lat,
     required double lon,
     @Default([]) List<LineSummary> lines,
+
+    /// A place's street and number (`1-7 Rue Pierre Lescot`), from OpenStreetMap
+    String? address,
+
+    /// A place's kind: OpenStreetMap's tag value (`pharmacy`, `bakery`, `cinema`…)
+    String? category,
   }) = _PlaceResult;
 
   factory PlaceResult.fromJson(Map<String, dynamic> json) => _$PlaceResultFromJson(json);
