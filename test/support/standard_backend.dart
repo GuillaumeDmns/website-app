@@ -90,6 +90,15 @@ FakeBackend standardBackend() {
         places: [
           PlaceResult(type: PlaceType.stopArea, id: chatelet.id, name: 'Châtelet (Paris)', lat: chatelet.lat, lon: chatelet.lon, lines: chatelet.lines),
           const PlaceResult(type: PlaceType.address, id: '2.3418;48.8598', name: '10 Rue de Rivoli (Paris)', lat: 48.8598, lon: 2.3418),
+          const PlaceResult(
+            type: PlaceType.poi,
+            id: 'osm:N4001',
+            name: 'Pharmacie des Halles (Paris 1er)',
+            lat: 48.8597,
+            lon: 2.3470,
+            address: 'Boulevard de Sébastopol',
+            category: 'pharmacy',
+          ),
         ],
       ).toJson()));
   backend.on('GET', '/api/v2/journeys', (_) {

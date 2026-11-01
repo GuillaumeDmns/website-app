@@ -104,7 +104,24 @@ void main() {
     });
 
     expect(result.places.first.lines, isEmpty);
+    expect(result.places.first.address, isNull);
     expect(result.places.last.type, PlaceType.poi);
+  });
+
+  test("reads OpenStreetMap's places with their street and kind", () {
+    final place = PlaceResult.fromJson({
+      'type': 'POI',
+      'id': 'osm:N1345636994',
+      'name': 'Fnac (Paris 1er)',
+      'lat': 48.8622,
+      'lon': 2.3482,
+      'address': '1-7 Rue Pierre Lescot',
+      'category': 'electronics',
+    });
+
+    expect(place.address, '1-7 Rue Pierre Lescot');
+    expect(place.category, 'electronics');
+    expect(place.lines, isEmpty);
   });
 
   test('reads rides with their arrival source', () {

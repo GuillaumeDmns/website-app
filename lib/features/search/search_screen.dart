@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
+import '../../core/utils/geo.dart';
+import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/ui.dart';
@@ -290,7 +293,46 @@ class _Results extends StatelessWidget {
   }
 }
 
-class _PlaceTile extends StatelessWidget {
+/// A place's icon from its OpenStreetMap kind (`PlaceResult.category`), null for a kind without one of its own
+IconData? placeCategoryIcon(String? category) => switch (category) {
+      'pharmacy' => Icons.local_pharmacy_outlined,
+      'bakery' || 'pastry' => Icons.bakery_dining_outlined,
+      'supermarket' || 'convenience' || 'greengrocer' => Icons.local_grocery_store_outlined,
+      'cafe' => Icons.local_cafe_outlined,
+      'restaurant' || 'fast_food' || 'food_court' => Icons.restaurant,
+      'bar' || 'pub' => Icons.local_bar_outlined,
+      'cinema' => Icons.local_movies_outlined,
+      'theatre' || 'arts_centre' => Icons.theater_comedy_outlined,
+      'museum' || 'gallery' => Icons.museum_outlined,
+      'hotel' || 'hostel' || 'guest_house' => Icons.hotel_outlined,
+      'bank' || 'atm' => Icons.local_atm,
+      'post_office' => Icons.local_post_office_outlined,
+      'toilets' => Icons.wc,
+      'hospital' || 'clinic' => Icons.local_hospital_outlined,
+      'doctors' || 'dentist' => Icons.medical_services_outlined,
+      'veterinary' || 'pet' => Icons.pets,
+      'parking' => Icons.local_parking,
+      'fuel' => Icons.local_gas_station_outlined,
+      'park' || 'garden' => Icons.park_outlined,
+      'swimming_pool' => Icons.pool,
+      'fitness_centre' || 'sports_centre' => Icons.fitness_center,
+      'library' => Icons.local_library_outlined,
+      'books' => Icons.menu_book_outlined,
+      'florist' => Icons.local_florist_outlined,
+      'clothes' || 'shoes' => Icons.checkroom,
+      'electronics' || 'mobile_phone' || 'computer' => Icons.devices_outlined,
+      'marketplace' || 'mall' || 'department_store' => Icons.storefront_outlined,
+      'townhall' => Icons.account_balance_outlined,
+      'police' => Icons.local_police_outlined,
+      'school' || 'college' || 'university' => Icons.school_outlined,
+      'stadium' => Icons.stadium_outlined,
+      'attraction' || 'viewpoint' || 'monument' => Icons.photo_camera_outlined,
+      'laundry' || 'dry_cleaning' => Icons.local_laundry_service_outlined,
+      'hairdresser' => Icons.content_cut,
+      _ => null,
+    };
+
+class _PlaceTile extends ConsumerWidget {
   const _PlaceTile({required this.place, required this.isPicking, required this.onTap, this.icon});
 
   final PlaceResult place;
@@ -301,27 +343,37 @@ class _PlaceTile extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final typeIcon = switch (place.type) {
       PlaceType.stopArea => Icons.directions_transit,
       PlaceType.address => Icons.place_outlined,
-      PlaceType.poi => Icons.star_outline,
+      PlaceType.poi => placeCategoryIcon(place.category) ?? Icons.star_outline,
     };
+    // From where the user is, not the map's center (about 10 m: a new fix seldom changes it); a stop shows its lines instead
+    final meters = place.type == PlaceType.stopArea
+        ? null
+        : ref.watch(userLocationProvider.select((location) => switch (location.value) {
+              final user? => (metersBetween(user, LatLng(place.lat, place.lon)) / 10).round() * 10,
+              null => null,
+            }));
+    final details = [?place.address, if (meters != null) formatDistance(meters)].join(' · ');
 
     return ListTile(
       leading: IconBubble(icon ?? typeIcon, color: icon == null && place.type == PlaceType.stopArea ? scheme.primary : null),
       title: Text(place.name),
-      subtitle: place.lines.isEmpty
-          ? null
-          : Padding(
+      subtitle: place.lines.isNotEmpty
+          ? Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Wrap(
                 spacing: 4,
                 runSpacing: 4,
                 children: [for (final line in place.lines.take(12)) LineBadge(line, size: 18)],
               ),
-            ),
+            )
+          : details.isEmpty
+              ? null
+              : Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
       onTap: onTap,
       trailing: isPicking || place.type == PlaceType.stopArea
           ? null
