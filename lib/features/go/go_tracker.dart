@@ -61,6 +61,22 @@ class GoStep {
 
   static const _aheadMeters = 30.0;
 
+  /// Ride: scheduled time from its first stop to [along] meters along it, between the times of the stops around
+  Duration scheduledTo(double along) {
+    if (stopAlongs.length < 2) {
+      final share = line.length <= 0 ? 0.0 : (along / line.length).clamp(0.0, 1.0);
+      return section.arrival.difference(section.departure) * share;
+    }
+    var k = 0;
+    while (k < stopAlongs.length - 2 && stopAlongs[k + 1] < along) {
+      k++;
+    }
+    final span = stopAlongs[k + 1] - stopAlongs[k];
+    final share = span <= 0 ? 1.0 : ((along - stopAlongs[k]) / span).clamp(0.0, 1.0);
+    final from = stopTime(k);
+    return from.add(stopTime(k + 1).difference(from) * share).difference(stopTime(0));
+  }
+
   /// Scheduled time at each stop, interpolated where the journey has none
   DateTime stopTime(int index) {
     final stops = section.stops;
@@ -245,11 +261,14 @@ class GoAlert {
 /// alerts to give.
 ///
 /// - Moving: position projected on the path; done near its end, or on schedule without a position (underground).
-/// - Waiting: boarding detected when moving fast along the line (the vehicle taken left when it is seen to, when that
-///   is far from the departure expected: a late one, an earlier one), or assumed after the departure without a
-///   position; still at the stop 90 s after the departure means the vehicle was missed (3 min after one only
-///   scheduled, often a few minutes late).
-/// - On board: stop reached from the position on the line, or from the stop times (+ shift) without one.
+/// - Waiting: boarding detected when moving fast along the line, or seen far along it whatever the speed (back from a
+///   tunnel) (the vehicle taken left when it is seen to, when that is far from the departure expected: a late one, an
+///   earlier one), or assumed after the departure without a precise position; still at the stop 90 s after the
+///   departure by a precise fix means the vehicle was missed (3 min after one only scheduled, often a few minutes
+///   late). Underground, the network's positions, or the last one given again, stay at the station while the vehicle
+///   takes the user away: they never say a vehicle was missed.
+/// - On board: stop reached from the position on the line, or from the stop times (+ shift) without one or with only
+///   rough ones.
 class GoTracker {
   GoTracker(this.journey) : steps = _steps(journey);
 
@@ -258,6 +277,10 @@ class GoTracker {
 
   static const _maxAccuracy = 100.0;
   static const _fixValidity = Duration(seconds: 30);
+
+  /// A fix this precise is the GPS's, outdoors: only such a fix says the user is still at a stop, or alone where they
+  /// are on board. The network's (Wi-Fi, cell towers), the only ones underground, are rougher.
+  static const _preciseAccuracy = 30.0;
 
   /// Without a fix for this long, the schedule leads
   static const _noFixDelay = Duration(seconds: 60);
@@ -475,10 +498,10 @@ class GoTracker {
       final end = step.end;
       done = step.line.length - current.along < 40 || (end != null && metersBetween(fix, end) < 40);
 
-      // Already riding the next vehicle
-      if (!done && nextStep != null && nextStep.isRide && (input.speed ?? 0) >= 4) {
-        final onLine = nextStep.line.project(fix);
-        done = onLine != null && onLine.distance < 50 && onLine.along > 80;
+      // Already riding the next vehicle (seen far along its line too, back from a tunnel, unless still on the walk)
+      if (!done && nextStep != null && nextStep.isRide) {
+        final onWalk = projection != null && projection.distance <= 60;
+        done = _riding(nextStep, fix, input.speed ?? 0, far: !onWalk) != null;
       }
 
       // Hurry: the vehicle leaves before the user gets to the stop at a normal pace
@@ -540,16 +563,19 @@ class GoTracker {
       ));
     }
 
-    // Moving fast along the line: on board, of the vehicle seen leaving then
+    // Seen riding: on board, of the vehicle seen leaving then
     final speed = input.speed ?? 0;
-    if (fix != null && speed >= 4) {
-      final projection = ride.line.project(fix);
-      if (projection != null && projection.distance < 60 && projection.along > 80) {
-        return _board(current, input.now, _departureTaken(departure, input.now, projection.along, speed));
+    if (fix != null) {
+      final riding = _riding(ride, fix, speed);
+      if (riding != null) {
+        final left = _leftAt(ride, input.now, riding.along, speed);
+        return _board(current, input.now, _departureTaken(departure, input.now, riding.along, left));
       }
     }
 
-    if (untilDeparture <= const Duration(seconds: -90) && fix != null) {
+    // Still at the stop by a precise fix only
+    final precise = fix != null && (input.accuracy ?? 0) <= _preciseAccuracy;
+    if (untilDeparture <= const Duration(seconds: -90) && fix != null && precise) {
       final start = ride.start;
       final stillAtStop = start != null && metersBetween(fix, start) < 150 && speed < 2;
       if (stillAtStop) {
@@ -566,23 +592,47 @@ class GoTracker {
       return _board(current, input.now, departure);
     }
 
-    // No position (underground station): assume the user boarded
-    if (untilDeparture <= const Duration(seconds: -60) && _noFixFor(current, input.now) && current.issue == null) {
+    // No position, or only rough ones (underground station): assume the user boarded
+    final unseen = fix == null ? _noFixFor(current, input.now) : !precise;
+    if (untilDeparture <= const Duration(seconds: -60) && unseen && current.issue == null) {
       return _board(current, input.now, departure);
     }
     return current;
   }
 
+  /// Seen on board [ride] at [fix]: moving fast along its line, or [far] along it from the stop whatever the speed
+  /// (the network's positions have none, back from a tunnel), not where the line passes by the stop again
+  static PolylineProjection? _riding(GoStep ride, LatLng fix, double speed, {bool far = true}) {
+    final projection = ride.line.project(fix);
+    if (projection == null) {
+      return null;
+    }
+    if (speed >= 4 && projection.distance < 60 && projection.along > 80) {
+      return projection;
+    }
+    final start = ride.start;
+    final awayFromStop = start == null || metersBetween(fix, start) > 150;
+    return far && awayFromStop && projection.distance < 100 && projection.along >= _farAlong ? projection : null;
+  }
+
+  /// Nobody waits this far down the line from their stop: seen there, the user is on board
+  static const _farAlong = 400.0;
+
+  /// When the vehicle the user is on left the stop, seen [along] meters from it at [now]: at [speed] near the stop (the
+  /// first fixes on board), else on the ride's times (the stops on the way slow it)
+  static DateTime _leftAt(GoStep ride, DateTime now, double along, double speed) => speed >= 4 && along <= 500
+      ? now.subtract(Duration(milliseconds: (along / speed * 1000).round()))
+      : now.subtract(ride.scheduledTo(along));
+
   /// Waiting for a vehicle only scheduled, how late it may still come before it is given up for missed
   static const _scheduledLateness = Duration(minutes: 3);
 
-  /// When the vehicle the user is on left, seen [along] meters from the stop at [speed] at [now]. Close to the stop
-  /// (the first fixes on board), that is well known: the [expected] departure when it is within a minute of it (its
-  /// real time is the more precise), else the user is on another vehicle than expected: a late one (taken after it
-  /// was given up for missed and the next one retained) or one before the planned one. Further, stops on the way
-  /// blur it: only an expected departure still to come is surely not the one taken.
-  static DateTime _departureTaken(DateTime expected, DateTime now, double along, double speed) {
-    final left = now.subtract(Duration(milliseconds: (along / speed * 1000).round()));
+  /// When the vehicle the user is on left, seen [along] meters from the stop at [now] and estimated to have [left]
+  /// then. Close to the stop (the first fixes on board), that is well known: the [expected] departure when it is
+  /// within a minute of it (its real time is the more precise), else the user is on another vehicle than expected: a
+  /// late one (taken after it was given up for missed and the next one retained) or one before the planned one.
+  /// Further, stops on the way blur it: only an expected departure still to come is surely not the one taken.
+  static DateTime _departureTaken(DateTime expected, DateTime now, double along, DateTime left) {
     final anotherVehicle = expected.isAfter(now.add(const Duration(minutes: 1))) ||
         along <= 500 && expected.difference(left).abs() > const Duration(minutes: 1);
     return anotherVehicle ? left : expected;
@@ -642,14 +692,16 @@ class GoTracker {
       }
       final end = ride.end;
       arrived = arrived || end != null && metersBetween(fix, end) < 60;
-    } else if (_noFixFor(current, input.now)) {
-      // Underground: stop times, shifted by the real departure
+    }
+    // Underground: stop times, shifted by the real departure; with only rough positions too, which may stay at a
+    // station the vehicle has left (the further of the two)
+    if (fix == null ? _noFixFor(current, input.now) : (input.accuracy ?? 0) > _preciseAccuracy) {
       for (var k = index; k < last; k++) {
         if (!input.now.isBefore(ride.stopTime(k).add(current.shift + _dwell))) {
           index = k;
         }
       }
-      arrived = !input.now.isBefore(shiftedArrival);
+      arrived = arrived || !input.now.isBefore(shiftedArrival);
     }
     current = current.copyWith(stopIndex: math.max(current.stopIndex, index));
 

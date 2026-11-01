@@ -67,6 +67,29 @@ void main() {
     expect(sureSpeed(fix(-1, 0)), isNull);
   });
 
+  test('the same position given again (underground, the system gives its last one) is as old as when first given', () {
+    final first = DateTime.utc(2026, 10, 31, 8, 0);
+    Position fix(double latitude, DateTime time) => Position(
+          latitude: latitude,
+          longitude: 2.3470,
+          timestamp: time,
+          accuracy: 8,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+    final platform = fix(48.8584, first);
+
+    expect(positionSince(platform, null, null), first);
+    expect(positionSince(fix(48.8584, first.add(const Duration(minutes: 3))), platform, first), first);
+    // A GPS standing still still wanders a little: each fix new
+    final later = first.add(const Duration(seconds: 5));
+    expect(positionSince(fix(48.85841, later), platform, first), later);
+  });
+
   test("GO asks the app's feed for what each moment needs, and gives it back when it stops", () async {
     final opened = <LocationSettings>[];
     final feed = PositionFeed(open: (settings) {
@@ -117,16 +140,10 @@ void main() {
 /// No notification nor screen kept on in the tests
 class _NoLiveJourney implements LiveJourney {
   @override
-  bool get systemAlerts => false;
-
-  @override
   Future<void> prepare() async {}
 
   @override
   Future<void> update(LiveJourneyUpdate update) async {}
-
-  @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
 
   @override
   Future<void> stop() async {}

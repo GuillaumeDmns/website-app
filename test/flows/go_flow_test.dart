@@ -115,21 +115,12 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets("the latest alert under the banner, unless the system's notification shows it", (tester) async {
+  testWidgets('the latest alert under the banner: no notification of its own, Android included', (tester) async {
     const alert = GoAlert(id: 'soon-1', title: 'Métro 1 dans 2 min', body: 'Direction Nation');
     final state = followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon))
         .copyWith(alert: alert, alertAt: DateTime.now());
 
-    // Android: its notification comes over the banner
     await openGo(tester, state);
-    expect(find.textContaining('Métro 1 dans 2 min'), findsNothing);
-    await closeApp(tester);
-
-    await pumpApp(tester, standardBackend(), overrides: [
-      goControllerProvider.overrideWith(() => _FollowedJourney(state)),
-      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
-    ]);
-    await tapOn(tester, find.text(currentL10n.go).first);
     expect(find.text('Métro 1 dans 2 min · Direction Nation'), findsOneWidget);
 
     await closeApp(tester);
@@ -290,16 +281,10 @@ void main() {
 /// No notification nor screen kept on in the tests
 class _NoLiveJourney implements LiveJourney {
   @override
-  bool get systemAlerts => false;
-
-  @override
   Future<void> prepare() async {}
 
   @override
   Future<void> update(LiveJourneyUpdate update) async {}
-
-  @override
-  Future<void> alert(String title, String body, {bool urgent = false, String kind = 'info'}) async {}
 
   @override
   Future<void> stop() async {}

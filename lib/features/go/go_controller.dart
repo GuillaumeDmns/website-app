@@ -44,6 +44,14 @@ LocationNeed? goLocationNeed(GoState? state, {required bool shown}) => switch (s
 /// 2.5 ± 2.1 m/s: still for GO (no smoothed walk, no boarding seen, no pace)
 double? sureSpeed(Position fix) => fix.speed < 0 ? null : math.max(0, fix.speed - math.max(0, fix.speedAccuracy));
 
+/// When the position of [fix] was first given, [previous] being the fix before it, whose position was first given at
+/// [since]: the same position given again with a new time (the system's last one, underground) is no fresher, and no
+/// sign that the user is still there
+DateTime positionSince(Position fix, Position? previous, DateTime? since) => previous != null && since != null &&
+        previous.latitude == fix.latitude && previous.longitude == fix.longitude
+    ? since
+    : fix.timestamp;
+
 /// GO session: feeds the [GoTracker] with high-accuracy positions (the app's [PositionFeed], asked as often as the
 /// moment needs, [goLocationNeed]), a 5 s clock and the real-time departures of the next ride (`rideOptionsProvider`,
 /// every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it
@@ -55,6 +63,9 @@ class GoController extends Notifier<GoState?> {
   Timer? _tick;
   Timer? _departuresTimer;
   Position? _lastFix;
+
+  /// When the position of [_lastFix] was first given ([positionSince])
+  DateTime? _fixSince;
 
   /// What the map shows of the fixes, redrawn ([GoSmoother.redrawInterval]) while it moves and the app is on screen
   final _smoother = GoSmoother();
@@ -234,7 +245,8 @@ class GoController extends Notifier<GoState?> {
       guess = _guess = RideGuess.start(progress.step, ride, seen ?? const [], departed: ride.section.departure.add(progress.shift));
     }
     final fix = _lastFix;
-    if (fix != null && fix.timestamp != _guessedFixAt) {
+    // A new position only: the same one given again tells nothing of a station (stopped there or not)
+    if (fix != null && fix.timestamp != _guessedFixAt && fix.timestamp == _fixSince) {
       _guessedFixAt = fix.timestamp;
       guess.observe(fix.timestamp, LatLng(fix.latitude, fix.longitude), speed: sureSpeed(fix), accuracy: fix.accuracy);
     }
@@ -398,6 +410,7 @@ class GoController extends Notifier<GoState?> {
   }
 
   void _onFix(Position position) {
+    _fixSince = positionSince(position, _lastFix, _fixSince);
     _lastFix = position;
     final now = DateTime.now();
     ref.read(goFixStatsProvider.notifier).record(now, position.accuracy);
@@ -478,6 +491,7 @@ class GoController extends Notifier<GoState?> {
 
   void _stopFeeds() {
     _lastFix = null;
+    _fixSince = null;
     // Not during a build: providers can't be modified while widgets build
     Future.microtask(() {
       try {
@@ -522,7 +536,7 @@ class GoController extends Notifier<GoState?> {
       position: position,
       accuracy: fix?.accuracy,
       speed: fix == null ? null : sureSpeed(fix),
-      fixAt: fix?.timestamp,
+      fixAt: fix == null ? null : _fixSince,
       vehicle: current.vehicle,
       vehicleStep: current.vehicleStep,
       realtimeDepartures: current.realtimeDepartures,
@@ -556,16 +570,12 @@ class GoController extends Notifier<GoState?> {
       _recalculateTimer = null;
       next = next.copyWith(recalculateAt: () => null);
     }
+    // In the app only: no notification of its own (the ongoing one says what to do now)
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
       if (!current.muted) {
-        final live = ref.read(liveJourneyProvider);
-        if (!live.systemAlerts) {
-          feelGoAlert(alert);
-        }
-        // Web: a notification when the tab is hidden
-        live.alert(alert.title, alert.body ?? '', urgent: alert.urgent, kind: alert.kind);
+        feelGoAlert(alert);
       }
     }
     state = next;
