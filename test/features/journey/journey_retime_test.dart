@@ -114,6 +114,38 @@ void main() {
     expect(retimed.sections[3].departure.isBefore(retimed.sections[1].arrival), isFalse);
   });
 
+  test('stops where the departure taken does: an express train skips some of the planned one', () {
+    // Planned: the RER A of 8:10 through Gare de Lyon (6 min). The express of 8:11 goes straight to Nation: its
+    // schedule shifted by its delay says 8:12 → 8:16, the real time 8:17
+    final stopping = journey([transit(at(10), 360, line: rerA, via: [gareDeLyon])]);
+    final express = ride(at(12), aimed: at(11), ride: const Duration(minutes: 5)).copyWith(stops: [
+      JourneyStop(name: 'Châtelet', lat: chatelet.lat, lon: chatelet.lon, time: at(12)),
+      JourneyStop(name: 'Nation', lat: nation.lat, lon: nation.lon, time: at(16)),
+    ]);
+
+    final direct = retimeJourney(stopping, lookup: lookupOf({'C01742': [express]}), now: now, choices: {0: express}).journey;
+
+    expect(direct.sections.single.stops.map((stop) => stop.name), ['Châtelet', 'Nation']);
+    expect(direct.sections.single.stops.map((stop) => stop.time), [at(12), at(17)]);
+
+    // The other way round: the train taken stops on the way, at its times shifted with it
+    final stoppingRide = ride(at(13), aimed: at(12), ride: const Duration(minutes: 6)).copyWith(stops: [
+      JourneyStop(name: 'Châtelet', lat: chatelet.lat, lon: chatelet.lon, time: at(13)),
+      JourneyStop(name: 'Gare de Lyon', lat: gareDeLyon.lat, lon: gareDeLyon.lon, time: at(16)),
+      JourneyStop(name: 'Nation', lat: nation.lat, lon: nation.lon, time: at(19)),
+    ]);
+    final through = retimeJourney(direct, lookup: lookupOf({'C01742': [stoppingRide]}), now: now, choices: {0: stoppingRide}).journey;
+
+    expect(through.sections.single.stops.map((stop) => stop.name), ['Châtelet', 'Gare de Lyon', 'Nation']);
+    expect(through.sections.single.stops[1].time, at(16));
+
+    // Stops not known: the planned ones, at times moved with the departure
+    final unknown = retimeJourney(stopping, lookup: lookupOf({'C01742': [ride(at(12), aimed: at(11))]}), now: now).journey;
+
+    expect(unknown.sections.single.stops.map((stop) => stop.name), ['Châtelet', 'Gare de Lyon', 'Nation']);
+    expect(unknown.sections.single.stops.first.time, at(12));
+  });
+
   test('moves the later rides after a late one', () {
     final retimed = retimeJourney(
       planned,

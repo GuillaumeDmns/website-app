@@ -155,6 +155,10 @@ abstract class Ride with _$Ride {
     required String destination,
     DateTime? arrivalAt,
     @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) ArrivalSource? arrivalSource,
+
+    /// Where it stops from the boarding stop to the alighting one, both included, from its scheduled trip (a direct
+    /// train skips some); empty when its trip isn't known
+    @Default([]) List<JourneyStop> stops,
   }) = _Ride;
 
   factory Ride.fromJson(Map<String, dynamic> json) => _$RideFromJson(json);

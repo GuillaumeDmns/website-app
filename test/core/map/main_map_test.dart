@@ -123,6 +123,23 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('walks are dots on the map itself, rides solid on a light edge', (tester) async {
+    final container = await pumpMap(tester);
+    const walk = [LatLng(48.8584, 2.3470), LatLng(48.8611, 2.3372)];
+    const ride = [LatLng(48.8584, 2.3470), LatLng(48.8550, 2.3650)];
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(paths: [
+      MapPath(points: walk, color: Color(0xFF3C4654), dotted: true),
+      MapPath(points: ride, color: Color(0xFFFFCD00), width: 6),
+    ]));
+    await tester.pump();
+
+    final polylines = tester.widget<PolylineLayer>(find.byType(PolylineLayer)).polylines;
+    expect(polylines.first.borderStrokeWidth, 0);
+    expect(polylines.last.borderStrokeWidth, greaterThan(0));
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('what is framed stays in the middle of the part above the panel while it moves, at once', (tester) async {
     final container = await pumpMap(tester);
     const stop = LatLng(48.8600, 2.3500);

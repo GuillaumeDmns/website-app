@@ -478,25 +478,40 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     final previous = _pathLayers;
     _pathLayers = [
       for (final (index, path) in paths.indexed)
-        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, _pathLayersOf(path)),
+        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, mapLibrePathLayers(path)),
     ];
     return [for (final (_, layers) in _pathLayers) ...layers];
   }
+}
 
-  /// Light edge of the paths: the map stays light in dark mode too
-  static const _casing = Colors.white;
+/// Light edge of the paths: the map stays light in dark mode too
+const _casing = Colors.white;
 
-  static List<Layer> _pathLayersOf(MapPath path) {
-    final lines = [if (path.points.length >= 2) _line(path.points)];
-    return [
-      // A light edge under the path (a band under the dotted ones), as faded as the path
-      PolylineLayer(polylines: lines, color: _casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
-      PolylineLayer(polylines: lines, color: path.color, width: path.width.round(), dashArray: path.dotted ? const [1, 2] : null),
-    ];
+/// The style layers of [path] on the MapLibre map: a solid path on a light edge as faded as it, a walk as round dots
+/// on the map itself like Citymapper's (a light band under them hid the map)
+List<Layer> mapLibrePathLayers(MapPath path) {
+  final lines = [
+    if (path.points.length >= 2)
+      Feature(geometry: LineString.from([for (final point in path.points) Geographic(lon: point.longitude, lat: point.latitude)])),
+  ];
+  if (path.dotted) {
+    return [DotsLayer(polylines: lines, color: path.color, width: path.width.round())];
   }
+  return [
+    PolylineLayer(polylines: lines, color: _casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
+    PolylineLayer(polylines: lines, color: path.color, width: path.width.round()),
+  ];
+}
 
-  static Feature<LineString> _line(List<LatLng> points) =>
-      Feature(geometry: LineString.from([for (final point in points) _geo(point)]));
+/// A line of round dots as wide as the line, one every two widths: dashes of no length, their round ends drawn
+class DotsLayer extends PolylineLayer {
+  const DotsLayer({required super.polylines, required super.color, required super.width});
+
+  @override
+  Map<String, Object> getLayout() => const {'line-cap': 'round', 'line-join': 'round'};
+
+  @override
+  Map<String, Object> getPaint() => {...super.getPaint(), 'line-dasharray': const [0, 2]};
 }
 
 /// Short credits, the full ones on the About page

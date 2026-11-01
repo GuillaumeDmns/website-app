@@ -189,7 +189,16 @@ class GoProgress {
 
 /// What the tracker knows at an update
 class GoInput {
-  const GoInput({required this.now, this.position, this.accuracy, this.speed, this.fixAt, this.vehicle, this.vehicleStep});
+  const GoInput({
+    required this.now,
+    this.position,
+    this.accuracy,
+    this.speed,
+    this.fixAt,
+    this.vehicle,
+    this.vehicleStep,
+    this.realtimeDepartures = false,
+  });
 
   final DateTime now;
   final LatLng? position;
@@ -204,6 +213,9 @@ class GoInput {
   /// Real-time departure of the planned vehicle at the boarding stop of the ride [vehicleStep], when found
   final Departure? vehicle;
   final int? vehicleStep;
+
+  /// The departures of the ride [vehicleStep] come with real time (see [GoState.realtimeDepartures])
+  final bool realtimeDepartures;
 
   Departure? vehicleOf(int step) => vehicleStep == step ? vehicle : null;
 }
@@ -233,8 +245,10 @@ class GoAlert {
 /// alerts to give.
 ///
 /// - Moving: position projected on the path; done near its end, or on schedule without a position (underground).
-/// - Waiting: boarding detected when moving fast along the line, or assumed after the departure without a position;
-///   still at the stop after the departure means the vehicle was missed.
+/// - Waiting: boarding detected when moving fast along the line (the vehicle taken left when it is seen to, when that
+///   is far from the departure expected: a late one, an earlier one), or assumed after the departure without a
+///   position; still at the stop 90 s after the departure means the vehicle was missed (3 min after one only
+///   scheduled, often a few minutes late).
 /// - On board: stop reached from the position on the line, or from the stop times (+ shift) without one.
 class GoTracker {
   GoTracker(this.journey) : steps = _steps(journey);
@@ -331,6 +345,25 @@ class GoTracker {
     }
     final fired = {...progress.fired}..removeWhere((id) => id.endsWith('-$step'));
     return progress.copyWith(phase: GoPhase.waiting, shift: Duration.zero, issue: () => null, fired: fired);
+  }
+
+  /// On board, the journey now follows another vehicle for the ride in progress, guessed (see [GoController]): the user
+  /// is where they were on the way, the stops left are counted on that vehicle's, and its times are shifted from
+  /// [departed], when the user was seen to leave, unless its real time says about the same (the more precise)
+  GoProgress onAnotherVehicle(GoProgress progress, DateTime departed) {
+    final ride = stepOf(progress);
+    if (ride == null || progress.phase != GoPhase.onBoard) {
+      return progress;
+    }
+    var index = 0;
+    for (var k = 0; k < ride.stopAlongs.length - 1; k++) {
+      if (ride.stopAlongs[k] + _leftStopMeters <= progress.along) {
+        index = k;
+      }
+    }
+    final gap = departed.difference(ride.section.departure);
+    final shift = gap.abs() <= const Duration(minutes: 1) ? Duration.zero : Duration(seconds: gap.inSeconds.clamp(-1800, 3600));
+    return progress.copyWith(stopIndex: index, shift: shift);
   }
 
   GoProgress dismissIssue(GoProgress progress) => progress.copyWith(issue: () => null, offRouteSince: () => null);
@@ -507,19 +540,23 @@ class GoTracker {
       ));
     }
 
-    // Moving fast along the line: on board
-    if (fix != null && (input.speed ?? 0) >= 4) {
+    // Moving fast along the line: on board, of the vehicle seen leaving then
+    final speed = input.speed ?? 0;
+    if (fix != null && speed >= 4) {
       final projection = ride.line.project(fix);
       if (projection != null && projection.distance < 60 && projection.along > 80) {
-        return _board(current, input.now, departure);
+        return _board(current, input.now, _departureTaken(departure, input.now, projection.along, speed));
       }
     }
 
     if (untilDeparture <= const Duration(seconds: -90) && fix != null) {
       final start = ride.start;
-      final stillAtStop = start != null && metersBetween(fix, start) < 150 && (input.speed ?? 0) < 2;
+      final stillAtStop = start != null && metersBetween(fix, start) < 150 && speed < 2;
       if (stillAtStop) {
-        if (current.issue == null && !current.fired.contains('missed-${current.step}')) {
+        // A vehicle only scheduled is often a few minutes late: given up later than one the real time saw leave
+        final realtime = vehicle?.realtime ?? (input.vehicleStep == current.step && input.realtimeDepartures);
+        final missed = untilDeparture <= (realtime ? const Duration(seconds: -90) : -_scheduledLateness);
+        if (missed && current.issue == null && !current.fired.contains('missed-${current.step}')) {
           current = current.copyWith(issue: () => GoIssue.missed);
           alerts.add(GoAlert(id: 'missed-${current.step}', title: currentL10n.alertMissed(lineLabel),
               body: currentL10n.alertMissedBody));
@@ -536,16 +573,32 @@ class GoTracker {
     return current;
   }
 
+  /// Waiting for a vehicle only scheduled, how late it may still come before it is given up for missed
+  static const _scheduledLateness = Duration(minutes: 3);
+
+  /// When the vehicle the user is on left, seen [along] meters from the stop at [speed] at [now]. Close to the stop
+  /// (the first fixes on board), that is well known: the [expected] departure when it is within a minute of it (its
+  /// real time is the more precise), else the user is on another vehicle than expected: a late one (taken after it
+  /// was given up for missed and the next one retained) or one before the planned one. Further, stops on the way
+  /// blur it: only an expected departure still to come is surely not the one taken.
+  static DateTime _departureTaken(DateTime expected, DateTime now, double along, double speed) {
+    final left = now.subtract(Duration(milliseconds: (along / speed * 1000).round()));
+    final anotherVehicle = expected.isAfter(now.add(const Duration(minutes: 1))) ||
+        along <= 500 && expected.difference(left).abs() > const Duration(minutes: 1);
+    return anotherVehicle ? left : expected;
+  }
+
   GoProgress _board(GoProgress progress, DateTime? now, DateTime? departure) {
     final ride = stepOf(progress);
     if (ride == null) {
       return progress;
     }
-    // Schedule shift from the real departure (clamped: a wrong detection must not shift by hours)
+    // Schedule shift from the real departure: later or earlier than planned (an earlier vehicle, a late one taken
+    // after the next one was retained), clamped so that a wrong detection never shifts by hours
     var shift = progress.shift;
     if (departure != null) {
       final measured = departure.difference(ride.section.departure);
-      shift = Duration(seconds: measured.inSeconds.clamp(-120, 3600));
+      shift = Duration(seconds: measured.inSeconds.clamp(-1800, 3600));
     }
     return progress.copyWith(phase: GoPhase.onBoard, along: 0, stopIndex: 0, shift: shift, issue: () => null);
   }

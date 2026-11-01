@@ -120,6 +120,24 @@ void main() {
 
     expect(rides.map((ride) => ride.arrivalSource),
         [ArrivalSource.realtime, ArrivalSource.scheduled, ArrivalSource.typical, null, null]);
+    expect(rides.first.stops, isEmpty);
+  });
+
+  test('reads where a ride stops', () {
+    // A direct train from Bécon-les-Bruyères to Saint-Lazare
+    final ride = Ride.fromJson({
+      'departure': {'time': '2026-10-10T08:11:10Z', 'aimedTime': '2026-10-10T08:11:10Z', 'realtime': true, 'trainNumber': '134512'},
+      'destination': 'Gare Saint-Lazare',
+      'arrivalAt': '2026-10-10T08:18:00Z',
+      'arrivalSource': 'scheduled',
+      'stops': [
+        {'name': 'Bécon les Bruyères', 'lat': 48.9055, 'lon': 2.2688, 'time': '2026-10-10T08:11:10Z'},
+        {'name': 'Gare Saint-Lazare', 'lat': 48.8775, 'lon': 2.3244, 'time': '2026-10-10T08:18:00Z'},
+      ],
+    });
+
+    expect(ride.stops.map((stop) => stop.name), ['Bécon les Bruyères', 'Gare Saint-Lazare']);
+    expect(ride.stops.last.time, DateTime.utc(2026, 10, 10, 8, 18));
   });
 
   test('reads vehicles, timetables, Vélib stations, the account and favorites', () {

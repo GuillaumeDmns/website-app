@@ -66,7 +66,9 @@ bool sameRide(Ride a, Ride b) {
 /// - another one keeps its planned departure while it can still be caught, else takes the first departure leaving
 ///   after the traveller gets to its stop (arrival of the previous ride, then the walk);
 /// - walks follow the ride before them, waits fill the time until the ride after, and the sections before the first
-///   ride end when it leaves.
+///   ride end when it leaves;
+/// - a ride on a departure whose stops are known stops where that one does: a direct train skips some of the planned
+///   train's.
 ///
 /// Sections before [from] are kept as they are (GO mode: the part already done). [lookup] gives the departures of
 /// a ride; without them its planned times are kept, or moved after the previous ride.
@@ -204,18 +206,22 @@ Ride? plannedRide(List<Ride> rides, DateTime planned) {
 }
 
 /// [section] moved to [departure] → [arrival], its stop times spread the same way; a ride gets the real-time state
-/// of the departure taken
+/// of the departure taken, and its stops when known (a direct train skips some of the planned one's)
 JourneySection _moved(JourneySection section, DateTime departure, DateTime arrival, Ride? ride) {
   if (departure == section.departure && arrival == section.arrival && ride == null) {
     return section;
   }
-  final oldSpan = section.arrival.difference(section.departure).inSeconds;
+  final rideStops = ride != null && ride.stops.length >= 2 ? ride.stops : null;
+  final stops = rideStops ?? section.stops;
+  final start = rideStops == null ? section.departure : rideStops.first.time;
+  final end = rideStops == null ? section.arrival : rideStops.last.time;
   final newSpan = arrival.difference(departure).inSeconds;
   DateTime? stopTime(DateTime? time) {
-    if (time == null) {
+    if (time == null || start == null || end == null) {
       return null;
     }
-    final ratio = oldSpan <= 0 ? 0.0 : time.difference(section.departure).inSeconds / oldSpan;
+    final oldSpan = end.difference(start).inSeconds;
+    final ratio = oldSpan <= 0 ? 0.0 : time.difference(start).inSeconds / oldSpan;
     return departure.add(Duration(seconds: (ratio * newSpan).round()));
   }
 
@@ -223,7 +229,7 @@ JourneySection _moved(JourneySection section, DateTime departure, DateTime arriv
     departure: departure,
     arrival: arrival,
     duration: newSpan,
-    stops: [for (final stop in section.stops) stop.copyWith(time: stopTime(stop.time))],
+    stops: [for (final stop in stops) stop.copyWith(time: stopTime(stop.time))],
     headsign: ride?.destination ?? section.headsign,
     realtime: ride == null ? section.realtime : ride.departure.realtime,
     delay: ride == null

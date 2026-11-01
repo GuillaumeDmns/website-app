@@ -22,6 +22,7 @@ import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
 import 'go_guidance.dart';
 import 'go_live.dart';
+import 'go_ride_guess.dart';
 import 'go_smoother.dart';
 import 'go_state.dart';
 import 'go_tracker.dart';
@@ -46,7 +47,8 @@ double? sureSpeed(Position fix) => fix.speed < 0 ? null : math.max(0, fix.speed 
 /// GO session: feeds the [GoTracker] with high-accuracy positions (the app's [PositionFeed], asked as often as the
 /// moment needs, [goLocationNeed]), a 5 s clock and the real-time departures of the next ride (`rideOptionsProvider`,
 /// every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it
-/// survives a restart.
+/// survives a restart. On board, the journey follows the vehicle guessed among the departures seen at the stop
+/// ([RideGuess]).
 class GoController extends Notifier<GoState?> {
   PositionFeed? _feed;
   StreamSubscription<Position>? _positions;
@@ -81,6 +83,16 @@ class GoController extends Notifier<GoState?> {
 
   /// A missed or cancelled vehicle being replaced by the next one
   bool _retaining = false;
+
+  /// Departures received for each ride of the journey followed by [_seenFor] (by step), the departed ones kept: those
+  /// the user may have boarded
+  final _seen = <int, List<Ride>>{};
+  GoTracker? _seenFor;
+
+  /// On board, which of them the user is on, and the journey being moved to it
+  RideGuess? _guess;
+  DateTime? _guessedFixAt;
+  bool _following = false;
 
   /// Off the way: the recalculation on its own, after a countdown the user can beat or cancel
   Timer? _recalculateTimer;
@@ -150,32 +162,12 @@ class GoController extends Notifier<GoState?> {
     }
     final previousEta = current.tracker.eta(current.progress, current.currentVehicle);
     final sectionIndex = current.tracker.steps[step].sectionIndex;
-    final api = ref.read(mobilityApiProvider);
-    final now = DateTime.now();
-
-    // Departures of the following rides, fetched as the retiming asks for them
-    final known = <RideKey, List<Ride>>{};
-    var retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
-    for (var round = 0; round < 6; round++) {
-      final missing = retimed.rides.values.map((plan) => plan.key).where((key) => !known.containsKey(key)).toList();
-      if (missing.isEmpty) {
-        break;
-      }
-      for (final key in missing) {
-        try {
-          known[key] = await api.lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
-        } catch (e) {
-          known[key] = const [];
-        }
-      }
-      retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
-    }
+    var journey = await _retimedWith(current, step, ride);
 
     final latest = state;
     if (latest == null || latest.tracker != current.tracker) {
       return;
     }
-    var journey = retimed.journey;
     final progress = latest.progress;
     if (step > progress.step && progress.shift != Duration.zero) {
       // The current ride's lateness still applies to what follows it: the chosen times are kept as they are
@@ -194,6 +186,79 @@ class GoController extends Notifier<GoState?> {
       position: latest.position,
       retained: retained ? (step: step, later: tracker.eta(chosen, null).difference(previousEta), cancelled: cancelled) : null,
     );
+    _save();
+    _watchDepartures();
+    _update();
+  }
+
+  /// [current]'s journey with [ride] taken for the ride [step], the departures of the following rides fetched as the
+  /// retiming asks for them
+  Future<JourneyOption> _retimedWith(GoState current, int step, Ride ride) async {
+    final sectionIndex = current.tracker.steps[step].sectionIndex;
+    final api = ref.read(mobilityApiProvider);
+    final now = DateTime.now();
+    final known = <RideKey, List<Ride>>{};
+    var retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
+    for (var round = 0; round < 6; round++) {
+      final missing = retimed.rides.values.map((plan) => plan.key).where((key) => !known.containsKey(key)).toList();
+      if (missing.isEmpty) {
+        break;
+      }
+      for (final key in missing) {
+        try {
+          known[key] = await api.lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
+        } catch (e) {
+          known[key] = const [];
+        }
+      }
+      retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
+    }
+    return retimed.journey;
+  }
+
+  /// On board, the vehicle taken is guessed among the departures seen at the stop ([RideGuess]: the one that left when
+  /// the user did, then checked at each station on the way): the journey follows it, without a word to the user
+  void _guessRide(GoState state) {
+    final progress = state.progress;
+    if (progress.phase != GoPhase.onBoard) {
+      _guess = null;
+      return;
+    }
+    var guess = _guess;
+    if (guess == null || guess.step != progress.step) {
+      final ride = state.tracker.steps[progress.step];
+      final seen = _seenFor == state.tracker ? _seen[progress.step] : null;
+      guess = _guess = RideGuess.start(progress.step, ride, seen ?? const [], departed: ride.section.departure.add(progress.shift));
+    }
+    final fix = _lastFix;
+    if (fix != null && fix.timestamp != _guessedFixAt) {
+      _guessedFixAt = fix.timestamp;
+      guess.observe(fix.timestamp, LatLng(fix.latitude, fix.longitude), speed: sureSpeed(fix), accuracy: fix.accuracy);
+    }
+    final better = guess.better;
+    if (better != null && !_following) {
+      _following = true;
+      unawaited(_followRide(progress.step, better).whenComplete(() => _following = false));
+    }
+  }
+
+  /// On board the ride [step], the vehicle is guessed to be [ride], not the one followed (a direct train, not the
+  /// stopping one): the journey follows it from there on, its stops, its arrival and the connections after it, the
+  /// user still where they are on board
+  Future<void> _followRide(int step, Ride ride) async {
+    final current = state;
+    if (current == null || current.progress.step != step || current.progress.phase != GoPhase.onBoard) {
+      return;
+    }
+    final journey = await _retimedWith(current, step, ride);
+    final latest = state;
+    if (latest == null || latest.tracker != current.tracker || latest.progress.step != step || latest.progress.phase != GoPhase.onBoard) {
+      return;
+    }
+    final departed = latest.tracker.steps[step].section.departure.add(latest.progress.shift);
+    final tracker = GoTracker(journey);
+    state = latest.copyWith(tracker: tracker, progress: tracker.onAnotherVehicle(latest.progress, departed));
+    _guess?.follow(ride);
     _save();
     _watchDepartures();
     _update();
@@ -431,6 +496,9 @@ class GoController extends Notifier<GoState?> {
     _departures = null;
     _departuresOf = null;
     _rides = null;
+    _seen.clear();
+    _seenFor = null;
+    _guess = null;
     _recalculateTimer?.cancel();
     _recalculateTimer = null;
   }
@@ -450,6 +518,7 @@ class GoController extends Notifier<GoState?> {
       fixAt: fix?.timestamp,
       vehicle: current.vehicle,
       vehicleStep: current.vehicleStep,
+      realtimeDepartures: current.realtimeDepartures,
     );
     final (progress, alerts) = current.tracker.update(current.progress, input);
 
@@ -495,6 +564,7 @@ class GoController extends Notifier<GoState?> {
     _askPositions();
     _publishLive(next);
     _feelTurn(next);
+    _guessRide(next);
 
     if (changed) {
       _save();
@@ -593,7 +663,7 @@ class GoController extends Notifier<GoState?> {
       _departures?.close();
       _departures = null;
       _departuresOf = null;
-      state = current.copyWith(vehicle: () => null, vehicleStep: () => null);
+      state = current.copyWith(vehicle: () => null, vehicleStep: () => null, realtimeDepartures: false);
       return;
     }
     final of = (key: key, tracker: current.tracker, step: index);
@@ -620,10 +690,27 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     _rides = rides;
+    if (_seenFor != of.tracker) {
+      _seen.clear();
+      _seenFor = of.tracker;
+    }
+    final seen = _seen.putIfAbsent(of.step, () => []);
+    for (final ride in rides) {
+      final known = seen.indexWhere((other) => sameDeparture(other, ride));
+      if (known >= 0) {
+        seen[known] = ride;
+      } else {
+        seen.add(ride);
+      }
+    }
     // The planned vehicle: same scheduled time (a few minutes of tolerance)
     final ride = of.tracker.steps[of.step];
     final vehicle = plannedRide(rides, of.tracker.plannedDeparture(ride, latest.progress))?.departure;
-    state = latest.copyWith(vehicle: () => vehicle, vehicleStep: () => of.step);
+    state = latest.copyWith(
+      vehicle: () => vehicle,
+      vehicleStep: () => of.step,
+      realtimeDepartures: rides.any((ride) => ride.departure.realtime),
+    );
   }
 
   Future<void> _save() async {
