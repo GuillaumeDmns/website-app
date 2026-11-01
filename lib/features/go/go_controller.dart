@@ -64,6 +64,9 @@ class GoController extends Notifier<GoState?> {
   /// The user's pace on the moves (m/s), averaged over the fixes
   double? _walkSpeed;
 
+  /// A move ridden in a vehicle, from the fixes' speeds
+  final _vehicleSpeed = GoVehicleSpeed();
+
   /// The turn last felt (its offset on the walk of that step), to give each one once
   String? _turnFelt;
 
@@ -339,6 +342,7 @@ class GoController extends Notifier<GoState?> {
     _closeTimer?.cancel();
     _closeTimer = null;
     _walkSpeed = null;
+    _vehicleSpeed.reset();
     _turnFelt = null;
     final tracker = GoTracker(journey);
     state = GoState(
@@ -400,6 +404,9 @@ class GoController extends Notifier<GoState?> {
     final current = state;
     final step = current?.tracker.stepOf(current.progress);
     final speed = sureSpeed(position);
+    if (step != null && !step.isRide) {
+      _vehicleSpeed.add(step.section.kind, speed);
+    }
     // The pace on foot or by bike, from decent fixes while moving
     if (step != null && !step.isRide && speed != null && speed >= 0.5 && speed <= 9 && position.accuracy <= 30) {
       final pace = _walkSpeed;
@@ -531,8 +538,9 @@ class GoController extends Notifier<GoState?> {
     if (progress.step != current.progress.step) {
       // A new move: its own pace (on foot after a bike, say)
       _walkSpeed = null;
+      _vehicleSpeed.reset();
     }
-    var next = current.copyWith(progress: progress, position: position, walkSpeed: _walkSpeed);
+    var next = current.copyWith(progress: progress, position: position, walkSpeed: _walkSpeed, inVehicle: _vehicleSpeed.inVehicle);
     // The vehicle kept on its own is said until the user is on board (or elsewhere)
     if (current.retained case final retained?
         when progress.step != retained.step || progress.phase != GoPhase.waiting) {

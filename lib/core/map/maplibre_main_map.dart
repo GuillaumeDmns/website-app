@@ -130,6 +130,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         center: _geo(overlay.fit.single),
         zoom: 16,
         bearing: 0,
+        pitch: 0,
         padding: padding,
         nativeDuration: const Duration(milliseconds: 500),
       ));
@@ -138,6 +139,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     unawaited(controller.fitBounds(
       bounds: _bounds(overlay.fit),
       bearing: 0,
+      pitch: 0,
       padding: padding,
       nativeDuration: const Duration(milliseconds: 500),
       webMaxZoom: 17,
@@ -181,7 +183,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     _shown = view;
-    _followPadding = followPadding(_livePanel, _height);
+    _followPadding = followPadding(_livePanel, _height, overhead: view.overhead);
     // A small step (the smoothed position, the compass): glided to, step by step
     if (shown != null && shown.closeTo(view)) {
       _camera ??= shown;
@@ -196,12 +198,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     const duration = Duration(milliseconds: 700);
     _camera = view;
     _target = view;
-    final padding = followPadding(_restingPanel, _height);
+    final padding = followPadding(_restingPanel, _height, overhead: view.overhead);
     _animating(duration, padding);
     unawaited(controller.animateCamera(
       center: _geo(view.position),
       zoom: view.zoom,
       bearing: view.bearing,
+      pitch: view.pitch,
       padding: padding,
       nativeDuration: duration,
     ));
@@ -233,6 +236,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       center: _geo(shown.position),
       zoom: shown.zoom,
       bearing: shown.bearing,
+      pitch: shown.pitch,
       padding: _followPadding,
     ));
     if (shown != target) {
@@ -284,7 +288,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     final following = _following != null;
-    final padding = following ? followPadding(_livePanel, _height) : framePadding(_livePanel, _height);
+    final padding = following
+        ? followPadding(_livePanel, _height, overhead: (_camera ?? _shown)?.overhead ?? false)
+        : framePadding(_livePanel, _height);
     if (following) {
       _followPadding = padding;
     }
@@ -323,7 +329,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       const duration = Duration(milliseconds: 500);
       final padding = framePadding(_restingPanel, _height);
       _animating(duration, padding);
-      unawaited(_controller?.animateCamera(bearing: 0, padding: padding, nativeDuration: duration));
+      unawaited(_controller?.animateCamera(bearing: 0, pitch: 0, padding: padding, nativeDuration: duration));
     }
   }
 
@@ -454,7 +460,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
                     // Upright marker: the heading on the screen is the heading minus the map's bearing
                     final bearing = MapCamera.maybeOf(context)?.bearing ?? 0;
                     final follow = overlay.follow;
-                    return UserDot(screenHeading: follow == null ? null : _heading.apply(follow).bearing - bearing);
+                    return UserDot(
+                      screenHeading: follow == null || follow.overhead ? null : _heading.apply(follow).bearing - bearing,
+                    );
                   },
                 ),
               ),

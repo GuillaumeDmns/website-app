@@ -64,9 +64,21 @@ class MapPath {
       listEquals(points, other.points);
 }
 
-/// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close.
+/// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close,
+/// tilted to see further ahead; or [overhead] (a vehicle followed): north up, the followed in the middle, further out.
 class MapFollow {
-  const MapFollow({required this.position, required this.bearing, this.zoom = 18, this.compass = false});
+  const MapFollow({
+    required this.position,
+    required this.bearing,
+    this.zoom = 18,
+    this.compass = false,
+    this.pitch = 0,
+    this.overhead = false,
+  });
+
+  /// From overhead, north up, [position] in the middle of what is left above the panel, a few streets around: a
+  /// vehicle moves too fast to be followed close up
+  const MapFollow.overhead(LatLng position) : this(position: position, bearing: 0, zoom: 15, overhead: true);
 
   final LatLng position;
 
@@ -78,14 +90,27 @@ class MapFollow {
   /// map turns): [bearing] is then only the fallback, without compass
   final bool compass;
 
-  MapFollow withBearing(double bearing) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
+  /// Degrees from looking straight down (MapLibre; flutter_map stays flat)
+  final double pitch;
 
-  MapFollow withPosition(LatLng position) => MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass);
+  /// See [MapFollow.overhead]
+  final bool overhead;
+
+  /// On foot or by bike: tilted, the way ahead seen further than from straight above
+  static const firstPersonPitch = 45.0;
+
+  MapFollow withBearing(double bearing) =>
+      MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead);
+
+  MapFollow withPosition(LatLng position) =>
+      MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead);
 
   /// The camera showing [other] only has to move a little, at once (no animation): a smoothed position redrawn several
   /// times a second, or the compass turning it
   bool closeTo(MapFollow other) =>
       zoom == other.zoom &&
+      pitch == other.pitch &&
+      overhead == other.overhead &&
       metersBetween(position, other.position) < 50 &&
       headingDelta(bearing, other.bearing).abs() < 25;
 
@@ -115,12 +140,24 @@ class MapFollow {
         headingDelta(nextBearing, target.bearing).abs() < 0.2 && metersBetween(nextPosition, target.position) < 0.05;
     return there
         ? target
-        : MapFollow(position: nextPosition, bearing: nextBearing, zoom: target.zoom, compass: target.compass);
+        : MapFollow(
+            position: nextPosition,
+            bearing: nextBearing,
+            zoom: target.zoom,
+            compass: target.compass,
+            pitch: target.pitch,
+            overhead: target.overhead,
+          );
   }
 
-  /// The camera showing [other] doesn't need to move for this one: same place and zoom, less than half a degree apart
+  /// The camera showing [other] doesn't need to move for this one: same place, zoom and tilt, less than half a degree
+  /// apart
   bool sameView(MapFollow other) =>
-      position == other.position && zoom == other.zoom && headingDelta(bearing, other.bearing).abs() < 0.5;
+      position == other.position &&
+      zoom == other.zoom &&
+      pitch == other.pitch &&
+      overhead == other.overhead &&
+      headingDelta(bearing, other.bearing).abs() < 0.5;
 }
 
 /// The heading of the follow camera, for the maps: the device's (kept from [deviceHeadingProvider] while the follow

@@ -22,6 +22,7 @@ class GoState {
     this.vehicle,
     this.vehicleStep,
     this.realtimeDepartures = false,
+    this.inVehicle = false,
     this.alert,
     this.alertAt,
     this.recalculating = false,
@@ -60,6 +61,9 @@ class GoState {
   /// schedule tells when a vehicle should come.
   final bool realtimeDepartures;
 
+  /// On a move, the user rides something faster than the move goes (`GoVehicleSpeed`): the map follows overhead
+  final bool inVehicle;
+
   /// Last alert given, and when
   final GoAlert? alert;
   final DateTime? alertAt;
@@ -90,6 +94,7 @@ class GoState {
     Departure? Function()? vehicle,
     int? Function()? vehicleStep,
     bool? realtimeDepartures,
+    bool? inVehicle,
     GoAlert? alert,
     DateTime? alertAt,
     bool? recalculating,
@@ -110,6 +115,7 @@ class GoState {
         vehicle: vehicle != null ? vehicle() : this.vehicle,
         vehicleStep: vehicleStep != null ? vehicleStep() : this.vehicleStep,
         realtimeDepartures: realtimeDepartures ?? this.realtimeDepartures,
+        inVehicle: inVehicle ?? this.inVehicle,
         alert: alert ?? this.alert,
         alertAt: alertAt ?? this.alertAt,
         recalculating: recalculating ?? this.recalculating,

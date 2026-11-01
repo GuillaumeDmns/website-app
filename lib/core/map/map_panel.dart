@@ -39,10 +39,10 @@ EdgeInsets framePadding(double extent, double height) =>
     EdgeInsets.only(bottom: panelInset(extent, height)) + const EdgeInsets.all(48);
 
 /// The camera's padding following the user: its center, where the user is, at 72 % of the part of a map [height] px
-/// high left above a panel [extent] px high
-EdgeInsets followPadding(double extent, double height) {
+/// high left above a panel [extent] px high (the way ahead above them), in its middle from [overhead]
+EdgeInsets followPadding(double extent, double height, {bool overhead = false}) {
   final hidden = panelInset(extent, height);
-  return EdgeInsets.only(top: (height - hidden) * 0.44, bottom: hidden);
+  return EdgeInsets.only(top: overhead ? 0 : (height - hidden) * 0.44, bottom: hidden);
 }
 
 /// How far down the screen the middle of the part of a map [height] px high left above the panel moves (logical

@@ -193,7 +193,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       });
       return null;
     }
-    return MapFollow(position: place.point, bearing: 0, zoom: 15);
+    return MapFollow.overhead(place.point);
   }
 
   Widget _content(

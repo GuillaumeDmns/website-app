@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/features/go/go_instruction.dart';
 import 'package:website_app/features/go/go_guidance.dart';
 import 'package:website_app/features/go/go_state.dart';
@@ -88,6 +90,53 @@ void main() {
       final waiting = tracker.jumpTo(walking, 1);
       expect(goFollow(state(waiting).copyWith(position: walkLine.pointAt(20)), 1), isNull);
       expect(goFollow(state(walking).copyWith(position: walkLine.pointAt(20)), 1), isNull);
+    });
+
+    test('in first person on foot and by bike, tilted to see ahead; overhead in a vehicle', () {
+      final position = walkLine.pointAt(20);
+      final onFoot = goFollow(state(walking).copyWith(position: position), 0)!;
+      expect((onFoot.pitch, onFoot.compass, onFoot.overhead, onFoot.zoom), (MapFollow.firstPersonPitch, true, false, 18));
+
+      // Faster than a walk: a vehicle, followed from overhead, north up
+      final riding = goFollow(state(walking).copyWith(position: position, inVehicle: true), 0)!;
+      expect((riding.pitch, riding.bearing, riding.compass, riding.overhead), (0, 0, false, true));
+      expect(riding.zoom, lessThan(onFoot.zoom));
+
+      // A car's step: overhead whatever the speed; a bike's: first person
+      GoTracker moveBy(SectionKind kind) => GoTracker(journey([walk(at(0), 600).copyWith(kind: kind)]));
+      GoState on(GoTracker moves) => GoState(
+            tracker: moves,
+            request: const JourneyRequest(),
+            progress: moves.initial(),
+            startedAt: at(0),
+            plannedArrival: at(10),
+            position: moves.steps.first.line.pointAt(20),
+          );
+      expect(goFollow(on(moveBy(SectionKind.car)), 0)!.overhead, isTrue);
+      expect(goFollow(on(moveBy(SectionKind.bike)), 0)!.pitch, MapFollow.firstPersonPitch);
+    });
+
+    test('a vehicle is two fast fixes in a row; back on foot after fifteen slow ones', () {
+      final speeds = GoVehicleSpeed();
+      // A run for the bus, a noisy fix: still on foot
+      for (final speed in [1.4, 5.0, 1.3, 3.8]) {
+        speeds.add(SectionKind.walk, speed);
+      }
+      expect(speeds.inVehicle, isFalse);
+      speeds
+        ..add(SectionKind.walk, 6)
+        ..add(SectionKind.walk, 8);
+      expect(speeds.inVehicle, isTrue);
+      // A red light, a speed unknown: still in it
+      for (var fix = 0; fix < 14; fix++) {
+        speeds.add(SectionKind.walk, 0);
+      }
+      speeds.add(SectionKind.walk, null);
+      expect(speeds.inVehicle, isTrue);
+      speeds.add(SectionKind.walk, 0.5);
+      expect(speeds.inVehicle, isFalse);
+      // By bike, 30 km/h is a bike
+      expect((GoVehicleSpeed()..add(SectionKind.bike, 8.3)..add(SectionKind.bike, 8.5)).inVehicle, isFalse);
     });
   });
 }
