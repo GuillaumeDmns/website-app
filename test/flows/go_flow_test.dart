@@ -7,6 +7,7 @@ import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/platform/live_journey.dart';
+import 'package:website_app/core/utils/time_format.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_screen.dart';
 import 'package:website_app/features/go/go_state.dart';
@@ -203,6 +204,12 @@ void main() {
     expect(find.descendant(of: card, matching: find.text(currentL10n.goExitNamed('2', 'av. du Trône'))), findsOneWidget);
     final pins = container.read(mapOverlaysProvider)[Routes.go]!.pins.map((pin) => pin.label);
     expect(pins, containsAll([currentL10n.goExitNamed('2', 'av. du Trône'), currentL10n.goExitNamed('6', 'av. du Bel Air')]));
+
+    // Then the walk, as long as its path (Navitia's length sometimes leaves out the way through the station)
+    await swipe(tester);
+    final walk = tracker.steps[2];
+    expect(walk.line.length, greaterThan(walk.section.length!));
+    expect(find.text(formatDistance(walk.line.length.round())), findsOneWidget);
 
     await closeApp(tester);
   });

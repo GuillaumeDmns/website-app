@@ -67,7 +67,8 @@ class GoCardHeader extends StatelessWidget {
   factory GoCardHeader.alert(GoGlance glance, {required bool live}) => GoCardHeader(
         leading: glance.line != null ? LineBadge(glance.line!, size: 30) : Icon(glance.icon ?? Icons.info_outline, size: 30, color: Colors.white),
         title: glance.action,
-        subtitle: [glance.kicker, ?glance.place].where((part) => part.isNotEmpty).join(' · '),
+        // Where, else the context: one line under the action
+        subtitle: glance.place?.isNotEmpty ?? false ? glance.place : glance.kicker,
         figure: glance.hero,
         unit: glance.heroUnit,
         live: live,
@@ -135,7 +136,9 @@ class GoCardHeader extends StatelessWidget {
               children: [
                 Text(
                   figure,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  // A word ("maintenant") smaller than a figure: the title keeps its room
+                  style: (int.tryParse(figure.replaceFirst('+', '')) == null ? theme.textTheme.titleMedium : theme.textTheme.headlineSmall)
+                      ?.copyWith(
                     fontWeight: FontWeight.w600,
                     height: 1.05,
                     color: foreground,

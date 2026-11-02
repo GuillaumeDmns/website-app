@@ -57,7 +57,8 @@ class GoWalkCard extends ConsumerWidget {
     final section = step.section;
     final moving = progress.phase == GoPhase.moving && progress.step == card.step;
     final pace = movePace(state, step);
-    final meters = moving ? metersToGo(state) : ((section.length ?? 0) > 0 ? section.length!.toDouble() : step.line.length);
+    // Navitia's length sometimes leaves out the way through a station that its path draws: the longer of the two
+    final meters = moving ? metersToGo(state) : math.max((section.length ?? 0).toDouble(), step.line.length);
     final minutes = moving ? math.max(1, (meters / pace / 60).ceil()) : math.max(1, (section.duration / 60).round());
     final to = section.to?.name ?? '';
 
