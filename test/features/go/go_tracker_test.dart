@@ -127,6 +127,58 @@ void main() {
     expect(alerts.map((alert) => alert.id), ['prepare-1']);
   });
 
+  test('on board underground, the user is between two stops by the clock: from the stop left to the next one', () {
+    final onBoard = tracker.jumpTo(tracker.initial(), 1).copyWith(phase: GoPhase.onBoard);
+
+    // Châtelet left at 8:06, Gare de Lyon at 8:10: a quarter of the way at 8:07, not halfway
+    expect(tracker.betweenStops(onBoard, at(7)), 0.25);
+    expect(tracker.betweenStops(onBoard, at(8)), 0.5);
+    expect(tracker.alongNow(onBoard, at(8)), closeTo(tracker.steps[1].stopAlongs[1] / 2, 0.01));
+    // At Gare de Lyon until it is left
+    expect(tracker.betweenStops(onBoard, at(10, 10)), 1);
+
+    // Left 20 s after its time: Nation at 8:14 is next, from there
+    final (pastLyon, _) = tracker.update(onBoard, GoInput(now: at(10, 25)));
+    expect(pastLyon.stopIndex, 1);
+    expect(tracker.betweenStops(pastLyon, at(10, 20)), 0);
+    expect(tracker.betweenStops(pastLyon, at(12, 10)), 0.5);
+
+    // Four minutes late since the departure: the stops' times shifted
+    expect(tracker.betweenStops(onBoard.copyWith(shift: const Duration(minutes: 4)), at(12)), 0.5);
+    // Not on board: nowhere between stops
+    expect(tracker.betweenStops(tracker.jumpTo(tracker.initial(), 1), at(7)), isNull);
+    expect(tracker.alongNow(const GoProgress(step: 0, phase: GoPhase.moving, along: 120), at(7)), 120);
+  });
+
+  test('on board above ground, the GPS puts the user between the stops; in a tunnel, the clock, never behind it', () {
+    final onBoard = tracker.jumpTo(tracker.initial(), 1).copyWith(phase: GoPhase.onBoard);
+    final ride = tracker.steps[1];
+    LatLng along(double meters) => ride.line.pointAt(meters);
+    final lyon = ride.stopAlongs[1];
+
+    // A late train: seen 30 % of the way to Gare de Lyon at 8:09, when the clock says 75 %
+    var (late, _) = tracker.update(onBoard, input(at(9), position: along(lyon * 0.3), speed: 10));
+    expect(tracker.betweenStops(late, at(9)), closeTo(0.3, 0.01));
+    expect(tracker.alongNow(late, at(9)), closeTo(lyon * 0.3, 1));
+    // Then nothing (a tunnel): the last fix says it a few seconds more, then the clock leads
+    (late, _) = tracker.update(late, GoInput(now: at(9, 6)));
+    expect(tracker.betweenStops(late, at(9, 6)), closeTo(0.3, 0.01));
+    expect(tracker.betweenStops(late, at(9, 20)), closeTo(200 / 240, 0.01));
+
+    // An early train: seen 60 % of the way at 8:07, then only the network's positions, staying behind
+    var (early, _) = tracker.update(onBoard, input(at(7), position: along(lyon * 0.6), speed: 10));
+    (early, _) = tracker.update(early, input(at(7, 20), position: along(lyon * 0.4), accuracy: 60));
+    expect(early.preciseAt, at(7));
+    // The clock says 35 % at 8:07:30: never behind where the GPS saw the user
+    expect(tracker.betweenStops(early, at(7, 30)), closeTo(0.6, 0.01));
+    expect(tracker.betweenStops(early, at(9)), 0.75);
+
+    // Boarding again (a correction) starts without it
+    final boarded = tracker.next(early.copyWith(phase: GoPhase.waiting));
+    expect(boarded.phase, GoPhase.onBoard);
+    expect(boarded.preciseAlong, isNull);
+  });
+
   test('warns when the vehicle comes soon and when it is late', () {
     final waiting = tracker.jumpTo(tracker.initial(), 1);
 

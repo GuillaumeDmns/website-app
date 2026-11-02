@@ -185,14 +185,19 @@ class GoNowCard extends ConsumerWidget {
   }
 }
 
-/// On board, the stops ahead on one line, left to right: the last one left, the user, the next one, then where to
-/// get off. One column each, the line running through their dots, bright up to the user and faint after.
+/// On board, the stops ahead on one line, left to right: the last one left, the next one, then where to get off, the
+/// user between the first two where GO puts them ([GoTracker.betweenStops]: the GPS above ground, else the clock
+/// between the two stops' times), not halfway. One column each, the line running through their dots, bright up to the
+/// user and faint after.
 class _StopsRail extends StatelessWidget {
   const _StopsRail({required this.state, required this.step, required this.color});
 
   final GoState state;
   final GoStep step;
   final Color color;
+
+  /// Room for the user's way from the stop left to the next one, besides their columns (in flex units)
+  static const _wayFlex = 2;
 
   @override
   Widget build(BuildContext context) {
@@ -202,44 +207,74 @@ class _StopsRail extends StatelessWidget {
     }
     final last = stops.length - 1;
     final left = math.min(state.progress.stopIndex, last);
+    final share = state.tracker.betweenStops(state.progress, DateTime.now()) ?? 0;
     final items = <(String, _Dot)>[
       (stops[left].name, _Dot.done),
-      ('', _Dot.me),
       if (left + 1 < last) (stops[left + 1].name, _Dot.next),
       if (left + 2 < last) (stops[left + 2].name, _Dot.stop),
       if (left < last) (stops[last].name, _Dot.end),
     ];
-    final me = items.indexWhere((item) => item.$2 == _Dot.me);
-    Widget half(bool shown, bool bright) => Expanded(
-          child: Container(height: 4, color: shown ? color.withValues(alpha: bright ? 1 : 0.3) : Colors.transparent),
-        );
+    // The next stop and the end get more room for their names
+    final flexes = [for (final (_, dot) in items) dot == _Dot.end || dot == _Dot.next ? 3 : 2];
+    final totalFlex = flexes.fold(0, (sum, flex) => sum + flex) + (items.length > 1 ? _wayFlex : 0);
+    final columns = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (index, (label, dot)) in items.indexed) ...[
+          if (index == 1) const Spacer(flex: _wayFlex),
+          Expanded(
+            flex: flexes[index],
+            child: Column(
+              children: [
+                SizedBox(height: 18, child: Center(child: _dot(context, dot))),
+                _label(context, label, dot),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
     return Semantics(
       label: context.l10n.goGetOffInAt(state.tracker.stopsLeft(state.progress), stops[last].name),
       excludeSemantics: true,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (index, (label, dot)) in items.indexed)
-            Expanded(
-              // The end gets more room for its name
-              flex: dot == _Dot.end || dot == _Dot.next ? 3 : 2,
-              child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Where the stops' dots are
+          final unit = constraints.maxWidth / totalFlex;
+          final centers = <double>[];
+          var x = 0.0;
+          for (final (index, flex) in flexes.indexed) {
+            x += index == 1 ? _wayFlex : 0;
+            centers.add((x + flex / 2) * unit);
+            x += flex;
+          }
+          return TweenAnimationBuilder<double>(
+            // From one fix or tick to the next, a glide; a new stretch starts where the user is, not sliding back
+            key: ValueKey(left),
+            tween: Tween(end: share),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+            child: columns,
+            builder: (context, share, columns) {
+              final me = centers.length < 2 ? centers.first : centers[0] + (centers[1] - centers[0]) * share;
+              return Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  SizedBox(
-                    height: 18,
-                    child: Row(
-                      children: [
-                        half(index > 0, index <= me),
-                        _dot(context, dot),
-                        half(index < items.length - 1, index < me),
-                      ],
-                    ),
+                  Positioned(left: centers.first, width: me - centers.first, top: 7, height: 4, child: ColoredBox(color: color)),
+                  Positioned(
+                    left: me,
+                    width: centers.last - me,
+                    top: 7,
+                    height: 4,
+                    child: ColoredBox(color: color.withValues(alpha: 0.3)),
                   ),
-                  _label(context, label, dot),
+                  columns!,
+                  Positioned(left: me - 9, top: 0, child: _dot(context, _Dot.me)),
                 ],
-              ),
-            ),
-        ],
+              );
+            },
+          );
+        },
       ),
     );
   }
