@@ -44,13 +44,25 @@ class GoDeparturesCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = context.colors;
-    final now = DateTime.now();
+    // The departures' clock: the header and the list count the same minutes
+    final now = ref.watch(nowProvider).value ?? DateTime.now();
     final tracker = state.tracker;
     final progress = state.progress;
     final step = tracker.steps[card.step];
     final section = step.section;
     final line = section.line;
-    final vehicle = state.vehicleStep == card.step ? state.vehicle : null;
+    // The line's departures from when the traveller gets to the stop (at it already, waiting), the one followed among
+    // them; its real time, else GO's for the next ride (the planned vehicle followed by the controller)
+    final earliest = card.step == progress.step ? now : earliestBoarding(state.journey, step.sectionIndex, now).add(progress.shift);
+    final key = rideKey(section, earliest, now);
+    final rides = key == null
+        ? const <Ride>[]
+        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
+              .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
+              .toList();
+    final planned = tracker.plannedDeparture(step, progress);
+    final selected = rides.isEmpty ? null : plannedRide(rides, planned);
+    final vehicle = state.vehicleStep == card.step ? state.vehicle : selected?.departure;
     final departure = tracker.expectedDeparture(step, progress, vehicle);
     final waiting = progress.phase == GoPhase.waiting && progress.step == card.step;
     final minutes = math.min(minutesLeft(departure.difference(now)), 999);
@@ -128,7 +140,7 @@ class GoDeparturesCard extends ConsumerWidget {
               for (final (index, part) in head.indexed) ...[if (index > 0) const SizedBox(height: 12), part],
               if (!done) ...[
                 const SizedBox(height: 12),
-                _Departures(state: state, step: step, index: card.step),
+                _Departures(step: step, index: card.step, rides: rides, selected: selected, planned: planned, earliest: earliest, departures: key),
               ],
               if (!done && positions.isNotEmpty && positions.length < 3) ...[
                 const SizedBox(height: 12),
@@ -195,32 +207,32 @@ class TrainPositions extends StatelessWidget {
 /// times at both stops; the one followed is highlighted, and the next one told in case it is missed. Choosing another
 /// one moves the journey to it.
 class _Departures extends ConsumerWidget {
-  const _Departures({required this.state, required this.step, required this.index});
+  const _Departures({
+    required this.step,
+    required this.index,
+    required this.rides,
+    required this.selected,
+    required this.planned,
+    required this.earliest,
+    required this.departures,
+  });
 
-  final GoState state;
   final GoStep step;
   final int index;
+  final List<Ride> rides;
+  final Ride? selected;
+  final DateTime planned;
+  final DateTime earliest;
+
+  /// Where and from when they are asked
+  final RideKey? departures;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final progress = state.progress;
-    final planned = state.tracker.plannedDeparture(step, progress);
     final now = ref.watch(nowProvider).value ?? DateTime.now();
-    // At the stop already for the step in progress; else after the steps before it
-    final earliest = index == progress.step ? now : earliestBoarding(state.journey, step.sectionIndex, now).add(progress.shift);
-    final key = rideKey(step.section, earliest, now);
-
-    final rides = key == null
-        ? const <Ride>[]
-        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
-              .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
-              .toList();
-
     if (rides.isEmpty) {
-      return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: theme.textTheme.titleMedium);
+      return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: Theme.of(context).textTheme.titleMedium);
     }
-    final selected = plannedRide(rides, planned);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -231,7 +243,7 @@ class _Departures extends ConsumerWidget {
           selected: selected,
           earliest: earliest,
           onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
-          onAllDepartures: () => context.push(Routes.stop(key!.from)),
+          onAllDepartures: () => context.push(Routes.stop(departures!.from)),
         ),
         IfMissedLine(rides: rides, taken: selected),
       ],

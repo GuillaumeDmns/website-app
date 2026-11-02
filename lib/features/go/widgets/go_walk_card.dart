@@ -61,7 +61,7 @@ class GoWalkCard extends ConsumerWidget {
     final minutes = moving ? math.max(1, (meters / pace / 60).ceil()) : math.max(1, (section.duration / 60).round());
     final to = section.to?.name ?? '';
 
-    final glance = live && moving ? goGlance(state, now) : null;
+    final glance = live && moving ? goGlance(state, now, turns: false) : null;
     final header = glance != null && glance.tone != GoTone.ok
         ? GoCardHeader.alert(glance, live: true)
         : GoCardHeader(

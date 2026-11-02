@@ -100,6 +100,20 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('walking too slowly for the metro: the card says to hurry, not the turn (listed under it, named on the map)',
+      (tester) async {
+    // The metro in 4 min, a little more than 3 min of walk left, the turn 20 m ahead
+    final along = tracker.steps.first.line.length * 280 / 500;
+    await openGo(tester,
+        followed(GoProgress(step: 0, phase: GoPhase.moving, along: along, shift: const Duration(minutes: -2)), position: LatLng(chatelet.lat, chatelet.lon)));
+
+    expect(find.text(currentL10n.goMarginHurry), findsOneWidget);
+    expect(find.text(currentL10n.goTurnLeft), findsNothing);
+    expect(find.text('Tournez à gauche sur Rue des Halles'), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
   testWidgets('"Je suis ici" on another card: GO goes on from there', (tester) async {
     final container =
         await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving), position: LatLng(chatelet.lat, chatelet.lon)));
@@ -127,8 +141,9 @@ void main() {
     final container =
         await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon)));
 
-    // Its time and, without real time, that it is the schedule; the minutes left
-    expect(find.textContaining(currentL10n.goScheduled, findRichText: true), findsOneWidget);
+    // Its time and punctuality from the line's departures in the card (real time), the minutes left
+    final card = find.byType(GoDeparturesCard);
+    expect(find.descendant(of: card, matching: find.textContaining(currentL10n.goOnTime, findRichText: true)), findsOneWidget);
     expect(find.text(currentL10n.minutesUnit), findsWidgets);
     expect(find.text(currentL10n.direction('Nation')), findsOneWidget);
     // Where to board along the train, the departures and the next one if missed
