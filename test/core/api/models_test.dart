@@ -265,4 +265,22 @@ void main() {
     expect(works.sections.single.fromName, 'Massy - Palaiseau');
     expect(works.sections.single.toId, 'IDFM:69677');
   });
+
+  test("reads a station's ways in and out", () {
+    final station = StopAreaDetail.fromJson({
+      'id': 'IDFM:71347',
+      'name': 'Charles de Gaulle - Étoile',
+      'lat': 48.8738,
+      'lon': 2.2950,
+      'entrances': [
+        {'id': 'IDFM:StopPlaceEntrance:50148550', 'code': '7', 'name': 'r. de Presbourg', 'lat': 48.87407, 'lon': 2.29306, 'wheelchairBoarding': 0},
+        {'id': 'IDFM:StopPlaceEntrance:1', 'name': 'Place Charles de Gaulle', 'lat': 48.8737, 'lon': 2.2951},
+      ],
+    });
+
+    expect(station.entrances.map((entrance) => entrance.code), ['7', null]);
+    expect(station.entrances.first.name, 'r. de Presbourg');
+    // Stops outside stations have none
+    expect(StopAreaDetail.fromJson({'id': 'IDFM:1', 'name': 'Arrêt', 'lat': 48.8, 'lon': 2.3}).entrances, isEmpty);
+  });
 }

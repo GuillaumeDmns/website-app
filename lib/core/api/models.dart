@@ -246,9 +246,33 @@ abstract class StopAreaDetail with _$StopAreaDetail {
     @Default([]) List<LineSummary> lines,
     @Default([]) List<Quay> quays,
     @Default([]) List<Connection> connections,
+
+    /// Ways in and out, by number (none for most stops outside stations)
+    @Default([]) List<StationEntrance> entrances,
   }) = _StopAreaDetail;
 
   factory StopAreaDetail.fromJson(Map<String, dynamic> json) => _$StopAreaDetailFromJson(json);
+}
+
+/// A way in and out of a station (GTFS entrance)
+@freezed
+abstract class StationEntrance with _$StationEntrance {
+  const factory StationEntrance({
+    required String id,
+
+    /// Its number on the signs (`7`), when it has one
+    String? code,
+
+    /// The street or place it opens on (`r. de Presbourg`)
+    required String name,
+    required double lat,
+    required double lon,
+
+    /// 0 unknown, 1 step-free, 2 not
+    int? wheelchairBoarding,
+  }) = _StationEntrance;
+
+  factory StationEntrance.fromJson(Map<String, dynamic> json) => _$StationEntranceFromJson(json);
 }
 
 @freezed
