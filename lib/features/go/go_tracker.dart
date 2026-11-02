@@ -130,6 +130,8 @@ class GoProgress {
     this.lastFixAt,
     this.fired = const {},
     this.arrivedAt,
+    this.preciseAlong,
+    this.preciseAt,
   });
 
   /// Index in [GoTracker.steps]
@@ -138,6 +140,11 @@ class GoProgress {
 
   /// Meters done along the current step's path
   final double along;
+
+  /// On board: meters along the ride where the last precise fix (the GPS's) put the user, never back, and when that
+  /// position was first given; null without one since boarding (underground)
+  final double? preciseAlong;
+  final DateTime? preciseAt;
 
   /// Ride: index of the last stop the vehicle has left (0 = the boarding stop); the alighting stop once there
   final int stopIndex;
@@ -166,6 +173,8 @@ class GoProgress {
     DateTime? lastFixAt,
     Set<String>? fired,
     DateTime? arrivedAt,
+    double? Function()? preciseAlong,
+    DateTime? Function()? preciseAt,
   }) =>
       GoProgress(
         step: step ?? this.step,
@@ -178,6 +187,8 @@ class GoProgress {
         lastFixAt: lastFixAt ?? this.lastFixAt,
         fired: fired ?? this.fired,
         arrivedAt: arrivedAt ?? this.arrivedAt,
+        preciseAlong: preciseAlong != null ? preciseAlong() : this.preciseAlong,
+        preciseAt: preciseAt != null ? preciseAt() : this.preciseAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -268,7 +279,7 @@ class GoAlert {
 ///   late). Underground, the network's positions, or the last one given again, stay at the station while the vehicle
 ///   takes the user away: they never say a vehicle was missed.
 /// - On board: stop reached from the position on the line, or from the stop times (+ shift) without one or with only
-///   rough ones.
+///   rough ones; where the user is between two stops likewise ([betweenStops]).
 class GoTracker {
   GoTracker(this.journey) : steps = _steps(journey);
 
@@ -338,6 +349,49 @@ class GoTracker {
   double metersLeft(GoProgress progress) {
     final step = stepOf(progress);
     return step == null ? 0 : math.max(0, step.line.length - progress.along);
+  }
+
+  /// On board, where the user is between the last stop left ([GoProgress.stopIndex]) and the next one: 0 at the stop
+  /// left, 1 at the next one. A recent precise fix on the ride's path says it (the GPS, above ground); otherwise
+  /// (underground, or only the network's positions, which stay at a station) the clock does, from when the stop was
+  /// left to the next one's time: the stop times of the vehicle followed (the journey moves to the real times of a
+  /// departure chosen or guessed, `retimeJourney`), else the schedule's, shifted by the delay measured at boarding
+  /// ([GoProgress.shift]); never behind where the GPS last saw the user. Null off board or without the served stops.
+  double? betweenStops(GoProgress progress, DateTime now) {
+    final ride = stepOf(progress);
+    final stops = ride?.section.stops ?? const <JourneyStop>[];
+    if (ride == null || progress.phase != GoPhase.onBoard || stops.length < 2) {
+      return null;
+    }
+    final last = stops.length - 1;
+    final k = math.min(progress.stopIndex, last - 1);
+    final span = ride.stopAlongs[k + 1] - ride.stopAlongs[k];
+    final preciseAlong = progress.preciseAlong;
+    final seen = preciseAlong == null || span <= 0 ? null : ((preciseAlong - ride.stopAlongs[k]) / span).clamp(0.0, 1.0);
+    final seenAt = progress.preciseAt;
+    if (seen != null && seenAt != null && now.difference(seenAt) <= _preciseValidity) {
+      return seen;
+    }
+    // Left when the vehicle was seen to leave (the boarding stop), else when the clock says so (see _ride)
+    final left = ride.stopTime(k).add(progress.shift + (k == 0 ? Duration.zero : _dwell));
+    final next = (k + 1 == last ? ride.section.arrival : ride.stopTime(k + 1)).add(progress.shift);
+    final total = next.difference(left);
+    final clock = total <= Duration.zero
+        ? (now.isBefore(left) ? 0.0 : 1.0)
+        : (now.difference(left).inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
+    return math.max(clock, seen ?? 0);
+  }
+
+  /// Meters along the current step's path where the user is: on board, between the stops ([betweenStops]); else
+  /// [GoProgress.along]
+  double alongNow(GoProgress progress, DateTime now) {
+    final share = betweenStops(progress, now);
+    final ride = stepOf(progress);
+    if (share == null || ride == null) {
+      return progress.along;
+    }
+    final k = math.min(progress.stopIndex, ride.stopAlongs.length - 2);
+    return ride.stopAlongs[k] + (ride.stopAlongs[k + 1] - ride.stopAlongs[k]) * share;
   }
 
   // Manual corrections
@@ -650,7 +704,15 @@ class GoTracker {
       final measured = departure.difference(ride.section.departure);
       shift = Duration(seconds: measured.inSeconds.clamp(-1800, 3600));
     }
-    return progress.copyWith(phase: GoPhase.onBoard, along: 0, stopIndex: 0, shift: shift, issue: () => null);
+    return progress.copyWith(
+      phase: GoPhase.onBoard,
+      along: 0,
+      stopIndex: 0,
+      shift: shift,
+      issue: () => null,
+      preciseAlong: () => null,
+      preciseAt: () => null,
+    );
   }
 
   /// A stop is left once the vehicle is this far beyond it…
@@ -665,6 +727,12 @@ class GoTracker {
   /// "Get ready" comes once the stop before is left and the arrival is this close: a direct train's stop before is
   /// where it was boarded, ten minutes away
   static const prepareAhead = Duration(minutes: 4);
+
+  /// A precise fix this close to the ride's path is on it (the shapes are a little off the tracks)…
+  static const _onPathMeters = 100.0;
+
+  /// …and says where the user is between the stops for this long; older (a tunnel), the clock does
+  static const _preciseValidity = Duration(seconds: 12);
 
   /// On board. [GoProgress.stopIndex] is the last stop the vehicle has left, so that "next stop" is only said once
   /// it is really the next one: not while the vehicle pulls in to the one before.
@@ -689,6 +757,11 @@ class GoTracker {
           }
         }
         arrived = withStops && ride.stopAlongs[last] <= current.along + _arrivingMeters;
+      }
+      // The GPS's: where the user is between the stops (see betweenStops)
+      if (projection != null && projection.distance < _onPathMeters && (input.accuracy ?? 0) <= _preciseAccuracy) {
+        final seen = math.max(current.preciseAlong ?? 0, projection.along);
+        current = current.copyWith(preciseAlong: () => seen, preciseAt: () => input.fixAt ?? input.now);
       }
       final end = ride.end;
       arrived = arrived || end != null && metersBetween(fix, end) < 60;

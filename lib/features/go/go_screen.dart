@@ -199,7 +199,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
 
   /// The journey on the map, framing the step shown; waiting for the ride in progress, the stop where to board (and the
   /// user close to it), like Citymapper; on board, what is left of the ride (from the last stop passed to where to get
-  /// off), the next stop marked
+  /// off), the next stop marked, the ride faded up to where the stops' rail puts the user
   MapOverlay _overlay(GoState state, int live) {
     final tracker = state.tracker;
     final progress = state.progress;
@@ -210,7 +210,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       context,
       state.journey,
       currentSection: arrived ? state.journey.sections.length : tracker.stepOf(progress)?.sectionIndex ?? -1,
-      currentAlong: onBoardOrMoving ? progress.along : 0,
+      currentAlong: onBoardOrMoving ? tracker.alongNow(progress, DateTime.now()) : 0,
       fitSection: shownStep?.sectionIndex,
     );
     final step = tracker.stepOf(progress);
