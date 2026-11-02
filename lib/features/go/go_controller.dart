@@ -20,6 +20,7 @@ import '../auth/auth_controller.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
+import 'go_cards.dart';
 import 'go_guidance.dart';
 import 'go_live.dart';
 import 'go_ride_guess.dart';
@@ -51,6 +52,16 @@ DateTime positionSince(Position fix, Position? previous, DateTime? since) => pre
         previous.latitude == fix.latitude && previous.longitude == fix.longitude
     ? since
     : fix.timestamp;
+
+/// Whether [alert] is felt (sound, vibration): not when muted, nor a getting-off alert of a ride whose alerts the user
+/// turned off ("Alerter quand descendre")
+bool goAlertFelt(GoState state, GoAlert alert) {
+  if (state.muted) {
+    return false;
+  }
+  final alighting = alert.kind == 'prepare' || alert.kind == 'alight';
+  return !alighting || !state.alightAlertsOff.contains(int.tryParse(alert.id.split('-').last));
+}
 
 /// GO session: feeds the [GoTracker] with high-accuracy positions (the app's [PositionFeed], asked as often as the
 /// moment needs, [goLocationNeed]), a 5 s clock and the real-time departures of the next ride (`rideOptionsProvider`,
@@ -153,6 +164,26 @@ class GoController extends Notifier<GoState?> {
 
   void jumpTo(int step) => _setProgress((tracker, progress) => tracker.jumpTo(progress, step));
 
+  /// "Je suis ici" on [card]: GO goes on from there, on board for a ride's card, [along] meters along a move (out of
+  /// the station got off at, for a walk's card after it)
+  void hereAt(GoCard card, {double along = 0}) => _setProgress((tracker, progress) => switch (card.kind) {
+        GoCardKind.ride => tracker.next(tracker.jumpTo(progress, card.step)),
+        GoCardKind.walk => tracker.jumpTo(progress, card.step, along: along),
+        _ => tracker.jumpTo(progress, card.step),
+      });
+
+  /// "Alerter quand descendre" for the ride [step]: off, its getting-off alerts are not felt
+  void setAlightAlert(int step, bool on) {
+    final current = state;
+    if (current == null) {
+      return;
+    }
+    final off = {...current.alightAlertsOff};
+    on ? off.remove(step) : off.add(step);
+    state = current.copyWith(alightAlertsOff: off);
+    _save();
+  }
+
   void dismissIssue() {
     _cancelRecalculation();
     _setProgress((tracker, progress) => tracker.dismissIssue(progress));
@@ -199,6 +230,7 @@ class GoController extends Notifier<GoState?> {
       keepAwake: latest.keepAwake,
       position: latest.position,
       retained: retained ? (step: step, later: tracker.eta(chosen, null).difference(previousEta), cancelled: cancelled) : null,
+      alightAlertsOff: latest.alightAlertsOff,
     );
     _save();
     _watchDepartures();
@@ -350,6 +382,7 @@ class GoController extends Notifier<GoState?> {
     DateTime? plannedArrival,
     GoProgress? progress,
     DateTime? startedAt,
+    Set<int> alightAlertsOff = const {},
   }) {
     _closeTimer?.cancel();
     _closeTimer = null;
@@ -365,6 +398,7 @@ class GoController extends Notifier<GoState?> {
       plannedArrival: plannedArrival ?? journey.arrival,
       muted: muted,
       keepAwake: keepAwake,
+      alightAlertsOff: alightAlertsOff,
     );
     ref.read(liveJourneyProvider).keepScreenOn(keepAwake);
     _save();
@@ -574,7 +608,7 @@ class GoController extends Notifier<GoState?> {
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
-      if (!current.muted) {
+      if (goAlertFelt(current, alert)) {
         feelGoAlert(alert);
       }
     }
@@ -744,6 +778,7 @@ class GoController extends Notifier<GoState?> {
       'plannedArrival': current.plannedArrival.toIso8601String(),
       'muted': current.muted,
       'keepAwake': current.keepAwake,
+      'alightOff': current.alightAlertsOff.toList(),
     });
   }
 
@@ -771,6 +806,7 @@ class GoController extends Notifier<GoState?> {
         plannedArrival: DateTime.tryParse(json['plannedArrival'] as String? ?? ''),
         progress: progress,
         startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
+        alightAlertsOff: {...?(json['alightOff'] as List?)?.cast<int>()},
       );
     } catch (e) {
       debugPrint('GO session unreadable: $e');

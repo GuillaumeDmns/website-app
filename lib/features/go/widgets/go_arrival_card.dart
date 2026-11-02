@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/time_format.dart';
+import '../../../core/widgets/size_reporter.dart';
 import '../../../l10n/l10n.dart';
 import '../../daily_trips/daily_trip_widgets.dart';
 import '../../journey/journey_request.dart';
+import '../go_cards.dart';
 import '../go_controller.dart';
 import '../go_state.dart';
 import '../go_tracker.dart';
@@ -15,9 +17,10 @@ import 'go_card_parts.dart';
 
 /// The arrival: the summary, then the way back, saving the trip, finishing (it closes itself after a while)
 class GoArrivalCard extends ConsumerWidget {
-  const GoArrivalCard({super.key, required this.state});
+  const GoArrivalCard({super.key, required this.state, this.onHeadSize});
 
   final GoState state;
+  final ValueChanged<Size>? onHeadSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,7 +31,7 @@ class GoArrivalCard extends ConsumerWidget {
     final destination = state.journey.sections.lastOrNull?.to?.name ?? '';
     final eta = state.tracker.eta(progress, state.currentVehicle);
 
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -81,12 +84,10 @@ class GoArrivalCard extends ConsumerWidget {
             },
           ),
         ] else
-          GoSmallAction(
-            label: context.l10n.goImArrived,
-            onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(state.tracker.steps.length),
-          ),
+          GoHereButton(card: GoCard(GoCardKind.arrival, state.tracker.steps.length), label: context.l10n.goImArrived),
       ],
     );
+    return GoCardFrame(children: [SizeReporter(onSize: (size) => onHeadSize?.call(size), child: content)]);
   }
 
   /// From here (the destination) to where the journey started, leaving now

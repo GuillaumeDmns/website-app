@@ -2,372 +2,301 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/routes.dart';
 import '../../../app/theme.dart';
-import '../../../core/api/models.dart';
-import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
+import '../../../core/widgets/size_reporter.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
-import '../../journey/journey_labels.dart';
-import '../../journey/journey_providers.dart';
-import '../../journey/journey_retime.dart';
-import '../../journey/widgets/ride_departures.dart';
-import '../../traffic/disruption_widgets.dart';
+import '../go_cards.dart';
 import '../go_controller.dart';
+import '../go_glance.dart';
 import '../go_state.dart';
 import '../go_tracker.dart';
 import 'go_card_parts.dart';
 
-/// A ride: waiting for it (countdown, where to board, departures, the next one if missed), on board
-/// (the stops left with their times, where to get off), or to come (its departures)
+/// A ride on board, like Citymapper's card after boarding: how many stops to where to get off and in how long, the
+/// stops on a rail with their times, the user's dot between the stop left and the next one where GO puts them
+/// ([GoTracker.betweenStops]: the GPS above ground, the clock underground), and "Alerter quand descendre". Its header
+/// turns red when getting off is close.
 class GoRideCard extends ConsumerWidget {
-  const GoRideCard({super.key, required this.state, required this.index, this.compact = false});
+  const GoRideCard({super.key, required this.state, required this.card, required this.live, required this.done, this.onHeadSize});
 
   final GoState state;
-  final int index;
-
-  /// The step in progress under the banner and [GoNowCard], which tell what to do, the countdown and where to board:
-  /// only the departures or the stops left, and what follows
-  final bool compact;
+  final GoCard card;
+  final bool live;
+  final bool done;
+  final ValueChanged<Size>? onHeadSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
     final tracker = state.tracker;
     final progress = state.progress;
-    final step = tracker.steps[index];
+    final step = tracker.steps[card.step];
     final section = step.section;
-    final isLive = index == progress.step && progress.phase != GoPhase.arrived;
-    final isDone = index < progress.step || progress.phase == GoPhase.arrived;
-    final onBoard = isLive && progress.phase == GoPhase.onBoard;
-    final lineLabel = section.line?.label ?? '';
-    final stopCount = math.max(0, section.stops.length - 1);
+    final line = section.line;
+    final stops = section.stops;
+    final onBoard = progress.phase == GoPhase.onBoard && progress.step == card.step;
+    final left = onBoard ? tracker.stopsLeft(progress) : math.max(1, stops.length - 1);
+    final arrival = section.arrival.add(progress.shift);
+    final minutes = onBoard ? minutesLeft(arrival.difference(now)) : math.max(1, (section.duration / 60).round());
+    final to = section.to?.name ?? '';
+    final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
 
-    final String title;
-    final String detail;
-    var urgent = false;
-    if (onBoard) {
-      final left = tracker.stopsLeft(progress);
-      urgent = left <= 1;
-      title = left <= 1 ? context.l10n.goGetOffNext : context.l10n.goGetOffIn(left);
-      detail = context.l10n.goAtStop(section.to?.name ?? '');
-    } else {
-      title = '$lineLabel → ${section.headsign ?? ''}';
-      detail = [
-        context.l10n.goFromTo(section.from?.name ?? '', section.to?.name ?? ''),
-        if (stopCount > 0) context.l10n.stopsCount(stopCount),
-      ].join(' · ');
-    }
-    final positions = section.boardingPositions;
-    final now = DateTime.now();
-    final waiting = isLive && progress.phase == GoPhase.waiting;
-    final countdown = waiting ? tracker.expectedDeparture(step, progress, state.currentVehicle).difference(now) : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final glance = live && onBoard ? goGlance(state, now) : null;
+    final header = glance != null && glance.tone != GoTone.ok
+        ? GoCardHeader.alert(glance, live: true)
+        : GoCardHeader(
+            leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
+            title: onBoard && left <= 1 ? context.l10n.goGetOffNext : context.l10n.goStopsTo(left, to),
+            subtitle: !onBoard
+                ? context.l10n.direction(section.headsign ?? '')
+                : left <= 1 || nextStop == null
+                ? '$to · ${context.l10n.arrivalAt(formatClock(arrival))}'
+                : context.l10n.goNextStop(nextStop),
+            figure: minutes <= 0 ? context.l10n.now : '$minutes',
+            unit: minutes <= 0 ? null : context.l10n.minutesUnit,
+            live: live,
+            done: done,
+          );
+    final late = (progress.shift.inSeconds / 60).round();
+    return GoCardFrame(
       children: [
-        if (!compact)
-        GoCardTitle(
-          leading: section.line != null ? LineBadge(section.line!, size: 36) : const Icon(Icons.directions_transit, size: 34),
-          title: title,
-          detail: detail,
-          trailing: countdown == null
-              ? null
-              : _Countdown(
-                  until: countdown,
-                  color: countdown <= const Duration(minutes: 1) ? Theme.of(context).colorScheme.error : AppTheme.brand,
-                ),
-          done: isDone,
-          urgent: urgent,
+        SizeReporter(
+          onSize: (size) => onHeadSize?.call(size),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header,
+              if (!live && !done) ...[const SizedBox(height: 12), GoHereButton(card: card)],
+              if (onBoard && late >= 1) ...[
+                const SizedBox(height: 12),
+                GoContextLine(icon: Icons.schedule, text: context.l10n.goMinutesLate(late), color: context.colors.warning),
+              ],
+              if (!done) ...[
+                const SizedBox(height: 12),
+                _StopsRail(state: state, step: step, onBoard: onBoard, now: now, color: parseHexColor(line?.color, theme.colorScheme.primary)),
+                const SizedBox(height: 4),
+                _AlightAlertSwitch(step: card.step, on: !state.alightAlertsOff.contains(card.step)),
+              ],
+            ],
+          ),
         ),
-        if (waiting && !compact) GoPills(state: state, now: now),
-        if (onBoard) ...[
-          if (!compact) const SizedBox(height: 12),
-          _StopsLeft(state: state, step: step),
-        ] else if (!isDone) ...[
-          if (positions.isNotEmpty && positions.length < 3 && !compact) ...[
-            const SizedBox(height: 12),
-            TrainPositions(positions: positions, color: parseHexColor(section.line?.color, Theme.of(context).colorScheme.primary)),
-          ],
-          if (!compact) const SizedBox(height: 14),
-          _RideDepartures(state: state, step: step, index: index),
-        ],
-        if (!isDone) RideDisruptions(lineId: section.line?.id, max: 1, top: 10),
-        if (!isDone && index + 1 < tracker.steps.length) GoNextStep(state: state, index: index + 1),
-        const SizedBox(height: 8),
-        // Manual corrections, kept discreet
-        if (compact)
-          const SizedBox.shrink()
-        else if (isLive && progress.phase == GoPhase.waiting)
-          GoSmallAction(label: context.l10n.goImOnBoard, onPressed: () => ref.read(goControllerProvider.notifier).next())
-        else if (!isLive && !isDone)
-          GoSmallAction(label: context.l10n.goImAtThisStep, onPressed: () => ref.read(goControllerProvider.notifier).jumpTo(index)),
       ],
     );
   }
 }
 
-/// Where to board along the train: its cars from the front, the ones to board highlighted
-class TrainPositions extends StatelessWidget {
-  const TrainPositions({super.key, required this.positions, required this.color});
-
-  /// `front`, `middle`, `back`
-  final List<String> positions;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = context.colors.subtle;
-    bool boarded(int car) => switch (car) {
-          0 || 1 => positions.contains('front'),
-          2 => positions.contains('middle'),
-          _ => positions.contains('back'),
-        };
-    return Semantics(
-      label: boardingLabel(positions),
-      excludeSemantics: true,
-      child: Row(
-        children: [
-          Icon(Icons.arrow_back, size: 16, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 4),
-          for (var car = 0; car < 5; car++)
-            Expanded(
-              child: Container(
-                height: 18,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: boarded(car) ? color : muted,
-                  borderRadius: BorderRadius.horizontal(
-                    left: Radius.circular(car == 0 ? 9 : 3),
-                    right: const Radius.circular(3),
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(width: 10),
-          Text(boardingLabel(positions),
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
-/// On board: the stops left with their times, a dot on the next one, where to get off marked
-class _StopsLeft extends StatelessWidget {
-  const _StopsLeft({required this.state, required this.step});
+/// The ride's stops down a rail in the line's color, like Citymapper's: on board from the stop left (the ones before
+/// it gone), the next one stressed, where to get off marked; the user's dot glides between the stop left and the next
+/// one. Long rides fold the stops in between.
+class _StopsRail extends StatelessWidget {
+  const _StopsRail({required this.state, required this.step, required this.onBoard, required this.now, required this.color});
 
   final GoState state;
   final GoStep step;
+  final bool onBoard;
+  final DateTime now;
+  final Color color;
 
-  /// More stops left than this: the ones in between folded
+  /// More stops than this: the ones in between folded
   static const _maxShown = 8;
+  static const _timeWidth = 48.0;
+  static const _railWidth = 24.0;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final progress = state.progress;
     final stops = step.section.stops;
-    final color = parseHexColor(step.section.line?.color, theme.colorScheme.primary);
-    final first = math.min(progress.stopIndex + 1, stops.length - 1);
-    final indexes = [for (var k = first; k < stops.length; k++) k];
+    if (stops.length < 2) {
+      return const SizedBox.shrink();
+    }
+    final progress = state.progress;
+    final last = stops.length - 1;
+    final from = onBoard ? math.min(progress.stopIndex, last - 1) : 0;
+    final indexes = [for (var k = from; k <= last; k++) k];
     final folded = indexes.length > _maxShown ? indexes.length - (_maxShown - 1) : 0;
-    final shown = folded == 0 ? indexes : [...indexes.take(_maxShown - 2), -1, indexes.last];
+    final shown = folded == 0 ? indexes : [...indexes.take(_maxShown - 2), -1, last];
+    final rowHeight = MediaQuery.textScalerOf(context).scale(34);
+    final share = onBoard ? state.tracker.betweenStops(progress, now) : null;
+    final railLeft = _timeWidth + _railWidth / 2 - 2.5;
+    final top = rowHeight / 2;
+    final bottom = rowHeight * (shown.length - 0.5);
 
-    return Column(
-      children: [
-        for (final (row, k) in shown.indexed)
-          if (k < 0)
-            _StopRow(color: color, name: context.l10n.stopsCount(folded), time: null, first: false, last: false, folded: true)
-          else
-            _StopRow(
-              color: color,
-              name: stops[k].name,
-              // Where to get off: the ride's arrival (a stop's time is its departure)
-              time: (k == stops.length - 1 ? step.section.arrival : step.stopTime(k)).add(progress.shift),
-              first: row == 0,
-              last: k == stops.length - 1,
-            ),
-      ],
+    Widget rail(double top, double bottom, double alpha) => Positioned(
+          left: railLeft,
+          top: top,
+          height: math.max(0, bottom - top),
+          width: 5,
+          child: ColoredBox(color: color.withValues(alpha: alpha)),
+        );
+
+    return Semantics(
+      label: context.l10n.goGetOffInAt(state.tracker.stopsLeft(progress), stops[last].name),
+      excludeSemantics: onBoard,
+      child: TweenAnimationBuilder<double>(
+        // From one fix or tick to the next, a glide; at the next stretch the user starts where they are
+        key: ValueKey(from),
+        tween: Tween(end: share ?? 0),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+        child: Column(
+          children: [
+            for (final (row, k) in shown.indexed)
+              SizedBox(
+                height: rowHeight,
+                child: k < 0
+                    ? _StopRow.folded(context.l10n.stopsCount(folded))
+                    : _StopRow(
+                        name: stops[k].name,
+                        // Where to get off: the ride's arrival (a stop's time is its departure)
+                        time: (k == last ? step.section.arrival : step.stopTime(k)).add(progress.shift),
+                        color: color,
+                        gone: onBoard && row == 0,
+                        next: onBoard && row == 1 && k != last,
+                        end: k == last,
+                        first: row == 0,
+                      ),
+              ),
+          ],
+        ),
+        builder: (context, share, rows) {
+          final me = top + rowHeight * share;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (onBoard) ...[rail(top, me, 0.35), rail(me, bottom, 1)] else rail(top, bottom, 1),
+              rows!,
+              if (share > 0 || onBoard) Positioned(left: _timeWidth + _railWidth / 2 - 9, top: me - 9, child: const _UserDot()),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
 class _StopRow extends StatelessWidget {
-  const _StopRow({required this.color, required this.name, required this.time, required this.first, required this.last, this.folded = false});
+  const _StopRow({
+    required this.name,
+    required this.time,
+    required this.color,
+    required this.gone,
+    required this.next,
+    required this.end,
+    required this.first,
+  }) : folded = false;
 
-  final Color color;
+  const _StopRow.folded(this.name)
+      : time = null,
+        color = Colors.transparent,
+        gone = false,
+        next = false,
+        end = false,
+        first = false,
+        folded = true;
+
   final String name;
   final DateTime? time;
+  final Color color;
+
+  /// The stop left, on board
+  final bool gone;
 
   /// The next stop
-  final bool first;
+  final bool next;
 
   /// Where to get off
-  final bool last;
+  final bool end;
+  final bool first;
   final bool folded;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final emphasis = first || last;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 48,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(time == null ? '' : formatClock(time!),
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: emphasis ? FontWeight.w600 : null)),
-            ),
-          ),
-          SizedBox(
-            width: 24,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Column(children: [
-                  Expanded(child: Container(width: 5, color: color)),
-                  Expanded(child: Container(width: 5, color: last ? Colors.transparent : color)),
-                ]),
-                if (!folded)
-                  Container(
-                    width: emphasis ? 16 : 10,
-                    height: emphasis ? 16 : 10,
+    final colors = context.colors;
+    final emphasis = next || end || (first && !gone);
+    final dot = end || first ? 14.0 : 10.0;
+    return Row(
+      children: [
+        SizedBox(
+          width: _StopsRail._timeWidth,
+          child: Text(time == null ? '' : formatClock(time!),
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: emphasis ? FontWeight.w600 : null, color: gone ? colors.muted : null)),
+        ),
+        SizedBox(
+          width: _StopsRail._railWidth,
+          child: folded
+              ? null
+              : Center(
+                  child: Container(
+                    width: dot,
+                    height: dot,
                     decoration: BoxDecoration(
-                      color: last ? color : context.colors.card,
+                      color: end ? color : colors.card,
                       shape: BoxShape.circle,
                       border: Border.all(color: color, width: 3),
                     ),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      name,
-                      style: folded
-                          ? theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)
-                          : (emphasis ? theme.textTheme.titleSmall : theme.textTheme.bodyMedium),
-                    ),
-                  ),
-                  if (first && !last) ...[
-                    const SizedBox(width: 8),
-                    PillTag(text: context.l10n.goNextStopLabel, color: theme.colorScheme.primary),
-                  ],
-                  if (last) ...[
-                    const SizedBox(width: 8),
-                    PillTag(text: context.l10n.goGetOffHere, color: theme.colorScheme.error),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their
-/// times at both stops; the one followed is highlighted, and the next one told in case it is missed. Choosing another
-/// one moves the journey to it.
-class _RideDepartures extends ConsumerWidget {
-  const _RideDepartures({required this.state, required this.step, required this.index});
-
-  final GoState state;
-  final GoStep step;
-  final int index;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final progress = state.progress;
-    final planned = state.tracker.plannedDeparture(step, progress);
-    final now = ref.watch(nowProvider).value ?? DateTime.now();
-    // At the stop already for the step in progress; else after the steps before it
-    final earliest = index == progress.step ? now : earliestBoarding(state.journey, step.sectionIndex, now).add(progress.shift);
-    final key = rideKey(step.section, earliest, now);
-
-    final rides = key == null
-        ? const <Ride>[]
-        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
-              .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
-              .toList();
-
-    if (rides.isEmpty) {
-      return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: theme.textTheme.titleMedium);
-    }
-    final selected = plannedRide(rides, planned);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RideDepartureList(
-          rides: rides,
-          now: now,
-          mode: step.section.line?.mode,
-          selected: selected,
-          earliest: earliest,
-          onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
-          onAllDepartures: () => context.push(Routes.stop(key!.from)),
+                ),
         ),
-        IfMissedLine(rides: rides, taken: selected),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: folded
+                ? theme.textTheme.bodySmall?.copyWith(color: colors.muted)
+                : emphasis
+                ? theme.textTheme.titleSmall
+                : theme.textTheme.bodyMedium?.copyWith(color: gone ? colors.muted : null),
+          ),
+        ),
+        if (next) PillTag(text: context.l10n.goNextStopLabel, color: theme.colorScheme.primary),
+        if (end) PillTag(text: context.l10n.goGetOffHere, color: theme.colorScheme.error),
       ],
     );
   }
 }
 
-/// Minutes until the vehicle leaves, large, with a ring emptying over the last ten minutes
-class _Countdown extends StatelessWidget {
-  const _Countdown({required this.until, required this.color});
-
-  final Duration until;
-  final Color color;
+/// The user on the rail: the blue of the map's dot
+class _UserDot extends StatelessWidget {
+  const _UserDot();
 
   @override
   Widget build(BuildContext context) {
-    // Like the departure lists: whole minutes left, "now" within 30 s
-    final minutes = math.min(minutesLeft(until), 999);
-    final theme = Theme.of(context);
-    return SizedBox.square(
-      dimension: 56,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: CircularProgressIndicator(
-              value: (until.inSeconds / 600).clamp(0.0, 1.0),
-              strokeWidth: 4,
-              color: color,
-              backgroundColor: color.withValues(alpha: 0.2),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                minutes <= 0 ? context.l10n.now : '$minutes',
-                style: (minutes <= 0 ? theme.textTheme.labelLarge : theme.textTheme.titleLarge)
-                    ?.copyWith(color: color, fontWeight: FontWeight.w700, height: 1),
-              ),
-              if (minutes > 0) Text(context.l10n.minutesUnit, style: theme.textTheme.labelSmall?.copyWith(color: color, height: 1)),
-            ],
-          ),
-        ],
+    final blue = Theme.of(context).colorScheme.secondary;
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: blue,
+        shape: BoxShape.circle,
+        border: Border.all(color: context.colors.card, width: 3),
+        boxShadow: [BoxShadow(color: blue.withValues(alpha: 0.18), spreadRadius: 4)],
       ),
     );
   }
+}
+
+/// "Alerter quand descendre" for one ride, on by default: off, getting off there is not felt
+class _AlightAlertSwitch extends ConsumerWidget {
+  const _AlightAlertSwitch({required this.step, required this.on});
+
+  final int step;
+  final bool on;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        secondary: Icon(on ? Icons.notifications_active_outlined : Icons.notifications_off_outlined),
+        title: Text(context.l10n.goAlightAlert, style: Theme.of(context).textTheme.titleSmall),
+        value: on,
+        onChanged: (value) => ref.read(goControllerProvider.notifier).setAlightAlert(step, value),
+      );
 }

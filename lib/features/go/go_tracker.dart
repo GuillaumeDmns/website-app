@@ -400,14 +400,16 @@ class GoTracker {
   GoProgress next(GoProgress progress) =>
       progress.phase == GoPhase.waiting ? _board(progress, null, null) : _advance(progress, null);
 
-  /// The user says they are at [step] (a step of the list, or `steps.length` for the arrival)
-  GoProgress jumpTo(GoProgress progress, int step) {
+  /// The user says they are at [step] (a step of the list, or `steps.length` for the arrival); on a move, [along]
+  /// meters along it (out of the station they got off at)
+  GoProgress jumpTo(GoProgress progress, int step, {double along = 0}) {
     if (step >= steps.length) {
       return _arrive(progress, DateTime.now());
     }
     return GoProgress(
       step: step,
       phase: _phaseOf(step),
+      along: steps[step].isRide ? 0 : along,
       shift: progress.shift,
       lastFixAt: progress.lastFixAt,
       fired: progress.fired,
