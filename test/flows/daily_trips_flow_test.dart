@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/daily_trips/daily_trip_widgets.dart';
 import 'package:website_app/features/daily_trips/daily_trips.dart';
@@ -35,7 +36,8 @@ void main() {
       'favorites': [work.toJson()],
       DailyTrips.key: [trip.toJson()],
     });
-    await pumpApp(tester, backend, store: store);
+    // At work already: no suggestion to go there, whatever the time, so the trip stays under "Mes trajets"
+    await pumpApp(tester, backend, store: store, position: LatLng(nation.lat, nation.lon));
 
     // Named after the saved places, timed from the métro's departures (the next one in 7 min, 5 min on foot)
     expect(find.text(currentL10n.dailyTripsTitle), findsOneWidget);
