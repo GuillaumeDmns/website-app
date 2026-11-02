@@ -17,6 +17,10 @@ import 'map_pins.dart';
 /// little of the streets
 const _style = 'https://tiles.openfreemap.org/styles/liberty';
 
+/// Layers of the style taken out once it is loaded: its points of interest (shops, restaurants… by importance) and
+/// its stations, which the app's own stop pins show better; streets, places and the 3D buildings stay
+const hiddenStyleLayers = ['poi_r1', 'poi_r7', 'poi_r20', 'poi_transit'];
+
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
 
@@ -347,7 +351,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
 
   void _onEvent(MapEvent event) {
     switch (event) {
-      case MapEventStyleLoaded():
+      case MapEventStyleLoaded(:final style):
+        for (final id in hiddenStyleLayers) {
+          // A style without one of them (another version of it) is fine as it is
+          unawaited(style.removeLayer(id).catchError((Object e) => debugPrint('Map layer $id not removed: $e')));
+        }
         if (_ready) {
           _reframe();
         }
