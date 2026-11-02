@@ -115,6 +115,19 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('large text (×1.8): the controls and each card hold', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving, along: 40), position: LatLng(chatelet.lat, chatelet.lon)));
+
+    // Every card, swiped to, without any overflow (reported as errors)
+    await swipe(tester, cards: 5);
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 5);
+    expect(find.byTooltip(currentL10n.goStop), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
   testWidgets('"Je suis ici" on another card: GO goes on from there', (tester) async {
     final container =
         await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving), position: LatLng(chatelet.lat, chatelet.lon)));

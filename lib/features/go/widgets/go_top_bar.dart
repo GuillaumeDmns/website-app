@@ -96,7 +96,10 @@ class _TimePill extends StatelessWidget {
             : Semantics(
                 label: context.l10n.goTimeLeftAndArrival(left, formatClock(eta)),
                 excludeSemantics: true,
-                child: Row(
+                // Large text: smaller rather than over the buttons
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
@@ -106,6 +109,7 @@ class _TimePill extends StatelessWidget {
                     Text('  /  ', style: theme.textTheme.titleLarge?.copyWith(color: colors.muted)),
                     Text(formatClock(eta), style: figure?.copyWith(color: late >= 3 ? colors.warning : null)),
                   ],
+                  ),
                 ),
               ),
       ),
