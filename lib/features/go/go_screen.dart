@@ -68,7 +68,8 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     if (head == null || !mounted) {
       return;
     }
-    PanelSheetScope.fitContent(context, _top + head + 16 + MediaQuery.paddingOf(context).bottom, reset: _newCard);
+    // The head as measured, in its card's frame (12 above and under it) and the page (4 above, 12 under)
+    PanelSheetScope.fitContent(context, _top + head + 24 + 16 + MediaQuery.paddingOf(context).bottom, reset: _newCard);
     _newCard = false;
   }
 
