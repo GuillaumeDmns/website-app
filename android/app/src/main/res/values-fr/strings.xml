@@ -10,4 +10,5 @@
     <string name="widget_no_departure">Aucun départ</string>
     <string name="journey_channel">Trajet en cours</string>
     <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
+    <string name="journey_finish">Terminer</string>
 </resources>

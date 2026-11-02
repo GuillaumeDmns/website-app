@@ -140,6 +140,8 @@ class GoController extends Notifier<GoState?> {
       _askPositions();
     });
     ref.onDispose(_stopFeeds);
+    // "Terminer" in the notification
+    ref.read(liveJourneyProvider).onStop(stop);
     _restore();
     return null;
   }
@@ -782,9 +784,14 @@ class GoController extends Notifier<GoState?> {
     });
   }
 
-  /// Session kept on the device, unless it is over (30 min after the arrival)
+  /// Session kept on the device, unless it is over (30 min after the arrival, or finished from the notification while
+  /// the app wasn't running)
   Future<void> _restore() async {
     final store = ref.read(localStoreProvider);
+    if (await ref.read(liveJourneyProvider).stopRequested()) {
+      await store.remove(_storageKey);
+      return;
+    }
     final json = await store.readJson(_storageKey);
     if (json is! Map<String, dynamic> || state != null) {
       return;

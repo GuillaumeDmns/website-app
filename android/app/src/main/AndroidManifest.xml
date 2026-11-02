@@ -33,6 +33,10 @@
             android:name=".GoService"
             android:exported="false"
             android:foregroundServiceType="location" />
+        <!-- GO mode: "Terminer" in its notification -->
+        <receiver
+            android:name=".GoStopReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".NextDepartures"

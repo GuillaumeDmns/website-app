@@ -384,4 +384,10 @@ class _NoLiveJourney implements LiveJourney {
 
   @override
   Future<void> keepScreenOn(bool on) async {}
+
+  @override
+  void onStop(VoidCallback stop) {}
+
+  @override
+  Future<bool> stopRequested() async => false;
 }

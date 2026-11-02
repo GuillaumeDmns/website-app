@@ -80,6 +80,7 @@ object LiveJourneyNotification {
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setRequestPromotedOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addAction(0, context.getString(R.string.journey_finish), finishJourney(context))
 
         if (longInfo.isNotEmpty()) {
             builder.setSubText(longInfo)
@@ -131,6 +132,14 @@ object LiveJourneyNotification {
     fun cancelJourney(context: Context) {
         context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
     }
+
+    /** "Terminer": GO stops without opening the app ([GoStopReceiver]) */
+    private fun finishJourney(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        1,
+        Intent(context, GoStopReceiver::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     private fun openApp(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
