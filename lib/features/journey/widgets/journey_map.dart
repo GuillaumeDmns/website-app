@@ -85,6 +85,7 @@ MapOverlay journeyOverlay(
           color: stopColor,
           label: stop.name,
           childSize: const Size(12, 12),
+          image: 'stop-dot-${stopColor.toARGB32()}-9',
           child: _StopDot(color: stopColor, size: 9),
         ));
       }
@@ -94,6 +95,7 @@ MapOverlay journeyOverlay(
         color: color,
         label: section.to?.name,
         childSize: const Size(16, 16),
+        image: 'stop-dot-${color.toARGB32()}-12',
         child: _StopDot(color: color),
       ));
       // Board: the line badge, above the stop
@@ -104,6 +106,7 @@ MapOverlay journeyOverlay(
           label: '${section.line!.label} · ${section.from?.name ?? ''}',
           above: true,
           childSize: const Size(56, 34),
+          image: 'badge-callout-${section.line!.id}-${section.line!.label}',
           child: _BadgeCallout(line: section.line!),
         ));
       }

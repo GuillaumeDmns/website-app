@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -240,6 +241,22 @@ void main() {
     expect(AccuracyCircle.radiusFor(30, 60, 18, tileSize: 256), closeTo(100.5, 0.1));
     expect(AccuracyCircle.radiusFor(3, 0, 18, tileSize: 512), isNull);
     expect(AccuracyCircle.radiusFor(null, 0, 18, tileSize: 512), isNull);
+  });
+
+  testWidgets('a pin turned from north turns with the map: a vehicle pointing the way it goes', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(pins: [
+      MapPin(point: user, color: Colors.black, rotation: 120, image: 'pointer', child: SizedBox.square(dimension: 20)),
+    ]));
+    await tester.pump();
+
+    final turned = tester.widget<Transform>(
+      find.ancestor(of: find.byType(PinView), matching: find.byType(Transform)).first,
+    );
+    // North up: its own rotation
+    expect(turned.transform.getRotation().entry(1, 0), closeTo(math.sin(120 * math.pi / 180), 1e-6));
+
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('a vehicle followed from overhead: north up, in the middle of what is left above the panel', (tester) async {

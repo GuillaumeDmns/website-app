@@ -11,7 +11,7 @@ import '../location/device_heading.dart';
 import '../location/location_providers.dart';
 import '../utils/geo.dart';
 
-/// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge).
+/// Marker drawn on the shared map: a colored dot, or any [child] (e.g. a line badge) named by its [image].
 class MapPin {
   const MapPin({
     required this.point,
@@ -21,9 +21,11 @@ class MapPin {
     this.label,
     this.onTap,
     this.child,
+    this.image,
     this.childSize = const Size(40, 28),
     this.above = false,
-  });
+    this.rotation,
+  }) : assert(child == null || image != null, 'A pin drawn by a child names its image');
 
   final LatLng point;
   final Color color;
@@ -34,10 +36,18 @@ class MapPin {
 
   /// Replaces the dot, drawn in a [childSize] box
   final Widget? child;
+
+  /// Names what [child] looks like, the same name for the same look: MapLibre draws a pin from an image of it, made
+  /// once (`vehicle-C01371-late`, `callout-Rue Cantin`)
+  final String? image;
   final Size childSize;
 
   /// Draws the marker above the point (like a callout) instead of centered on it
   final bool above;
+
+  /// Degrees clockwise from north the marker is turned to, turning with the map (a vehicle's pointer); upright
+  /// otherwise
+  final double? rotation;
 }
 
 /// Line drawn on the shared map

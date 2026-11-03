@@ -35,6 +35,7 @@ List<MapPin> bikeStationPins(BuildContext context, List<BikeStation> stations) =
           label: context.l10n.bikePinLabel(station.name, station.bikes),
           childSize: const Size(44, 24),
           onTap: () => showBikeStationSheet(context, station),
+          image: 'bike-${station.renting && station.bikes > 0}-${station.bikes}',
           child: _BikePin(station: station),
         ),
     ];

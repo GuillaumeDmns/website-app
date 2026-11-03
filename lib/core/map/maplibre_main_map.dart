@@ -12,6 +12,7 @@ import '../location/location_providers.dart';
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
+import 'maplibre_overlay.dart';
 
 /// OpenFreeMap's Liberty style (free, no key, OpenStreetMap data), in dark mode too: its dark style (Fiord) showed too
 /// little of the streets
@@ -24,14 +25,10 @@ const hiddenStyleLayers = ['poi_r1', 'poi_r7', 'poi_r20', 'poi_transit'];
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
 
-/// Where a pin sits on its point in MapLibre's widget layer, which puts that point of the marker on the position
-/// (flutter_map moves the marker by it instead): a callout ([MapPin.above]) by its bottom, its arrow on the place
-Alignment mapLibrePinAlignment(MapPin pin) => pin.above ? Alignment.bottomCenter : Alignment.center;
-
 /// The map with MapLibre (native SDK on Android and iOS, maplibre-gl-js on the web): OpenFreeMap's vector tiles drawn
-/// by the GPU. Paths are style layers, pins and the user position Flutter widgets over the map. The part hidden by the
-/// [panel] is the camera's padding: changing it without animation keeps what is in the middle of the part left above
-/// (MapLibre's camera center is that of its padded area). See [MainMap].
+/// by the GPU. What a page shows on it, and the user dot, are layers of the map ([MapLibreOverlay]): they move with it.
+/// The part hidden by the [panel] is the camera's padding: changing it without animation keeps what is in the middle of
+/// the part left above (MapLibre's camera center is that of its padded area). See [MainMap].
 class MapLibreMainMap extends ConsumerStatefulWidget {
   const MapLibreMainMap({super.key, this.panel, this.onLongPress});
 
@@ -62,6 +59,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
 
   /// The overlay shown, for the callbacks of the map
   MapOverlay _overlay = MapOverlay.empty;
+
+  /// Where the user dot is and how sure, and the theme the pins are drawn with
+  LatLng? _user;
+  double? _accuracy;
+  ThemeData? _theme;
+
+  /// The overlay as layers of the map shown, once its style is loaded
+  MapLibreOverlay? _layers;
 
   /// Size of the map last laid out: a frame computed at another size (the page still being laid out) is done again
   Size? _size;
@@ -97,6 +102,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     _animation?.cancel();
     _centerDebounce?.cancel();
     _heading.dispose();
+    _layers?.dispose();
     super.dispose();
   }
 
@@ -262,7 +268,28 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     final follow = _following;
     if (mounted && follow != null && follow.compass) {
       _follow(follow);
+      // The user's heading turned too
+      _showLayers();
     }
+  }
+
+  /// Shows the overlay, the user dot and its heading on the map's own layers
+  void _showLayers() {
+    final layers = _layers;
+    final theme = _theme;
+    if (layers == null || theme == null || !mounted) {
+      return;
+    }
+    final follow = _overlay.follow;
+    layers
+      ..showPaths(_overlay.paths)
+      ..showPins(_overlay.pins, outline: theme.colorScheme.surface, theme: theme)
+      ..showUser(
+        _user,
+        accuracy: _accuracy,
+        heading: follow == null || follow.overhead ? null : _heading.apply(follow).bearing,
+        zoom: _controller?.camera?.zoom ?? 0,
+      );
   }
 
   @override
@@ -360,8 +387,19 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           // A style without one of them (another version of it) is fine as it is
           unawaited(style.removeLayer(id).catchError((Object e) => debugPrint('Map layer $id not removed: $e')));
         }
+        // The overlay's layers on this style (the map may be created again)
+        _layers?.dispose();
+        _layers = MapLibreOverlay(style, theme: Theme.of(context), pixelRatio: View.of(context).devicePixelRatio);
+        _showLayers();
         if (_ready) {
           _reframe();
+        }
+      case MapEventMoveCamera(:final camera):
+        _layers?.zoomed(camera.zoom);
+      case MapEventClick(:final screenPoint):
+        final controller = _controller;
+        if (controller != null) {
+          _layers?.tappedPin(controller, screenPoint)?.onTap?.call();
         }
       case MapEventStartMoveCamera(reason: CameraChangeReason.apiGesture):
         // Moving the map by hand stops following until "Recentrer"
@@ -388,9 +426,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   Widget build(BuildContext context) {
     final (:overlay, :user, :accuracy) = watchMapView(ref);
     _overlay = overlay;
-    final scheme = Theme.of(context).colorScheme;
+    _user = user;
+    _accuracy = accuracy;
+    _theme = Theme.of(context);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _frame(overlay);
+      _showLayers();
+    });
 
     _heading.watch(ref, overlay.follow, _turn);
 
@@ -419,11 +462,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           }
         });
       }
-      return _map(context, user, accuracy, overlay, scheme);
+      return _map(context, user, overlay);
     });
   }
 
-  Widget _map(BuildContext context, LatLng? user, double? accuracy, MapOverlay overlay, ColorScheme scheme) {
+  Widget _map(BuildContext context, LatLng? user, MapOverlay overlay) {
     return MapLibreMap(
       options: MapOptions(
         initStyle: _style,
@@ -435,7 +478,6 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         gestures: const MapGestures.all(rotate: false, pitch: false),
       ),
       onEvent: _onEvent,
-      layers: _layers(overlay.paths),
       children: [
         // The controller of the map actually shown: the map can be created again (the page laid out again), and the
         // overlay is then framed on the new one
@@ -453,45 +495,26 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           }
           return const SizedBox.shrink();
         }),
-        WidgetLayer(
-          allowInteraction: true,
-          markers: [
-            // How sure the position is, lying on the ground (flattened when the map is tilted) under the pins and the dot
-            if (user != null && accuracy != null)
-              Marker(
-                point: _geo(user),
-                size: UserDot.size,
-                flat: true,
-                child: Builder(builder: (context) {
-                  final zoom = MapCamera.maybeOf(context)?.zoom;
-                  final radius = zoom == null ? null : AccuracyCircle.radiusFor(accuracy, user.latitude, zoom, tileSize: 512);
-                  return radius == null ? const SizedBox.shrink() : AccuracyCircle(radius: radius);
-                }),
-              ),
-            for (final pin in overlay.pins)
-              Marker(
-                point: _geo(pin.point),
-                size: pin.child != null ? pin.childSize : Size.square(pin.size + 16),
-                alignment: mapLibrePinAlignment(pin),
-                child: PinView(pin: pin, outline: scheme.surface),
-              ),
-            if (user != null)
-              Marker(
-                point: _geo(user),
-                size: UserDot.size,
-                child: Builder(
-                  builder: (context) {
-                    // Upright marker: the heading on the screen is the heading minus the map's bearing
-                    final bearing = MapCamera.maybeOf(context)?.bearing ?? 0;
-                    final follow = overlay.follow;
-                    return UserDot(
-                      screenHeading: follow == null || follow.overhead ? null : _heading.apply(follow).bearing - bearing,
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
+        // The pins for screen readers (drawn by the map): where they are, named, tappable; nothing seen nor touched
+        if (MediaQuery.of(context).accessibleNavigation)
+          WidgetLayer(
+            allowInteraction: true,
+            markers: [
+              for (final pin in overlay.pins)
+                if (pin.label != null)
+                  Marker(
+                    point: _geo(pin.point),
+                    size: PinView.boxOf(pin),
+                    alignment: pin.above ? Alignment.bottomCenter : Alignment.center,
+                    child: Semantics(
+                      label: pin.label,
+                      button: pin.onTap != null,
+                      onTap: pin.onTap,
+                      child: SizedBox.fromSize(size: PinView.boxOf(pin)),
+                    ),
+                  ),
+            ],
+          ),
         if (_following != null && _followPaused)
           ListenableBuilder(
             listenable: widget.panel ?? const AlwaysStoppedAnimation(0),
@@ -501,49 +524,6 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       ],
     );
   }
-
-  /// Layers of the paths drawn last: the map sends a layer to the map engine again unless it is the same object, so
-  /// the layers of unchanged paths are kept (a line's page publishes its overlay every second while its vehicles move)
-  List<(MapPath, List<Layer>)> _pathLayers = const [];
-
-  List<Layer> _layers(List<MapPath> paths) {
-    final previous = _pathLayers;
-    _pathLayers = [
-      for (final (index, path) in paths.indexed)
-        index < previous.length && previous[index].$1.sameAs(path) ? previous[index] : (path, mapLibrePathLayers(path)),
-    ];
-    return [for (final (_, layers) in _pathLayers) ...layers];
-  }
-}
-
-/// Light edge of the paths: the map stays light in dark mode too
-const _casing = Colors.white;
-
-/// The style layers of [path] on the MapLibre map: a solid path on a light edge as faded as it, a walk as round dots
-/// on the map itself like Citymapper's (a light band under them hid the map)
-List<Layer> mapLibrePathLayers(MapPath path) {
-  final lines = [
-    if (path.points.length >= 2)
-      Feature(geometry: LineString.from([for (final point in path.points) Geographic(lon: point.longitude, lat: point.latitude)])),
-  ];
-  if (path.dotted) {
-    return [DotsLayer(polylines: lines, color: path.color, width: path.width.round())];
-  }
-  return [
-    PolylineLayer(polylines: lines, color: _casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
-    PolylineLayer(polylines: lines, color: path.color, width: path.width.round()),
-  ];
-}
-
-/// A line of round dots as wide as the line, one every two widths: dashes of no length, their round ends drawn
-class DotsLayer extends PolylineLayer {
-  const DotsLayer({required super.polylines, required super.color, required super.width});
-
-  @override
-  Map<String, Object> getLayout() => const {'line-cap': 'round', 'line-join': 'round'};
-
-  @override
-  Map<String, Object> getPaint() => {...super.getPaint(), 'line-dasharray': const [0, 2]};
 }
 
 /// Short credits, the full ones on the About page

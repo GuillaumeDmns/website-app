@@ -157,22 +157,26 @@ class _LineScreenState extends ConsumerState<LineScreen> {
             label: stop.name,
             onTap: () => context.push(Routes.stop(stop.id)),
           ),
-        for (final (:vehicle, :place) in placed)
+        for (final (:vehicle, :place) in placed) ...[
+          // Its pointer the way it goes, turned with the map, under its circle
+          MapPin(
+            point: place.point,
+            color: color,
+            rotation: place.heading,
+            childSize: Size.square(VehicleMarker.boxSize(_vehicleSize)),
+            image: 'vehicle-pointer-$_vehicleSize-${vehicle.stale}',
+            child: VehiclePointer(size: _vehicleSize, stale: vehicle.stale),
+          ),
           MapPin(
             point: place.point,
             color: color,
             label: vehicleLabel(vehicle, now, line.mode),
             onTap: () => showVehicleSheet(context, line: line, vehicle: vehicle, onFollow: () => _follow(vehicle)),
             childSize: Size.square(VehicleMarker.boxSize(_vehicleSize)),
-            child: VehicleMarker(
-              line: line,
-              size: _vehicleSize,
-              // The map of a line's page is north up
-              heading: place.heading,
-              punctuality: Punctuality.of(vehicle),
-              stale: vehicle.stale,
-            ),
+            image: 'vehicle-${line.id}-$_vehicleSize-${Punctuality.of(vehicle).name}-${vehicle.stale}',
+            child: VehicleMarker(line: line, size: _vehicleSize, punctuality: Punctuality.of(vehicle), stale: vehicle.stale),
           ),
+        ],
       ],
       fit: selected,
     ).withFollow(_followView(placed));
