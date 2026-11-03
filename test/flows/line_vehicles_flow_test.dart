@@ -1,6 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
 import 'package:website_app/l10n/l10n.dart';
@@ -47,13 +50,17 @@ void main() {
     await tapOn(tester, find.text('Châtelet'));
     await tapOn(tester, find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == metro1.id));
 
-    // On the map with a pointer, on the stop list without
-    final onMap = find.byWidgetPredicate((widget) => widget is VehicleMarker && widget.heading != null);
+    // On the map, its circle over its pointer turned the way it goes (the map turns it); on the stop list, its circle
+    final map = find.byType(fm.FlutterMap);
+    final onMap = find.descendant(of: map, matching: find.byType(VehicleMarker));
     expect(onMap, findsNWidgets(2));
+    expect(find.descendant(of: map, matching: find.byType(VehiclePointer)), findsNWidgets(2));
     final moving = tester.widget<VehicleMarker>(onMap.first);
     expect(moving.punctuality, Punctuality.late);
     // Châtelet → Gare de Lyon goes south-east
-    expect(moving.heading, inInclusiveRange(90, 180));
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    final pins = container.read(mapOverlaysProvider)[container.read(routerLocationProvider)]!.pins;
+    expect(pins.firstWhere((pin) => pin.rotation != null).rotation, inInclusiveRange(90, 180));
     expect(tester.widgetList<VehicleMarker>(find.byType(VehicleMarker)).where((marker) => marker.stale), hasLength(2));
 
     // No trail behind them: the line's branches only

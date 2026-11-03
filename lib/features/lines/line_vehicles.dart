@@ -263,6 +263,21 @@ class VehicleMarker extends StatelessWidget {
   }
 }
 
+/// The pointer of a [VehicleMarker] of [size] alone, pointing up, in the marker's box: turned on the map the way the
+/// vehicle goes, under its circle drawn apart
+class VehiclePointer extends StatelessWidget {
+  const VehiclePointer({super.key, required this.size, this.stale = false});
+
+  final double size;
+  final bool stale;
+
+  @override
+  Widget build(BuildContext context) {
+    final pointer = CustomPaint(size: Size.square(VehicleMarker.boxSize(size)), painter: _PointerPainter(radius: size / 2));
+    return stale ? Opacity(opacity: 0.45, child: pointer) : pointer;
+  }
+}
+
 /// A dark triangle pointing up, just outside a circle of [radius] at the center: dark, since it points along the line
 /// drawn in the line's color
 class _PointerPainter extends CustomPainter {

@@ -12,21 +12,27 @@ class PinView extends StatelessWidget {
   final MapPin pin;
   final Color outline;
 
+  /// What [pin] looks like, alone: its child, else its colored dot ringed with [outline]
+  static Widget marker(MapPin pin, Color outline) =>
+      pin.child ??
+      Container(
+        width: pin.size,
+        height: pin.size,
+        decoration: BoxDecoration(
+          color: pin.color,
+          shape: BoxShape.circle,
+          border: Border.all(color: outline, width: 2),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+        ),
+        child: pin.icon == Icons.circle ? null : Icon(pin.icon, size: pin.size * 0.6, color: Colors.white),
+      );
+
+  /// The box [pin] is drawn in: its child's, else its dot with room around it to tap it
+  static Size boxOf(MapPin pin) => pin.child != null ? pin.childSize : Size.square(pin.size + 16);
+
   @override
   Widget build(BuildContext context) {
-    final dot = Container(
-      width: pin.size,
-      height: pin.size,
-      decoration: BoxDecoration(
-        color: pin.color,
-        shape: BoxShape.circle,
-        border: Border.all(color: outline, width: 2),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
-      ),
-      child: pin.icon == Icons.circle ? null : Icon(pin.icon, size: pin.size * 0.6, color: Colors.white),
-    );
-
-    final marker = pin.child ?? dot;
+    final marker = PinView.marker(pin, outline);
     final child = Center(child: pin.label == null ? marker : Tooltip(message: pin.label!, child: marker));
     if (pin.onTap == null) {
       return child;
@@ -61,8 +67,7 @@ class UserDot extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        if (rotation != null)
-          Transform.rotate(angle: rotation, child: const CustomPaint(size: Size(72, 72), painter: _HeadingPainter())),
+        if (rotation != null) Transform.rotate(angle: rotation, child: const HeadingCone()),
         Container(
           width: halo,
           height: halo,
@@ -141,6 +146,14 @@ class _AccuracyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_AccuracyPainter oldDelegate) => oldDelegate.radius != radius;
+}
+
+/// The soft cone of [UserDot] pointing up from the middle of its box, the way the user faces
+class HeadingCone extends StatelessWidget {
+  const HeadingCone({super.key});
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: UserDot.size, painter: const _HeadingPainter());
 }
 
 /// A soft cone pointing up, from the center of the box

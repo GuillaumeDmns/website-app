@@ -289,6 +289,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       label: [maneuver.label, ?maneuver.walk.name].join(' · '),
       above: true,
       childSize: const Size(220, 44),
+      image: 'callout-${maneuver.icon.codePoint}-${maneuver.walk.name ?? maneuver.label}',
       child: _MapCallout(icon: maneuver.icon, text: maneuver.walk.name ?? maneuver.label),
     );
   }
@@ -309,6 +310,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
               color: walkPathColor,
               label: stationAccessName(entrance, exit: true),
               childSize: const Size(20, 20),
+              image: 'station-access',
               child: const _AccessIcon(),
             ),
         MapPin(
@@ -317,6 +319,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
           label: name,
           above: true,
           childSize: const Size(240, 44),
+          image: 'callout-${Icons.exit_to_app.codePoint}-$name',
           child: _MapCallout(icon: Icons.exit_to_app, text: name),
         ),
       ],

@@ -342,10 +342,19 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
             for (final pin in overlay.pins)
               Marker(
                 point: pin.point,
-                width: pin.child != null ? pin.childSize.width : pin.size + 16,
-                height: pin.child != null ? pin.childSize.height : pin.size + 16,
+                width: PinView.boxOf(pin).width,
+                height: PinView.boxOf(pin).height,
                 alignment: pin.above ? Alignment.topCenter : Alignment.center,
-                child: PinView(pin: pin, outline: scheme.surface),
+                child: switch (pin.rotation) {
+                  null => PinView(pin: pin, outline: scheme.surface),
+                  // Turned from north, with the map: its rotation plus the map's (the layer keeps markers upright)
+                  final rotation => Builder(
+                      builder: (context) => Transform.rotate(
+                        angle: (rotation + MapCamera.of(context).rotation) * math.pi / 180,
+                        child: PinView(pin: pin, outline: scheme.surface),
+                      ),
+                    ),
+                },
               ),
             if (user != null)
               Marker(
