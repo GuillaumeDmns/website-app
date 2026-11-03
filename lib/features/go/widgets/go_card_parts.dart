@@ -311,13 +311,6 @@ class GoStationAccess extends StatelessWidget {
   }
 }
 
-/// `Vous allez le rater · suivant à 14:38 (+6 min)`: walking too slowly to the ride, its next departure the user can
-/// still catch, from the ride's departures
-String? goMissedNextText(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) => switch (goNextCatchable(ref, state, margin, now)) {
-      (:final time, :final later) => currentL10n.goMarginLateNext(formatClock(time), later),
-      null => null,
-    };
-
 /// Walking to the ride: its next departure after the one aimed at that the user can still catch at their pace, and
 /// how many minutes later it leaves; null when the departures don't say
 ({DateTime time, int later})? goNextCatchable(WidgetRef ref, GoState state, WalkMargin margin, DateTime now) {

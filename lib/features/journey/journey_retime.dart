@@ -177,27 +177,38 @@ int _walkingBefore(List<JourneySection> sections, int index) => sections
 
 Ride? _choose(JourneySection section, List<Ride>? list, Ride? choice, DateTime earliest) {
   if (choice != null) {
-    // Its latest real time
-    return list?.where((ride) => sameRide(ride, choice)).firstOrNull ?? choice;
+    // Its latest real time: among the same departures (a line serving two stops of a stop area lists a vehicle twice,
+    // arriving at each), the one arriving when the chosen one does
+    final same = list?.where((ride) => sameRide(ride, choice)).toList() ?? const <Ride>[];
+    return same.isEmpty
+        ? choice
+        : same.reduce((best, ride) => _arrivalGap(ride, choice.arrivalAt) < _arrivalGap(best, choice.arrivalAt) ? ride : best);
   }
   if (list == null) {
     return null;
   }
   final catchable = earliest.subtract(_tolerance);
-  final planned = plannedRide(list, section.departure);
+  final planned = plannedRide(list, section.departure, arrival: section.arrival);
   if (planned != null && !planned.departure.cancelled && !planned.departure.time.isBefore(catchable)) {
     return planned;
   }
   return list.where((ride) => !ride.departure.cancelled && !ride.departure.time.isBefore(catchable)).firstOrNull;
 }
 
-/// The departure planned at [planned]: closest scheduled time, a few minutes off at most
-Ride? plannedRide(List<Ride> rides, DateTime planned) {
+Duration _arrivalGap(Ride ride, DateTime? arrival) =>
+    ride.arrivalAt == null || arrival == null ? Duration.zero : ride.arrivalAt!.difference(arrival).abs();
+
+/// The departure planned at [planned]: closest scheduled time, a few minutes off at most. Among the same ones (a
+/// vehicle listed twice, arriving at two stops of a stop area), the one arriving closest to [arrival], else the first
+Ride? plannedRide(List<Ride> rides, DateTime planned, {DateTime? arrival}) {
   Ride? best;
   var bestGap = const Duration(minutes: 4);
   for (final ride in rides) {
     final gap = (ride.departure.aimedTime ?? ride.departure.time).difference(planned).abs();
-    if (gap <= bestGap) {
+    final closer = best == null
+        ? gap <= bestGap
+        : gap < bestGap || (gap == bestGap && arrival != null && _arrivalGap(ride, arrival) < _arrivalGap(best, arrival));
+    if (closer) {
       bestGap = gap;
       best = ride;
     }

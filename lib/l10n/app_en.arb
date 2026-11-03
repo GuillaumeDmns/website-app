@@ -404,7 +404,6 @@
   "goMarginAhead": "{minutes} min to spare",
   "goMarginHurry": "Walk faster",
   "goMarginLate": "You'll miss it",
-  "goMarginLateNext": "You'll miss it · next at {time} (+{minutes} min)",
   "minutesUnit": "min",
   "goArrivesIn": "in {duration}",
   "goNextStopLabel": "Next",

@@ -48,6 +48,18 @@ void main() {
     expect(plannedRide(rides, at(30)), isNull);
   });
 
+  test('a vehicle listed twice (a line serving two stops of a stop area): the first one is the planned one, the other '
+      'one keeps its own arrival when chosen', () {
+    final first = ride(at(10), ride: const Duration(minutes: 6));
+    final second = ride(at(10), ride: const Duration(minutes: 10));
+    expect(plannedRide([first, second], at(10)), first);
+    // The journey on the second one (its arrival at 8:20): that one, not the first
+    expect(plannedRide([first, second], at(10), arrival: at(20)), second);
+
+    final retimed = retimeJourney(planned, lookup: lookupOf({'C01371': [first, second]}), now: now, choices: {1: second}).journey;
+    expect(retimed.sections[1].arrival, at(20));
+  });
+
   test('keeps the plan when its departures are unknown', () {
     final retimed = retimeJourney(planned, lookup: (_) => null, now: now);
 
