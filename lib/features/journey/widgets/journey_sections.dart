@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
-import '../../../app/theme.dart';
 import '../../../core/api/models.dart';
 import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
-import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../bikes/bike_widgets.dart';
 import '../../daily_trips/daily_trip_widgets.dart';
@@ -256,20 +254,8 @@ class _RideTile extends StatelessWidget {
                     if (hasLine) RideAlertsButton(section: section),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    if (section.realtime == true)
-                      PillTag(
-                        icon: Icons.rss_feed,
-                        color: delay >= 120 ? context.colors.warning : context.colors.live,
-                        text: delay >= 60 ? context.l10n.delayMinutes(Duration(seconds: delay).roundedMinutes) : context.l10n.realtime,
-                      ),
-                    if (hasLine) LastRideTag(ride: section),
-                  ],
-                ),
+                // The real time shows in its departures (their minutes in green, with its signal): no tag for it here
+                if (hasLine) Padding(padding: const EdgeInsets.only(top: 6), child: LastRideTag(ride: section)),
                 if (plan != null) _RideDepartures(plan: plan!, mode: section.line?.mode, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   // The stops between, like Citymapper: below, on the line

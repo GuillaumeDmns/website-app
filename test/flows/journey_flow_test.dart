@@ -83,13 +83,14 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets("a ride's alerts behind one small icon of its line's row, read in a sheet; no boarding nor platform tag", (tester) async {
+  testWidgets("a ride's alerts behind one small icon of its line's row, read in a sheet; no real-time, boarding nor platform tag",
+      (tester) async {
     final backend = standardBackend();
     DateTime inMinutes(int minutes) => DateTime.now().toUtc().add(Duration(minutes: minutes));
     backend.on('GET', '/api/v2/journeys', (_) => FakeResponse(JourneyPlan(journeys: [
           journey([
             walk(inMinutes(2), 300),
-            transit(inMinutes(7), 480, to: gareDeLyon).copyWith(boardingPositions: ['front']),
+            transit(inMinutes(7), 480, to: gareDeLyon).copyWith(boardingPositions: ['front'], realtime: true),
           ]),
         ]).toJson()));
     backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
@@ -101,7 +102,9 @@ void main() {
     await tapOn(tester, find.text(currentL10n.goThere));
     await tapOn(tester, find.byType(JourneyCard));
 
-    // Where to board is GO's, the platform the departures list's
+    // The real time is in the departures (their minutes in green), where to board is GO's, the platform the departures
+    // list's
+    expect(find.text(currentL10n.realtime), findsNothing);
     expect(find.text(boardingLabel(['front'])), findsNothing);
     expect(find.text(platformLabel(metro1, '2')!), findsNothing);
     expect(find.text(currentL10n.platform('2')), findsWidgets);
