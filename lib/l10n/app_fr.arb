@@ -5,8 +5,8 @@
     "description": "Name of the app"
   },
   "departureCancelled": "Supprimé",
-  "delayedTo": "Retardé {time}",
-  "@delayedTo": {"placeholders": {"time": {"type": "String"}}},
+  "retimedClock": "{time}, prévu à {planned}",
+  "@retimedClock": {"placeholders": {"time": {"type": "String"}, "planned": {"type": "String"}}},
   "departureAtStop": "À l'arrêt",
   "@departureAtStop": {
     "description": "The vehicle is at the stop (bus)"
@@ -621,6 +621,8 @@
   "boardFront": "à l'avant",
   "boardMiddle": "au milieu",
   "boardBack": "à l'arrière",
+  "goWhereToBoard": "Où monter ?",
+  "goDirectionOfTravel": "Sens de la marche",
   "boardAnywhere": "Montez n'importe où",
   "boardAt": "Montez {positions}",
   "@boardAt": {
@@ -1220,7 +1222,7 @@
   "@goDepartsAt": {"placeholders": {"time": {"type": "String"}}},
   "goNextMove": "{duration} jusqu'à {place}",
   "@goNextMove": {"placeholders": {"duration": {"type": "String"}, "place": {"type": "String"}}},
-  "goIfMissed": "Si vous le ratez : suivant à {time} (+{minutes} min)",
+  "goIfMissed": "Si vous le ratez : suivant à {time}, {minutes} min plus tard",
   "@goIfMissed": {"placeholders": {"time": {"type": "String"}, "minutes": {"type": "int"}}},
   "goNextDeparture": "Suivant à {time}, dans {minutes} min",
   "@goNextDeparture": {"placeholders": {"time": {"type": "String"}, "minutes": {"type": "int"}}},

@@ -6,7 +6,7 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
-import '../../core/utils/time_format.dart';
+import '../../core/widgets/departure_time.dart';
 import '../../l10n/l10n.dart';
 import 'line_vehicles.dart';
 import '../../app/theme.dart';
@@ -81,6 +81,8 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
       for (final (index, call) in _vehicle.calls.indexed)
         if (leavesAt(_vehicle, index, widget.line.mode).isAfter(now)) call,
     ];
+    // A stop's time moved by the real time: room for the planned one, struck through, on every row
+    final retimed = calls.any((call) => RetimedClock.moved(call.expectedAt, _CallRow.plannedOf(call)) != 0);
     final subtitle = [
       widget.line.label,
       if (_vehicle.name != null) _vehicle.name!,
@@ -114,7 +116,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                             ),
                             if (_DelayLabel.shown(_vehicle.delaySeconds)) ...[
                               const SizedBox(width: 8),
-                              _DelayLabel(_vehicle.delaySeconds!),
+                              Flexible(child: _DelayLabel(_vehicle.delaySeconds!)),
                             ],
                           ],
                         ),
@@ -160,6 +162,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
                   itemCount: calls.length,
                   itemBuilder: (context, i) => _CallRow(
                     call: calls[i],
+                    retimed: retimed,
                     now: now,
                     mode: widget.line.mode,
                     color: color,
@@ -190,6 +193,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
 class _CallRow extends StatelessWidget {
   const _CallRow({
     required this.call,
+    required this.retimed,
     required this.now,
     required this.mode,
     required this.color,
@@ -200,7 +204,16 @@ class _CallRow extends StatelessWidget {
 
   static const _height = 48.0;
 
+  /// When the vehicle was planned at [call]: its time less its delay, null without one
+  static DateTime? plannedOf(VehicleCall call) => switch (call.delaySeconds) {
+        final delay? => call.expectedAt.subtract(Duration(seconds: delay)),
+        null => null,
+      };
+
   final VehicleCall call;
+
+  /// Some stop's time moved: the time column has room for a planned time struck through
+  final bool retimed;
   final DateTime now;
   final TransportMode mode;
   final Color color;
@@ -226,16 +239,21 @@ class _CallRow extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              width: 72,
+              width: retimed ? 112 : 72,
               child: Padding(
                 padding: const EdgeInsets.only(left: 20),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      formatClock(call.expectedAt),
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()]),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: RetimedClock(
+                        time: call.expectedAt,
+                        planned: plannedOf(call),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                     if (until != null)
                       // "à l'arrêt", "at the platform": smaller rather than over the line
@@ -280,7 +298,6 @@ class _CallRow extends StatelessWidget {
                 style: TextStyle(fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400),
               ),
             ),
-            if (_DelayLabel.shown(call.delaySeconds)) ...[_DelayLabel(call.delaySeconds!), const SizedBox(width: 8)],
             if (call.platform != null)
               Padding(
                 padding: const EdgeInsets.only(right: 16),
@@ -295,7 +312,7 @@ class _CallRow extends StatelessWidget {
   }
 }
 
-/// `+3 min` (late) or `-2 min` (early), from a minute off
+/// `3 min de retard` or `2 min d'avance`, in words (a sign beside a time reads as a sum to make), from a minute off
 class _DelayLabel extends StatelessWidget {
   const _DelayLabel(this.seconds);
 
@@ -307,12 +324,10 @@ class _DelayLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final minutes = (seconds / 60).round();
     return Text(
-      minutes > 0 ? '+${context.l10n.minutesShort(minutes)}' : context.l10n.minutesShort(minutes),
-      style: TextStyle(
-        color: minutes > 0 ? context.colors.warning : Colors.blue.shade700,
-        fontWeight: FontWeight.w600,
-        fontSize: 12,
-      ),
+      minutes > 0 ? context.l10n.goMinutesLate(minutes) : context.l10n.goMinutesEarly(-minutes),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: RetimedClock.colorOf(context, minutes), fontWeight: FontWeight.w600, fontSize: 12),
     );
   }
 }

@@ -44,6 +44,23 @@ void main() {
     expect(chosen, second);
   });
 
+  testWidgets('late and early departures: the planned time struck through, the new one beside it, no sign to add up',
+      (tester) async {
+    final late = ride(inMinutes(13), aimed: inMinutes(10));
+    final early = ride(inMinutes(30), aimed: inMinutes(32));
+    await pump(tester, RideDepartureList(rides: [late, early], now: now, selected: late, onSelect: (_) {}));
+
+    for (final (moved, planned, color) in [
+      (late, inMinutes(10), AppColors.light.delayed),
+      (early, inMinutes(32), AppTheme.lightTheme.colorScheme.secondary),
+    ]) {
+      expect(tester.widget<Text>(find.text(formatClock(planned))).style?.decoration, TextDecoration.lineThrough);
+      expect(tester.widget<Text>(find.text(formatClock(moved.departure.time))).style?.color, color);
+    }
+    expect(find.textContaining('+'), findsNothing);
+    expect(find.textContaining(RegExp(r'^-\d')), findsNothing);
+  });
+
   testWidgets('if the departure taken is missed: the next vehicle, not the same one listed again', (tester) async {
     final first = ride(inMinutes(10), ride: const Duration(minutes: 6));
     final second = ride(inMinutes(10), ride: const Duration(minutes: 10));

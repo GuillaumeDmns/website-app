@@ -24,6 +24,10 @@ const hiddenStyleLayers = ['poi_r1', 'poi_r7', 'poi_r20', 'poi_transit'];
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
 
+/// Where a pin sits on its point in MapLibre's widget layer, which puts that point of the marker on the position
+/// (flutter_map moves the marker by it instead): a callout ([MapPin.above]) by its bottom, its arrow on the place
+Alignment mapLibrePinAlignment(MapPin pin) => pin.above ? Alignment.bottomCenter : Alignment.center;
+
 /// The map with MapLibre (native SDK on Android and iOS, maplibre-gl-js on the web): OpenFreeMap's vector tiles drawn
 /// by the GPU. Paths are style layers, pins and the user position Flutter widgets over the map. The part hidden by the
 /// [panel] is the camera's padding: changing it without animation keeps what is in the middle of the part left above
@@ -468,7 +472,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
               Marker(
                 point: _geo(pin.point),
                 size: pin.child != null ? pin.childSize : Size.square(pin.size + 16),
-                alignment: pin.above ? Alignment.topCenter : Alignment.center,
+                alignment: mapLibrePinAlignment(pin),
                 child: PinView(pin: pin, outline: scheme.surface),
               ),
             if (user != null)

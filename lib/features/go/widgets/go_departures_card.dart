@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import '../../../core/api/models.dart';
 import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
 import '../../../core/utils/time_format.dart';
+import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/size_reporter.dart';
 import '../../../l10n/l10n.dart';
@@ -67,13 +69,27 @@ class GoDeparturesCard extends ConsumerWidget {
     final waiting = progress.phase == GoPhase.waiting && progress.step == card.step;
     final minutes = math.min(minutesLeft(departure.difference(now)), 999);
 
-    // When it leaves: its time, then on time, late or cancelled when the real time says
-    final late = vehicle == null ? 0 : vehicle.time.difference(vehicle.aimedTime ?? vehicle.time).roundedMinutes;
-    final (status, statusColor) = switch (vehicle) {
-      null => (context.l10n.goScheduled, colors.muted),
-      final vehicle when vehicle.cancelled => (context.l10n.goCancelledStatus, colors.cancelled),
-      _ when late >= 1 => (context.l10n.goMinutesLate(late), colors.warning),
-      _ => (context.l10n.goOnTime, colors.live),
+    // When it leaves: its time on time or from the schedule; moved by the real time, the planned time struck through and
+    // the new one beside it, in the delay's color (blue early); cancelled, the planned time struck through
+    final moved = vehicle == null || vehicle.cancelled ? 0 : RetimedClock.moved(departure, vehicle.aimedTime);
+    final struck = TextStyle(
+      color: colors.muted,
+      fontWeight: FontWeight.w400,
+      decoration: TextDecoration.lineThrough,
+      decorationColor: colors.muted,
+    );
+    TextStyle colored(Color? color) => TextStyle(color: done ? null : color);
+    final when = switch (vehicle) {
+      null => [TextSpan(text: '${formatClock(departure)} '), TextSpan(text: context.l10n.goScheduled, style: colored(colors.muted))],
+      final vehicle when vehicle.cancelled => [
+          TextSpan(text: formatClock(vehicle.aimedTime ?? departure), style: struck),
+          TextSpan(text: ' ${context.l10n.goCancelledStatus}', style: colored(colors.cancelled)),
+        ],
+      final vehicle when moved != 0 => [
+          TextSpan(text: formatClock(vehicle.aimedTime!), style: struck),
+          TextSpan(text: ' ${formatClock(departure)}', style: colored(RetimedClock.colorOf(context, moved))),
+        ],
+      _ => [TextSpan(text: '${formatClock(departure)} '), TextSpan(text: context.l10n.goOnTime, style: colored(colors.live))],
     };
     final mission = vehicle?.mission;
     final issue = live && waiting && progress.issue != GoIssue.offRoute ? progress.issue : null;
@@ -92,10 +108,7 @@ class GoDeparturesCard extends ConsumerWidget {
         : GoCardHeader(
             leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
             title: formatClock(departure),
-            titleSpan: TextSpan(children: [
-              TextSpan(text: '${formatClock(departure)} '),
-              TextSpan(text: status, style: TextStyle(color: done ? null : statusColor)),
-            ]),
+            titleSpan: TextSpan(children: when),
             subtitle: [?mission, mission != null ? section.headsign ?? '' : context.l10n.direction(section.headsign ?? '')]
                 .where((part) => part.isNotEmpty)
                 .join(' '),
@@ -156,8 +169,8 @@ class GoDeparturesCard extends ConsumerWidget {
   }
 }
 
-/// Where to board along the train, like Citymapper's "Où monter ?": its cars from the front, the ones to board
-/// highlighted
+/// Where to board along the train, like Citymapper's "Où monter ?": a small train drawn from its front (the way it
+/// goes, on the left), the cars to board in the line's color with a mark under them
 class TrainPositions extends StatelessWidget {
   const TrainPositions({super.key, required this.positions, required this.color});
 
@@ -165,42 +178,146 @@ class TrainPositions extends StatelessWidget {
   final List<String> positions;
   final Color color;
 
+  /// Cars drawn: two for each third of the train
+  static const cars = 6;
+
+  /// Whether each car, from the front, is one to board
+  static List<bool> boardedCars(List<String> positions) => [
+        for (var car = 0; car < cars; car++)
+          positions.contains(switch (car * 3 ~/ cars) {
+            0 => 'front',
+            1 => 'middle',
+            _ => 'back',
+          }),
+      ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = context.colors.subtle;
-    bool boarded(int car) => switch (car) {
-          0 || 1 => positions.contains('front'),
-          2 => positions.contains('middle'),
-          _ => positions.contains('back'),
-        };
+    final colors = context.colors;
+    final label = boardingLabel(positions);
     return Semantics(
-      label: boardingLabel(positions),
+      label: label,
       excludeSemantics: true,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.arrow_back, size: 16, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 4),
-          for (var car = 0; car < 5; car++)
-            Expanded(
-              child: Container(
-                height: 18,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: boarded(car) ? color : muted,
-                  borderRadius: BorderRadius.horizontal(
-                    left: Radius.circular(car == 0 ? 9 : 3),
-                    right: const Radius.circular(3),
-                  ),
+          Row(
+            children: [
+              Text(context.l10n.goWhereToBoard, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 12),
+              Expanded(
+                // The question asked: `À l'avant`, `Au milieu ou à l'arrière`
+                child: Text(
+                  switch (boardingPositionNames(positions)) {
+                    '' => label,
+                    final names => '${names[0].toUpperCase()}${names.substring(1)}',
+                  },
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          CustomPaint(
+            size: const Size.fromHeight(38),
+            painter: _TrainPainter(
+              boarded: boardedCars(positions),
+              color: color,
+              idle: colors.subtle,
+              windows: colors.card,
             ),
-          const SizedBox(width: 10),
-          Text(boardingLabel(positions), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Icon(Icons.arrow_back, size: 14, color: colors.muted),
+              const SizedBox(width: 4),
+              Text(context.l10n.goDirectionOfTravel, style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+            ],
+          ),
         ],
       ),
     );
   }
+}
+
+/// [TrainPositions]' train: its cars side by side, the first one with a sloping nose, windows along them, the cars to
+/// board filled with the line's color and a mark pointing up at them
+class _TrainPainter extends CustomPainter {
+  const _TrainPainter({required this.boarded, required this.color, required this.idle, required this.windows});
+
+  final List<bool> boarded;
+  final Color color;
+  final Color idle;
+  final Color windows;
+
+  static const _gap = 3.0;
+  static const _mark = 7.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final height = size.height - _mark - 3;
+    final width = (size.width - _gap * (boarded.length - 1)) / boarded.length;
+    for (final (car, board) in boarded.indexed) {
+      final left = car * (width + _gap);
+      final body = Rect.fromLTWH(left, 0, width, height);
+      final first = car == 0;
+      final last = car == boarded.length - 1;
+      final nose = Radius.elliptical(math.min(width * 0.55, height * 1.3), height * 0.9);
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          body,
+          topLeft: first ? nose : const Radius.circular(4),
+          bottomLeft: first ? const Radius.circular(6) : const Radius.circular(4),
+          topRight: Radius.circular(last ? 8 : 4),
+          bottomRight: Radius.circular(last ? 8 : 4),
+        ),
+        Paint()..color = board ? color : idle,
+      );
+      // Windows along the upper half; the first car's start after its nose, a windscreen
+      final window = Paint()..color = board ? Colors.white.withValues(alpha: 0.85) : windows;
+      final top = height * 0.2;
+      final windowHeight = height * 0.32;
+      final start = left + (first ? width * 0.42 : 5);
+      final end = left + width - 5;
+      final count = first ? 1 : math.max(2, ((end - start) / 16).floor());
+      final windowWidth = (end - start - (count - 1) * 4) / count;
+      for (var index = 0; index < count; index++) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(start + index * (windowWidth + 4), top, windowWidth, windowHeight),
+            const Radius.circular(2.5),
+          ),
+          window,
+        );
+      }
+    }
+    // The mark under the cars to board, pointing up at them
+    final firstBoarded = boarded.indexOf(true);
+    if (firstBoarded < 0) {
+      return;
+    }
+    final lastBoarded = boarded.lastIndexOf(true);
+    final middle = (firstBoarded * (width + _gap) + (lastBoarded + 1) * (width + _gap) - _gap) / 2;
+    final tip = height + 3;
+    canvas.drawPath(
+      Path()
+        ..moveTo(middle, tip)
+        ..lineTo(middle + _mark, tip + _mark)
+        ..lineTo(middle - _mark, tip + _mark)
+        ..close(),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_TrainPainter oldDelegate) =>
+      !listEquals(oldDelegate.boarded, boarded) ||
+      oldDelegate.color != color ||
+      oldDelegate.idle != idle ||
+      oldDelegate.windows != windows;
 }
 
 /// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their

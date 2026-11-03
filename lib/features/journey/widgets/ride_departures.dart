@@ -196,7 +196,6 @@ class _RideRow extends StatelessWidget {
     final muted = theme.colorScheme.onSurfaceVariant;
     final departure = ride.departure;
     final arrival = ride.arrivalAt;
-    final late = departure.aimedTime == null ? 0 : departure.time.difference(departure.aimedTime!).roundedMinutes;
     final minutes = arrival?.difference(departure.time).roundedMinutes;
     const figures = [FontFeature.tabularFigures()];
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
@@ -216,26 +215,22 @@ class _RideRow extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Row(
                     children: [
-                      Text(
-                        formatClock(departure.time),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          fontFeatures: figures,
-                          decoration: departure.cancelled ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                      if (late.abs() >= 1 && !departure.cancelled)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            late > 0 ? '+$late' : '$late',
-                            style: TextStyle(
-                              color: late > 0 ? context.colors.warning : theme.colorScheme.secondary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
+                      if (departure.cancelled)
+                        Text(
+                          formatClock(departure.time),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            fontFeatures: figures,
+                            decoration: TextDecoration.lineThrough,
                           ),
+                        )
+                      else
+                        // Moved by the real time: the planned time struck through, the new one beside it
+                        RetimedClock(
+                          time: departure.time,
+                          planned: departure.aimedTime,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                         ),
                       if (arrival != null && !departure.cancelled) ...[
                         Padding(

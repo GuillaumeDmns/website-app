@@ -43,8 +43,12 @@ void main() {
       ),
     ));
 
-    expect(find.text(formatClock(inMinutes(1))), findsOneWidget);
-    expect(find.text(currentL10n.delayedTo(formatClock(inMinutes(4)))), findsOneWidget);
+    // The planned time struck through, the new one beside it in the delay's color: nothing to add up
+    final planned = tester.widget<Text>(find.text(formatClock(inMinutes(1))));
+    expect(planned.style?.decoration, TextDecoration.lineThrough);
+    final now4 = tester.widget<Text>(find.text(formatClock(inMinutes(4))));
+    expect(now4.style?.color, AppColors.light.delayed);
+    expect(find.bySemanticsLabel(currentL10n.retimedClock(formatClock(inMinutes(4)), formatClock(inMinutes(1)))), findsOneWidget);
     expect(find.text('POPU'), findsOneWidget);
     expect(find.text('Paris Saint-Lazare'), findsOneWidget);
     expect(find.text('Voie A'), findsOneWidget);

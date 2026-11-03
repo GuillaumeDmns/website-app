@@ -8,6 +8,7 @@ import '../../../core/api/models.dart';
 import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
 import '../../../core/utils/time_format.dart';
+import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
@@ -219,6 +220,10 @@ class _RideTile extends StatelessWidget {
         TimelineRow(
           color: color,
           time: formatClock(section.departure),
+          // Late or early by the real time: the planned time struck through under the new one
+          clock: delay.abs() >= 60
+              ? RetimedClock(time: section.departure, planned: section.departure.subtract(Duration(seconds: delay)), stacked: true)
+              : null,
           dot: true,
           child: InkWell(
             onTap: section.from?.stopAreaId == null ? null : () => context.push(Routes.stop(section.from!.stopAreaId!)),

@@ -29,4 +29,19 @@ void main() {
     expect(line.color, faded);
     expect(line.dashArray, isNull);
   });
+
+  test('a callout stands on its place on MapLibre: its arrow on the point, not hanging 44 px under it', () {
+    // MapLibre's widget layer puts a marker of size s at left = x - s.w / 2 (a.x + 1), top = y - s.h / 2 (a.y + 1)
+    const size = Size(240, 44);
+    const point = Offset(200, 300);
+    final callout = mapLibrePinAlignment(
+      const MapPin(point: LatLng(48.8584, 2.3470), color: Color(0xFF0A8F4E), above: true, childSize: size, child: SizedBox()),
+    );
+    final left = point.dx - size.width / 2 * (callout.x + 1);
+    final top = point.dy - size.height / 2 * (callout.y + 1);
+    expect(Offset(left + size.width / 2, top + size.height), point);
+
+    // A pin: on its point
+    expect(mapLibrePinAlignment(const MapPin(point: LatLng(48.8584, 2.3470), color: Color(0xFF0A8F4E))), Alignment.center);
+  });
 }

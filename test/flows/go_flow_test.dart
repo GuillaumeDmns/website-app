@@ -169,6 +169,34 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets("waiting for a late vehicle: its planned time struck through, the new one beside it, no minutes to add",
+      (tester) async {
+    final backend = standardBackend();
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
+          ride(inMinutes(9), aimed: inMinutes(6)).toJson(),
+          ride(inMinutes(12)).toJson(),
+        ]));
+    await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.waiting), position: LatLng(chatelet.lat, chatelet.lon)),
+        backend: backend);
+
+    final header = find.descendant(
+      of: find.byType(GoDeparturesCard),
+      matching: find.byWidgetPredicate((widget) => widget is RichText && widget.text.toPlainText().contains(formatClock(inMinutes(6)))),
+    );
+    final spans = <TextSpan>[];
+    tester.widget<RichText>(header.first).text.visitChildren((span) {
+      if (span is TextSpan && (span.text?.trim().isNotEmpty ?? false)) {
+        spans.add(span);
+      }
+      return true;
+    });
+    expect([for (final span in spans) span.text!.trim()], [formatClock(inMinutes(6)), formatClock(inMinutes(9))]);
+    expect(spans.first.style?.decoration, TextDecoration.lineThrough);
+    expect(find.textContaining(currentL10n.goMinutesLate(3), findRichText: true), findsNothing);
+
+    await closeApp(tester);
+  });
+
   testWidgets('on board: the stops left on a rail, the next one, where to get off, its alerts switched off', (tester) async {
     final container = await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 0)));
 
