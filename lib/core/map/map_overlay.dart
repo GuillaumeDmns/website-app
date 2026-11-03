@@ -64,8 +64,9 @@ class MapPath {
       listEquals(points, other.points);
 }
 
-/// The camera following the user (GO on foot or by bike): the way ahead up, the user low in the visible part, close,
-/// tilted to see further ahead; or [overhead] (a vehicle followed): north up, the followed in the middle, further out.
+/// The camera following the user (GO, [user]) on foot or by bike: the way ahead up, the user low in the visible part,
+/// close, tilted to see further ahead; or [overhead] (the user in a vehicle, or a vehicle followed from a line's page):
+/// north up, the followed in the middle, further out.
 class MapFollow {
   const MapFollow({
     required this.position,
@@ -74,11 +75,13 @@ class MapFollow {
     this.compass = false,
     this.pitch = 0,
     this.overhead = false,
+    this.user = false,
   });
 
   /// From overhead, north up, [position] in the middle of what is left above the panel, a few streets around: a
   /// vehicle moves too fast to be followed close up
-  const MapFollow.overhead(LatLng position) : this(position: position, bearing: 0, zoom: 15, overhead: true);
+  const MapFollow.overhead(LatLng position, {bool user = false})
+      : this(position: position, bearing: 0, zoom: 15, overhead: true, user: user);
 
   final LatLng position;
 
@@ -96,14 +99,19 @@ class MapFollow {
   /// See [MapFollow.overhead]
   final bool overhead;
 
+  /// The user is followed (GO, [position] its last fix): the camera goes with GO's smoothed position instead, where the
+  /// user dot is ([watchMapView]). Otherwise something else is (a vehicle from a line's page), the user dot staying
+  /// where the user is.
+  final bool user;
+
   /// On foot or by bike: tilted, the way ahead seen further than from straight above
   static const firstPersonPitch = 45.0;
 
-  MapFollow withBearing(double bearing) =>
-      MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead);
+  MapFollow withBearing(double bearing) => MapFollow(
+      position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead, user: user);
 
-  MapFollow withPosition(LatLng position) =>
-      MapFollow(position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead);
+  MapFollow withPosition(LatLng position) => MapFollow(
+      position: position, bearing: bearing, zoom: zoom, compass: compass, pitch: pitch, overhead: overhead, user: user);
 
   /// The camera showing [other] only has to move a little, at once (no animation): a smoothed position redrawn several
   /// times a second, or the compass turning it
@@ -147,6 +155,7 @@ class MapFollow {
             compass: target.compass,
             pitch: target.pitch,
             overhead: target.overhead,
+            user: target.user,
           );
   }
 
@@ -306,23 +315,20 @@ class RouterLocation extends Notifier<String> {
 
 final routerLocationProvider = NotifierProvider<RouterLocation, String>(RouterLocation.new);
 
-/// What the maps show: the overlay of the current page, its follow on the smoothed position when there is one (GO on
-/// foot) so that the camera and the dot agree, where the user dot goes and how sure that position is (the accuracy of
-/// its fix in meters, for the circle around the dot; null when unknown)
+/// What the maps show: the overlay of the current page, where the user dot goes (the smoothed position when there is
+/// one, GO's, else the regular one) and how sure that position is (the accuracy of its fix in meters, for the circle
+/// around the dot; null when unknown). A follow of the user goes on the smoothed position too, so that the camera and
+/// the dot agree; a vehicle followed keeps its own, the dot staying on the user.
 ({MapOverlay overlay, LatLng? user, double? accuracy}) watchMapView(WidgetRef ref) {
   final location = ref.watch(routerLocationProvider);
   final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
   final precise = ref.watch(preciseUserPositionProvider);
+  if (precise == null) {
+    return (overlay: page, user: ref.watch(userLocationProvider).value, accuracy: ref.watch(userAccuracyProvider));
+  }
   final follow = page.follow;
-  if (precise != null) {
-    final overlay = follow != null ? page.withFollow(follow.withPosition(precise.position)) : page;
-    return (overlay: overlay, user: precise.position, accuracy: precise.accuracy);
-  }
-  if (follow != null) {
-    // A vehicle followed from a line's page: no accuracy of the user's around it
-    return (overlay: page, user: follow.position, accuracy: null);
-  }
-  return (overlay: page, user: ref.watch(userLocationProvider).value, accuracy: ref.watch(userAccuracyProvider));
+  final overlay = follow != null && follow.user ? page.withFollow(follow.withPosition(precise.position)) : page;
+  return (overlay: overlay, user: precise.position, accuracy: precise.accuracy);
 }
 
 /// Publishes [overlay] for the page it is in while the page exists.

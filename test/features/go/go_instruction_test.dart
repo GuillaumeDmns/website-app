@@ -96,10 +96,12 @@ void main() {
       final position = walkLine.pointAt(20);
       final onFoot = goFollow(state(walking).copyWith(position: position), 0)!;
       expect((onFoot.pitch, onFoot.compass, onFoot.overhead, onFoot.zoom), (MapFollow.firstPersonPitch, true, false, 18));
+      // The user followed: the map puts the camera on GO's smoothed position, where the dot is
+      expect(onFoot.user, isTrue);
 
       // Faster than a walk: a vehicle, followed from overhead, north up
       final riding = goFollow(state(walking).copyWith(position: position, inVehicle: true), 0)!;
-      expect((riding.pitch, riding.bearing, riding.compass, riding.overhead), (0, 0, false, true));
+      expect((riding.pitch, riding.bearing, riding.compass, riding.overhead, riding.user), (0, 0, false, true, true));
       expect(riding.zoom, lessThan(onFoot.zoom));
 
       // A car's step: overhead whatever the speed; a bike's: first person
