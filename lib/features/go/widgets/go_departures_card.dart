@@ -157,7 +157,11 @@ class GoDeparturesCard extends ConsumerWidget {
               ],
               if (!done && positions.isNotEmpty && positions.length < 3) ...[
                 const SizedBox(height: 12),
-                TrainPositions(positions: positions, color: parseHexColor(line?.color, theme.colorScheme.primary)),
+                TrainPositions(
+                  positions: positions,
+                  color: parseHexColor(line?.color, theme.colorScheme.primary),
+                  headRight: TrainPositions.headRightFor(line),
+                ),
               ],
             ],
           ),
@@ -169,17 +173,32 @@ class GoDeparturesCard extends ConsumerWidget {
   }
 }
 
-/// Where to board along the train, like Citymapper's "Où monter ?": a small train drawn from its front (the way it
-/// goes, on the left), the cars to board in the line's color with a mark under them
+/// Where to board along the train, like Citymapper's "Où monter ?": a small train as seen from the platform, facing the
+/// track, its front where it will stop ([headRight]), the cars to board in the line's color with a mark under them
 class TrainPositions extends StatelessWidget {
-  const TrainPositions({super.key, required this.positions, required this.color});
+  const TrainPositions({super.key, required this.positions, required this.color, required this.headRight});
 
   /// `front`, `middle`, `back`
   final List<String> positions;
   final Color color;
 
+  /// Its front on the traveller's right, the platform being on the train's right; else on the left
+  final bool headRight;
+
   /// Cars drawn: two for each third of the train
   static const cars = 6;
+
+  /// Tram-trains running on railway lines, on the left: T11, T13
+  static const _onTheLeft = {'C01999', 'C02344'};
+
+  /// Whether the front of the [line]'s trains stops on the traveller's right, as their usual station is laid out: the
+  /// metro and the tram run on the right with a platform on each side, on their right; trains run on the left (RER A
+  /// and B too, on their RATP sections as well: the GTFS tracks of both directions say so). An island platform between
+  /// the tracks turns it round, which the data doesn't tell for trains (one point per station for both directions).
+  static bool headRightFor(LineSummary? line) => switch (line?.mode) {
+        TransportMode.metro || TransportMode.tram => !_onTheLeft.contains(line!.id),
+        _ => false,
+      };
 
   /// Whether each car, from the front, is one to board
   static List<bool> boardedCars(List<String> positions) => [
@@ -227,14 +246,17 @@ class TrainPositions extends StatelessWidget {
               color: color,
               idle: colors.subtle,
               windows: colors.card,
+              headRight: headRight,
             ),
           ),
           const SizedBox(height: 2),
+          // Under its front, the way it goes
           Row(
+            mainAxisAlignment: headRight ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
-              Icon(Icons.arrow_back, size: 14, color: colors.muted),
-              const SizedBox(width: 4),
+              if (!headRight) ...[Icon(Icons.arrow_back, size: 14, color: colors.muted), const SizedBox(width: 4)],
               Text(context.l10n.goDirectionOfTravel, style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+              if (headRight) ...[const SizedBox(width: 4), Icon(Icons.arrow_forward, size: 14, color: colors.muted)],
             ],
           ),
         ],
@@ -246,18 +268,25 @@ class TrainPositions extends StatelessWidget {
 /// [TrainPositions]' train: its cars side by side, the first one with a sloping nose, windows along them, the cars to
 /// board filled with the line's color and a mark pointing up at them
 class _TrainPainter extends CustomPainter {
-  const _TrainPainter({required this.boarded, required this.color, required this.idle, required this.windows});
+  const _TrainPainter({required this.boarded, required this.color, required this.idle, required this.windows, required this.headRight});
 
   final List<bool> boarded;
   final Color color;
   final Color idle;
   final Color windows;
+  final bool headRight;
 
   static const _gap = 3.0;
   static const _mark = 7.0;
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Drawn from its front on the left, mirrored for a front on the right
+    if (headRight) {
+      canvas
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+    }
     final height = size.height - _mark - 3;
     final width = (size.width - _gap * (boarded.length - 1)) / boarded.length;
     for (final (car, board) in boarded.indexed) {
@@ -317,7 +346,8 @@ class _TrainPainter extends CustomPainter {
       !listEquals(oldDelegate.boarded, boarded) ||
       oldDelegate.color != color ||
       oldDelegate.idle != idle ||
-      oldDelegate.windows != windows;
+      oldDelegate.windows != windows ||
+      oldDelegate.headRight != headRight;
 }
 
 /// Departures of the ride's line stopping where it gets off, from when the traveller gets to its stop, with their
