@@ -517,7 +517,7 @@ class GoController extends Notifier<GoState?> {
   void _smoothen() {
     final position = _smoother.at(DateTime.now());
     if (position != null) {
-      ref.read(preciseUserPositionProvider.notifier).set(position);
+      ref.read(preciseUserPositionProvider.notifier).set(position, accuracy: _lastFix?.accuracy);
     }
     if (_smoothTimer != null || !_shown || !_smoother.moving(DateTime.now())) {
       return;

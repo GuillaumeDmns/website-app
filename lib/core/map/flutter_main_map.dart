@@ -257,7 +257,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final (:overlay, :user) = watchMapView(ref);
+    final (:overlay, :user, :accuracy) = watchMapView(ref);
     final scheme = Theme.of(context).colorScheme;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _frame(overlay));
@@ -317,6 +317,24 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
               ),
           ],
         ),
+        // How sure the position is, under the pins and the dot
+        if (user != null && accuracy != null)
+          Builder(builder: (context) {
+            // Drawn in meters by flutter_map, unless within the dot's halo
+            if (AccuracyCircle.radiusFor(accuracy, user.latitude, MapCamera.of(context).zoom, tileSize: 256) == null) {
+              return const SizedBox.shrink();
+            }
+            return CircleLayer(circles: [
+              CircleMarker(
+                point: user,
+                radius: accuracy,
+                useRadiusInMeter: true,
+                color: AccuracyCircle.fill,
+                borderColor: AccuracyCircle.border,
+                borderStrokeWidth: 1,
+              ),
+            ]);
+          }),
         MarkerLayer(
           // Upright when the map turns (GO on foot)
           rotate: true,

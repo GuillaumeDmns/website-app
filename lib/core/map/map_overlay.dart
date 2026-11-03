@@ -260,16 +260,20 @@ class MapOverlay {
   MapOverlay withFollow(MapFollow? follow) => MapOverlay(pins: pins, paths: paths, fit: fit, follow: follow);
 }
 
-/// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them); the
-/// map following the user follows it too
-class PreciseUserPosition extends Notifier<LatLng?> {
-  @override
-  LatLng? build() => null;
+/// A position of the user and how sure it is: the accuracy (m) of the fix it comes from, null when unknown
+typedef UserPosition = ({LatLng position, double? accuracy});
 
-  void set(LatLng? position) => state = position;
+/// Position shown as the user dot instead of the regular one (GO mode: more frequent fixes, smoothed between them), with
+/// the accuracy of the fix it goes to; the map following the user follows it too
+class PreciseUserPosition extends Notifier<UserPosition?> {
+  @override
+  UserPosition? build() => null;
+
+  void set(LatLng? position, {double? accuracy}) =>
+      state = position == null ? null : (position: position, accuracy: accuracy);
 }
 
-final preciseUserPositionProvider = NotifierProvider<PreciseUserPosition, LatLng?>(PreciseUserPosition.new);
+final preciseUserPositionProvider = NotifierProvider<PreciseUserPosition, UserPosition?>(PreciseUserPosition.new);
 
 /// Overlays by route location: the map shows the one of the current page, so going back restores the previous one.
 class MapOverlays extends Notifier<Map<String, MapOverlay>> {
@@ -303,14 +307,22 @@ class RouterLocation extends Notifier<String> {
 final routerLocationProvider = NotifierProvider<RouterLocation, String>(RouterLocation.new);
 
 /// What the maps show: the overlay of the current page, its follow on the smoothed position when there is one (GO on
-/// foot) so that the camera and the dot agree, and where the user dot goes
-({MapOverlay overlay, LatLng? user}) watchMapView(WidgetRef ref) {
+/// foot) so that the camera and the dot agree, where the user dot goes and how sure that position is (the accuracy of
+/// its fix in meters, for the circle around the dot; null when unknown)
+({MapOverlay overlay, LatLng? user, double? accuracy}) watchMapView(WidgetRef ref) {
   final location = ref.watch(routerLocationProvider);
   final page = ref.watch(mapOverlaysProvider.select((overlays) => overlays[location])) ?? MapOverlay.empty;
   final precise = ref.watch(preciseUserPositionProvider);
   final follow = page.follow;
-  final overlay = follow != null && precise != null ? page.withFollow(follow.withPosition(precise)) : page;
-  return (overlay: overlay, user: overlay.follow?.position ?? precise ?? ref.watch(userLocationProvider).value);
+  if (precise != null) {
+    final overlay = follow != null ? page.withFollow(follow.withPosition(precise.position)) : page;
+    return (overlay: overlay, user: precise.position, accuracy: precise.accuracy);
+  }
+  if (follow != null) {
+    // A vehicle followed from a line's page: no accuracy of the user's around it
+    return (overlay: page, user: follow.position, accuracy: null);
+  }
+  return (overlay: page, user: ref.watch(userLocationProvider).value, accuracy: ref.watch(userAccuracyProvider));
 }
 
 /// Publishes [overlay] for the page it is in while the page exists.

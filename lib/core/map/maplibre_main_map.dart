@@ -382,7 +382,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
 
   @override
   Widget build(BuildContext context) {
-    final (:overlay, :user) = watchMapView(ref);
+    final (:overlay, :user, :accuracy) = watchMapView(ref);
     _overlay = overlay;
     final scheme = Theme.of(context).colorScheme;
 
@@ -415,11 +415,11 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           }
         });
       }
-      return _map(context, user, overlay, scheme);
+      return _map(context, user, accuracy, overlay, scheme);
     });
   }
 
-  Widget _map(BuildContext context, LatLng? user, MapOverlay overlay, ColorScheme scheme) {
+  Widget _map(BuildContext context, LatLng? user, double? accuracy, MapOverlay overlay, ColorScheme scheme) {
     return MapLibreMap(
       options: MapOptions(
         initStyle: _style,
@@ -452,6 +452,18 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         WidgetLayer(
           allowInteraction: true,
           markers: [
+            // How sure the position is, lying on the ground (flattened when the map is tilted) under the pins and the dot
+            if (user != null && accuracy != null)
+              Marker(
+                point: _geo(user),
+                size: UserDot.size,
+                flat: true,
+                child: Builder(builder: (context) {
+                  final zoom = MapCamera.maybeOf(context)?.zoom;
+                  final radius = zoom == null ? null : AccuracyCircle.radiusFor(accuracy, user.latitude, zoom, tileSize: 512);
+                  return radius == null ? const SizedBox.shrink() : AccuracyCircle(radius: radius);
+                }),
+              ),
             for (final pin in overlay.pins)
               Marker(
                 point: _geo(pin.point),

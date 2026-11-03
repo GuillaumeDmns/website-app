@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/location/position_feed.dart';
+import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_state.dart';
@@ -134,6 +135,40 @@ void main() {
     await pumpEventQueue();
     // Nobody else listens here: closed
     expect(feed.opened, isNull);
+  });
+
+  test("GO's dot comes with how sure its fix is, for the circle around it", () async {
+    final fixes = StreamController<Position>.broadcast();
+    addTearDown(fixes.close);
+    final container = testContainer(standardBackend(), overrides: [
+      positionFeedProvider.overrideWithValue(PositionFeed(open: (_) => fixes.stream)),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      userLocationProvider.overrideWith((ref) => Stream.value(const LatLng(48.8584, 2.3470))),
+    ]);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    container.listen(goControllerProvider, (_, _) {});
+    final controller = container.read(goControllerProvider.notifier);
+
+    controller.start(plan, const JourneyRequest());
+    await pumpEventQueue();
+    fixes.add(Position(
+      latitude: 48.8585,
+      longitude: 2.3471,
+      timestamp: DateTime.now(),
+      accuracy: 12,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    ));
+    await pumpEventQueue();
+    expect(container.read(preciseUserPositionProvider)?.accuracy, 12);
+
+    controller.stop();
+    await pumpEventQueue();
+    expect(container.read(preciseUserPositionProvider), isNull);
   });
 }
 
