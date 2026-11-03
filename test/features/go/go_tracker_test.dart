@@ -380,6 +380,40 @@ void main() {
     expect(tracker.eta(progress, null), at(17));
   });
 
+  test('arrives right by the destination, not 35 m before it as the progress along the path would say', () {
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+    final walk = tracker.steps[2];
+
+    var (progress, alerts) = tracker.update(lastWalk, input(at(16), position: walk.line.pointAt(walk.line.length - 35), speed: 1.3));
+    expect(progress.phase, GoPhase.moving);
+    expect(alerts, isEmpty);
+
+    (progress, alerts) = tracker.update(progress, input(at(16, 30), position: walk.line.pointAt(walk.line.length - 20), speed: 1.3));
+    expect(progress.phase, GoPhase.arrived);
+    expect(alerts.map((alert) => alert.id), ['arrived']);
+  });
+
+  test('a rough fix at the destination ends nothing before its time; well past it, near is enough (indoors)', () {
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+    const destination = LatLng(48.8475, 2.4000);
+
+    final (early, _) = tracker.update(lastWalk, input(at(15), position: destination, accuracy: 60));
+    expect(early.phase, GoPhase.moving);
+    // Planned at 8:17: two minutes later, 40 m from it by the network's positions
+    final (late, _) = tracker.update(lastWalk, input(at(19, 1), position: const Distance().offset(destination, 40, 0), accuracy: 60));
+    expect(late.phase, GoPhase.arrived);
+  });
+
+  test("a big place, whose point can't be walked to: 40 m from it is enough once its time is well past", () {
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+    final aside = const Distance().offset(const LatLng(48.8475, 2.4000), 40, 0);
+
+    final (early, _) = tracker.update(lastWalk, input(at(16), position: aside));
+    expect(early.phase, GoPhase.moving);
+    final (late, _) = tracker.update(lastWalk, input(at(19, 1), position: aside));
+    expect(late.phase, GoPhase.arrived);
+  });
+
   test('moves on when the user says so', () {
     final waiting = tracker.jumpTo(tracker.initial(), 1);
 
