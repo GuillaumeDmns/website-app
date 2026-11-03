@@ -175,13 +175,14 @@ MapFollow? goFollow(GoState state, int shownStep) {
         _ => false,
       };
   if (!firstPerson) {
-    return MapFollow.overhead(position);
+    return MapFollow.overhead(position, user: true);
   }
   return MapFollow(
     position: position,
     bearing: step.headingFrom(position, progress.along),
     compass: true,
     pitch: MapFollow.firstPersonPitch,
+    user: true,
   );
 }
 

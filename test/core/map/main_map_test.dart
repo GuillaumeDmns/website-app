@@ -53,6 +53,14 @@ void main() {
 
   MapCamera camera(WidgetTester tester) => MapCamera.of(tester.element(find.byType(MarkerLayer)));
 
+  /// The circles on the map: the accuracy's around the user dot
+  List<CircleMarker> circles(WidgetTester tester) => [
+        for (final layer in tester.widgetList<CircleLayer>(find.byType(CircleLayer))) ...layer.circles,
+      ];
+
+  /// Where the user dot is on the screen
+  Offset dot(WidgetTester tester) => tester.getCenter(find.byType(UserDot));
+
   testWidgets('follows the user with the way ahead up, low in the part of the map above the panel', (tester) async {
     final container = await pumpMap(tester);
 
@@ -167,13 +175,10 @@ void main() {
 
   testWidgets("a circle of the fix's accuracy around the user dot, like Google Maps", (tester) async {
     final container = await pumpMap(tester);
-    List<CircleMarker> circles() => [
-          for (final layer in tester.widgetList<CircleLayer>(find.byType(CircleLayer))) ...layer.circles,
-        ];
 
     container.read(userAccuracyProvider.notifier).set(300);
     await tester.pump();
-    final circle = circles().single;
+    final circle = circles(tester).single;
     expect(circle.point, user);
     expect(circle.radius, 300);
     expect(circle.useRadiusInMeter, isTrue);
@@ -181,21 +186,48 @@ void main() {
     // Within the dot's halo: not drawn
     container.read(userAccuracyProvider.notifier).set(2);
     await tester.pump();
-    expect(circles(), isEmpty);
+    expect(circles(tester), isEmpty);
 
     // GO's smoothed position, with its own fix's accuracy
     const walked = LatLng(48.8590, 2.3480);
     container.read(preciseUserPositionProvider.notifier).set(walked, accuracy: 400);
     await tester.pump();
-    expect(circles().single.point, walked);
-    expect(circles().single.radius, 400);
+    expect(circles(tester).single.point, walked);
+    expect(circles(tester).single.radius, 400);
 
-    // A vehicle followed, not the user: no circle
-    container.read(preciseUserPositionProvider.notifier).set(null);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a vehicle followed from a line's page: the camera on it, the user dot and its circle on the user",
+      (tester) async {
+    final container = await pumpMap(tester);
+    // 400 m east of the user
+    const vehicle = LatLng(48.8584, 2.3525);
     container.read(userAccuracyProvider.notifier).set(300);
-    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow.overhead(walked)));
-    await tester.pump();
-    expect(circles(), isEmpty);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow.overhead(vehicle)));
+    await animate(tester);
+
+    expect(camera(tester).latLngToScreenOffset(vehicle), offsetMoreOrLessEquals(const Offset(200, 250), epsilon: 4));
+    expect(dot(tester), offsetMoreOrLessEquals(camera(tester).latLngToScreenOffset(user), epsilon: 1));
+    expect((circles(tester).single.point, circles(tester).single.radius), (user, 300));
+    // The vehicle's way isn't the user's: no heading cone
+    expect(tester.widget<UserDot>(find.byType(UserDot)).screenHeading, isNull);
+
+    // GO going on meanwhile: the dot and its circle on its smoothed position, the camera still on the vehicle
+    const walked = LatLng(48.8590, 2.3480);
+    container.read(preciseUserPositionProvider.notifier).set(walked, accuracy: 60);
+    await animate(tester);
+    expect(camera(tester).latLngToScreenOffset(vehicle), offsetMoreOrLessEquals(const Offset(200, 250), epsilon: 4));
+    expect(dot(tester), offsetMoreOrLessEquals(camera(tester).latLngToScreenOffset(walked), epsilon: 1));
+    expect((circles(tester).single.point, circles(tester).single.radius), (walked, 60));
+
+    // GO's own follow is the user's: the camera on the smoothed position, where the dot is, not on the last fix
+    const fix = LatLng(48.8588, 2.3476);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow(position: fix, bearing: 0, user: true)));
+    await animate(tester);
+    expect(camera(tester).latLngToScreenOffset(walked), offsetMoreOrLessEquals(const Offset(200, 360), epsilon: 4));
+    expect(dot(tester), offsetMoreOrLessEquals(camera(tester).latLngToScreenOffset(walked), epsilon: 1));
+    expect(tester.widget<UserDot>(find.byType(UserDot)).screenHeading, isNotNull);
 
     await tester.pumpWidget(const SizedBox());
   });
