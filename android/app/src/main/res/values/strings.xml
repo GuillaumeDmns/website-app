@@ -12,4 +12,5 @@
     <string name="widget_no_departure">No departure</string>
     <string name="journey_channel">Journey in progress</string>
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>
+    <string name="journey_finish">Finish</string>
 </resources>

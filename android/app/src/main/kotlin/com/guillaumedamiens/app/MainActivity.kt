@@ -41,7 +41,9 @@ class MainActivity: FlutterFragmentActivity() {
         LiveJourneyNotification.createChannels(this)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, DeviceHeading.CHANNEL).setStreamHandler(DeviceHeading(this))
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        bridge = channel
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "updateJourney" -> {
                     val notification = LiveJourneyNotification.journey(
@@ -71,6 +73,9 @@ class MainActivity: FlutterFragmentActivity() {
                     GoService.stop(this)
                     LiveJourneyNotification.cancelJourney(this)
                     result.success(null)
+                }
+                "takeStopRequest" -> {
+                    result.success(GoStopReceiver.take(this))
                 }
                 "requestNotificationPermission" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -103,6 +108,17 @@ class MainActivity: FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        bridge = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    companion object {
+        /** The channel to the Dart side while its engine runs: GO's notification's "Terminer" goes through it */
+        @Volatile
+        var bridge: MethodChannel? = null
     }
 
     private fun requestLocationService(result: MethodChannel.Result) {

@@ -467,5 +467,18 @@
   "timeHours": "Hours",
   "timeMinutes": "Minutes",
   "journeyEarlier": "Earlier",
-  "journeyLater": "Later"
+  "journeyLater": "Later",
+  "goImHere": "I'm here",
+  "goStopsTo": "{count, plural, =1{1 stop to {stop}} other{{count} stops to {stop}}}",
+  "goExitStation": "Leave the station",
+  "goBestExit": "Best exit",
+  "goBestEntrance": "Best entrance",
+  "goExitNamed": "Exit {code} – {name}",
+  "goEntranceNamed": "Entrance {code} – {name}",
+  "goAlightAlert": "Alert me when to get off",
+  "goTransferWalk": "Transfer · {duration} on foot",
+  "goCancelledStatus": "Cancelled",
+  "goUnderAMinute": "< 1 min",
+  "goCardOf": "Step {index} of {count}",
+  "goTimeLeftAndArrival": "{minutes} min, arriving at {time}"
 }

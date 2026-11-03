@@ -29,6 +29,7 @@ class GoState {
     this.error,
     this.retained,
     this.recalculateAt,
+    this.alightAlertsOff = const {},
   });
 
   final GoTracker tracker;
@@ -79,6 +80,9 @@ class GoState {
   /// Off the way: when the journey is recalculated on its own, unless the user does it first or ignores it
   final DateTime? recalculateAt;
 
+  /// Rides (steps) whose getting-off alerts the user turned off ("Alerter quand descendre"): nothing felt for them
+  final Set<int> alightAlertsOff;
+
   JourneyOption get journey => tracker.journey;
 
   /// Vehicle of the current ride (null when the next ride is not the current step)
@@ -101,6 +105,7 @@ class GoState {
     String? Function()? error,
     ({int step, Duration later, bool cancelled})? Function()? retained,
     DateTime? Function()? recalculateAt,
+    Set<int>? alightAlertsOff,
   }) =>
       GoState(
         tracker: tracker ?? this.tracker,
@@ -122,6 +127,7 @@ class GoState {
         error: error != null ? error() : this.error,
         retained: retained != null ? retained() : this.retained,
         recalculateAt: recalculateAt != null ? recalculateAt() : this.recalculateAt,
+        alightAlertsOff: alightAlertsOff ?? this.alightAlertsOff,
       );
 }
 

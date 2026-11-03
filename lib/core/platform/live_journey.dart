@@ -53,6 +53,12 @@ abstract class LiveJourney {
 
   /// Keeps the screen on (or not) while GO mode is shown
   Future<void> keepScreenOn(bool on);
+
+  /// "Terminer" in the notification calls [stop] (Android: the notification and its service are already gone)
+  void onStop(VoidCallback stop);
+
+  /// "Terminer" was tapped while the app wasn't running: its session is over (asked once, at start-up)
+  Future<bool> stopRequested();
 }
 
 class _AndroidLiveJourney implements LiveJourney {
@@ -90,6 +96,23 @@ class _AndroidLiveJourney implements LiveJourney {
 
   @override
   Future<void> keepScreenOn(bool on) => _call('keepScreenOn', {'on': on});
+
+  @override
+  void onStop(VoidCallback stop) => _channel.setMethodCallHandler((call) async {
+        if (call.method == 'stopRequested') {
+          stop();
+        }
+      });
+
+  @override
+  Future<bool> stopRequested() async {
+    try {
+      return await _channel.invokeMethod<bool>('takeStopRequest') ?? false;
+    } catch (e) {
+      debugPrint('LiveJourney.stopRequested failed: $e');
+      return false;
+    }
+  }
 }
 
 class _NoLiveJourney implements LiveJourney {
@@ -104,6 +127,12 @@ class _NoLiveJourney implements LiveJourney {
 
   @override
   Future<void> keepScreenOn(bool on) async {}
+
+  @override
+  void onStop(VoidCallback stop) {}
+
+  @override
+  Future<bool> stopRequested() async => false;
 }
 
 /// Browser: the screen kept on only
@@ -119,6 +148,12 @@ class _WebLiveJourney implements LiveJourney {
 
   @override
   Future<void> keepScreenOn(bool on) => browser.keepScreenOn(on);
+
+  @override
+  void onStop(VoidCallback stop) {}
+
+  @override
+  Future<bool> stopRequested() async => false;
 }
 
 final liveJourneyProvider = Provider<LiveJourney>(

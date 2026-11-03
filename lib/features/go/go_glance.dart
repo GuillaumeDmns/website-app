@@ -65,7 +65,9 @@ const getOffSoon = Duration(minutes: 2);
   return (NumberFormat('0.0', currentL10n.localeName).format(meters / 1000), 'km');
 }
 
-GoGlance goGlance(GoState state, DateTime now) {
+/// [turns]: the next turn of a walk is the action when it is close (the banner, the notification); without them, what
+/// needs attention on the walk (GO's walk card lists the turns and the map names the next one)
+GoGlance goGlance(GoState state, DateTime now, {bool turns = true}) {
   final tracker = state.tracker;
   final progress = state.progress;
   final step = tracker.stepOf(progress);
@@ -179,7 +181,7 @@ GoGlance goGlance(GoState state, DateTime now) {
           tone: GoTone.warn,
         );
       }
-      final maneuver = nextManeuver(step, progress.along);
+      final maneuver = turns ? nextManeuver(step, progress.along) : null;
       // Too slow for the ride: walking faster is what to do, unless a turn is right there
       if (late && nextLine != null && (maneuver == null || maneuver.meters > 30)) {
         final (figure, unit) = _distance(meters);
