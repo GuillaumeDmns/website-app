@@ -201,6 +201,8 @@
   "boardFront": "at the front",
   "boardMiddle": "in the middle",
   "boardBack": "at the back",
+  "goWhereToBoard": "Where to board?",
+  "goDirectionOfTravel": "Direction of travel",
   "boardAnywhere": "Board anywhere",
   "boardAt": "Board {positions}",
   "or": "or",

@@ -621,6 +621,8 @@
   "boardFront": "à l'avant",
   "boardMiddle": "au milieu",
   "boardBack": "à l'arrière",
+  "goWhereToBoard": "Où monter ?",
+  "goDirectionOfTravel": "Sens de la marche",
   "boardAnywhere": "Montez n'importe où",
   "boardAt": "Montez {positions}",
   "@boardAt": {
