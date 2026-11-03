@@ -633,17 +633,6 @@
     }
   },
   "or": "ou",
-  "brokenElevatorsAt": "{count, plural, =1{1 ascenseur en panne} other{{count} ascenseurs en panne}} à {stop}",
-  "@brokenElevatorsAt": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "stop": {
-        "type": "String"
-      }
-    }
-  },
   "leaveFromHere": "Partir d'ici",
   "recenter": "Recentrer",
   "pointOnMap": "Point sur la carte",
@@ -1320,5 +1309,10 @@
   "goCardOf": "Étape {index} sur {count}",
   "@goCardOf": {"placeholders": {"index": {"type": "int"}, "count": {"type": "int"}}},
   "goTimeLeftAndArrival": "{minutes} min, arrivée à {time}",
-  "@goTimeLeftAndArrival": {"placeholders": {"minutes": {"type": "int"}, "time": {"type": "String"}}}
+  "@goTimeLeftAndArrival": {"placeholders": {"minutes": {"type": "int"}, "time": {"type": "String"}}},
+  "rideAlerts": "Alertes du trajet",
+  "rideAlertsOf": "Alertes du trajet : {summary}",
+  "@rideAlertsOf": {"placeholders": {"summary": {"type": "String"}}},
+  "atStop": "À {stop}",
+  "@atStop": {"placeholders": {"stop": {"type": "String"}}}
 }

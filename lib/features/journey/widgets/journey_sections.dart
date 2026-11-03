@@ -14,12 +14,11 @@ import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../bikes/bike_widgets.dart';
 import '../../daily_trips/daily_trip_widgets.dart';
-import '../../traffic/disruption_widgets.dart';
-import '../../traffic/traffic_providers.dart';
 import '../journey_labels.dart';
 import '../journey_providers.dart';
 import '../journey_retime.dart';
 import 'journey_timeline.dart';
+import 'ride_alerts.dart';
 import 'ride_departures.dart';
 
 /// A section in the journey detail's timeline: a ride, a wait, a Vélib ride or a move (its turns folded)
@@ -189,8 +188,9 @@ class _BikeShareTile extends ConsumerWidget {
   }
 }
 
-/// A ride: where to board, the line and its direction, its tags, disruptions, elevators and departures, the stops
-/// between (folded), where to get off
+/// A ride: where to board, the line and its direction with one small icon when something goes wrong (its alerts in a
+/// sheet), its tags and departures, the stops between (folded), where to get off. Where to board along the train and
+/// the platform are GO's and the departures' (each row has its platform).
 class _RideTile extends StatelessWidget {
   const _RideTile({required this.section, required this.plan, required this.onChoose, required this.focused, required this.onFocus});
 
@@ -251,6 +251,7 @@ class _RideTile extends StatelessWidget {
                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                       ),
                     ),
+                    if (hasLine) RideAlertsButton(section: section),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -265,18 +266,8 @@ class _RideTile extends StatelessWidget {
                         text: delay >= 60 ? context.l10n.delayMinutes(Duration(seconds: delay).roundedMinutes) : context.l10n.realtime,
                       ),
                     if (hasLine) LastRideTag(ride: section),
-                    // The platform of the departure taken, once announced, and where to board: what to do, in plain chips
-                    if (platformLabel(line, plan?.ride?.departure.platform) case final platform?)
-                      PillTag(icon: Icons.signpost_outlined, color: theme.colorScheme.onSurface, text: platform),
-                    if (section.boardingPositions.isNotEmpty)
-                      PillTag(icon: Icons.train, color: theme.colorScheme.onSurface, text: boardingLabel(section.boardingPositions)),
                   ],
                 ),
-                if (hasLine) RideDisruptions(lineId: lineId),
-                // Elevators matter to get on and off: those of both stops
-                for (final point in [section.from, section.to])
-                  if (point?.stopAreaId case final stopAreaId?)
-                    _StopElevators(stopAreaId: stopAreaId, name: point!.name),
                 if (plan != null) _RideDepartures(plan: plan!, mode: section.line?.mode, onChoose: onChoose),
                 if (intermediate.isNotEmpty)
                   // The stops between, like Citymapper: below, on the line
@@ -330,65 +321,6 @@ class _RideTile extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Elevator outages of a stop of the ride, on one line (a folding card would break the timeline's intrinsic height);
-/// tapping it shows the messages
-class _StopElevators extends ConsumerWidget {
-  const _StopElevators({required this.stopAreaId, required this.name});
-
-  final String stopAreaId;
-  final String name;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final elevators = (ref.watch(stopDisruptionsProvider(stopAreaId)).value ?? const <Disruption>[])
-        .where((disruption) => disruption.active && disruption.category == DisruptionCategory.elevator)
-        .toList();
-    if (elevators.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final color = context.colors.warning;
-    final title = context.l10n.brokenElevatorsAt(elevators.length, name);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(title),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final disruption in elevators)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text('• ${disruption.message ?? disruption.title ?? ''}'),
-                    ),
-                ],
-              ),
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close))],
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.elevator_outlined, size: 18, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 18, color: color),
-          ],
-        ),
-      ),
     );
   }
 }
