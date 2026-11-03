@@ -76,3 +76,61 @@ class DepartureTime extends StatelessWidget {
     );
   }
 }
+
+/// A clock time the real time moved, like a station's board: the planned time struck through and the new one beside
+/// it, in the delay's color when late and blue when early, so that nothing is left to add up; the time alone when it
+/// moved less than a minute. [stacked] puts the new time over the planned one, for narrow columns.
+class RetimedClock extends StatelessWidget {
+  const RetimedClock({super.key, required this.time, required this.planned, this.style, this.stacked = false});
+
+  /// When it leaves (or gets there) now
+  final DateTime time;
+
+  /// When it was planned to, null when unknown
+  final DateTime? planned;
+  final TextStyle? style;
+  final bool stacked;
+
+  /// Minutes [time] moved from [planned]: late above 0, early below, 0 within a minute
+  static int moved(DateTime time, DateTime? planned) => planned == null ? 0 : time.difference(planned).roundedMinutes;
+
+  /// The color of a time moved by [minutes]: the delay's when late, blue when early, null on time
+  static Color? colorOf(BuildContext context, int minutes) => switch (minutes) {
+        > 0 => context.colors.delayed,
+        < 0 => Theme.of(context).colorScheme.secondary,
+        _ => null,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style.merge(style).copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+    final minutes = moved(time, planned);
+    if (minutes == 0) {
+      return Text(formatClock(time), style: base);
+    }
+    final muted = context.colors.muted;
+    final now = Text(formatClock(time), style: base.copyWith(color: colorOf(context, minutes)));
+    final was = Text(
+      formatClock(planned!),
+      style: base.copyWith(
+        color: muted,
+        fontWeight: FontWeight.w400,
+        fontSize: (base.fontSize ?? 14) * 0.87,
+        decoration: TextDecoration.lineThrough,
+        decorationColor: muted,
+      ),
+    );
+    return Semantics(
+      label: context.l10n.retimedClock(formatClock(time), formatClock(planned!)),
+      excludeSemantics: true,
+      child: stacked
+          ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [now, was])
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [was, const SizedBox(width: 5), now],
+            ),
+    );
+  }
+}

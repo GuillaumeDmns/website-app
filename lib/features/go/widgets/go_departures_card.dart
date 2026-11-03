@@ -11,6 +11,7 @@ import '../../../core/api/models.dart';
 import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
 import '../../../core/utils/time_format.dart';
+import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/size_reporter.dart';
 import '../../../l10n/l10n.dart';
@@ -67,13 +68,27 @@ class GoDeparturesCard extends ConsumerWidget {
     final waiting = progress.phase == GoPhase.waiting && progress.step == card.step;
     final minutes = math.min(minutesLeft(departure.difference(now)), 999);
 
-    // When it leaves: its time, then on time, late or cancelled when the real time says
-    final late = vehicle == null ? 0 : vehicle.time.difference(vehicle.aimedTime ?? vehicle.time).roundedMinutes;
-    final (status, statusColor) = switch (vehicle) {
-      null => (context.l10n.goScheduled, colors.muted),
-      final vehicle when vehicle.cancelled => (context.l10n.goCancelledStatus, colors.cancelled),
-      _ when late >= 1 => (context.l10n.goMinutesLate(late), colors.warning),
-      _ => (context.l10n.goOnTime, colors.live),
+    // When it leaves: its time on time or from the schedule; moved by the real time, the planned time struck through and
+    // the new one beside it, in the delay's color (blue early); cancelled, the planned time struck through
+    final moved = vehicle == null || vehicle.cancelled ? 0 : RetimedClock.moved(departure, vehicle.aimedTime);
+    final struck = TextStyle(
+      color: colors.muted,
+      fontWeight: FontWeight.w400,
+      decoration: TextDecoration.lineThrough,
+      decorationColor: colors.muted,
+    );
+    TextStyle colored(Color? color) => TextStyle(color: done ? null : color);
+    final when = switch (vehicle) {
+      null => [TextSpan(text: '${formatClock(departure)} '), TextSpan(text: context.l10n.goScheduled, style: colored(colors.muted))],
+      final vehicle when vehicle.cancelled => [
+          TextSpan(text: formatClock(vehicle.aimedTime ?? departure), style: struck),
+          TextSpan(text: ' ${context.l10n.goCancelledStatus}', style: colored(colors.cancelled)),
+        ],
+      final vehicle when moved != 0 => [
+          TextSpan(text: formatClock(vehicle.aimedTime!), style: struck),
+          TextSpan(text: ' ${formatClock(departure)}', style: colored(RetimedClock.colorOf(context, moved))),
+        ],
+      _ => [TextSpan(text: '${formatClock(departure)} '), TextSpan(text: context.l10n.goOnTime, style: colored(colors.live))],
     };
     final mission = vehicle?.mission;
     final issue = live && waiting && progress.issue != GoIssue.offRoute ? progress.issue : null;
@@ -92,10 +107,7 @@ class GoDeparturesCard extends ConsumerWidget {
         : GoCardHeader(
             leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
             title: formatClock(departure),
-            titleSpan: TextSpan(children: [
-              TextSpan(text: '${formatClock(departure)} '),
-              TextSpan(text: status, style: TextStyle(color: done ? null : statusColor)),
-            ]),
+            titleSpan: TextSpan(children: when),
             subtitle: [?mission, mission != null ? section.headsign ?? '' : context.l10n.direction(section.headsign ?? '')]
                 .where((part) => part.isNotEmpty)
                 .join(' '),

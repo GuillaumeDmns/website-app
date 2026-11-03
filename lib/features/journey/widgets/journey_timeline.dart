@@ -8,6 +8,7 @@ class TimelineRow extends StatelessWidget {
     required this.color,
     required this.child,
     this.time,
+    this.clock,
     this.dot = false,
     this.stopDot = false,
     this.dotted = false,
@@ -17,6 +18,9 @@ class TimelineRow extends StatelessWidget {
   final Color color;
   final Widget child;
   final String? time;
+
+  /// In place of [time]: a time the real time moved ([RetimedClock], stacked)
+  final Widget? clock;
   final bool dot;
 
   /// A stop the vehicle passes: a small dot on the line, which goes on
@@ -34,13 +38,13 @@ class TimelineRow extends StatelessWidget {
           SizedBox(
             // Room for "09:15" at the user's text size
             width: MediaQuery.textScalerOf(context).scale(44),
-            child: time == null
+            child: time == null && clock == null
                 ? null
                 : Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      time!,
+                    child: DefaultTextStyle.merge(
                       style: theme.textTheme.titleSmall?.copyWith(fontSize: 13, fontFeatures: const [FontFeature.tabularFigures()]),
+                      child: clock ?? Text(time!),
                     ),
                   ),
           ),

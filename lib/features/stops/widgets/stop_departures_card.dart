@@ -167,7 +167,6 @@ class TrainDepartureRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = context.colors;
-    final late = departure.aimedTime == null ? 0 : departure.time.difference(departure.aimedTime!).roundedMinutes;
     const figures = [FontFeature.tabularFigures()];
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -178,27 +177,23 @@ class TrainDepartureRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      formatClock(departure.aimedTime ?? departure.time),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        fontFeatures: figures,
-                        decoration: departure.cancelled ? TextDecoration.lineThrough : null,
-                      ),
+                if (departure.cancelled)
+                  Text(
+                    formatClock(departure.aimedTime ?? departure.time),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      fontFeatures: figures,
+                      decoration: TextDecoration.lineThrough,
                     ),
-                    if (late >= 1 && !departure.cancelled)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: Text(
-                          context.l10n.delayedTo(formatClock(departure.time)),
-                          style: TextStyle(color: colors.delayed, fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                      ),
-                  ],
-                ),
+                  )
+                else
+                  // Delayed or early: the planned time struck through, the new one beside it
+                  RetimedClock(
+                    time: departure.time,
+                    planned: departure.aimedTime,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
                 Row(
                   children: [
                     if (departure.mission case final mission?)
