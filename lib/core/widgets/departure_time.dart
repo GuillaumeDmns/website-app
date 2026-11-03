@@ -78,8 +78,8 @@ class DepartureTime extends StatelessWidget {
 }
 
 /// A clock time the real time moved, like a station's board: the planned time struck through and the new one beside
-/// it, in the delay's color when late and blue when early, so that nothing is left to add up; the time alone when it
-/// moved less than a minute. [stacked] puts the new time over the planned one, for narrow columns.
+/// it, in the delay's color when late and blue when early, so that nothing is left to add up; the time alone when both
+/// print the same minute. [stacked] puts the new time over the planned one, for narrow columns.
 class RetimedClock extends StatelessWidget {
   const RetimedClock({super.key, required this.time, required this.planned, this.style, this.stacked = false});
 
@@ -91,8 +91,16 @@ class RetimedClock extends StatelessWidget {
   final TextStyle? style;
   final bool stacked;
 
-  /// Minutes [time] moved from [planned]: late above 0, early below, 0 within a minute
-  static int moved(DateTime time, DateTime? planned) => planned == null ? 0 : time.difference(planned).roundedMinutes;
+  /// Minutes between the clocks [planned] and [time] print ([formatClock]: local time, to the minute): late above 0,
+  /// early below, 0 when both print the same minute (planned 21:11:00, 40 s late: still 21:11)
+  static int moved(DateTime time, DateTime? planned) =>
+      planned == null ? 0 : _printedMinute(time).difference(_printedMinute(planned)).inMinutes;
+
+  /// The minute [formatClock] prints for [time]: its local time without the seconds
+  static DateTime _printedMinute(DateTime time) {
+    final local = time.toLocal();
+    return local.subtract(Duration(seconds: local.second, milliseconds: local.millisecond, microseconds: local.microsecond));
+  }
 
   /// The color of a time moved by [minutes]: the delay's when late, blue when early, null on time
   static Color? colorOf(BuildContext context, int minutes) => switch (minutes) {
