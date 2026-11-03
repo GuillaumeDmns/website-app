@@ -108,18 +108,18 @@ class GoWalkCard extends ConsumerWidget {
     if (walks.isEmpty) {
       return const [];
     }
-    final total = (step.section.length ?? 0) > 0 ? step.section.length! : walks.last.offset + walks.last.length;
-    final scale = total > 0 && step.line.length > 0 ? step.line.length / total : 1.0;
+    // The places of the map's callout
+    final alongs = walkStepAlongs(step);
     final along = moving ? state.progress.along : 0.0;
     final next = moving ? nextManeuver(step, along) : null;
     final rows = <Widget>[];
     var first = true;
     for (final (index, walk) in walks.indexed) {
-      final at = walk.offset * scale;
+      final at = alongs[index];
       if (moving && at < along - 3 && walk != next?.walk) {
         continue;
       }
-      final from = first && moving ? along : (index == 0 ? 0.0 : walks[index - 1].offset * scale);
+      final from = first && moving ? along : (index == 0 ? 0.0 : alongs[index - 1]);
       first = false;
       rows.add(_TurnRow(walk: walk, meters: walk.offset == 0 ? null : math.max(0.0, at - from), pace: pace, next: walk == next?.walk));
     }

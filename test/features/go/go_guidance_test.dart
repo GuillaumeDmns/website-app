@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/utils/geo.dart';
 import 'package:website_app/core/utils/time_format.dart';
 import 'package:website_app/features/go/go_guidance.dart';
 import 'package:website_app/features/go/go_instruction.dart';
@@ -73,6 +76,80 @@ void main() {
       // Far from it: where to walk to
       final far = goInstruction(state(tracker.initial(), position: const LatLng(48.86, 2.34)), at(0));
       expect(far.title, contains('Châtelet'));
+    });
+
+    // A walk drawn as Navitia's path, from points in meters east and north of 3 Avenue Léon de Bertalot
+    GoStep walkAlong(List<(double, double)> path, {required int length, required List<WalkStep> steps}) {
+      const origin = LatLng(48.905168, 2.274459);
+      final perDegree = 111195.0;
+      final shape = [
+        for (final (east, north) in path)
+          [origin.longitude + east / (perDegree * math.cos(origin.latitude * math.pi / 180)), origin.latitude + north / perDegree],
+      ];
+      return GoStep(walk(at(0), 300).copyWith(length: length, steps: steps, shape: shape), 0);
+    }
+
+    test("stands each turn on the path's corner, later than the offsets scaled to the path say", () {
+      // From the address, 60 m to the avenue that Navitia's lengths don't count; the avenue 50 m north, Rue Cantin
+      // 80 m west, Rue Watteau 90 m north
+      final step = walkAlong(const [(0, 0), (48, 36), (48, 86), (-32, 86), (-32, 176)], length: 220, steps: const [
+        WalkStep(instruction: 'Marchez vers le nord sur Avenue Léon de Bertalot', length: 50, offset: 0),
+        WalkStep(instruction: 'Tournez à gauche dans Rue Cantin', length: 80, offset: 50, direction: -91, name: 'Rue Cantin'),
+        WalkStep(instruction: 'Tournez à droite dans Rue Watteau', length: 90, offset: 130, direction: 92, name: 'Rue Watteau'),
+        WalkStep(instruction: 'Vous êtes arrivé à votre destination.', length: 0, offset: 220),
+      ]);
+      // Scaled to the path, Rue Cantin stood 46 m before its corner
+      expect(50 * step.line.length / 220, closeTo(64, 1));
+
+      final cantin = nextManeuver(step, 0)!;
+      expect(cantin.walk.name, 'Rue Cantin');
+      expect(cantin.meters, closeTo(110, 1));
+      // The callout on the corner
+      expect(metersBetween(step.line.pointAt(cantin.meters), step.line.points[2]), lessThan(0.01));
+      // Navitia's 80 m on, the next one on its own corner; the arrival at the end
+      final watteau = nextManeuver(step, 120)!;
+      expect(watteau.walk.name, 'Rue Watteau');
+      expect(watteau.meters, closeTo(70, 1));
+      expect(walkStepAlongs(step), [0, closeTo(110, 1), closeTo(190, 1), closeTo(280, 1)]);
+
+      // The card's instruction says the same distance
+      final followed = GoState(
+        tracker: GoTracker(journey([step.section, transit(at(6), 480)])),
+        request: const JourneyRequest(),
+        progress: const GoProgress(step: 0, phase: GoPhase.moving, along: 10),
+        startedAt: at(0),
+        plannedArrival: at(14),
+      );
+      final instruction = goInstruction(followed, at(1));
+      expect(instruction.subtitle, startsWith('Dans 100'));
+      expect(instruction.subtitle, endsWith('Rue Cantin'));
+    });
+
+    test('moves the offsets by what a station counts and the path draws shorter', () {
+      // Out of the station: Navitia counts 167 m of corridors, drawn as 16 m; then 13 m on, right, 29 m on, left
+      final step = walkAlong(const [(0, 0), (0, 16), (0, 29), (29, 29), (29, 218)], length: 233, steps: const [
+        WalkStep(instruction: 'Sortez de Charles de Gaulle - Étoile (Paris) via av. de la Grande Armée.', length: 167, offset: 0),
+        WalkStep(instruction: "Marchez vers le nord sur l'allée", length: 13, offset: 167),
+        WalkStep(instruction: 'Tournez à droite dans Avenue de la Grande Armée', length: 29, offset: 180, direction: 85),
+        WalkStep(instruction: 'Tournez à gauche pour rester sur Avenue de la Grande Armée', length: 189, offset: 209, direction: -76),
+        WalkStep(instruction: 'Vous êtes arrivé à votre destination.', length: 0, offset: 398),
+      ]);
+
+      expect(walkStepAlongs(step), [0, closeTo(16, 1), closeTo(29, 1), closeTo(58, 1), closeTo(247, 1)]);
+      expect(nextManeuver(step, 0)!.meters, closeTo(29, 1));
+    });
+
+    test('keeps the offsets scaled to a path without corners', () {
+      // Straight on, a slight bend: no corner where Navitia says to turn
+      final step = walkAlong(const [(0, 0), (0, 100), (10, 250)], length: 200, steps: const [
+        WalkStep(instruction: 'Marchez vers le nord', length: 120, offset: 0),
+        WalkStep(instruction: 'Tournez à droite', length: 80, offset: 120, direction: 90),
+        WalkStep(instruction: 'Vous êtes arrivé à votre destination.', length: 0, offset: 200),
+      ]);
+      final scale = step.line.length / 200;
+
+      expect(walkStepAlongs(step), [0, closeTo(120 * scale, 0.01), closeTo(200 * scale, 0.01)]);
+      expect(nextManeuver(step, 0)!.meters, closeTo(120 * scale, 0.01));
     });
 
     test('draws an arrow for each turn', () {
