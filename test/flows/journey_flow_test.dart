@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/app/theme.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/utils/time_format.dart';
 import 'package:website_app/features/journey/journey_labels.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
 import 'package:website_app/l10n/l10n.dart';
@@ -119,6 +121,40 @@ void main() {
     expect(find.text(currentL10n.brokenElevators(1)), findsOneWidget);
     expect(find.textContaining(elevatorOutage.title!), findsOneWidget);
     expect(find.text(elevatorOutage.message!), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("the timeline strikes a ride's planned time through only when its clock prints another minute", (tester) async {
+    final backend = standardBackend();
+    final soon = DateTime.now().toUtc().add(const Duration(minutes: 10));
+    final minute = DateTime.utc(soon.year, soon.month, soon.day, soon.hour, soon.minute);
+    // The metro 40 s late, still in its minute; the RER 20 s late, across the minute
+    final metro = minute.add(const Duration(seconds: 40));
+    final rer = minute.add(const Duration(minutes: 12, seconds: 10));
+    final rerPlanned = rer.subtract(const Duration(seconds: 20));
+    backend.on('GET', '/api/v2/journeys', (_) => FakeResponse(JourneyPlan(journeys: [
+          journey([
+            walk(minute.subtract(const Duration(minutes: 5)), 300),
+            transit(metro, 480, to: gareDeLyon).copyWith(realtime: true, delay: 40),
+            transit(rer, 600, line: rerA, from: gareDeLyon, to: nation).copyWith(realtime: true, delay: 20),
+          ]),
+        ]).toJson()));
+    // No departures to retime the rides with: the timeline shows the journey's own real time
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([]));
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+    await tapOn(tester, find.byType(JourneyCard));
+
+    bool struck(DateTime time) =>
+        tester.widgetList<Text>(find.text(formatClock(time))).any((text) => text.style?.decoration == TextDecoration.lineThrough);
+    // The metro at its minute alone, not "21:11" struck through before "21:11"
+    expect(find.text(formatClock(metro)), findsWidgets);
+    expect(struck(metro), isFalse);
+    // The RER: the planned minute struck through under the new one, in the delay's color
+    expect(struck(rerPlanned), isTrue);
+    expect(tester.widgetList<Text>(find.text(formatClock(rer))).any((text) => text.style?.color == AppColors.light.delayed), isTrue);
 
     await closeApp(tester);
   });
