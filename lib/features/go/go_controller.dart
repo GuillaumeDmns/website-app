@@ -395,7 +395,10 @@ class GoController extends Notifier<GoState?> {
     state = GoState(
       tracker: tracker,
       request: request,
-      progress: progress ?? tracker.initial(),
+      // The GPS gets its usual time for a first fix before the clock leads (GoTracker.followsSchedule): a session taken
+      // up again after a restart (the last fix isn't kept with it), or started from a journey looked at for a while,
+      // never skips a step by the schedule while that fix comes
+      progress: (progress ?? tracker.initial()).copyWith(lastFixAt: DateTime.now()),
       startedAt: startedAt ?? DateTime.now(),
       plannedArrival: plannedArrival ?? journey.arrival,
       muted: muted,
