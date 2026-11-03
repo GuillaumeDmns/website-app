@@ -1210,8 +1210,6 @@
   "@goMarginAhead": {"placeholders": {"minutes": {"type": "int"}}},
   "goMarginHurry": "Pressez le pas",
   "goMarginLate": "Vous allez le rater",
-  "goMarginLateNext": "Vous allez le rater · suivant à {time} (+{minutes} min)",
-  "@goMarginLateNext": {"placeholders": {"time": {"type": "String"}, "minutes": {"type": "int"}}},
   "minutesUnit": "min",
   "goArrivesIn": "dans {duration}",
   "@goArrivesIn": {"placeholders": {"duration": {"type": "String"}}},

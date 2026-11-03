@@ -80,7 +80,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
     if (!mounted || selected == null || !_scroll.hasClients || (last != null && sameRide(last, selected))) {
       return;
     }
-    final index = widget.rides.indexWhere((ride) => sameRide(ride, selected));
+    final index = _selectedIndex(widget.rides, selected);
     if (index < 0) {
       return;
     }
@@ -99,6 +99,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
     final theme = Theme.of(context);
     final rides = widget.rides;
     final selected = widget.selected;
+    final selectedIndex = _selectedIndex(rides, selected);
     _rowExtent = MediaQuery.textScalerOf(context).scale(_rowHeight);
     final height = (rides.length < _visibleRows ? rides.length : _visibleRows) * _rowExtent + 8;
 
@@ -121,7 +122,7 @@ class _RideDepartureListState extends State<RideDepartureList> {
               itemCount: rides.length,
               itemBuilder: (context, i) {
                 final ride = rides[i];
-                final isSelected = selected != null && sameRide(ride, selected);
+                final isSelected = i == selectedIndex;
                 final earliest = widget.earliest;
                 return _RideRow(
                   ride: ride,
@@ -160,6 +161,14 @@ class _RideDepartureListState extends State<RideDepartureList> {
     );
   }
 }
+
+/// The row of [selected], raised: the departure itself, else the first one like it (a line serving two stops of a stop
+/// area lists a vehicle twice, at the same time: one row raised, the other one can be chosen)
+int _selectedIndex(List<Ride> rides, Ride? selected) => selected == null
+    ? -1
+    : rides.contains(selected)
+    ? rides.indexOf(selected)
+    : rides.indexWhere((ride) => sameRide(ride, selected));
 
 /// `20:56 → 21:03 (6 min)` / `PEBU Paris Saint-Lazare`, time until it leaves and platform on the right
 class _RideRow extends StatelessWidget {
@@ -318,7 +327,8 @@ class IfMissedLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final taken = this.taken;
-    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).firstOrNull;
+    // The next vehicle: not the taken one listed again
+    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).where((ride) => !sameRide(ride, taken)).firstOrNull;
     if (taken == null || after == null) {
       return const SizedBox.shrink();
     }

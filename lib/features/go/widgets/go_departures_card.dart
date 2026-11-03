@@ -61,7 +61,7 @@ class GoDeparturesCard extends ConsumerWidget {
               .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
               .toList();
     final planned = tracker.plannedDeparture(step, progress);
-    final selected = rides.isEmpty ? null : plannedRide(rides, planned);
+    final selected = rides.isEmpty ? null : plannedRide(rides, planned, arrival: section.arrival.add(progress.shift));
     final vehicle = state.vehicleStep == card.step ? state.vehicle : selected?.departure;
     final departure = tracker.expectedDeparture(step, progress, vehicle);
     final waiting = progress.phase == GoPhase.waiting && progress.step == card.step;

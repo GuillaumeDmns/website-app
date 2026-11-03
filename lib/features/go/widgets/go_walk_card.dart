@@ -144,16 +144,11 @@ class GoWalkCard extends ConsumerWidget {
           ].join(' · '),
           color: colors.live,
         ),
-      // The header says to hurry: here, the plan B
-      MarginLevel.hurry => switch (goNextCatchable(ref, state, margin, now)) {
+      // The header says to hurry, or that it will be missed: here, the plan B
+      MarginLevel.hurry || MarginLevel.late => switch (goNextCatchable(ref, state, margin, now)) {
           (:final time, :final later) => GoContextLine(icon: Icons.update, text: context.l10n.goIfMissed(formatClock(time), later)),
           null => null,
         },
-      MarginLevel.late => GoContextLine(
-          icon: Icons.warning_amber,
-          text: goMissedNextText(ref, state, margin, now) ?? context.l10n.goMarginLate,
-          color: colors.warning,
-        ),
     };
   }
 }

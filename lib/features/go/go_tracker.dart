@@ -271,7 +271,8 @@ class GoAlert {
 /// Follows a journey from positions, the clock and real time. Pure: [update] returns the new progress and the
 /// alerts to give.
 ///
-/// - Moving: position projected on the path; done near its end, or on schedule without a position (underground).
+/// - Moving: position projected on the path; done near its end, or on schedule without a position (underground); the
+///   journey's last move only right by the destination ([_atDestination]).
 /// - Waiting: boarding detected when moving fast along the line, or seen far along it whatever the speed (back from a
 ///   tunnel) (the vehicle taken left when it is seen to, when that is far from the departure expected: a late one, an
 ///   earlier one), or assumed after the departure without a precise position; still at the stop 90 s after the
@@ -468,10 +469,9 @@ class GoTracker {
       }
     }
 
-    // Close to the destination on the last step
-    final destination = this.destination;
-    if (current.phase != GoPhase.arrived && fix != null && destination != null && current.step >= steps.length - 1 &&
-        metersBetween(fix, destination) < 50) {
+    // Right by the destination on the last step
+    if (current.phase != GoPhase.arrived && fix != null && current.step >= steps.length - 1 &&
+        _atDestination(current, fix, input.accuracy, input.now)) {
       current = _arrive(current, input.now);
     }
     if (current.phase == GoPhase.arrived && !current.fired.contains('arrived')) {
@@ -552,7 +552,10 @@ class GoTracker {
         }
       }
       final end = step.end;
-      done = step.line.length - current.along < 40 || (end != null && metersBetween(fix, end) < 40);
+      done = nextStep == null
+          // The destination: right by it, not where the progress along the path (run ahead by GPS noise) says
+          ? _atDestination(current, fix, input.accuracy, input.now)
+          : step.line.length - current.along < 40 || (end != null && metersBetween(fix, end) < 40);
 
       // Already riding the next vehicle (seen far along its line too, back from a tunnel, unless still on the walk)
       if (!done && nextStep != null && nextStep.isRide) {
@@ -654,6 +657,30 @@ class GoTracker {
       return _board(current, input.now, departure);
     }
     return current;
+  }
+
+  /// The destination is reached by a fix this close to it, or to the end of the walk to it (an address may be a point
+  /// inside a building that the walk stops in front of)…
+  static const _arrivalMeters = 25.0;
+
+  /// …and this precise: a rougher one (the network's, indoors) may be 100 m off
+  static const _arrivalAccuracy = 25.0;
+
+  /// Its time past by this, [_nearArrivalMeters] from the destination is enough: a big place whose point can't be
+  /// walked to (a park), or indoors where only rough fixes come
+  static const _arrivalLateness = Duration(minutes: 2);
+  static const _nearArrivalMeters = 60.0;
+
+  /// [fix], of [accuracy], is right by the destination: within a few tens of meters by a precise fix, never more than a
+  /// hundred meters ahead of the user as rough fixes and the progress along the path would say
+  bool _atDestination(GoProgress progress, LatLng fix, double? accuracy, DateTime now) {
+    final last = steps.lastOrNull;
+    final ends = [?destination, if (last != null && !last.isRide && last.line.points.isNotEmpty) last.line.points.last];
+    final distance = ends.fold(double.infinity, (closest, end) => math.min(closest, metersBetween(fix, end)));
+    if (distance <= _arrivalMeters && (accuracy ?? 0) <= _arrivalAccuracy) {
+      return true;
+    }
+    return distance <= _nearArrivalMeters && !now.isBefore(journey.arrival.add(progress.shift + _arrivalLateness));
   }
 
   /// Seen on board [ride] at [fix]: moving fast along its line, or [far] along it from the stop whatever the speed
