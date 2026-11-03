@@ -43,10 +43,29 @@ Future<void> fixLocationIssue(WidgetRef ref, LocationIssue issue) async {
   ref.invalidate(userLocationProvider);
 }
 
-/// User position, null when unavailable (permission denied, no location service, desktop without GeoClue…).
+/// How sure the position [userLocationProvider] gives is: the accuracy (m) of the fix it comes from, null when unknown
+/// (the circle around the user dot)
+class UserAccuracy extends Notifier<double?> {
+  @override
+  double? build() => null;
+
+  void set(double? accuracy) => state = accuracy;
+}
+
+final userAccuracyProvider = NotifierProvider<UserAccuracy, double?>(UserAccuracy.new);
+
+/// User position, null when unavailable (permission denied, no location service, desktop without GeoClue…); how sure
+/// it is in [userAccuracyProvider].
 final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
   void report(LocationIssue? issue) => Future.microtask(() => ref.read(locationIssueProvider.notifier).set(issue));
+  // With each position given
+  void sure(double? accuracy) => Future.microtask(() {
+        if (ref.mounted) {
+          ref.read(userAccuracyProvider.notifier).set(accuracy);
+        }
+      });
   final feed = ref.watch(positionFeedProvider);
+  sure(null);
 
   try {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -67,21 +86,27 @@ final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
     report(null);
 
     LatLng? shown;
+    double? shownAccuracy;
     if (!kIsWeb) {
       final last = await Geolocator.getLastKnownPosition();
       if (last != null) {
+        sure(shownAccuracy = last.accuracy);
         yield shown = LatLng(last.latitude, last.longitude);
       }
     }
 
-    // The app's single feed (GO may ask it a fix a second): a new position every 25 m here, as without GO
-    yield* feed.fixes.map((fix) => LatLng(fix.latitude, fix.longitude)).where((position) {
+    // The app's single feed (GO may ask it a fix a second): a new position every 25 m here, as without GO, or a fix
+    // twice as sure as the one given (the circle around the user dot shrinks as the GPS settles, like Google Maps')
+    yield* feed.fixes.where((fix) {
+      final position = LatLng(fix.latitude, fix.longitude);
       final moved = shown == null || metersBetween(shown!, position) >= regularDistanceFilter;
-      if (moved) {
+      final surer = fix.accuracy > 0 && fix.accuracy * 2 <= (shownAccuracy ?? 0);
+      if (moved || surer) {
         shown = position;
+        sure(shownAccuracy = fix.accuracy);
       }
-      return moved;
-    });
+      return moved || surer;
+    }).map((fix) => LatLng(fix.latitude, fix.longitude));
   } catch (e) {
     debugPrint('Location unavailable: $e');
     yield null;

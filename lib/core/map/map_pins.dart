@@ -51,6 +51,9 @@ class UserDot extends StatelessWidget {
   /// Size of the box it is drawn in, the dot in its middle
   static const size = Size(72, 72);
 
+  /// Diameter of the soft halo around the dot
+  static const halo = 22.0;
+
   @override
   Widget build(BuildContext context) {
     final heading = screenHeading;
@@ -61,8 +64,8 @@ class UserDot extends StatelessWidget {
         if (rotation != null)
           Transform.rotate(angle: rotation, child: const CustomPaint(size: Size(72, 72), painter: _HeadingPainter())),
         Container(
-          width: 22,
-          height: 22,
+          width: halo,
+          height: halo,
           decoration: BoxDecoration(
             color: Colors.blue.withValues(alpha: 0.2),
             shape: BoxShape.circle,
@@ -86,6 +89,58 @@ class UserDot extends StatelessWidget {
       ),
     );
   }
+}
+
+/// How sure the user's position is, like Google Maps: a soft blue disc of its fix's accuracy around the user dot (the
+/// user is somewhere in it), [radius] logical pixels from the middle of its box; under the pins and the dot
+class AccuracyCircle extends StatelessWidget {
+  const AccuracyCircle({super.key, required this.radius});
+
+  final double radius;
+
+  static final fill = Colors.blue.withValues(alpha: 0.12);
+  static final border = Colors.blue.withValues(alpha: 0.3);
+
+  /// The radius (logical pixels) of the circle of [accuracy] meters around a position at [latitude] on a map at [zoom]
+  /// whose world is [tileSize] × 2^zoom pixels wide (MapLibre's tiles are 512 px, flutter_map's 256); null when unknown
+  /// or within the dot's halo, which says it already
+  static double? radiusFor(double? accuracy, double latitude, double zoom, {required double tileSize}) {
+    if (accuracy == null) {
+      return null;
+    }
+    // Web Mercator: the equator's length over the world's width in pixels, shrunk by the latitude's cosine
+    final metersPerPixel = 40075016.686 * math.cos(latitude * math.pi / 180) / (tileSize * math.pow(2, zoom));
+    final radius = accuracy / metersPerPixel;
+    return radius > UserDot.halo / 2 ? radius : null;
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(child: CustomPaint(painter: _AccuracyPainter(radius)));
+}
+
+/// [AccuracyCircle]'s disc and its thin edge, around the middle of the box (beyond it when larger)
+class _AccuracyPainter extends CustomPainter {
+  const _AccuracyPainter(this.radius);
+
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    canvas
+      ..drawCircle(center, radius, Paint()..color = AccuracyCircle.fill)
+      ..drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = AccuracyCircle.border
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+  }
+
+  @override
+  bool shouldRepaint(_AccuracyPainter oldDelegate) => oldDelegate.radius != radius;
 }
 
 /// A soft cone pointing up, from the center of the box

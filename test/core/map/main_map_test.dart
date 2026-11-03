@@ -11,6 +11,7 @@ import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/map/map_panel.dart';
+import 'package:website_app/core/map/map_pins.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 void main() {
@@ -162,6 +163,51 @@ void main() {
     expect(camera(tester).latLngToScreenOffset(stop).dy, closeTo((800 - 560) / 2, 2));
 
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a circle of the fix's accuracy around the user dot, like Google Maps", (tester) async {
+    final container = await pumpMap(tester);
+    List<CircleMarker> circles() => [
+          for (final layer in tester.widgetList<CircleLayer>(find.byType(CircleLayer))) ...layer.circles,
+        ];
+
+    container.read(userAccuracyProvider.notifier).set(300);
+    await tester.pump();
+    final circle = circles().single;
+    expect(circle.point, user);
+    expect(circle.radius, 300);
+    expect(circle.useRadiusInMeter, isTrue);
+
+    // Within the dot's halo: not drawn
+    container.read(userAccuracyProvider.notifier).set(2);
+    await tester.pump();
+    expect(circles(), isEmpty);
+
+    // GO's smoothed position, with its own fix's accuracy
+    const walked = LatLng(48.8590, 2.3480);
+    container.read(preciseUserPositionProvider.notifier).set(walked, accuracy: 400);
+    await tester.pump();
+    expect(circles().single.point, walked);
+    expect(circles().single.radius, 400);
+
+    // A vehicle followed, not the user: no circle
+    container.read(preciseUserPositionProvider.notifier).set(null);
+    container.read(userAccuracyProvider.notifier).set(300);
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(follow: MapFollow.overhead(walked)));
+    await tester.pump();
+    expect(circles(), isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('the circle of accuracy in pixels: wider at a closer zoom and further north, none within the halo', () {
+    // MapLibre's 512 px tiles at zoom 18: 0.2986 m a pixel at the equator, half of it at 60°
+    expect(AccuracyCircle.radiusFor(30, 0, 18, tileSize: 512), closeTo(100.5, 0.1));
+    expect(AccuracyCircle.radiusFor(30, 60, 18, tileSize: 512), closeTo(201, 0.1));
+    // flutter_map's 256 px tiles: the same zoom is twice as far
+    expect(AccuracyCircle.radiusFor(30, 60, 18, tileSize: 256), closeTo(100.5, 0.1));
+    expect(AccuracyCircle.radiusFor(3, 0, 18, tileSize: 512), isNull);
+    expect(AccuracyCircle.radiusFor(null, 0, 18, tileSize: 512), isNull);
   });
 
   testWidgets('a vehicle followed from overhead: north up, in the middle of what is left above the panel', (tester) async {

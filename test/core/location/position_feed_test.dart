@@ -9,11 +9,11 @@ import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/location/position_feed.dart';
 
 /// A fix [north] meters north of Châtelet
-Position fixAt(double north) => Position(
+Position fixAt(double north, {double accuracy = 5}) => Position(
       latitude: 48.8584 + north / 111200,
       longitude: 2.3470,
       timestamp: DateTime.now(),
-      accuracy: 5,
+      accuracy: accuracy,
       altitude: 0,
       altitudeAccuracy: 0,
       heading: 0,
@@ -141,5 +141,36 @@ void main() {
 
     final moves = [for (final position in shown.nonNulls) ((position.latitude - 48.8584) * 111200).round()];
     expect(moves, [0, 30, 70]);
+  });
+
+  test("the user's position comes with how sure it is, and a fix twice as sure moves it even within 25 m", () async {
+    const geolocator = MethodChannel('flutter.baseflow.com/geolocator');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(geolocator, (call) async => switch (call.method) {
+          'isLocationServiceEnabled' => true,
+          'checkPermission' => LocationPermission.whileInUse.index,
+          _ => null,
+        });
+    addTearDown(() => messenger.setMockMethodCallHandler(geolocator, null));
+    final positions = feed();
+    final container = ProviderContainer(overrides: [positionFeedProvider.overrideWithValue(positions)]);
+    addTearDown(container.dispose);
+    container.listen(userLocationProvider, (_, _) {});
+    await pumpEventQueue();
+
+    // Where the position given is (meters north) and how sure, each time it changes
+    final shown = <(int, double?)>[];
+    // A rough fix first, the GPS settling (a little better, then twice as sure, then not twice again), then a move
+    for (final (north, accuracy) in const [(0.0, 40.0), (5.0, 30.0), (8.0, 12.0), (10.0, 8.0), (40.0, 20.0)]) {
+      opened.last.$2.add(fixAt(north, accuracy: accuracy));
+      await pumpEventQueue();
+      final position = container.read(userLocationProvider).value!;
+      final given = (((position.latitude - 48.8584) * 111200).round(), container.read(userAccuracyProvider));
+      if (shown.lastOrNull != given) {
+        shown.add(given);
+      }
+    }
+
+    expect(shown, [(0, 40.0), (8, 12.0), (40, 20.0)]);
   });
 }
