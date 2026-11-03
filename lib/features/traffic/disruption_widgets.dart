@@ -84,12 +84,15 @@ class WithSeverity extends StatelessWidget {
 /// Disruptions of a line or a stop: active ones as cards (tap to read the message), elevator outages grouped,
 /// upcoming ones at the end.
 class DisruptionList extends StatelessWidget {
-  const DisruptionList({super.key, required this.disruptions, this.leading});
+  const DisruptionList({super.key, required this.disruptions, this.leading, this.expanded = false});
 
   final List<Disruption> disruptions;
 
   /// Widget shown before each disruption's title (e.g. the line badges), from its line ids
   final Widget? Function(Disruption disruption)? leading;
+
+  /// The active ones' messages shown at once (a ride's alerts), not a tap away
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +104,8 @@ class DisruptionList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final disruption in active) DisruptionCard(disruption: disruption, leading: leading?.call(disruption)),
-        if (elevators.isNotEmpty) _ElevatorCard(disruptions: elevators),
+        for (final disruption in active) DisruptionCard(disruption: disruption, leading: leading?.call(disruption), expanded: expanded),
+        if (elevators.isNotEmpty) _ElevatorCard(disruptions: elevators, expanded: expanded),
         if (upcoming.isNotEmpty)
           Theme(
             data: theme.copyWith(dividerColor: Colors.transparent),
@@ -121,10 +124,13 @@ class DisruptionList extends StatelessWidget {
 }
 
 class DisruptionCard extends StatelessWidget {
-  const DisruptionCard({super.key, required this.disruption, this.leading});
+  const DisruptionCard({super.key, required this.disruption, this.leading, this.expanded = false});
 
   final Disruption disruption;
   final Widget? leading;
+
+  /// Its message shown at first
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +151,7 @@ class DisruptionCard extends StatelessWidget {
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: expanded,
           tilePadding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           expandedAlignment: Alignment.topLeft,
@@ -261,9 +268,10 @@ class RideDisruptions extends ConsumerWidget {
 }
 
 class _ElevatorCard extends StatelessWidget {
-  const _ElevatorCard({required this.disruptions});
+  const _ElevatorCard({required this.disruptions, required this.expanded});
 
   final List<Disruption> disruptions;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +286,7 @@ class _ElevatorCard extends StatelessWidget {
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: expanded,
           tilePadding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           expandedAlignment: Alignment.topLeft,

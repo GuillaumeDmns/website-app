@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/journey/journey_labels.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -76,6 +77,48 @@ void main() {
 
     await tapOn(tester, find.textContaining(currentL10n.stopsCount(1)));
     expect(find.text('Gare de Lyon'), findsNothing);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("a ride's alerts behind one small icon of its line's row, read in a sheet; no boarding nor platform tag", (tester) async {
+    final backend = standardBackend();
+    DateTime inMinutes(int minutes) => DateTime.now().toUtc().add(Duration(minutes: minutes));
+    backend.on('GET', '/api/v2/journeys', (_) => FakeResponse(JourneyPlan(journeys: [
+          journey([
+            walk(inMinutes(2), 300),
+            transit(inMinutes(7), 480, to: gareDeLyon).copyWith(boardingPositions: ['front']),
+          ]),
+        ]).toJson()));
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
+          for (final minutes in [7, 12, 17])
+            ride(inMinutes(minutes)).copyWith(departure: departure(inMinutes(minutes)).copyWith(platform: '2')).toJson(),
+        ]));
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+    await tapOn(tester, find.byType(JourneyCard));
+
+    // Where to board is GO's, the platform the departures list's
+    expect(find.text(boardingLabel(['front'])), findsNothing);
+    expect(find.text(platformLabel(metro1, '2')!), findsNothing);
+    expect(find.text(currentL10n.platform('2')), findsWidgets);
+    // The line interrupted and Châtelet's elevator: one red icon, not their texts
+    expect(find.text(metroStopped.title!), findsNothing);
+    expect(find.text(currentL10n.brokenElevators(1)), findsNothing);
+    final alerts = find.byTooltip(currentL10n.rideAlertsOf('${currentL10n.severityBlocking} · ${currentL10n.brokenElevators(1)}'));
+    expect(alerts, findsOneWidget);
+    expect(find.descendant(of: alerts, matching: find.byIcon(Icons.block)), findsOneWidget);
+
+    // A tap: their messages at once, the elevators under their stop
+    await tapOn(tester, alerts);
+    expect(find.text(currentL10n.rideAlerts), findsOneWidget);
+    expect(find.text(metroStopped.title!), findsOneWidget);
+    expect(find.text(metroStopped.message!), findsOneWidget);
+    expect(find.text(currentL10n.atStop('Châtelet')), findsOneWidget);
+    expect(find.text(currentL10n.brokenElevators(1)), findsOneWidget);
+    expect(find.textContaining(elevatorOutage.title!), findsOneWidget);
+    expect(find.text(elevatorOutage.message!), findsOneWidget);
 
     await closeApp(tester);
   });
