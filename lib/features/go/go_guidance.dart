@@ -28,20 +28,18 @@ class Maneuver {
 
 /// The next turn of the walk [step] after [along] meters on its path, null when none is left (or without
 /// instructions). Only real turns count: Navitia also lists going straight on, arriving and entering the station,
-/// which tell nothing to do. Its lengths are scaled to the path drawn, which may be a little longer or shorter.
+/// which tell nothing to do. Where [walkStepAlongs] puts it on the path drawn.
 Maneuver? nextManeuver(GoStep step, double along) {
   final walks = step.section.steps;
   if (step.isRide || walks.isEmpty) {
     return null;
   }
-  final total = (step.section.length ?? 0) > 0 ? step.section.length! : walks.last.offset + walks.last.length;
-  final scale = total > 0 && step.line.length > 0 ? step.line.length / total : 1.0;
-  for (final walk in walks) {
-    // The first one says where to head from the start: the map shows it
-    if (walk.offset == 0 || walk.direction.abs() <= straightOn) {
+  final alongs = walkStepAlongs(step);
+  for (final (index, walk) in walks.indexed) {
+    if (!_isTurn(walk)) {
       continue;
     }
-    final at = walk.offset * scale;
+    final at = alongs[index];
     if (at > along + 3) {
       return Maneuver(walk: walk, meters: at - along);
     }
@@ -51,6 +49,126 @@ Maneuver? nextManeuver(GoStep step, double along) {
 
 /// Turns of at most this many degrees are going straight on
 const straightOn = 20;
+
+/// Whether Navitia's instruction [walk] is a turn to make (the first one says where to head from the start: the map
+/// shows it)
+bool _isTurn(WalkStep walk) => walk.offset > 0 && walk.direction.abs() > straightOn;
+
+/// Where each of Navitia's instructions of the walk [step] starts on its path drawn, in meters along it, in the order
+/// of `section.steps`. Navitia's lengths between its turns are the path's, and a turn's `direction` the angle of the
+/// path's corner there, but its offsets don't count the way from the start to the street, nor a station's corridors,
+/// as drawn (14 m more from 3 Avenue Léon de Bertalot, 150 m less out of Charles de Gaulle - Étoile): scaled to the
+/// path, a turn stood tens of meters before its corner. So the offsets are moved by the shift most turns agree with
+/// (a corner turning the same way there), one turn alone only near its scaled offset, and each turn is put onto such
+/// a corner close by, the instructions after it following it; without any, the offsets scaled to the path.
+List<double> walkStepAlongs(GoStep step) => _walkStepAlongs[step] ??= _placeWalkSteps(step);
+
+final _walkStepAlongs = Expando<List<double>>();
+
+/// A corner of the path within this many degrees of an instruction's turn is where it is
+const _turnMatch = 30;
+
+/// Turns agree on a shift of the offsets when their corners are within this many meters of it
+const _agreeMeters = 10.0;
+
+/// A turn is put onto a corner at most this many meters from where the shifted offsets say
+const _snapMeters = 25.0;
+
+List<double> _placeWalkSteps(GoStep step) {
+  final walks = step.section.steps;
+  final line = step.line;
+  if (walks.isEmpty) {
+    return const [];
+  }
+  final total = (step.section.length ?? 0) > 0 ? step.section.length! : walks.last.offset + walks.last.length;
+  final scale = total > 0 && line.length > 0 ? line.length / total : 1.0;
+  final corners = _corners(line);
+  final turns = walks.where(_isTurn).toList();
+  bool fits(WalkStep walk, _Corner corner) => _degreesBetween(corner.angle, walk.direction).abs() <= _turnMatch;
+  bool agrees(WalkStep walk, double shift) =>
+      corners.any((corner) => fits(walk, corner) && (corner.along - walk.offset - shift).abs() <= _agreeMeters);
+
+  // The shift most turns agree with, the closest to the scaled offsets among equals; one turn alone within what the
+  // path and Navitia's length differ by
+  double? shift;
+  var agreeing = 0;
+  var fromScaled = double.infinity;
+  final reach = _snapMeters + (line.length - total).abs();
+  for (final turn in turns) {
+    for (final corner in corners) {
+      if (!fits(turn, corner)) {
+        continue;
+      }
+      final candidate = corner.along - turn.offset;
+      final away = (candidate - turn.offset * (scale - 1)).abs();
+      final count = turns.where((other) => agrees(other, candidate)).length;
+      if ((count > 1 || away <= reach) && (count > agreeing || count == agreeing && away < fromScaled)) {
+        shift = candidate;
+        agreeing = count;
+        fromScaled = away;
+      }
+    }
+  }
+
+  final alongs = <double>[];
+  var previous = 0.0;
+  for (final walk in walks) {
+    var at = shift == null ? walk.offset * scale : walk.offset + shift;
+    if (shift != null && _isTurn(walk)) {
+      _Corner? closest;
+      for (final corner in corners) {
+        final distance = (corner.along - at).abs();
+        if (fits(walk, corner) &&
+            corner.along > previous &&
+            distance <= _snapMeters &&
+            (closest == null || distance < (closest.along - at).abs())) {
+          closest = corner;
+        }
+      }
+      if (closest != null) {
+        at = closest.along;
+        shift = at - walk.offset;
+      }
+    }
+    // The first one starts where the path does
+    at = walk.offset == 0 ? 0.0 : at.clamp(previous, line.length);
+    alongs.add(at);
+    previous = at;
+  }
+  return alongs;
+}
+
+/// A corner of a path: [angle] degrees turned there (negative to the left), [along] meters from its start
+typedef _Corner = ({double along, double angle});
+
+/// The corners of [line] turning more than going straight on
+List<_Corner> _corners(MeasuredPolyline line) {
+  final points = line.points;
+  final along = line.cumulative;
+  final corners = <_Corner>[];
+  for (var i = 1; i < points.length - 1; i++) {
+    // From and to points a meter away at least: a point given twice turns nowhere
+    var before = i - 1;
+    while (before > 0 && along[i] - along[before] < 1) {
+      before--;
+    }
+    var after = i + 1;
+    while (after < points.length - 1 && along[after] - along[i] < 1) {
+      after++;
+    }
+    if (along[i] - along[before] < 1 || along[after] - along[i] < 1) {
+      continue;
+    }
+    final angle = _degreesBetween(bearingBetween(points[i], points[after]), bearingBetween(points[before], points[i]));
+    if (angle.abs() > straightOn) {
+      corners.add((along: along[i], angle: angle));
+    }
+  }
+  return corners;
+}
+
+/// [a] less [b], from -180 to 180 degrees
+double _degreesBetween(num a, num b) => (a - b + 540) % 360 - 180;
 
 /// The arrow of a turn of [direction] degrees (negative to the left)
 IconData turnIcon(int direction) => switch (direction) {
