@@ -4,7 +4,7 @@ name: Apple
 on:
   pull_request:
   push:
-    branches: [master, claude/citymapper-comparison-ios-macos-1s0w5b]
+    branches: [master]
   workflow_dispatch:
 concurrency:
   group: apple-${{ github.ref }}
@@ -35,8 +35,9 @@ jobs:
         run: flutter build ios --flavor dev --debug --simulator
       - name: The widget extension is in the app
         run: test -d build/ios/iphoneos/Runner.app/PlugIns/NextDepartures.appex
-      - name: Project changes made by Flutter (none expected)
-        run: git status --short && git diff -- ios ':!ios/Podfile.lock'
+      # Flutter migrates the Xcode project when it needs to (Swift Package Manager, schemes): commit what it changes
+      - name: No project change made by Flutter
+        run: git status --short && git diff --exit-code -- ios
 
   macos:
     name: macOS
@@ -66,5 +67,5 @@ jobs:
           tail -n 5 build.log
       - name: The widget extension is in the app
         run: test -d build/macos-xcode/Build/Products/Release-prod/website_app.app/Contents/PlugIns/NextDepartures.appex
-      - name: Project changes made by Flutter (none expected)
-        run: git status --short && git diff -- macos ':!macos/Podfile.lock'
+      - name: No project change made by Flutter
+        run: git status --short && git diff --exit-code -- macos
