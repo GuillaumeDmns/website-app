@@ -1,6 +1,6 @@
 # App mobilité Île-de-France (Flutter)
 
-Android, web et desktop (iOS et macOS en usage personnel). Architecture et conventions : `CLAUDE.md`.
+Android, iOS, macOS, web et desktop (Linux, Windows). Architecture et conventions : `CLAUDE.md`.
 
 ## Deux environnements qui ne se mélangent pas
 
@@ -8,6 +8,7 @@ Android, web et desktop (iOS et macOS en usage personnel). Architecture et conve
 |---|---|---|
 | Backend | `website-back` lancé sur ta machine (`./mvnw spring-boot:run`) : `http://localhost:8080`, base PostgreSQL locale | `https://guillaumedamiens.com` (VPS, base sur le VPS) |
 | App Android | **Guillaume Dev**, `com.guillaumedamiens.app.dev`, icône orange « DEV » | **Guillaume**, `com.guillaumedamiens.app` |
+| App iOS / macOS | **Guillaume Dev**, `com.guillaumedamiens.app.dev` (schéma Xcode `dev`) | **Guillaume**, `com.guillaumedamiens.app` (schéma `prod`) |
 | Web | `http://localhost:5000` | `https://app.guillaumedamiens.com` |
 | Repère | bandeau « DEV » en haut à droite | aucun |
 
@@ -21,7 +22,11 @@ En dev, l'app appelle toujours `http://localhost:8080`. `flutter run` sans optio
 flutter run -d <device>                      # Android (téléphone ou émulateur), après adb reverse ci-dessous
 flutter run -d chrome --web-port 5000
 flutter run -d linux
+flutter run -d macos
+flutter run -d <simulateur iOS>              # le simulateur atteint localhost:8080 du Mac
 ```
+
+Sur un iPhone branché, `localhost` est le téléphone : `flutter run -d <iphone> --dart-define=API_BASE_URL=http://<ip-du-mac>:8080`. Le premier lancement iOS/macOS fait `pod install` ; Xcode signe avec l'équipe `L846MR2M2R` (signature automatique, à accepter une fois dans Xcode).
 
 Sur un téléphone ou un émulateur Android, `localhost` est l'appareil lui-même : rediriger le port vers ta machine (à refaire à chaque branchement) :
 
