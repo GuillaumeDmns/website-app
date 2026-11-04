@@ -36,13 +36,13 @@ final deviceHeadingProvider = StreamProvider.autoDispose<double>((ref) {
   return controller.stream;
 });
 
-/// The device's raw headings: Android's rotation vector sensor (`DeviceHeading.kt`), the browser's orientation events;
-/// null without a compass here
+/// The device's raw headings: Android's rotation vector sensor (`DeviceHeading.kt`), iOS's compass (Core Location,
+/// `DeviceHeading.swift`), the browser's orientation events; null without a compass here (desktop, macOS included)
 Stream<double>? deviceHeadings() {
   if (kIsWeb) {
     return browser.deviceHeadings();
   }
-  if (defaultTargetPlatform == TargetPlatform.android) {
+  if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS) {
     return const EventChannel('com.guillaumedamiens.app/heading')
         .receiveBroadcastStream()
         .map((heading) => (heading as num).toDouble());

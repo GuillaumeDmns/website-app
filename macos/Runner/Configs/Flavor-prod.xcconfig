@@ -1,0 +1,12 @@
+// The prod flavor (scheme "prod", configurations *-prod): the published app.
+// Project-level base configuration (the widget extension reads it too).
+#include "../../Flutter/ephemeral/Flutter-Generated.xcconfig"
+#include "Warnings.xcconfig"
+
+APP_BUNDLE_ID = com.guillaumedamiens.app
+APP_DISPLAY_NAME = Guillaume
+// Shared with the widget extension; prefixed with the team on macOS
+APP_GROUP_ID = $(DEVELOPMENT_TEAM).com.guillaumedamiens.app
+// Reversed id of the flavor's Google iOS OAuth client (AppConfig.googleAppleClientId, the same client as iOS), the URL
+// scheme Google returns through: com.googleusercontent.apps.<number>-<id>. A placeholder until that client exists.
+GOOGLE_REVERSED_CLIENT_ID = com.guillaumedamiens.app.google-sign-in-unset

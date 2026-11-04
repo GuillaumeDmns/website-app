@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["L846MR2M2R.com.guillaumedamiens.app"],
+        "components": [
+          {
+            "/": "/*",
+            "comment": "Every page of the web app opens the prod iOS app, as on Android (assetlinks.json)"
+          }
+        ]
+      }
+    ]
+  }
+}
