@@ -8,7 +8,16 @@
 	<true/>
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<!-- The app's own keychain group first (secure storage's default), then Google sign-in's -->
 	<key>keychain-access-groups</key>
-	<array/>
+	<array>
+		<string>$(AppIdentifierPrefix)$(APP_BUNDLE_ID)</string>
+		<string>$(AppIdentifierPrefix)com.google.GIDSignIn</string>
+	</array>
+	<!-- The widget extension's data, "Terminer" in GO's notification -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(APP_GROUP_ID)</string>
+	</array>
 </dict>
 </plist>

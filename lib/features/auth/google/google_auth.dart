@@ -3,14 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/config.dart';
+import '../../../core/platform/platforms.dart';
 
 /// "Continuer avec Google": the Google ID token the backend exchanges for its own tokens (`POST /api/auth/google`).
 /// Android: the system account chooser (Credential Manager), the token is issued for the web client
-/// ([AppConfig.googleWebClientId], `serverClientId`). Web: Google's own button (`google_button_web.dart`), which reports
-/// through [GoogleSignIn.authenticationEvents]. Elsewhere (desktop, iOS until it has its own client): not offered.
-bool get googleSignInAvailable => kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+/// ([AppConfig.googleWebClientId], `serverClientId`). iOS and macOS: Google's sign-in page, through the iOS client of
+/// the flavor ([AppConfig.googleAppleClientId]), the token still issued for the web client; offered once that client
+/// exists. Web: Google's own button (`google_button_web.dart`), which reports through
+/// [GoogleSignIn.authenticationEvents]. Elsewhere (Linux, Windows): not offered.
+bool get googleSignInAvailable => kIsWeb || isAndroid || (isApple && AppConfig.googleAppleClientId.isNotEmpty);
 
-/// Opens the account chooser and gives the ID token (null when cancelled), where the app does it itself (Android);
+/// Opens the account chooser and gives the ID token (null when cancelled), where the app does it itself (Android, iOS,
+/// macOS);
 /// null on the web (Google's own button) and where Google sign-in is not available. The tests replace it.
 final googleAccountChooserProvider = Provider<Future<String?> Function()?>(
   (ref) => !kIsWeb && googleSignInAvailable ? requestGoogleIdToken : null,
@@ -19,11 +23,11 @@ final googleAccountChooserProvider = Provider<Future<String?> Function()?>(
 Future<void>? _initialized;
 
 Future<void> initGoogleSignIn() => _initialized ??= GoogleSignIn.instance.initialize(
-      clientId: kIsWeb ? AppConfig.googleWebClientId : null,
+      clientId: kIsWeb ? AppConfig.googleWebClientId : (isApple ? AppConfig.googleAppleClientId : null),
       serverClientId: kIsWeb ? null : AppConfig.googleWebClientId,
     );
 
-/// Android: lets the user choose a Google account; null when they cancel
+/// Android, iOS, macOS: lets the user choose a Google account; null when they cancel
 Future<String?> requestGoogleIdToken() async {
   await initGoogleSignIn();
   try {

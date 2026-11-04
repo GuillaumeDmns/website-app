@@ -1,0 +1,11 @@
+// The dev flavor (scheme "dev", configurations *-dev): the development app, on the development machine's backend, beside the production one.
+// Project-level base configuration (the widget extension reads it); the Runner's ones include it.
+#include "Generated.xcconfig"
+
+APP_BUNDLE_ID = com.guillaumedamiens.app.dev
+APP_DISPLAY_NAME = Guillaume Dev
+// Shared with the widget extension (AppConfig.iosAppGroup on the Dart side)
+APP_GROUP_ID = group.com.guillaumedamiens.app.dev
+// Reversed id of the flavor's Google iOS OAuth client (AppConfig.googleAppleClientId), the URL scheme Google returns
+// through: com.googleusercontent.apps.<number>-<id>. A placeholder until that client exists.
+GOOGLE_REVERSED_CLIENT_ID = com.guillaumedamiens.app.dev.google-sign-in-unset

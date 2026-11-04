@@ -111,11 +111,15 @@ class PositionFeed {
     }
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => AndroidSettings(accuracy: LocationAccuracy.best, distanceFilter: 0, intervalDuration: need.interval),
+      // On iOS the fixes go on with the app in the background (the `location` background mode of Info.plist; the blue
+      // pill in the status bar says so), so that GO follows the journey with the screen off, as Android's service does
       TargetPlatform.iOS || TargetPlatform.macOS => AppleSettings(
           accuracy: LocationAccuracy.bestForNavigation,
           distanceFilter: 0,
           activityType: ActivityType.otherNavigation,
           pauseLocationUpdatesAutomatically: false,
+          allowBackgroundLocationUpdates: true,
+          showBackgroundLocationIndicator: true,
         ),
       _ => const LocationSettings(accuracy: LocationAccuracy.best, distanceFilter: 0),
     };
