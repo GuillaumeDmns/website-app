@@ -41,6 +41,34 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('lowered by its handle with its list scrolled: the page shows its top, and a swipe on it raises the sheet',
+      (tester) async {
+    // A lower screen, where a stop's page is longer than the highest sheet
+    await pumpApp(tester, standardBackend(), size: const Size(412, 600));
+    await tapOn(tester, find.text('Châtelet'));
+
+    // Raised, then its list scrolled down: its header out of sight
+    await tester.dragFrom(Offset(206, sheetTop(tester) + 60), const Offset(0, -500));
+    await settle(tester);
+    await tester.dragFrom(const Offset(206, 400), const Offset(0, -300));
+    await settle(tester);
+    expect(find.byTooltip(currentL10n.back).hitTestable(), findsNothing);
+
+    // Lowered by its handle, at the top of the sheet: as low as it goes, the page's header showing
+    await tester.dragFrom(Offset(206, sheetTop(tester) + 11), const Offset(0, 900));
+    await settle(tester);
+    final lowest = sheetTop(tester);
+    expect(lowest, closeTo(600 - 110, 2));
+    expect(find.byTooltip(currentL10n.back).hitTestable(), findsOneWidget);
+
+    // Swiped up on the page, not its handle: the sheet comes up (a list left scrolled took the swipe)
+    await tester.dragFrom(Offset(206, lowest + 60), const Offset(0, -300));
+    await settle(tester);
+    expect(sheetTop(tester), lessThan(lowest - 200));
+
+    await closeApp(tester);
+  });
+
   testWidgets('the user stays in the middle of the part of the map above the sheet as it moves', (tester) async {
     await pumpApp(tester, standardBackend());
 

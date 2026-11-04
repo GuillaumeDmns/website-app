@@ -47,15 +47,17 @@ class SheetProfile {
 /// highest, and whether it stays at its highest
 typedef SheetSizes = ({double min, double middle, double max, bool locked});
 
-/// Sizes of the sheet for [location] on a [screen] whose status bar is [topInset] high (never under it); [fitted]: the
-/// height of the content of a page sized to it (GO), [handle] aside
-SheetSizes sheetSizes(String location, {required Size screen, required double topInset, double? fitted, double handle = 22}) {
+/// Sizes of the sheet for [location] on a [screen] whose status bar is [topInset] high (never under it) and whose
+/// system navigation bar is [bottomInset] high (the lowest sheet keeps its peek above it, out of the system's swipes);
+/// [fitted]: the height of the content of a page sized to it (GO), [handle] aside
+SheetSizes sheetSizes(String location,
+    {required Size screen, required double topInset, double bottomInset = 0, double? fitted, double handle = 22}) {
   final profile = SheetProfile.of(location);
   final max = ((screen.height - topInset) / screen.height).clamp(0.5, 1.0);
   if (profile.full) {
     return (min: max, middle: max, max: max, locked: true);
   }
-  final min = (profile.peek / screen.height).clamp(0.08, 0.4);
+  final min = ((profile.peek + bottomInset) / screen.height).clamp(0.08, 0.4);
   final middle = fitted == null ? profile.middle : ((fitted + handle) / screen.height).clamp(min, profile.maxMiddle);
   return (min: min, middle: middle.clamp(min, max), max: max, locked: false);
 }

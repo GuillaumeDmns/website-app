@@ -194,7 +194,6 @@
   "bikeDropOff": "Drop off the bike: {station}",
   "bikeRideEstimated": "Ride {duration}{distance} · estimated time",
   "direction": "Towards {headsign}",
-  "delayMinutes": "{minutes} min late",
   "realtime": "Real time",
   "stopsCount": "{count, plural, =1{1 stop} other{{count} stops}}",
   "getOffAt": "Get off at {stop}",

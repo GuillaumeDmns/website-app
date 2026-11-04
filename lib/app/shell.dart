@@ -157,6 +157,10 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
 
   Size _screen = Size.zero;
   double _topInset = 0;
+  double _bottomInset = 0;
+
+  /// The sheet's scroll controller, which the page's list takes (see [PanelScrollScope])
+  ScrollController? _pageList;
 
   @override
   void initState() {
@@ -179,8 +183,8 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
     }
   }
 
-  SheetSizes _sizesOf(String location) =>
-      sheetSizes(location, screen: _screen, topInset: _topInset, fitted: _fitted[location], handle: _handleHeight);
+  SheetSizes _sizesOf(String location) => sheetSizes(location,
+      screen: _screen, topInset: _topInset, bottomInset: _bottomInset, fitted: _fitted[location], handle: _handleHeight);
 
   void _onSheetMoved() {
     final target = _animatingTo;
@@ -189,7 +193,29 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
     } else if ((_sheetController.size - target).abs() < 0.001) {
       _animatingTo = null;
     }
+    _topAtLowest();
     _publishPanel();
+  }
+
+  /// Lowered as far as it goes (by its handle, or by the shell), the page shows its top: its header, as the lowest size
+  /// is meant to, and a swipe up on it raises the sheet (a list left scrolled down takes the swipe and scrolls instead)
+  void _topAtLowest() {
+    bool atLowest() =>
+        _sheetController.isAttached && _sheetController.size <= _sizesOf(ref.read(routerLocationProvider)).min + 0.001;
+    if (!atLowest()) {
+      return;
+    }
+    // After the frame: the sheet also moves while it is built (its sizes replaced)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !atLowest()) {
+        return;
+      }
+      for (final position in [...?_pageList?.positions]) {
+        if (position.pixels > position.minScrollExtent) {
+          position.jumpTo(position.minScrollExtent);
+        }
+      }
+    });
   }
 
   /// The user takes the sheet: whatever the shell was doing with it, it is theirs now
@@ -262,9 +288,11 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
     final scheme = Theme.of(context).colorScheme;
     final screen = MediaQuery.sizeOf(context);
     final topInset = MediaQuery.paddingOf(context).top;
-    if (screen != _screen || topInset != _topInset) {
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    if (screen != _screen || topInset != _topInset || bottomInset != _bottomInset) {
       _screen = screen;
       _topInset = topInset;
+      _bottomInset = bottomInset;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _publishPanel();
@@ -320,57 +348,60 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
             maxChildSize: sizes.max,
             snap: !sizes.locked,
             snapSizes: _snapSizes,
-            builder: (context, scrollController) => Material(
-              color: scheme.surface,
-              elevation: 8,
-              shadowColor: Colors.black45,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(sizes.locked ? 0 : 20)),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  if (sizes.locked)
-                    const SizedBox(height: 8)
-                  else
-                    _SheetHandle(controller: _sheetController, sizes: [sizes.min, sizes.middle, sizes.max], onDragStart: _onUserDrag),
-                  Expanded(
-                    child: MediaQuery.removePadding(
-                      context: context,
-                      removeTop: true,
-                      child: PanelSheetScope(
-                        controller: _sheetController,
-                        middle: sizes.middle,
-                        onFit: _fit,
-                        child: PanelScrollScope(
-                          controller: scrollController,
-                          // A drag of the page's list, which moves the sheet (or scrolls it): the user's
-                          child: NotificationListener<ScrollStartNotification>(
-                            onNotification: (notification) {
-                              if (notification.dragDetails != null && notification.metrics.axis == Axis.vertical) {
-                                _onUserDrag();
-                              }
-                              return false;
-                            },
-                            child: LayoutBuilder(
-                              builder: (context, constraints) => constraints.maxHeight >= _minPageHeight
-                                  ? widget.child
-                                  // Lowered sheet: the top of the page shows, the rest is cut
-                                  : ClipRect(
-                                      child: OverflowBox(
-                                        alignment: Alignment.topCenter,
-                                        minHeight: _minPageHeight,
-                                        maxHeight: _minPageHeight,
-                                        child: widget.child,
+            builder: (context, scrollController) {
+              _pageList = scrollController;
+              return Material(
+                color: scheme.surface,
+                elevation: 8,
+                shadowColor: Colors.black45,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(sizes.locked ? 0 : 20)),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    if (sizes.locked)
+                      const SizedBox(height: 8)
+                    else
+                      _SheetHandle(controller: _sheetController, sizes: [sizes.min, sizes.middle, sizes.max], onDragStart: _onUserDrag),
+                    Expanded(
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: PanelSheetScope(
+                          controller: _sheetController,
+                          middle: sizes.middle,
+                          onFit: _fit,
+                          child: PanelScrollScope(
+                            controller: scrollController,
+                            // A drag of the page's list, which moves the sheet (or scrolls it): the user's
+                            child: NotificationListener<ScrollStartNotification>(
+                              onNotification: (notification) {
+                                if (notification.dragDetails != null && notification.metrics.axis == Axis.vertical) {
+                                  _onUserDrag();
+                                }
+                                return false;
+                              },
+                              child: LayoutBuilder(
+                                builder: (context, constraints) => constraints.maxHeight >= _minPageHeight
+                                    ? widget.child
+                                    // Lowered sheet: the top of the page shows, the rest is cut
+                                    : ClipRect(
+                                        child: OverflowBox(
+                                          alignment: Alignment.topCenter,
+                                          minHeight: _minPageHeight,
+                                          maxHeight: _minPageHeight,
+                                          child: widget.child,
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

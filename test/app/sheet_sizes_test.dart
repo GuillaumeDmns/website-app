@@ -25,6 +25,12 @@ void main() {
     expect((search.min, search.middle, search.locked), (search.max, search.max, true));
   });
 
+  test("lowered, the sheet keeps its peek above the system's navigation bar", () {
+    // A phone's gesture bar, 24 px: out of reach of the system's swipes
+    expect(sheetSizes(Routes.home, screen: screen, topInset: 40, bottomInset: 24).min, closeTo(134 / 915, 1e-9));
+    expect(sheetSizes(Routes.go, screen: screen, topInset: 40, bottomInset: 24).min, closeTo(108 / 915, 1e-9));
+  });
+
   test("GO's sheet fits its content, the map keeping half of the screen at least", () {
     expect(sizesOf(Routes.go).middle, 0.4);
     expect(sizesOf(Routes.go, fitted: 300).middle, closeTo(322 / 915, 1e-9));

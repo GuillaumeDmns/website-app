@@ -593,14 +593,6 @@
       }
     }
   },
-  "delayMinutes": "Retard {minutes} min",
-  "@delayMinutes": {
-    "placeholders": {
-      "minutes": {
-        "type": "int"
-      }
-    }
-  },
   "realtime": "Temps réel",
   "stopsCount": "{count, plural, =1{1 arrêt} other{{count} arrêts}}",
   "@stopsCount": {
