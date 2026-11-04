@@ -35,7 +35,7 @@ jobs:
         run: flutter build ios --flavor dev --debug --simulator
       - name: The widget extension is in the app
         run: test -d build/ios/iphoneos/Runner.app/PlugIns/NextDepartures.appex
-      - name: Project changes made by Flutter
+      - name: Project changes made by Flutter (none expected)
         run: git status --short && git diff -- ios ':!ios/Podfile.lock'
 
   macos:
@@ -66,5 +66,5 @@ jobs:
           tail -n 5 build.log
       - name: The widget extension is in the app
         run: test -d build/macos-xcode/Build/Products/Release-prod/website_app.app/Contents/PlugIns/NextDepartures.appex
-      - name: Project changes made by Flutter
+      - name: Project changes made by Flutter (none expected)
         run: git status --short && git diff -- macos ':!macos/Podfile.lock'
