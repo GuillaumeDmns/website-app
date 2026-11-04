@@ -42,6 +42,33 @@ void main() {
     expect(tester.getCenter(now).dy, lessThan(tester.getCenter(was).dy));
   });
 
+  test('moved: the minutes between the clocks printed, not the delay rounded', () {
+    // 20:1x UTC: 21:1x in Paris
+    DateTime at(int minute, int second) => DateTime.utc(2026, 11, 3, 20, minute, second);
+    // 40 s late, still 21:11
+    expect(RetimedClock.moved(at(11, 40), at(11, 0)), 0);
+    // 20 s late across the minute: 21:10, then 21:11
+    expect(RetimedClock.moved(at(11, 10), at(10, 50)), 1);
+    // 20 s early across the minute: 21:11, then 21:10
+    expect(RetimedClock.moved(at(10, 50), at(11, 10)), -1);
+    expect(RetimedClock.moved(at(14, 30), at(11, 30)), 3);
+    expect(RetimedClock.moved(at(11, 40), null), 0);
+  });
+
+  testWidgets('late by less than a minute within the same minute: the time alone, nothing struck through', (tester) async {
+    // Transilien L at Bécon les Bruyères, 21:11 planned and expected 40 s later: no "21:11" struck through before "21:11"
+    final aimed = DateTime.utc(2026, 11, 3, 20, 11);
+    await pump(tester, RetimedClock(time: aimed.add(const Duration(seconds: 40)), planned: aimed));
+    expect(find.text(formatClock(aimed)), findsOneWidget);
+    expect(tester.widget<Text>(find.byType(Text)).style?.decoration, isNot(TextDecoration.lineThrough));
+
+    // 20 s late across the minute: moved, the planned time struck through
+    final crossing = DateTime.utc(2026, 11, 3, 20, 10, 50);
+    await pump(tester, RetimedClock(time: crossing.add(const Duration(seconds: 20)), planned: crossing));
+    expect(tester.widget<Text>(find.text(formatClock(crossing))).style?.decoration, TextDecoration.lineThrough);
+    expect(tester.widget<Text>(find.text(formatClock(aimed))).style?.color, AppColors.light.delayed);
+  });
+
   testWidgets('less than a minute off, or no planned time: the time alone', (tester) async {
     await pump(tester, RetimedClock(time: planned.add(const Duration(seconds: 25)), planned: planned));
     expect(find.byType(Text), findsOneWidget);

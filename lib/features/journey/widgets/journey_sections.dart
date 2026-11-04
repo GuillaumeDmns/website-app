@@ -213,6 +213,7 @@ class _RideTile extends StatelessWidget {
         ? section.stops.sublist(1, section.stops.length - 1)
         : const <JourneyStop>[];
     final delay = section.delay ?? 0;
+    final planned = section.departure.subtract(Duration(seconds: delay));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -220,9 +221,10 @@ class _RideTile extends StatelessWidget {
         TimelineRow(
           color: color,
           time: formatClock(section.departure),
-          // Late or early by the real time: the planned time struck through under the new one
-          clock: delay.abs() >= 60
-              ? RetimedClock(time: section.departure, planned: section.departure.subtract(Duration(seconds: delay)), stacked: true)
+          // Late or early by the real time, its clock printing another minute: the planned time struck through under
+          // the new one, as in its departures below
+          clock: RetimedClock.moved(section.departure, planned) != 0
+              ? RetimedClock(time: section.departure, planned: planned, stacked: true)
               : null,
           dot: true,
           child: InkWell(
