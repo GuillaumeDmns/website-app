@@ -133,7 +133,6 @@ void main() {
     // Châtelet left at 8:06, Gare de Lyon at 8:10: a quarter of the way at 8:07, not halfway
     expect(tracker.betweenStops(onBoard, at(7)), 0.25);
     expect(tracker.betweenStops(onBoard, at(8)), 0.5);
-    expect(tracker.alongNow(onBoard, at(8)), closeTo(tracker.steps[1].stopAlongs[1] / 2, 0.01));
     // At Gare de Lyon until it is left
     expect(tracker.betweenStops(onBoard, at(10, 10)), 1);
 
@@ -147,7 +146,6 @@ void main() {
     expect(tracker.betweenStops(onBoard.copyWith(shift: const Duration(minutes: 4)), at(12)), 0.5);
     // Not on board: nowhere between stops
     expect(tracker.betweenStops(tracker.jumpTo(tracker.initial(), 1), at(7)), isNull);
-    expect(tracker.alongNow(const GoProgress(step: 0, phase: GoPhase.moving, along: 120), at(7)), 120);
   });
 
   test('on board above ground, the GPS puts the user between the stops; in a tunnel, the clock, never behind it', () {
@@ -159,7 +157,8 @@ void main() {
     // A late train: seen 30 % of the way to Gare de Lyon at 8:09, when the clock says 75 %
     var (late, _) = tracker.update(onBoard, input(at(9), position: along(lyon * 0.3), speed: 10));
     expect(tracker.betweenStops(late, at(9)), closeTo(0.3, 0.01));
-    expect(tracker.alongNow(late, at(9)), closeTo(lyon * 0.3, 1));
+    // The map fades the ride up to there
+    expect(late.along, closeTo(lyon * 0.3, 1));
     // Then nothing (a tunnel): the last fix says it a few seconds more, then the clock leads
     (late, _) = tracker.update(late, GoInput(now: at(9, 6)));
     expect(tracker.betweenStops(late, at(9, 6)), closeTo(0.3, 0.01));

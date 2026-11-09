@@ -383,18 +383,6 @@ class GoTracker {
     return math.max(clock, seen ?? 0);
   }
 
-  /// Meters along the current step's path where the user is: on board, between the stops ([betweenStops]); else
-  /// [GoProgress.along]
-  double alongNow(GoProgress progress, DateTime now) {
-    final share = betweenStops(progress, now);
-    final ride = stepOf(progress);
-    if (share == null || ride == null) {
-      return progress.along;
-    }
-    final k = math.min(progress.stopIndex, ride.stopAlongs.length - 2);
-    return ride.stopAlongs[k] + (ride.stopAlongs[k + 1] - ride.stopAlongs[k]) * share;
-  }
-
   // Manual corrections
 
   /// Waiting: the user says they boarded; otherwise the step is done
