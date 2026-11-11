@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/map/map_overlay.dart';
+import 'package:website_app/core/utils/geo.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/core/utils/time_format.dart';
 import 'package:website_app/features/go/go_controller.dart';
@@ -402,6 +403,39 @@ void main() {
     expect(find.text(currentL10n.goRecalculateJourney), findsOneWidget);
 
     await closeApp(tester);
+  });
+
+  testWidgets('on board, the map fades the ride up to where the GPS saw the user, not where the clock puts them', (tester) async {
+    // The metro 1 left Châtelet 3 min ago for Gare de Lyon (4 min) and Nation: three quarters of the way by the clock
+    final start = DateTime.now().toUtc();
+    final onBoard = journey([transit(start.subtract(const Duration(minutes: 3)), 480, via: [gareDeLyon])]);
+    Future<List<MapPath>> ridePaths(double along) async {
+      final container = await openGo(
+        tester,
+        GoState(
+          tracker: GoTracker(onBoard),
+          request: const JourneyRequest(),
+          progress: GoProgress(step: 0, phase: GoPhase.onBoard, along: along, lastFixAt: start),
+          startedAt: start,
+          plannedArrival: onBoard.arrival,
+        ),
+      );
+      final paths = container.read(mapOverlaysProvider)[Routes.go]!.paths;
+      await closeApp(tester);
+      return paths;
+    }
+
+    // Underground since Châtelet, the user's dot still there: nothing faded ahead of it
+    final unseen = await ridePaths(0);
+    expect(unseen, hasLength(1));
+    expect(unseen.single.color.a, 1);
+
+    // Seen 300 m along the ride: faded up to there
+    final seen = await ridePaths(300);
+    expect(seen, hasLength(2));
+    expect(seen.first.color.a, lessThan(1));
+    expect(MeasuredPolyline(seen.first.points).length, closeTo(300, 1));
+    expect(seen.last.color.a, 1);
   });
 
   testWidgets("on board, the user is on the ride's rail where the clock puts them between two stops, not halfway", (tester) async {
