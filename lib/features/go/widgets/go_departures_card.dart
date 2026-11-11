@@ -15,6 +15,7 @@ import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/departure_time.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/size_reporter.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../l10n/l10n.dart';
 import '../../journey/journey_labels.dart';
 import '../../journey/journey_providers.dart';
@@ -57,11 +58,10 @@ class GoDeparturesCard extends ConsumerWidget {
     // them; its real time, else GO's for the next ride (the planned vehicle followed by the controller)
     final earliest = card.step == progress.step ? now : earliestBoarding(state.journey, step.sectionIndex, now).add(progress.shift);
     final key = rideKey(section, earliest, now);
-    final rides = key == null
-        ? const <Ride>[]
-        : (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
-              .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
-              .toList();
+    final options = key == null ? null : ref.watch(rideOptionsProvider(key));
+    final rides = currentRides(options)
+        .where((ride) => ride.departure.time.isAfter(now.subtract(const Duration(minutes: 1))))
+        .toList();
     final planned = tracker.plannedDeparture(step, progress);
     final selected = rides.isEmpty ? null : plannedRide(rides, planned, arrival: section.arrival.add(progress.shift));
     final vehicle = state.vehicleStep == card.step ? state.vehicle : selected?.departure;
@@ -153,7 +153,16 @@ class GoDeparturesCard extends ConsumerWidget {
               for (final (index, part) in head.indexed) ...[if (index > 0) const SizedBox(height: 12), part],
               if (!done) ...[
                 const SizedBox(height: 12),
-                _Departures(step: step, index: card.step, rides: rides, selected: selected, planned: planned, earliest: earliest, departures: key),
+                _Departures(
+                  step: step,
+                  index: card.step,
+                  rides: rides,
+                  loading: options?.isLoading ?? false,
+                  selected: selected,
+                  planned: planned,
+                  earliest: earliest,
+                  departures: key,
+                ),
               ],
               if (!done && positions.isNotEmpty && positions.length < 3) ...[
                 const SizedBox(height: 12),
@@ -358,6 +367,7 @@ class _Departures extends ConsumerWidget {
     required this.step,
     required this.index,
     required this.rides,
+    required this.loading,
     required this.selected,
     required this.planned,
     required this.earliest,
@@ -367,6 +377,9 @@ class _Departures extends ConsumerWidget {
   final GoStep step;
   final int index;
   final List<Ride> rides;
+
+  /// Being asked: [rides] are to come
+  final bool loading;
   final Ride? selected;
   final DateTime planned;
   final DateTime earliest;
@@ -378,7 +391,10 @@ class _Departures extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = ref.watch(nowProvider).value ?? DateTime.now();
     if (rides.isEmpty) {
-      return Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: Theme.of(context).textTheme.titleMedium);
+      // Their place kept while they are asked
+      return loading
+          ? const SkeletonCards(height: 62)
+          : Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: Theme.of(context).textTheme.titleMedium);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
