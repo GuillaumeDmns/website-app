@@ -57,7 +57,12 @@ final userAccuracyProvider = NotifierProvider<UserAccuracy, double?>(UserAccurac
 /// User position, null when unavailable (permission denied, no location service, desktop without GeoClue…); how sure
 /// it is in [userAccuracyProvider].
 final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
-  void report(LocationIssue? issue) => Future.microtask(() => ref.read(locationIssueProvider.notifier).set(issue));
+  // Not by a build the provider left while it waited for the device (rebuilt as the app came back on screen)
+  void report(LocationIssue? issue) => Future.microtask(() {
+        if (ref.mounted) {
+          ref.read(locationIssueProvider.notifier).set(issue);
+        }
+      });
   // With each position given
   void sure(double? accuracy) => Future.microtask(() {
         if (ref.mounted) {
