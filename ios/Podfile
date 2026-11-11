@@ -1,13 +1,16 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# The flavors (Android's dev and prod): schemes dev and prod, configurations <build>-<flavor>
 project 'Runner', {
-  'Debug' => :debug,
-  'Profile' => :release,
-  'Release' => :release,
+  'Debug-dev' => :debug,
+  'Debug-prod' => :debug,
+  'Profile-dev' => :release,
+  'Profile-prod' => :release,
+  'Release-dev' => :release,
+  'Release-prod' => :release,
 }
 
 def flutter_root
@@ -33,6 +36,13 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
+  end
+
+  # The widget extension (home screen widget, GO's Live Activity): home_widget's background worker for the widget's
+  # refresh button (NextDepartures/RefreshIntent.swift)
+  target 'NextDepartures' do
+    inherit! :search_paths
+    pod 'home_widget', :path => '.symlinks/plugins/home_widget/ios'
   end
 end
 

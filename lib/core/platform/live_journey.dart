@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'browser_stub.dart' if (dart.library.js_interop) 'browser_web.dart' as browser;
+import 'platforms.dart';
 
 /// Step of the journey in the progress bar of the notification
 class LiveJourneySegment {
@@ -41,8 +42,10 @@ class LiveJourneyUpdate {
 }
 
 /// System side of GO mode: ongoing notification with the progress and what to do now, and keeping the journey
-/// followed with the screen off. Android: foreground service + Live Update. Web: screen kept on with the Wake Lock
-/// API. Nothing elsewhere, where GO works while the app is open. No notification per alert: the app shows them.
+/// followed with the screen off. Android: foreground service + Live Update. iOS: a Live Activity (lock screen and
+/// Dynamic Island, `ios/NextDepartures/GoLiveActivity.swift`), the position kept in the background by the `location`
+/// background mode. macOS: a quiet notification replaced in place. Web: screen kept on with the Wake Lock API. Nothing
+/// elsewhere, where GO works while the app is open. No notification per alert: the app shows them.
 abstract class LiveJourney {
   /// Asks what is needed before starting (notification permission)
   Future<void> prepare();
@@ -54,14 +57,16 @@ abstract class LiveJourney {
   /// Keeps the screen on (or not) while GO mode is shown
   Future<void> keepScreenOn(bool on);
 
-  /// "Terminer" in the notification calls [stop] (Android: the notification and its service are already gone)
+  /// "Terminer" in the notification (or the Live Activity) calls [stop] (the notification, its service or the Live
+  /// Activity are already gone)
   void onStop(VoidCallback stop);
 
   /// "Terminer" was tapped while the app wasn't running: its session is over (asked once, at start-up)
   Future<bool> stopRequested();
 }
 
-class _AndroidLiveJourney implements LiveJourney {
+/// Android, iOS and macOS: the same channel, answered by `MainActivity.kt` and `AppBridge.swift`
+class _NativeLiveJourney implements LiveJourney {
   static const _channel = MethodChannel('com.guillaumedamiens.live_notification/bridge');
 
   Future<void> _call(String method, [Map<String, Object?>? arguments]) async {
@@ -159,7 +164,7 @@ class _WebLiveJourney implements LiveJourney {
 final liveJourneyProvider = Provider<LiveJourney>(
   (ref) => kIsWeb
       ? _WebLiveJourney()
-      : defaultTargetPlatform == TargetPlatform.android
-          ? _AndroidLiveJourney()
+      : hasNativeBridge
+          ? _NativeLiveJourney()
           : _NoLiveJourney(),
 );

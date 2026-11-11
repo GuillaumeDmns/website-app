@@ -54,4 +54,29 @@ void main() {
     expect(widgetRows(many).trimRight().split('\n'), hasLength(4));
     expect(widgetRows(StopDepartures(stop: chatelet, realtimeAvailable: true)), isEmpty);
   });
+
+  test('the widget gets the stop, its rows and when they were written', () {
+    final departures = StopDepartures(
+      stop: chatelet,
+      realtimeAvailable: true,
+      lines: [LineDepartures(line: metro1, destination: 'Nation', departures: [departure(at(3))])],
+    );
+
+    final data = widgetData(departures, now);
+
+    expect(data['stop_id'], chatelet.id);
+    expect(data['stop_name'], chatelet.name);
+    expect(data['departures_json'], widgetRows(departures));
+    expect(data['departures_list'], isNull);
+    expect(data['last_updated'], currentL10n.widgetUpdated(formatClock(now)));
+    // iOS and macOS move to the following departure from it
+    expect(DateTime.parse(data['updated_at']!), now);
+  });
+
+  test('without departures the widget says so', () {
+    final data = widgetData(StopDepartures(stop: chatelet, realtimeAvailable: true, lines: const []), now);
+
+    expect(data['departures_json'], isNull);
+    expect(data['departures_list'], currentL10n.widgetNoDeparture);
+  });
 }

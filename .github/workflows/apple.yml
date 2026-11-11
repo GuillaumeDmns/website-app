@@ -1,0 +1,71 @@
+name: Apple
+# iOS and macOS builds on every pull request and push to master, without signing (no Apple certificate on GitHub): the
+# Xcode projects, their flavors, the widget extension and the Swift side compile.
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+concurrency:
+  group: apple-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios:
+    name: iOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The version comes from the last tag (tool/version.sh)
+          fetch-depth: 0
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      - name: iOS (prod, unsigned)
+        run: tool/build.sh ios --flavor prod --no-codesign
+      - name: iOS (dev, simulator)
+        run: flutter build ios --flavor dev --debug --simulator
+      - name: The widget extension is in the app
+        run: test -d build/ios/iphoneos/Runner.app/PlugIns/NextDepartures.appex
+      # Flutter migrates the Xcode project when it needs to (Swift Package Manager, schemes): commit what it changes
+      - name: No project change made by Flutter
+        run: git status --short && git diff --exit-code -- ios
+
+  macos:
+    name: macOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      # flutter build macos always signs: the project is configured by Flutter, then built by xcodebuild unsigned
+      - name: macOS (prod, unsigned)
+        run: |
+          tool/build.sh macos --flavor prod --config-only
+          xcodebuild -workspace macos/Runner.xcworkspace -scheme prod -configuration Release-prod \
+            -destination 'generic/platform=macOS' -derivedDataPath build/macos-xcode CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || { grep -E "error:|failed" build.log | head -n 60; tail -n 40 build.log; exit 1; }
+          tail -n 5 build.log
+      - name: The widget extension is in the app
+        run: test -d build/macos-xcode/Build/Products/Release-prod/website_app.app/Contents/PlugIns/NextDepartures.appex
+      - name: No project change made by Flutter
+        run: git status --short && git diff --exit-code -- macos

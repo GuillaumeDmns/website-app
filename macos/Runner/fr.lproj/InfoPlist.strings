@@ -1,0 +1,3 @@
+/* Demandé avant la première position */
+"NSLocationWhenInUseUsageDescription" = "Votre position affiche les départs aux arrêts autour de vous et fait partir vos trajets d'où vous êtes. Elle n'est envoyée que pour trouver les arrêts proches et calculer les trajets.";
+"NSLocationUsageDescription" = "Votre position affiche les départs aux arrêts autour de vous et fait partir vos trajets d'où vous êtes. Elle n'est envoyée que pour trouver les arrêts proches et calculer les trajets.";

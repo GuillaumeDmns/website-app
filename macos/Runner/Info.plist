@@ -13,9 +13,34 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Guillaume</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Guillaume</string>
+	<string>$(APP_DISPLAY_NAME)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>fr</string>
+	</array>
+	<key>AppGroupId</key>
+	<string>$(APP_GROUP_ID)</string>
+	<!-- Google sign-in comes back through the reversed id of the flavor's iOS OAuth client (Configs/Flavor-*.xcconfig) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
+	<!-- The dev flavor's backend: http://localhost:8080 -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,7 +52,9 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSLocationUsageDescription</key>
-	<string>This app needs access to location.</string>
+	<string>Your location shows the departures at the stops around you and starts your journeys from where you are. It is only sent to find nearby stops and plan journeys.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location shows the departures at the stops around you and starts your journeys from where you are. It is only sent to find nearby stops and plan journeys.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
