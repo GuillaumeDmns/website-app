@@ -32,9 +32,13 @@
   <title>Guillaume</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- MapLibre GL JS, drawn by the package maplibre on the web (pinned version) -->
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+  <!-- MapLibre GL JS, drawn by the package maplibre on the web: a pinned version, and the very files of that version
+       (integrity: the browser refuses anything else the CDN would serve; it runs in the page, next to the session).
+       To update: openssl dgst -sha384 -binary maplibre-gl.js | openssl base64 -A, for both files -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css"
+        integrity="sha384-Nq6PQ+9vJPvw7U/VfDELyrWoGQMsy0gi6QShhaSrGzkpF5KkM40csg2leky+YMTd" crossorigin="anonymous">
+  <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"
+          integrity="sha384-GfxBM9x46BaAFxtCq39Fxir8fNZ4VDnwgfi6Kzi5/F1tAFsm0amuuV8kd+Pxzuf/" crossorigin="anonymous"></script>
   <script>
     // Fixes to the map of the package maplibre:
     // - it is created in a detached element at the window's size, then Flutter moves it into its platform view:

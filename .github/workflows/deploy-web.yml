@@ -21,10 +21,17 @@ jobs:
         run: |
           echo "Run this workflow on a tag (v1.2.3): the web app is published in the tag's release" >&2
           exit 1
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           # The version comes from the tag (tool/version.sh)
           fetch-depth: 0
+      - name: Releases come from master
+        # Its commits went through the pull request's checks; a tag pushed on any other commit deploys nothing
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "Tag $GITHUB_REF_NAME is not a commit of master" >&2
+            exit 1
+          fi
       - name: The tag is the version
         run: |
           read -r name code commit < <(tool/version.sh)
@@ -34,7 +41,7 @@ jobs:
           fi
           echo "Version $name (build $code, commit $commit)"
       - name: 🛠 Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: '3.47.6'
           channel: stable

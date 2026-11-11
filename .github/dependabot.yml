@@ -1,0 +1,19 @@
+# Dependency updates proposed as pull requests (checked by the build like any other): the libraries once a week,
+# grouped, and the GitHub actions, which the workflows pin to a commit (a tag can be moved to other code)
+version: 2
+updates:
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
