@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
@@ -45,7 +44,14 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
       localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
       // Rebuilt from scratch when the language changes: texts formatted outside widgets (currentL10n) follow
       builder: (context, child) {
-        final app = KeyedSubtree(key: ValueKey(locale), child: child!);
+        final app = KeyedSubtree(
+          key: ValueKey(locale),
+          // flutter_map, vector_map_tiles and maplibre still build their widgets (the attribution, …) from Flutter's own
+          // Material library, which only reads its own ThemeData and MaterialLocalizations: the bridge gives them
+          // the app's. To drop once they have moved to material_ui.
+          // ignore: deprecated_member_use
+          child: MaterialUiCompatibilityBridge(child: child!),
+        );
         // Never mistaken for the production app
         return AppConfig.isDev
             ? Banner(message: 'DEV', location: BannerLocation.topEnd, color: Colors.orange.shade800, child: app)

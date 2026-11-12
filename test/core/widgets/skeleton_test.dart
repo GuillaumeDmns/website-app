@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/location/location_providers.dart';
@@ -15,7 +15,7 @@ void main() {
         overrides: [if (clock.isNotEmpty) nowProvider.overrideWith((ref) => Stream.fromIterable(clock))],
         child: MaterialApp(
           locale: const Locale('fr'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: child),
         ),
@@ -35,7 +35,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [nowProvider.overrideWith((ref) => clock.stream)],
       child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: const [AppLocalizations.delegate, ...GlobalMaterialLocalizations.delegates],
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('fr'),
         home: const Scaffold(body: UpdatedAgo<int>(value: AsyncValue.data(1))),
