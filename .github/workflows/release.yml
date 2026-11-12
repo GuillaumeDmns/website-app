@@ -1,0 +1,220 @@
+name: Release
+# Tag a commit of master (git tag v1.2.3 && git push origin v1.2.3), or run it by hand on a tag: builds the production
+# apps and publishes them as assets of the tag's GitHub release, next to the web app's archive (deploy-web.yml):
+#   android-<tag>.apk        signed with the release key (secrets below); not published without them
+#   linux-x64-<tag>.tar.gz, windows-x64-<tag>.zip
+# Nothing for iOS and macOS: without the Apple Developer Program their builds can't be signed for others.
+# A pull request that changes this file runs it dry: the same builds, kept 7 days as artifacts of the run instead
+# (the only way to check the Windows packaging without that machine). README: "Installer une release".
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+permissions:
+  contents: write
+jobs:
+  check:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+      label: ${{ steps.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The version comes from the tag (tool/version.sh)
+          fetch-depth: 0
+      - name: Version, and the tag's release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r name code commit < <(tool/version.sh)
+          echo "Version $name (build $code, commit $commit)"
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            echo "Not a tag: dry run, the builds are kept as artifacts of this run"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "label=v$name-$commit" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Its commits went through the pull request's checks; a tag pushed on any other commit publishes nothing
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "Tag $GITHUB_REF_NAME is not a commit of master" >&2
+            exit 1
+          fi
+          if [ "v$name" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME: tag vX.Y.Z (minor and patch up to 99) the commit to release (version found: $name)" >&2
+            exit 1
+          fi
+          # deploy-web.yml creates it too, whichever comes first
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
+              --notes "Installation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release" ||
+            gh release view "$GITHUB_REF_NAME" >/dev/null
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "label=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FILE: android-${{ needs.check.outputs.label }}.apk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: 🛠 Set up Java 21 (Android build)
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      # Secrets: ANDROID_KEYSTORE_BASE64 (base64 -w0 of the keystore), ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+      # ANDROID_KEY_PASSWORD (README). Without them the APK gets this runner's debug key, another one at every run:
+      # it could never be updated by the next release, so it is not published.
+      - name: Release key
+        id: key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::warning::No release key (secret ANDROID_KEYSTORE_BASE64): the APK is signed with a debug key and not published in the release"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Android (prod)
+        run: |
+          tool/build.sh apk --flavor prod
+          cp build/app/outputs/flutter-apk/app-prod-release.apk "$FILE"
+          # The certificate that signed it (the one Google's Android OAuth client knows by its SHA-1)
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)/apksigner" verify --print-certs "$FILE" | grep -i "certificate"
+      - name: Publish in the release
+        if: needs.check.outputs.publish == 'true' && steps.key.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "$FILE" --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.check.outputs.publish != 'true'
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 7
+
+  linux:
+    name: Linux
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FILE: linux-x64-${{ needs.check.outputs.label }}.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libjsoncpp-dev
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      - name: Linux (prod)
+        run: tool/build.sh linux --flavor prod --dart-define=APP_ENV=prod
+      # One folder, website_app/, with the binary of the same name
+      - name: Package
+        run: |
+          test -x build/linux/x64/release/bundle/website_app
+          tar -C build/linux/x64/release -czf "$FILE" --transform 's,^bundle,website_app,' bundle
+          ls -lh "$FILE"
+      - name: Publish in the release
+        if: needs.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "$FILE" --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.check.outputs.publish != 'true'
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 7
+
+  windows:
+    name: Windows
+    needs: check
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      FILE: windows-x64-${{ needs.check.outputs.label }}.zip
+    steps:
+      # The runner's git would give tool/*.sh Windows line ends, which bash doesn't run
+      - name: Files as committed
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: 🛠 Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Dependencies and generated code
+        run: |
+          flutter pub get
+          dart run build_runner build -d
+      - name: Windows (prod)
+        run: tool/build.sh windows --dart-define=APP_ENV=prod
+      # With Visual C++'s runtime next to the app, for the PCs that don't have it (Flutter's advice)
+      - name: Package
+        run: |
+          out=build/windows/x64/runner/Release
+          test -f "$out/website_app.exe"
+          cp /c/Windows/System32/msvcp140.dll /c/Windows/System32/vcruntime140.dll /c/Windows/System32/vcruntime140_1.dll "$out/"
+          (cd "$out" && 7z a -tzip "$GITHUB_WORKSPACE/$FILE" . > /dev/null)
+          ls -lh "$FILE"
+      - name: Publish in the release
+        if: needs.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "$FILE" --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.check.outputs.publish != 'true'
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 7
