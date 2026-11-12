@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
+import '../../app/shell.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/widgets/line_badge.dart';
 import '../../l10n/l10n.dart';
@@ -14,7 +15,7 @@ import 'widgets/go_top_bar.dart';
 
 /// Floating bar over the map while a journey is followed: on the other pages, the current instruction (tap to open GO),
 /// the latest alert in it for a few seconds; on the GO page, Citymapper's controls ([GoTopBar]): what to do now and the
-/// alerts are in GO's cards there.
+/// alerts are in GO's cards there. On a wide screen GO's controls are in the side panel ([GoPanelHeader]), nothing here.
 class GoBar extends ConsumerWidget {
   const GoBar({super.key});
 
@@ -28,7 +29,7 @@ class GoBar extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     if (onGoPage) {
-      return GoTopBar(state: state);
+      return isWideLayout(context) ? const SizedBox.shrink() : GoTopBar(state: state);
     }
     // The GO state changes every 5 s at least: fresher than nowProvider
     final now = DateTime.now();

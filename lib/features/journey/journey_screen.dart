@@ -479,7 +479,7 @@ class _Results extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
+    final wide = isWideLayout(context);
     final theme = Theme.of(context);
     if (plan.journeys.isEmpty) {
       // Nothing at this time (the night, mostly): another time in one tap

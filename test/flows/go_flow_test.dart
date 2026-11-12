@@ -16,6 +16,7 @@ import 'package:website_app/features/go/go_tracker.dart';
 import 'package:website_app/features/go/widgets/go_departures_card.dart';
 import 'package:website_app/features/go/widgets/go_exit_card.dart';
 import 'package:website_app/features/go/widgets/go_ride_card.dart';
+import 'package:website_app/features/go/widgets/go_top_bar.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -60,8 +61,8 @@ void main() {
         position: position,
       );
 
-  Future<ProviderContainer> openGo(WidgetTester tester, GoState state, {FakeBackend? backend}) async {
-    await pumpApp(tester, backend ?? standardBackend(), overrides: [
+  Future<ProviderContainer> openGo(WidgetTester tester, GoState state, {FakeBackend? backend, Size size = const Size(412, 915)}) async {
+    await pumpApp(tester, backend ?? standardBackend(), size: size, overrides: [
       goControllerProvider.overrideWith(() => _FollowedJourney(state)),
       liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
     ]);
@@ -125,6 +126,49 @@ void main() {
     await swipe(tester, cards: 5);
     expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 5);
     expect(find.byTooltip(currentL10n.goStop), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("wide screen (web, desktop): the controls in the side panel's header, nothing over the map", (tester) async {
+    final container = await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving, along: 40), position: LatLng(chatelet.lat, chatelet.lon)),
+        size: const Size(1280, 800));
+
+    expect(find.byType(GoTopBar), findsNothing);
+    expect(find.byType(GoPanelHeader), findsOneWidget);
+    // In the panel, over the dots and the cards
+    final panel = tester.getRect(find.byType(GoScreen));
+    expect(panel.right, lessThan(500));
+    for (final tooltip in [currentL10n.back, currentL10n.goMute, currentL10n.goKeepScreenOn, currentL10n.goStop]) {
+      expect(find.byTooltip(tooltip), findsOneWidget, reason: tooltip);
+      expect(panel.contains(tester.getCenter(find.byTooltip(tooltip))), isTrue, reason: tooltip);
+    }
+    expect(tester.getRect(find.byType(GoPanelHeader)).bottom, lessThanOrEqualTo(tester.getRect(find.byType(PageView)).top));
+
+    // They do what they do over the map
+    await tapOn(tester, find.byTooltip(currentL10n.goMute));
+    expect(container.read(goControllerProvider)!.muted, isTrue);
+    expect(find.byTooltip(currentL10n.goUnmute), findsOneWidget);
+
+    // Back: the bar over the map says what to do now, and opens GO again
+    await tapOn(tester, find.byTooltip(currentL10n.back));
+    expect(find.byType(GoScreen), findsNothing);
+    await tapOn(tester, find.text(currentL10n.go).first);
+    expect(find.byType(GoPanelHeader), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets("wide screen, large text (×1.8): the panel's header holds", (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving, along: 40), position: LatLng(chatelet.lat, chatelet.lon)),
+        size: const Size(1280, 800));
+
+    // No overflow (reported as errors), every control there
+    expect(find.byType(GoPanelHeader), findsOneWidget);
+    expect(find.byTooltip(currentL10n.goStop), findsOneWidget);
+    expect(find.byTooltip(currentL10n.goKeepScreenOn), findsOneWidget);
 
     await closeApp(tester);
   });
