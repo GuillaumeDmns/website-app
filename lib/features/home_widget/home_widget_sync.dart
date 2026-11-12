@@ -129,9 +129,42 @@ String widgetRows(StopDepartures departures) {
   }).map((row) => '$row\n').join();
 }
 
-/// Refresh button of the widget (Android; iOS 17, through home_widget's `BackgroundIntent`), run in a background
-/// isolate (the app may be closed): renews the account's access token from the stored refresh token (or takes the
-/// device's guest token), then fetches the stop's departures
+/// The widget's fetches in the background, always with the device's guest token, signed in or not: the account's
+/// access token lives in the app's memory only, and renewing it here would rotate its refresh token at every widget
+/// refresh, racing the app's own renewal (a refresh token used twice revokes all of the account's sessions). The
+/// guest token is kept on the device for 30 days: no authentication call most of the time. Fetched again once when
+/// missing, expiring or rejected.
+@visibleForTesting
+Future<Dio> widgetBackgroundDio(Dio dio, TokenStore tokens) async {
+  final authApi = AuthApi(dio);
+  Future<void> renew() async => tokens.saveGuest(await authApi.guest());
+  if (!tokens.hasValidGuestToken) {
+    await renew();
+  }
+  dio.options.headers['Authorization'] = 'Bearer ${tokens.guestToken}';
+  dio.interceptors.add(InterceptorsWrapper(onError: (error, handler) async {
+    final request = error.requestOptions;
+    if (error.response?.statusCode != 401 || request.extra['guestRenewed'] == true || request.path.contains('/auth/')) {
+      return handler.next(error);
+    }
+    try {
+      await tokens.clearGuest();
+      await renew();
+      request
+        ..headers['Authorization'] = 'Bearer ${tokens.guestToken}'
+        ..extra['guestRenewed'] = true;
+      dio.options.headers['Authorization'] = 'Bearer ${tokens.guestToken}';
+      handler.resolve(await dio.fetch<dynamic>(request));
+    } catch (_) {
+      handler.next(error);
+    }
+  }));
+  return dio;
+}
+
+/// Refresh button of the widget (Android; iOS 17, through home_widget's `BackgroundIntent`) and its periodic refresh
+/// (Android), run in a background isolate (the app may be closed): fetches the departures with the device's guest
+/// token ([widgetBackgroundDio])
 @pragma('vm:entry-point')
 Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   if (uri?.host != 'refreshdepartures') {
@@ -149,15 +182,11 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   final tokens = TokenStore();
   await tokens.load();
   try {
-    final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl, connectTimeout: const Duration(seconds: 10)));
-    dio.options.headers.addAll(AppConfig.clientHeaders);
-    final authApi = AuthApi(dio);
-    if (tokens.signedIn) {
-      await tokens.save(await authApi.refresh(tokens.refreshToken!));
-    } else if (!tokens.hasValidAccessToken) {
-      await tokens.saveGuest(await authApi.guest());
-    }
-    dio.options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
+    final dio = await widgetBackgroundDio(
+      Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl, connectTimeout: const Duration(seconds: 10)))
+        ..options.headers.addAll(AppConfig.clientHeaders),
+      tokens,
+    );
     if (android) {
       await refreshAndroidWidgets(MobilityApi(dio));
     } else {
