@@ -6,6 +6,8 @@ bool get hasNativeBridge => !kIsWeb && (isAndroid || isApple);
 
 bool get isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+bool get isLinux => !kIsWeb && defaultTargetPlatform == TargetPlatform.linux;
+
 /// The desktops without a Google SDK: Google sign-in goes through the system browser there
 bool get isLinuxOrWindows =>
     !kIsWeb && (defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.windows);
