@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_widget_description">Prochains départs de transport en commun en temps réel</string>
-    <string name="widget_stop_placeholder">Station</string>
+    <string name="widget_label">Prochains départs</string>
+    <string name="app_widget_description">Prochains départs en temps réel de l\'arrêt de votre choix</string>
     <string name="widget_refresh">Actualiser</string>
-    <string name="widget_loading">Chargement…</string>
-    <string name="widget_last_updated_placeholder">Mis à jour : --:--</string>
-    <string name="widget_no_stop">Aucune station</string>
-    <string name="widget_tap_to_load">Ouvrez l\'app pour choisir un arrêt</string>
-    <string name="widget_no_departure">Aucun départ</string>
+    <string name="widget_choose_stop">Choisir un arrêt</string>
+    <string name="widget_no_departure">Aucun départ prochainement</string>
+    <string name="widget_soon">&lt; 1 min</string>
+    <string name="widget_minutes">%1$d min</string>
+    <string name="widget_then">puis %1$s</string>
+    <string name="widget_departures_of">Prochains départs à %1$s</string>
     <string name="journey_channel">Trajet en cours</string>
     <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
+    <string name="journey_preparing">Préparation du trajet…</string>
     <string name="journey_finish">Terminer</string>
+    <string name="journey_alerts_channel">Alertes de trajet</string>
+    <string name="journey_alerts_channel_description">Descendre, changement de voie, véhicule raté : avec son et vibration quand l\'app n\'est pas à l\'écran</string>
 </resources>

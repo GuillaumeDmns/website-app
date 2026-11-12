@@ -10,9 +10,10 @@ import 'go_instruction.dart';
 import 'go_state.dart';
 import 'go_tracker.dart';
 
-/// What the system notification (Android) shows of [state], like a live activity: the same moment as GO's banner
-/// ([goGlance]: what to do, where, its figure as the chip), the platform, the progress along the steps and the
-/// arrival. Not for an arrived journey: the notification is gone then.
+/// What the system notification (Android) shows of [state], like a live activity (design 3A): the same moment as GO's
+/// banner ([goGlance]: what to do as its title, its figure then where under it, the figure also as the chip), the
+/// platform, the line of the ride as a badge, the progress along the steps and the arrival. Not for an arrived
+/// journey: the notification is gone then.
 LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
   final glance = goGlance(state, now);
   final tracker = state.tracker;
@@ -30,6 +31,7 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
   // The platform as soon as it is known: the subtitle while waiting, the next ride's otherwise
   final platform = goPlatformText(state);
   final status = [
+    chip,
     if (glance.place case final place? when place.isNotEmpty) place,
     if (platform != null && !(glance.place ?? '').contains(platform) && !glance.kicker.toLowerCase().contains(platform)) platform,
   ].join(' · ');
@@ -41,6 +43,15 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
     mode: _liveMode(step?.section),
     chip: chip,
     info: currentL10n.goArrival(formatClock(tracker.eta(progress, state.currentVehicle))),
+    line: switch (step?.section.line) {
+      final line? when step!.isRide && (line.name ?? '').isNotEmpty => LiveJourneyLine(
+          name: line.name!,
+          color: '#${line.color ?? '666666'}',
+          textColor: '#${line.textColor ?? 'FFFFFF'}',
+          mode: line.mode.name,
+        ),
+      _ => null,
+    },
     segments: [
       for (final goStep in tracker.steps)
         LiveJourneySegment(
@@ -62,6 +73,14 @@ String _liveMode(JourneySection? section) => switch (section?.kind) {
       SectionKind.transfer => 'transfer',
       _ => 'walk',
     };
+
+/// Whether [alert] also rings in a notification while the app isn't on screen (design 3B): only what must be done
+/// now, so that it stays rare: get off, a platform changed, a vehicle missed or cancelled
+bool goAlertRings(GoAlert alert) =>
+    alert.kind == 'alight' ||
+    (alert.kind == 'platform' && alert.urgent) ||
+    alert.id.startsWith('missed-') ||
+    alert.id.startsWith('cancel-');
 
 /// An alert felt in the app: each kind its own pattern
 void feelGoAlert(GoAlert alert) {

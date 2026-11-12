@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
@@ -39,6 +40,7 @@ class MainActivity: FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         LiveJourneyNotification.createChannels(this)
+        WidgetBridge.register(flutterEngine, this, receivesLaunches = true)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, DeviceHeading.CHANNEL).setStreamHandler(DeviceHeading(this))
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
@@ -55,6 +57,7 @@ class MainActivity: FlutterFragmentActivity() {
                         chipText = call.argument<String>("chipText") ?: "",
                         longInfo = call.argument<String>("longInfo") ?: "",
                         segments = call.argument<List<Map<String, Any>>>("segments") ?: emptyList(),
+                        line = call.argument<Map<String, String>>("line"),
                     )
                     val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -67,6 +70,10 @@ class MainActivity: FlutterFragmentActivity() {
                         getSystemService(NotificationManager::class.java)
                             .notify(LiveJourneyNotification.NOTIFICATION_ID, notification)
                     }
+                    result.success(null)
+                }
+                "alertJourney" -> {
+                    LiveJourneyNotification.showAlert(this, call.argument<String>("title") ?: "", call.argument<String>("body"))
                     result.success(null)
                 }
                 "stopNotification" -> {
@@ -110,8 +117,22 @@ class MainActivity: FlutterFragmentActivity() {
         }
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Opened from a home screen widget: its stop
+        WidgetBridge.launched(intent)
+    }
+
+    /** A widget tapped while the app's task is there (singleTop): its stop, once the Dart side takes it */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        WidgetBridge.launched(intent)
+    }
+
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         bridge = null
+        WidgetBridge.unregister()
         super.cleanUpFlutterEngine(flutterEngine)
     }
 

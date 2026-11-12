@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -6,14 +8,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../../core/api/auth_api.dart';
+import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/api/mobility_api.dart';
+import '../../app/routes.dart';
 import '../../core/auth/token_store.dart';
 import '../../core/config.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../stops/stop_screen.dart';
+import 'android_widgets.dart';
 
 /// Where the home screen widget lives: Android's `NextDepartures.kt`, the WidgetKit extension of iOS and macOS
 /// (`ios/NextDepartures/`, also built for macOS). Android and iOS get their data through home_widget (iOS: the App
@@ -30,8 +35,9 @@ WidgetHost? get widgetHost => kIsWeb
         _ => null,
       };
 
-/// Home screen widget: the next departures of the first favorite stop, else of the closest one. The app writes them
-/// when it shows them; the widget's refresh button (Android, iOS 17) fetches them in the background
+/// Home screen widget. Android: each widget shows the stop its user chose for it (`android_widgets.dart`,
+/// `WidgetSetupScreen`). iOS and macOS: the next departures of the first favorite stop, else of the closest one, written
+/// by the app when it shows them. The widget's refresh button (Android, iOS 17) fetches them in the background
 /// ([homeWidgetBackgroundCallback]).
 bool get homeWidgetSupported => widgetHost != null;
 
@@ -134,8 +140,9 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
   // Another isolate: the app's language and App Group are given again
   await loadLocale();
   await _useAppGroup();
-  final stopId = await HomeWidget.getWidgetData<String>('stop_id');
-  if (stopId == null) {
+  final android = widgetHost == WidgetHost.android;
+  final stopId = android ? null : await HomeWidget.getWidgetData<String>('stop_id');
+  if (!android && stopId == null) {
     await _write({'departures_list': currentL10n.widgetOpenApp});
     return;
   }
@@ -151,16 +158,26 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
       await tokens.saveGuest(await authApi.guest());
     }
     dio.options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
-    await pushDeparturesToWidget(await MobilityApi(dio).stopDepartures(stopId, limit: 3));
+    if (android) {
+      await refreshAndroidWidgets(MobilityApi(dio));
+    } else {
+      await pushDeparturesToWidget(await MobilityApi(dio).stopDepartures(stopId!, limit: 3));
+    }
   } catch (e) {
     debugPrint('Home widget refresh failed: $e');
-    await _write({'last_updated': currentL10n.widgetUpdateFailed(formatClock(DateTime.now()))});
+    if (android) {
+      // No token, no network: the widgets say so, with the departures they had
+      await failAndroidWidgets();
+    } else {
+      await _write({'last_updated': currentL10n.widgetUpdateFailed(formatClock(DateTime.now()))});
+    }
   }
 }
 
-/// Another account: the widget forgets the stop
+/// Another account: the widget forgets the stop (iOS, macOS: it came from the account's favorites; an Android widget
+/// keeps the stop chosen for it, which says nothing of the account)
 Future<void> clearHomeWidget() async {
-  if (!homeWidgetSupported) {
+  if (!homeWidgetSupported || widgetHost == WidgetHost.android) {
     return;
   }
   try {
@@ -172,6 +189,60 @@ Future<void> clearHomeWidget() async {
     debugPrint('Home widget reset failed: $e');
   }
 }
+
+/// The widget's side of `MainActivity` (`WidgetBridge.kt`): what a tap on a widget opens, kept there until taken
+const _widgetChannel = MethodChannel('com.guillaumedamiens.app/widget');
+
+/// The location a widget's tap asked for and that nobody took yet, else null
+Future<String?> _takeWidgetLaunch() async =>
+    widgetLaunchLocation(Uri.tryParse(await _widgetChannel.invokeMethod<String>('takeLaunch') ?? ''));
+
+/// What a home screen widget opened the app for (Android): its setup when the system places it, its stop or its
+/// setup when tapped; null otherwise
+Future<String?> initialWidgetLocation() async {
+  if (widgetHost != WidgetHost.android) {
+    return null;
+  }
+  try {
+    if (int.tryParse(await HomeWidget.initiallyLaunchedFromHomeWidgetConfigure() ?? '') case final id?) {
+      return Routes.widgetSetup(id, configure: true);
+    }
+    return await _takeWidgetLaunch();
+  } catch (e) {
+    debugPrint('Home widget launch failed: $e');
+    return null;
+  }
+}
+
+/// A widget tapped while the app runs (Android): the location to open, taken from `MainActivity` when it says so,
+/// and once at first in case the tap came before. A provider, so that the tests, without the native side, replace it.
+final widgetClicksProvider = Provider<Stream<String>>((ref) {
+  if (widgetHost != WidgetHost.android) {
+    return const Stream.empty();
+  }
+  final clicks = StreamController<String>();
+  Future<void> take() async {
+    try {
+      if (await _takeWidgetLaunch() case final location?) {
+        clicks.add(location);
+      }
+    } catch (e) {
+      debugPrint('Home widget launch failed: $e');
+    }
+  }
+
+  _widgetChannel.setMethodCallHandler((call) async {
+    if (call.method == 'launched') {
+      await take();
+    }
+  });
+  take();
+  ref.onDispose(() {
+    _widgetChannel.setMethodCallHandler(null);
+    clicks.close();
+  });
+  return clicks.stream;
+});
 
 /// Registers the widget's refresh button (Android; iOS 17, where home_widget keeps the callback in the App Group)
 Future<void> initHomeWidget() async {
@@ -185,7 +256,8 @@ Future<void> initHomeWidget() async {
   }
 }
 
-/// Invisible: keeps the widget on the departures the home page shows (first favorite stop, else [closest])
+/// Invisible: keeps the widget on the departures the home page shows (first favorite stop, else [closest]); on Android,
+/// fetches again the departures of the stops chosen for its widgets
 class HomeWidgetSync extends ConsumerWidget {
   const HomeWidgetSync({super.key, required this.closest});
 
@@ -197,6 +269,15 @@ class HomeWidgetSync extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!homeWidgetSupported) {
+      return const SizedBox.shrink();
+    }
+    if (widgetHost == WidgetHost.android) {
+      final now = DateTime.now();
+      if (_lastPush == null || now.difference(_lastPush!) > const Duration(minutes: 1)) {
+        _lastPush = now;
+        final api = ref.read(mobilityApiProvider);
+        Future.microtask(() => refreshAndroidWidgets(api));
+      }
       return const SizedBox.shrink();
     }
     final favorite = (ref.watch(favoritesProvider).value ?? const <Favorite>[])

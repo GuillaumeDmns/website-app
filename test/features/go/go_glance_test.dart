@@ -98,7 +98,24 @@ void main() {
     final update = goLiveUpdate(state(waiting, platform: '2'), at(2));
     expect(update.title, glance.action);
     expect(update.chip, glance.heroText);
-    expect(update.status, glance.place);
+    // The figure, then where (design 3A)
+    expect(update.status, '${glance.heroText} · ${glance.place}');
+    // Waiting for the RER: its badge
+    expect(update.line?.name, 'A');
+  });
+
+  test('only what must be done at once rings in a notification of its own', () {
+    GoAlert alert(String id, {bool urgent = false}) => GoAlert(id: id, title: id, urgent: urgent);
+    expect(goAlertRings(alert('alight-2', urgent: true)), isTrue);
+    expect(goAlertRings(alert('missed-1')), isTrue);
+    expect(goAlertRings(alert('cancel-1', urgent: true)), isTrue);
+    // A platform changed, not a platform announced
+    expect(goAlertRings(alert('platform-1-5', urgent: true)), isTrue);
+    expect(goAlertRings(alert('platform-1-5')), isFalse);
+    // The rest stays in the app
+    for (final quiet in ['prepare-2', 'soon-1', 'delay-1', 'hurry-0', 'offroute-0', 'arrived']) {
+      expect(goAlertRings(alert(quiet)), isFalse, reason: quiet);
+    }
   });
 
   test('walking too slowly: hurry is the instruction, with how far and the train', () {

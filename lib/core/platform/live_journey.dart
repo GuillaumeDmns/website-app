@@ -15,6 +15,20 @@ class LiveJourneySegment {
   final String color;
 }
 
+/// The line of the step in progress, as a badge in the notification
+class LiveJourneyLine {
+  const LiveJourneyLine({required this.name, required this.color, required this.textColor, required this.mode});
+
+  final String name;
+
+  /// `#RRGGBB`
+  final String color;
+  final String textColor;
+
+  /// `metro`, `rer`, `bus`… (`TransportMode.name`): the badge's shape
+  final String mode;
+}
+
 class LiveJourneyUpdate {
   const LiveJourneyUpdate({
     required this.title,
@@ -24,6 +38,7 @@ class LiveJourneyUpdate {
     required this.chip,
     required this.info,
     required this.segments,
+    this.line,
   });
 
   final String title;
@@ -39,6 +54,9 @@ class LiveJourneyUpdate {
   final String chip;
   final String info;
   final List<LiveJourneySegment> segments;
+
+  /// Waiting for a ride or on board: its line
+  final LiveJourneyLine? line;
 }
 
 /// System side of GO mode: ongoing notification with the progress and what to do now, and keeping the journey
@@ -51,6 +69,10 @@ abstract class LiveJourney {
   Future<void> prepare();
 
   Future<void> update(LiveJourneyUpdate update);
+
+  /// What must be done now while the app isn't on screen (get off, a platform changed, a vehicle missed): a
+  /// notification that rings and vibrates (Android), over the ongoing one, gone after a while
+  Future<void> alert(String title, String? body);
 
   Future<void> stop();
 
@@ -91,7 +113,12 @@ class _NativeLiveJourney implements LiveJourney {
         'segments': [
           for (final segment in update.segments) {'length': segment.seconds, 'color': segment.color},
         ],
+        if (update.line case final line?)
+          'line': {'name': line.name, 'color': line.color, 'textColor': line.textColor, 'mode': line.mode},
       });
+
+  @override
+  Future<void> alert(String title, String? body) => _call('alertJourney', {'title': title, 'body': body});
 
   @override
   Future<void> stop() async {
@@ -122,6 +149,9 @@ class _NativeLiveJourney implements LiveJourney {
 
 class _NoLiveJourney implements LiveJourney {
   @override
+  Future<void> alert(String title, String? body) async {}
+
+  @override
   Future<void> prepare() async {}
 
   @override
@@ -142,6 +172,9 @@ class _NoLiveJourney implements LiveJourney {
 
 /// Browser: the screen kept on only
 class _WebLiveJourney implements LiveJourney {
+  @override
+  Future<void> alert(String title, String? body) async {}
+
   @override
   Future<void> prepare() async {}
 

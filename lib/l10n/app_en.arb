@@ -488,5 +488,17 @@
   "goTimeLeftAndArrival": "{minutes} min, arriving at {time}",
   "rideAlerts": "Ride alerts",
   "rideAlertsOf": "Ride alerts: {summary}",
-  "atStop": "At {stop}"
+  "atStop": "At {stop}",
+  "widgetFailedAt": "Failed at {time}",
+  "widgetSetupTitle": "Which stop to show?",
+  "widgetSetupHint": "Search for a stop",
+  "widgetSetupFavorites": "Favorite stops",
+  "widgetSetupEmpty": "Search for the stop whose next departures the widget will show.",
+  "widgetSetupLines": "Lines to show",
+  "widgetSetupAll": "All",
+  "widgetSetupChange": "Change stop",
+  "widgetSetupConfirm": "Show on the widget",
+  "widgetSetupNoLine": "No upcoming departure at this stop: the widget will show all its lines.",
+  "widgetTimeLeftTitle": "Show the time left",
+  "widgetTimeLeftBody": "\"4 min\" rather than the clock time for departures within the hour: let the app update the widget every minute (Alarms and reminders)."
 }

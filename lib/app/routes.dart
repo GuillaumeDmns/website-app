@@ -55,6 +55,10 @@ abstract final class Routes {
         },
       ).toString();
 
+  /// Choosing what Android's home screen widget [widgetId] shows; [configure]: Android's setup of a widget being placed
+  static String widgetSetup(int widgetId, {bool configure = false}) =>
+      Uri(path: '/widget/$widgetId', queryParameters: configure ? {'configure': '1'} : null).toString();
+
   static String line(String lineId) => '/lines/${Uri.encodeComponent(lineId)}';
 
   static String around(double lat, double lon, String name) =>

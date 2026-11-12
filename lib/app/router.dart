@@ -12,6 +12,7 @@ import '../features/auth/login_screen.dart';
 import '../features/go/go_screen.dart';
 import '../features/home/around_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/home_widget/widget_setup_screen.dart';
 import '../features/journey/journey_detail_screen.dart';
 import '../features/journey/journey_request.dart';
 import '../features/journey/journey_screen.dart';
@@ -26,6 +27,9 @@ import '../l10n/l10n.dart';
 import 'routes.dart';
 import 'shell.dart';
 
+/// Where the app opens: the home page, or what a home screen widget asked for (`main.dart`)
+final initialLocationProvider = Provider<String>((ref) => Routes.home);
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Re-evaluates the redirect when the session changes, without rebuilding the router
   final authListenable = ValueNotifier<AuthStatus>(ref.read(authControllerProvider));
@@ -33,7 +37,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(authListenable.dispose);
 
   final router = GoRouter(
-    initialLocation: Routes.home,
+    initialLocation: ref.read(initialLocationProvider),
     refreshListenable: authListenable,
     redirect: (context, state) {
       final status = authListenable.value;
@@ -52,8 +56,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         AuthStatus.unknown => location == Routes.splash ? null : withFrom(Routes.splash),
         // Welcome pages once per device (a restored session may skip the splash page, so from any page). The search
         // and the sign-in pages stay reachable: the welcome pages use them; the legal notice too, for whoever opens its link.
+        // Nor the widget's setup, which Android opens when it is placed.
         _ when !ref.read(onboardingDoneProvider) && location != Routes.welcome && location != Routes.search && !onAuthPage &&
-            location != Routes.privacy =>
+            location != Routes.privacy && !location.startsWith('/widget/') =>
           Uri(path: Routes.welcome, queryParameters: {'from': waiting ? (from ?? Routes.home) : state.uri.toString()}).toString(),
         _ when location == Routes.splash => from ?? Routes.home,
         // Signed in: back to the page that asked for it
@@ -65,6 +70,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       _route(path: Routes.splash, builder: (context, state) => const _SplashScreen()),
       _route(path: Routes.login, builder: (context, state) => const LoginScreen()),
       _route(path: Routes.welcome, builder: (context, state) => WelcomeScreen(from: state.uri.queryParameters['from'])),
+      _route(
+        path: '/widget/:widgetId',
+        builder: (context, state) => WidgetSetupScreen(
+          widgetId: int.tryParse(state.pathParameters['widgetId']!) ?? 0,
+          configure: state.uri.queryParameters['configure'] == '1',
+        ),
+      ),
       ShellRoute(
         pageBuilder: (context, state, child) => _instant(state, AppShell(child: child)),
         routes: [
