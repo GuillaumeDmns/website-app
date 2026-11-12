@@ -1312,5 +1312,18 @@
   "rideAlertsOf": "Alertes du trajet : {summary}",
   "@rideAlertsOf": {"placeholders": {"summary": {"type": "String"}}},
   "atStop": "À {stop}",
-  "@atStop": {"placeholders": {"stop": {"type": "String"}}}
+  "@atStop": {"placeholders": {"stop": {"type": "String"}}},
+  "widgetFailedAt": "Échec à {time}",
+  "@widgetFailedAt": {"placeholders": {"time": {"type": "String"}}},
+  "widgetSetupTitle": "Quel arrêt afficher ?",
+  "widgetSetupHint": "Rechercher un arrêt",
+  "widgetSetupFavorites": "Arrêts favoris",
+  "widgetSetupEmpty": "Cherchez l'arrêt dont le widget affichera les prochains départs.",
+  "widgetSetupLines": "Lignes à afficher",
+  "widgetSetupAll": "Toutes",
+  "widgetSetupChange": "Changer d'arrêt",
+  "widgetSetupConfirm": "Afficher sur le widget",
+  "widgetSetupNoLine": "Aucun départ prochainement à cet arrêt : le widget affichera toutes ses lignes.",
+  "widgetTimeLeftTitle": "Afficher le temps restant",
+  "widgetTimeLeftBody": "« 4 min » plutôt que l'heure pour les départs dans l'heure : autorisez l'app à mettre le widget à jour chaque minute (Alarmes et rappels)."
 }

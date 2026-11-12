@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="appwidget_text">EXAMPLE</string>
-    <string name="add_widget">Add widget</string>
-    <string name="app_widget_description">Real-time next public transport departures</string>
-    <string name="widget_stop_placeholder">Stop</string>
+    <!-- Home screen widget -->
+    <string name="widget_label">Next departures</string>
+    <string name="app_widget_description">Real-time next departures of the stop of your choice</string>
     <string name="widget_refresh">Refresh</string>
-    <string name="widget_loading">Loading…</string>
-    <string name="widget_last_updated_placeholder">Updated --:--</string>
-    <string name="widget_no_stop">No stop</string>
-    <string name="widget_tap_to_load">Open the app to choose a stop</string>
-    <string name="widget_no_departure">No departure</string>
+    <string name="widget_choose_stop">Choose a stop</string>
+    <string name="widget_no_departure">No upcoming departure</string>
+    <!-- A departure within the minute, when the widget shows the time left -->
+    <string name="widget_soon">&lt; 1 min</string>
+    <string name="widget_minutes">%1$d min</string>
+    <!-- The following departure, small widget -->
+    <string name="widget_then">then %1$s</string>
+    <string name="widget_departures_of">Next departures at %1$s</string>
+    <!-- GO -->
     <string name="journey_channel">Journey in progress</string>
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>
+    <string name="journey_preparing">Preparing the journey…</string>
     <string name="journey_finish">Finish</string>
+    <string name="journey_alerts_channel">Journey alerts</string>
+    <string name="journey_alerts_channel_description">Getting off, platform change, vehicle missed: with sound and vibration while the app isn\'t on screen</string>
 </resources>

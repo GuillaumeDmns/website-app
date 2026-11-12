@@ -609,12 +609,16 @@ class GoController extends Notifier<GoState?> {
       _recalculateTimer = null;
       next = next.copyWith(recalculateAt: () => null);
     }
-    // In the app only: no notification of its own (the ongoing one says what to do now)
+    // Felt in the app; the ongoing notification says what to do now, and only what must be done at once rings in a
+    // notification of its own while the app isn't on screen
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
       next = next.copyWith(alert: alert, alertAt: DateTime.now());
       if (goAlertFelt(current, alert)) {
         feelGoAlert(alert);
+        if (!_shown && goAlertRings(alert)) {
+          ref.read(liveJourneyProvider).alert(alert.title, alert.body);
+        }
       }
     }
     state = next;

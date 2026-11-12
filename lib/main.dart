@@ -6,6 +6,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app/app.dart';
+import 'app/router.dart';
 import 'features/home_widget/home_widget_sync.dart';
 import 'features/onboarding/onboarding.dart';
 import 'l10n/l10n.dart';
@@ -23,17 +24,20 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks(['Inter'], await rootBundle.loadString('assets/google_fonts/OFL.txt'));
   });
   GoogleFonts.inter();
-  final (_, onboardingDone, locale, _) = await (
+  final (_, onboardingDone, locale, _, widgetLocation) = await (
     GoogleFonts.pendingFonts().timeout(const Duration(seconds: 3), onTimeout: () => const []),
     loadOnboardingDone(),
     loadLocale(),
     initHomeWidget(),
+    initialWidgetLocation(),
   ).wait;
 
   runApp(ProviderScope(
     overrides: [
       onboardingDoneProvider.overrideWith(() => OnboardingController(onboardingDone)),
       localeProvider.overrideWith(() => LocaleController(locale)),
+      // Opened by a home screen widget: its stop, or the choice of its stop
+      if (widgetLocation != null) initialLocationProvider.overrideWithValue(widgetLocation),
     ],
     child: const MobilityApp(),
   ));

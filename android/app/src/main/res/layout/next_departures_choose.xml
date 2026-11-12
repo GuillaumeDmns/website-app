@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A widget without stop (placed before this version, or its stop forgotten): one thing to do, tapping it opens the
+     choice of its stop -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/next_departures_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <ImageView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_add_location"
+        android:tint="@color/widget_brand" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="@string/widget_choose_stop"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+</LinearLayout>

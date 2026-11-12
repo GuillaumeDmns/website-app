@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:website_app/features/home_widget/home_widget_sync.dart';
 import 'package:website_app/app/app.dart';
 import 'package:website_app/core/api/api_providers.dart';
 import 'package:website_app/core/location/device_heading.dart';
@@ -67,6 +68,8 @@ Future<MemoryStore> pumpApp(
       googleAccountChooserProvider.overrideWithValue(googleAccountChooser),
       // Never the real one, which opens the browser of the machine (the integration tests run on Linux)
       googleBrowserSignInProvider.overrideWithValue(googleBrowserSignIn),
+      // No home_widget native side
+      widgetClicksProvider.overrideWithValue(const Stream.empty()),
       ...overrides,
     ],
     child: const MobilityApp(),

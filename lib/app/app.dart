@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
 import '../core/location/location_providers.dart';
+import '../features/home_widget/home_widget_sync.dart';
 import '../l10n/l10n.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -15,15 +18,26 @@ class MobilityApp extends ConsumerStatefulWidget {
 }
 
 class _MobilityAppState extends ConsumerState<MobilityApp> {
-  // Back from the system settings (location turned on, permission granted): look for the position again
+  // Back from the system settings (location turned on, permission granted): look for the position again, where a page
+  // uses it (not the widget's setup, which never asks for it)
   late final _lifecycle = AppLifecycleListener(onResume: () {
-    if (ref.read(userLocationProvider).value == null) {
+    if (ref.read(userLocationProvider.exists) && ref.read(userLocationProvider).value == null) {
       ref.invalidate(userLocationProvider);
     }
   });
 
+  /// A home screen widget tapped while the app runs: its stop, or its setup
+  StreamSubscription<String>? _widgetClicks;
+
+  @override
+  void initState() {
+    super.initState();
+    _widgetClicks = ref.read(widgetClicksProvider).listen((location) => ref.read(routerProvider).push(location));
+  }
+
   @override
   void dispose() {
+    _widgetClicks?.cancel();
     _lifecycle.dispose();
     super.dispose();
   }

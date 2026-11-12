@@ -32,6 +32,13 @@ class TokenStore {
 
   String? get refreshToken => _refreshToken;
 
+  /// The device's guest token, signed in or not (the home screen widget's background fetches, which never touch the
+  /// account's session)
+  String? get guestToken => _guestToken;
+
+  bool get hasValidGuestToken =>
+      _guestToken != null && _guestExpiry != null && DateTime.now().isBefore(_guestExpiry!.subtract(_expiryMargin));
+
   bool get hasValidAccessToken {
     final (token, expiry) = signedIn ? (_accessToken, _accessExpiry) : (_guestToken, _guestExpiry);
     return token != null && expiry != null && DateTime.now().isBefore(expiry.subtract(_expiryMargin));

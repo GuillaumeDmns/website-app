@@ -471,6 +471,9 @@ void main() {
 /// No notification nor screen kept on in the tests
 class _NoLiveJourney implements LiveJourney {
   @override
+  Future<void> alert(String title, String? body) async {}
+
+  @override
   Future<void> prepare() async {}
 
   @override
