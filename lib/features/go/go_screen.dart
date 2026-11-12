@@ -205,14 +205,17 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       if (card.kind == GoCardKind.exit) {
         final all = of(steps[card.step - 1].section.to?.stopAreaId);
         exitsAll[card.step] = all;
-        if (bestExit(steps[card.step].line, all) case final best?) {
+        final walk = steps[card.step];
+        if ((takenExit(walk.line, walk.section.accesses, all) ?? bestExit(walk.line, all)) case final best?) {
           exits[card.step] = best;
         }
       } else if (card.kind == GoCardKind.walk && card.step + 1 < steps.length && steps[card.step + 1].isRide) {
         final ride = steps[card.step + 1].section;
         final mode = ride.line?.mode;
         if (mode == TransportMode.metro || (mode?.isRail ?? false)) {
-          if (bestEntrance(steps[card.step].line, of(ride.from?.stopAreaId)) case final best?) {
+          final walk = steps[card.step];
+          final all = of(ride.from?.stopAreaId);
+          if ((takenEntrance(walk.line, walk.section.accesses, all) ?? bestEntrance(walk.line, all)) case final best?) {
             entrances[card.step] = best;
           }
         }

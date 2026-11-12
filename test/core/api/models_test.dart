@@ -77,6 +77,15 @@ void main() {
                 [2.4, 48.9],
               ],
             },
+            {
+              'kind': 'WALK',
+              'departure': '2026-10-10T08:30:00Z',
+              'arrival': '2026-10-10T08:31:00Z',
+              'duration': 60,
+              'accesses': [
+                {'id': 'IDFM:StopPlaceEntrance:50147905', 'code': '3', 'name': 'r. Auber', 'lat': 48.873542, 'lon': 2.327803},
+              ],
+            },
             {'kind': 'TELEPORT', 'departure': '2026-10-10T08:30:00Z', 'arrival': '2026-10-10T08:30:00Z', 'duration': 0},
           ],
         },
@@ -89,6 +98,10 @@ void main() {
     expect(journey.rides.single.line!.name, '999');
     expect(journey.rides.single.line!.id, isEmpty);
     expect(journey.sections.last.kind, SectionKind.other);
+    // The station entrance the walk takes, as Navitia says; none on the other sections
+    expect(journey.sections[1].accesses.single.code, '3');
+    expect(journey.sections[1].accesses.single.id, 'IDFM:StopPlaceEntrance:50147905');
+    expect(journey.sections.first.accesses, isEmpty);
     expect(journey.fare, 215);
     expect(plan.earlier!.arriveBy, isTrue);
     expect(plan.later, isNull);

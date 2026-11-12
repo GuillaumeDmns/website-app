@@ -95,8 +95,32 @@ int goCurrentCard(List<GoCard> cards, GoProgress progress, {double? exitAlong}) 
 /// A way in or out of a station on a walk, and how far along the walk's path it is
 typedef StationAccess = ({StationEntrance entrance, double along});
 
+/// The way out of the station that [walk] (starting in it) really takes: the first of Navitia's [accesses] among the
+/// station's [entrances], its path starting there
+StationAccess? takenExit(MeasuredPolyline walk, List<StationEntrance> accesses, List<StationEntrance> entrances) =>
+    _taken(walk, accesses, entrances);
+
+/// The way into the station that [walk] (ending in it) really takes: the last of Navitia's [accesses] among the
+/// station's [entrances]
+StationAccess? takenEntrance(MeasuredPolyline walk, List<StationEntrance> accesses, List<StationEntrance> entrances) =>
+    _taken(walk, accesses.reversed, entrances);
+
+StationAccess? _taken(MeasuredPolyline walk, Iterable<StationEntrance> accesses, List<StationEntrance> entrances) {
+  for (final access in accesses) {
+    // The station's own entrance (its wheelchair access), never one of another station the walk goes through
+    final entrance = entrances.where((entrance) => entrance.id == access.id).firstOrNull;
+    if (entrance == null) {
+      continue;
+    }
+    final projection = walk.project(LatLng(entrance.lat, entrance.lon));
+    return projection == null ? null : (entrance: entrance, along: projection.along);
+  }
+  return null;
+}
+
 /// The way out of a station that leaves the least to walk on [walk] (starting in the station): the one from which
-/// joining the path, then following it to its end, is the shortest
+/// joining the path, then following it to its end, is the shortest; a guess, when Navitia doesn't say which one its
+/// path takes ([takenExit])
 StationAccess? bestExit(MeasuredPolyline walk, List<StationEntrance> entrances) => _best(walk, entrances, exit: true);
 
 /// The way into a station that [walk] (ending in the station) reaches first, with the least detour from its path
