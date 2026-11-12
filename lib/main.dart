@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -7,12 +9,20 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app/app.dart';
 import 'app/router.dart';
+import 'core/config.dart';
+import 'core/platform/desktop_entry.dart';
+import 'core/platform/platforms.dart';
 import 'features/home_widget/home_widget_sync.dart';
 import 'features/onboarding/onboarding.dart';
 import 'l10n/l10n.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The Linux app's icon in GNOME's dock, and the app in the applications list. Production only: the development
+  // builds have the same app id, and the entry would open them
+  if (isLinux && !AppConfig.isDev) {
+    unawaited(registerDesktopEntry());
+  }
   // Clean URLs on the web (/stops/IDFM:71264 instead of /#/stops/…)
   usePathUrlStrategy();
 

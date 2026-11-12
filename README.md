@@ -72,7 +72,7 @@ Chaque tag `vX.Y.Z` a sa [release GitHub](https://github.com/GuillaumeDmns/websi
 | Fichier | Installation |
 |---|---|
 | `android-<tag>.apk` | L'ouvrir sur le téléphone et autoriser l'installation depuis cette source. |
-| `linux-x64-<tag>.tar.gz` | Décompresser, lancer `website_app/website_app` (GTK 3 et libsecret, présents sur les bureaux courants). |
+| `linux-x64-<tag>.tar.gz` | Décompresser, lancer `website_app/website_app` (GTK 3 et libsecret, présents sur les bureaux courants). Au lancement, l'app s'ajoute à la liste des applications avec son icône (`~/.local/share/applications/com.guillaumedamiens.app.desktop`, mis à jour si le dossier est déplacé) : l'épingler au dock depuis là. Supprimer le dossier de l'app l'en retire (ce fichier peut ensuite être supprimé). |
 | `windows-x64-<tag>.zip` | Décompresser, lancer `website_app.exe` ; SmartScreen prévient que l'éditeur est inconnu (*Informations complémentaires → Exécuter quand même*). |
 
 Le build Windows n'est vérifié que par la CI (compilation) : personne ne l'a essayé sur une vraie machine.
