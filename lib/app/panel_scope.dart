@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Gives the pages the scroll controller of the bottom sheet (narrow layout), so that scrolling their list also
 /// drags the sheet. Null in the wide layout.

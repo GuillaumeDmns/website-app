@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Parses a GTFS hex color (`FFCD00`, with or without `#`), or returns [fallback].
 Color parseHexColor(String? hex, Color fallback) {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -62,31 +62,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       };
     },
     routes: [
-      GoRoute(path: Routes.splash, builder: (context, state) => const _SplashScreen()),
-      GoRoute(path: Routes.login, builder: (context, state) => const LoginScreen()),
-      GoRoute(path: Routes.welcome, builder: (context, state) => WelcomeScreen(from: state.uri.queryParameters['from'])),
+      _route(path: Routes.splash, builder: (context, state) => const _SplashScreen()),
+      _route(path: Routes.login, builder: (context, state) => const LoginScreen()),
+      _route(path: Routes.welcome, builder: (context, state) => WelcomeScreen(from: state.uri.queryParameters['from'])),
       ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
+        pageBuilder: (context, state, child) => _instant(state, AppShell(child: child)),
         routes: [
-          GoRoute(path: Routes.home, builder: (context, state) => const HomeScreen()),
-          GoRoute(
+          _route(path: Routes.home, builder: (context, state) => const HomeScreen()),
+          _route(
             path: Routes.search,
             builder: (context, state) => SearchScreen(
               pickTitle: state.uri.queryParameters['pick'],
               allowCurrentLocation: state.uri.queryParameters['here'] != '0',
             ),
           ),
-          GoRoute(
+          _route(
             path: Routes.journeyPath,
             builder: (context, state) => JourneyScreen(request: JourneyRequest.fromQuery(state.uri.queryParameters)),
           ),
-          GoRoute(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
-          GoRoute(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
-          GoRoute(path: Routes.about, builder: (context, state) => const AboutScreen()),
-          GoRoute(path: Routes.privacy, builder: (context, state) => const PrivacyScreen()),
-          GoRoute(path: Routes.account, builder: (context, state) => const AccountScreen()),
-          GoRoute(path: Routes.go, builder: (context, state) => const GoScreen()),
-          GoRoute(
+          _route(path: Routes.journeyDetail, builder: (context, state) => JourneyDetailScreen(query: state.uri.query)),
+          _route(path: Routes.traffic, builder: (context, state) => const TrafficScreen()),
+          _route(path: Routes.about, builder: (context, state) => const AboutScreen()),
+          _route(path: Routes.privacy, builder: (context, state) => const PrivacyScreen()),
+          _route(path: Routes.account, builder: (context, state) => const AccountScreen()),
+          _route(path: Routes.go, builder: (context, state) => const GoScreen()),
+          _route(
             path: Routes.aroundPath,
             builder: (context, state) {
               final query = state.uri.queryParameters;
@@ -96,11 +96,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               );
             },
           ),
-          GoRoute(
+          _route(
             path: '/stops/:stopAreaId',
             builder: (context, state) => StopScreen(stopAreaId: state.pathParameters['stopAreaId']!),
           ),
-          GoRoute(
+          _route(
             path: '/stops/:stopAreaId/timetable',
             builder: (context, state) => TimetableScreen(
               stopAreaId: state.pathParameters['stopAreaId']!,
@@ -108,7 +108,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               date: DateTime.tryParse(state.uri.queryParameters['date'] ?? ''),
             ),
           ),
-          GoRoute(
+          _route(
             path: '/lines/:lineId',
             builder: (context, state) => LineScreen(lineId: state.pathParameters['lineId']!),
           ),
@@ -131,6 +131,20 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return router;
 });
+
+/// Pages switch at once, without a transition: the panel swaps them in place over the map, and only the page on top
+/// takes the sheet's scroll controller ([PanelScrollScope]). go_router animates the pages of a material_ui
+/// MaterialApp: these are the pages it built while the app's MaterialApp was still Flutter's own.
+Page<void> _instant(GoRouterState state, Widget child) => NoTransitionPage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.path,
+      arguments: {...state.pathParameters, ...state.uri.queryParameters},
+      restorationId: state.pageKey.value,
+      child: child,
+    );
+
+GoRoute _route({required String path, required GoRouterWidgetBuilder builder}) =>
+    GoRoute(path: path, pageBuilder: (context, state) => _instant(state, builder(context, state)));
 
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
