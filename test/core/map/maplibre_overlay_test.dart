@@ -84,9 +84,15 @@ void main() {
     expect((jsonDecode(accuracyGeoJson(at, null)) as Map)['features'], isEmpty);
   });
 
-  test('images drawn at the screen density are shown at their size on every platform', () {
+  test('images shown at their size on every platform, drawn at 1 on Android where the map scales them up itself', () {
+    expect(overlayImageRatio(2.625, web: true), 2.625);
     expect(overlayIconSize(2.625, web: true), 1);
-    expect(overlayIconSize(2.625, web: false), closeTo(1 / 2.625, 1e-9));
+    // iOS takes them for points
+    expect(overlayImageRatio(2.625, web: false, platform: TargetPlatform.iOS), 2.625);
+    expect(overlayIconSize(2.625, web: false, platform: TargetPlatform.iOS), closeTo(1 / 2.625, 1e-9));
+    // Android decodes them scaled up to the screen's density: drawn at its density, they came 2.625² too big
+    expect(overlayImageRatio(2.625, web: false, platform: TargetPlatform.android), 1);
+    expect(overlayIconSize(2.625, web: false, platform: TargetPlatform.android), 1);
   });
 
   test("the overlay's layers from the bottom: the circle, the close-up pins, the turned pins, the pins, the heading, the dot",
