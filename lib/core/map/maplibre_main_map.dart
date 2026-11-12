@@ -9,18 +9,11 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
 
 import '../location/location_providers.dart';
+import 'base_map_style.dart';
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
 import 'maplibre_overlay.dart';
-
-/// OpenFreeMap's Liberty style (free, no key, OpenStreetMap data), in dark mode too: its dark style (Fiord) showed too
-/// little of the streets
-const _style = 'https://tiles.openfreemap.org/styles/liberty';
-
-/// Layers of the style taken out once it is loaded: its points of interest (shops, restaurants… by importance) and
-/// its stations, which the app's own stop pins show better; streets, places and the 3D buildings stay
-const hiddenStyleLayers = ['poi_r1', 'poi_r7', 'poi_r20', 'poi_transit'];
 
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
@@ -469,7 +462,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   Widget _map(BuildContext context, LatLng? user, MapOverlay overlay) {
     return MapLibreMap(
       options: MapOptions(
-        initStyle: _style,
+        initStyle: baseMapStyleUrl,
         initCenter: _geo(user ?? parisCenter),
         initZoom: user != null ? 16 : 13,
         minZoom: 8,

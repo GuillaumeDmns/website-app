@@ -8,17 +8,19 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng;
+import 'package:vector_map_tiles/vector_map_tiles.dart' as vmt;
 
 import '../location/location_providers.dart';
+import 'base_map_style.dart';
 import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
 
-/// The map with flutter_map and the Plan IGN raster tiles (Géoplateforme, free, no key; light in dark mode too): on
-/// desktop, where MapLibre doesn't run, and in the tests (the tiles off). flutter_map has no padding: the camera's
-/// center is moved by half the panel's moves instead, so that what is in the middle of the part left above stays
-/// there. See [MainMap].
+/// The map with flutter_map and OpenFreeMap's vector tiles in the MapLibre map's style (vector_map_tiles, flat: no
+/// tilt nor 3D buildings): on desktop, where MapLibre doesn't run, and in the tests (the tiles off). flutter_map has
+/// no padding: the camera's center is moved by half the panel's moves instead, so that what is in the middle of the
+/// part left above stays there. See [MainMap].
 class FlutterMainMap extends ConsumerStatefulWidget {
   const FlutterMainMap({super.key, this.panel, this.onLongPress});
 
@@ -294,15 +296,15 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         onSecondaryTap: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),
       ),
       children: [
-        // Plan IGN (Géoplateforme): free, no key, open licence; light in dark mode too, like the MapLibre map
+        // OpenFreeMap's vector tiles, drawn by vector_map_tiles with the MapLibre map's style and its hidden layers
         if (ref.watch(mapTilesEnabledProvider))
-          TileLayer(
-            urlTemplate: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
-                '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM'
-                '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png',
-            userAgentPackageName: 'com.guillaumedamiens.app',
-            maxNativeZoom: 19,
-          ),
+          if (ref.watch(baseMapStyleProvider).value case final style?)
+            vmt.VectorTileLayer(
+              theme: style.theme,
+              sprites: style.sprites,
+              tileProviders: style.providers,
+              maximumZoom: 19,
+            ),
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
@@ -381,7 +383,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
           alignment: AttributionAlignment.bottomLeft,
           // Full credits on the About page
           attributions: [
-            TextSourceAttribution('IGN – Plan IGN', onTap: null),
+            TextSourceAttribution('OpenFreeMap © OpenMapTiles', onTap: null),
             TextSourceAttribution('Île-de-France Mobilités', onTap: null),
             TextSourceAttribution('© contributeurs OpenStreetMap', onTap: null),
           ],
