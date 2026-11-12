@@ -29,14 +29,16 @@ import 'widgets/go_arrival_card.dart';
 import 'widgets/go_departures_card.dart';
 import 'widgets/go_exit_card.dart';
 import 'widgets/go_ride_card.dart';
+import 'widgets/go_top_bar.dart';
 import 'widgets/go_walk_card.dart';
 
-/// GO mode like Citymapper's, map first: its controls over the map ([GoBar] shows [GoTopBar]); the panel is one card
-/// per moment of the journey ([goCards]: a walk, each ride's departures then the ride, getting out of a station, the
-/// arrival), swiped, dots over them. The card going on ([goCurrentCard]) carries Citymapper's blue dot and says in its
-/// header what needs attention; the others offer "Je suis ici". The page follows the card going on and the sheet fits
-/// what it shows at rest (looking at another card doesn't move it). The map frames the card shown, follows the user on
-/// foot with the next turn named on it, shows a station's ways out.
+/// GO mode like Citymapper's, map first: its controls over the map ([GoBar] shows [GoTopBar]; on a wide screen in the
+/// side panel's header, [GoPanelHeader]); the panel is one card per moment of the journey ([goCards]: a walk, each
+/// ride's departures then the ride, getting out of a station, the arrival), swiped, dots over them. The card going on
+/// ([goCurrentCard]) carries Citymapper's blue dot and says in its header what needs attention; the others offer "Je
+/// suis ici". The page follows the card going on and the sheet fits what it shows at rest (looking at another card
+/// doesn't move it). The map frames the card shown, follows the user on foot with the next turn named on it, shows a
+/// station's ways out.
 class GoScreen extends ConsumerStatefulWidget {
   const GoScreen({super.key});
 
@@ -138,6 +140,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
             },
             child: Column(
               children: [
+                if (isWideLayout(context)) GoPanelHeader(state: state),
                 if (AppConfig.isDev) const GoGpsStats(),
                 _Dots(count: cards.length, shown: _shown, live: current, onTap: _show),
               ],

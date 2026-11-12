@@ -20,6 +20,9 @@ export 'panel_scope.dart';
 /// Width from which the page is shown in a side panel next to the map instead of a bottom sheet
 const wideLayoutBreakpoint = 840.0;
 
+/// Whether the shell shows the pages in a side panel next to the map (web, desktop, tablet) rather than in a bottom sheet
+bool isWideLayout(BuildContext context) => MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
+
 const _sidePanelWidth = 420.0;
 
 /// Map behind, current page in a side panel (wide) or a draggable bottom sheet (narrow), like Citymapper.
