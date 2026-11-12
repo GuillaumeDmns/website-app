@@ -25,7 +25,11 @@ class MapPin {
     this.childSize = const Size(40, 28),
     this.above = false,
     this.rotation,
+    this.closeUp = false,
   }) : assert(child == null || image != null, 'A pin drawn by a child names its image');
+
+  /// Where [closeUp] pins start showing: a few streets on the screen, a station's ways in and out apart
+  static const closeUpZoom = 16.0;
 
   final LatLng point;
   final Color color;
@@ -48,6 +52,13 @@ class MapPin {
   /// Degrees clockwise from north the marker is turned to, turning with the map (a vehicle's pointer); upright
   /// otherwise
   final double? rotation;
+
+  /// Only shown from [closeUpZoom] on, under the other pins (a station's ways in and out: further out they crowd the
+  /// station, and say nothing yet)
+  final bool closeUp;
+
+  /// Shown at [zoom]
+  bool shownAt(double zoom) => !closeUp || zoom >= closeUpZoom;
 }
 
 /// Line drawn on the shared map

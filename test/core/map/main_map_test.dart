@@ -258,6 +258,30 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("a station's ways in and out show close up only, under the other pins", (tester) async {
+    final container = await pumpMap(tester);
+    const pins = [
+      MapPin(point: user, color: Colors.green, label: 'Châtelet'),
+      MapPin(point: user, color: Colors.indigo, label: 'Sortie 3', closeUp: true, image: 'access-3', child: SizedBox.square(dimension: 20)),
+    ];
+    List<String?> shown() => [for (final pin in tester.widgetList<PinView>(find.byType(PinView))) pin.pin.label];
+
+    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(pins: pins, follow: MapFollow.overhead(user)));
+    await animate(tester);
+    expect(camera(tester).zoom, lessThan(MapPin.closeUpZoom));
+    expect(shown(), ['Châtelet']);
+
+    container
+        .read(mapOverlaysProvider.notifier)
+        .set('/', const MapOverlay(pins: pins, follow: MapFollow(position: user, bearing: 0, zoom: 17, overhead: true)));
+    await animate(tester);
+    expect(camera(tester).zoom, 17);
+    // Drawn first: under the station's own pin
+    expect(shown(), ['Sortie 3', 'Châtelet']);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a vehicle followed from overhead: north up, in the middle of what is left above the panel', (tester) async {
     final container = await pumpMap(tester);
 
