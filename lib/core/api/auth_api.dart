@@ -16,6 +16,21 @@ class AuthApi {
   /// Exchanges a Google ID token for the account's tokens (account created at the first sign-in)
   Future<AuthTokens> google(String idToken) => _tokens('/api/auth/google', {'idToken': idToken});
 
+  /// Linux, Windows: starts a Google sign-in that goes through the system browser and ends on [port] of the loopback,
+  /// where the app listens
+  Future<DesktopSignInStart> startDesktopSignIn(int port) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>('/api/auth/google/desktop', data: {'port': port});
+      return DesktopSignInStart.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw _googleFailure(e) ?? ApiException.fromDio(e);
+    }
+  }
+
+  /// Exchanges the one-time code the browser brought to the app's port for the account's tokens
+  Future<AuthTokens> finishDesktopSignIn(String code, String verifier) =>
+      _tokens('/api/auth/google/desktop/token', {'code': code, 'verifier': verifier});
+
   /// Token of a device used without account (capped usage, about 30 days, no refresh token)
   Future<AuthTokens> guest() => _tokens('/api/auth/guest', const {});
 
@@ -32,10 +47,11 @@ class AuthApi {
       final response = await _dio.post<Map<String, dynamic>>(path, data: body);
       return AuthTokens.fromJson(response.data!);
     } on DioException catch (e) {
-      if (path == '/api/auth/google' && e.response != null) {
-        throw ApiException(currentL10n.googleSignInFailed, statusCode: e.response?.statusCode);
-      }
-      throw ApiException.fromDio(e);
+      throw (path.startsWith('/api/auth/google') ? _googleFailure(e) : null) ?? ApiException.fromDio(e);
     }
   }
+
+  /// The backend refused a Google sign-in (token, code, or sign-in not configured): why is in its logs
+  static ApiException? _googleFailure(DioException e) =>
+      e.response == null ? null : ApiException(currentL10n.googleSignInFailed, statusCode: e.response?.statusCode);
 }

@@ -134,8 +134,19 @@ void main() {
       debugDefaultTargetPlatformOverride = platform;
       expect(googleSignInAvailable, AppConfig.googleAppleClientId.isNotEmpty, reason: platform.name);
     }
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
     expect(googleSignInAvailable, isFalse);
+  });
+
+  test('Google sign-in on Linux and Windows goes through the browser, not the Google SDK', () {
+    for (final platform in [TargetPlatform.linux, TargetPlatform.windows]) {
+      debugDefaultTargetPlatformOverride = platform;
+      expect(isLinuxOrWindows, isTrue, reason: platform.name);
+      expect(googleSignInAvailable, isTrue, reason: platform.name);
+      expect(googleSdkAvailable, isFalse, reason: platform.name);
+    }
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    expect(isLinuxOrWindows, isFalse);
   });
 
   test("each environment has its own App Group (the dev and prod apps don't share a widget)", () {

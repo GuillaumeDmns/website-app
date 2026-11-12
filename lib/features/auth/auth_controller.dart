@@ -47,6 +47,9 @@ class AuthController extends Notifier<AuthStatus> {
     await _signedIn(tokens);
   }
 
+  /// Linux, Windows: the sign-in through the browser ends with the account's tokens (`BrowserSignIn`)
+  Future<void> signInWithTokens(AuthTokens tokens) => _signedIn(tokens);
+
   Future<void> _signedIn(AuthTokens tokens) async {
     await OfflineCacheInterceptor.clear(ref.read(localStoreProvider));
     await ref.read(tokenStoreProvider).save(tokens);

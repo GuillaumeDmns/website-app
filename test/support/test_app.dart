@@ -10,6 +10,7 @@ import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/storage/local_store.dart';
+import 'package:website_app/features/auth/google/browser_sign_in.dart';
 import 'package:website_app/features/auth/google/google_auth.dart';
 import 'package:website_app/features/onboarding/onboarding.dart';
 import 'package:website_app/l10n/l10n.dart';
@@ -44,6 +45,7 @@ Future<MemoryStore> pumpApp(
   Locale locale = const Locale('fr'),
   Size size = const Size(412, 915),
   Future<String?> Function()? googleAccountChooser = _testGoogleAccount,
+  BrowserSignIn? googleBrowserSignIn,
   List<Override> overrides = const [],
 }) async {
   FlutterSecureStorage.setMockInitialValues({refreshTokenKey: ?refreshToken});
@@ -63,6 +65,8 @@ Future<MemoryStore> pumpApp(
       deviceHeadingProvider.overrideWith((ref) => const Stream.empty()),
       mapTilesEnabledProvider.overrideWithValue(false),
       googleAccountChooserProvider.overrideWithValue(googleAccountChooser),
+      // Never the real one, which opens the browser of the machine (the integration tests run on Linux)
+      googleBrowserSignInProvider.overrideWithValue(googleBrowserSignIn),
       ...overrides,
     ],
     child: const MobilityApp(),

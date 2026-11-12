@@ -7,10 +7,11 @@ import '../../app/routes.dart';
 import '../../l10n/l10n.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
+import 'google/browser_sign_in.dart';
 import 'google/google_auth.dart';
 import 'google/google_sign_in_button.dart';
 
-/// Sign-in: with Google only. Where it is not available yet (desktop, iOS), the app is used as a guest.
+/// Sign-in: with Google only. Where it is not available yet (iOS, macOS), the app is used as a guest.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -22,13 +23,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _loading = false;
   String? _error;
 
-  Future<void> _signInWithGoogle(String idToken) async {
+  Future<void> _signInWithGoogle(String idToken) => _signIn((auth) => auth.signInWithGoogle(idToken));
+
+  Future<void> _signIn(Future<void> Function(AuthController auth) signIn) async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await ref.read(authControllerProvider.notifier).signInWithGoogle(idToken);
+      await signIn(ref.read(authControllerProvider.notifier));
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString());
@@ -42,14 +45,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final available = kIsWeb || ref.watch(googleAccountChooserProvider) != null;
+    final available =
+        kIsWeb || ref.watch(googleAccountChooserProvider) != null || ref.watch(googleBrowserSignInProvider) != null;
     final theme = Theme.of(context);
     return AuthFormLayout(
       title: context.l10n.signIn,
       subtitle: context.l10n.signInSubtitle,
       children: [
         if (available)
-          GoogleSignInButton(onIdToken: _signInWithGoogle, enabled: !_loading)
+          GoogleSignInButton(
+            onIdToken: _signInWithGoogle,
+            onTokens: (tokens) => _signIn((auth) => auth.signInWithTokens(tokens)),
+            enabled: !_loading,
+          )
         else
           Text(
             context.l10n.googleSignInUnavailable,
