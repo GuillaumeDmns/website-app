@@ -76,23 +76,11 @@ bool _underground(JourneySection section) {
   return section.kind == SectionKind.transit && (mode == TransportMode.metro || (mode?.isRail ?? false));
 }
 
-/// The metro and train stations of [journey]: where its rides by metro or train start and end
-Set<String> journeyStationIds(JourneyOption journey) => {
-      for (final section in journey.sections.where(_underground)) ...[?section.from?.stopAreaId, ?section.to?.stopAreaId],
-    };
-
-/// The GTFS entrances of [journey]'s stations as far as their pages are loaded ([stopAreaProvider], GTFS only,
-/// cached by the backend)
-Map<String, List<StationEntrance>> watchStationEntrances(WidgetRef ref, JourneyOption journey) => {
-      for (final id in journeyStationIds(journey)) id: ref.watch(stopAreaProvider(id)).value?.entrances ?? const [],
-    };
-
-/// [journey]'s stations with their ways in and out ([entrancesOf], by stop area), and the ones it takes: the way in
-/// of the walk to a ride, the way out of the walk after it, as Navitia's path goes ([takenEntrance], [takenExit]),
-/// else the best guess ([bestEntrance], [bestExit]); a transfer within a station takes none
-List<StationAccesses> journeyStationAccesses(JourneyOption journey, Map<String, List<StationEntrance>> entrancesOf) {
+/// The ends of [journey]'s metro and train rides it walks to or from: the station, that walk, and whether it gets out
+/// there ([exit]) or in. A transfer within a station takes no way in or out: its stations are left out.
+List<({String stopAreaId, JourneySection walk, bool exit})> _walkedStations(JourneyOption journey) {
   final sections = journey.sections;
-  // The walk next to the ride at [index], waits between them left aside
+  // The walk next to the ride at [index], waits between them left aside; none for a transfer
   JourneySection? walkBeside(int index, int direction) {
     for (var k = index + direction; k >= 0 && k < sections.length; k += direction) {
       final section = sections[k];
@@ -103,32 +91,47 @@ List<StationAccesses> journeyStationAccesses(JourneyOption journey, Map<String, 
     return null;
   }
 
+  return [
+    for (final (index, section) in sections.indexed)
+      if (_underground(section))
+        for (final (stopAreaId, exit) in [(section.from?.stopAreaId, false), (section.to?.stopAreaId, true)])
+          if ((stopAreaId, walkBeside(index, exit ? 1 : -1)) case (final stopAreaId?, final walk?))
+            (stopAreaId: stopAreaId, walk: walk, exit: exit),
+  ];
+}
+
+/// The metro and train stations [journey] walks into or out of: where its rides by metro or train start and end,
+/// transfers within a station aside
+Set<String> journeyStationIds(JourneyOption journey) => {for (final end in _walkedStations(journey)) end.stopAreaId};
+
+/// The GTFS entrances of [journey]'s stations as far as their pages are loaded ([stopAreaProvider], GTFS only,
+/// cached by the backend)
+Map<String, List<StationEntrance>> watchStationEntrances(WidgetRef ref, JourneyOption journey) => {
+      for (final id in journeyStationIds(journey)) id: ref.watch(stopAreaProvider(id)).value?.entrances ?? const [],
+    };
+
+/// [journey]'s stations with their ways in and out ([entrancesOf], by stop area), and the ones it takes: the way in
+/// of the walk to a ride, the way out of the walk after it, as Navitia's path goes ([takenEntrance], [takenExit]),
+/// else the best guess ([bestEntrance], [bestExit]); the stations of a transfer within them left out, their ways never
+/// taken
+List<StationAccesses> journeyStationAccesses(JourneyOption journey, Map<String, List<StationEntrance>> entrancesOf) {
   final taken = <String, Map<String, bool>>{};
   final exits = <String>{};
-  for (final (index, section) in sections.indexed) {
-    if (!_underground(section)) {
+  for (final (:stopAreaId, :walk, :exit) in _walkedStations(journey)) {
+    final all = entrancesOf[stopAreaId];
+    if (all == null || all.isEmpty) {
       continue;
     }
-    for (final (stopAreaId, exit) in [(section.from?.stopAreaId, false), (section.to?.stopAreaId, true)]) {
-      final all = stopAreaId == null ? null : entrancesOf[stopAreaId];
-      if (all == null || all.isEmpty) {
-        continue;
-      }
-      final station = taken.putIfAbsent(stopAreaId!, () => {});
-      if (exit) {
-        exits.add(stopAreaId);
-      }
-      final walk = walkBeside(index, exit ? 1 : -1);
-      if (walk == null) {
-        continue;
-      }
-      final line = MeasuredPolyline(sectionPath(walk));
-      final access = exit
-          ? takenExit(line, walk.accesses, all) ?? bestExit(line, all)
-          : takenEntrance(line, walk.accesses, all) ?? bestEntrance(line, all);
-      if (access != null) {
-        station[access.entrance.id] = exit;
-      }
+    final station = taken.putIfAbsent(stopAreaId, () => {});
+    if (exit) {
+      exits.add(stopAreaId);
+    }
+    final line = MeasuredPolyline(sectionPath(walk));
+    final access = exit
+        ? takenExit(line, walk.accesses, all) ?? bestExit(line, all)
+        : takenEntrance(line, walk.accesses, all) ?? bestEntrance(line, all);
+    if (access != null) {
+      station[access.entrance.id] = exit;
     }
   }
   return [

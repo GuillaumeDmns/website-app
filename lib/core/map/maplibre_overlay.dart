@@ -133,7 +133,7 @@ class MapLibreOverlay {
             ),
           ),
           logicalSize: size,
-          imageSize: size * _pixelRatio,
+          imageSize: size * overlayImageRatio(_pixelRatio),
         );
         _images.add(id);
       } catch (e) {
@@ -279,10 +279,17 @@ class MapLibreOverlay {
   }
 }
 
-/// The size images are drawn at on the map. They are drawn at the screen's [pixelRatio] for sharpness: the web map is
-/// told so, Android's takes them for images of logical pixels scaled up again (and iOS's for points), so they are
-/// drawn smaller by as much there
-double overlayIconSize(double pixelRatio, {bool web = kIsWeb}) => web ? 1 : 1 / pixelRatio;
+/// The pixels an image of the overlay is made of per logical pixel: the screen's [pixelRatio] for sharpness, but on
+/// Android, whose map (`maplibre_android`) decodes images scaled up to the screen's density once more. Drawn at that
+/// density there, every image came 7 times too big (2.625² on a Pixel 10), MapLibre's icon atlas outgrew what the GPU
+/// takes and pins showed pieces of others: drawn at 1 and scaled up there, a little blurry instead.
+double overlayImageRatio(double pixelRatio, {bool web = kIsWeb, TargetPlatform? platform}) =>
+    !web && (platform ?? defaultTargetPlatform) == TargetPlatform.android ? 1 : pixelRatio;
+
+/// The size images are drawn at on the map ([overlayImageRatio]): the web map is told their density, Android's scales
+/// them to the screen's, iOS's takes them for points, so they are drawn smaller by as much there
+double overlayIconSize(double pixelRatio, {bool web = kIsWeb, TargetPlatform? platform}) =>
+    web || (platform ?? defaultTargetPlatform) == TargetPlatform.android ? 1 : 1 / pixelRatio;
 
 /// The name of [pin]'s look: its own, else its dot's
 String pinImageName(MapPin pin, Color outline) =>

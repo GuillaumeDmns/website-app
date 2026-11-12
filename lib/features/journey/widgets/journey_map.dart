@@ -135,7 +135,7 @@ MapOverlay journeyOverlay(
 }
 
 /// The ways in and out of [stations] as signs on the map, close up only but at the station [shown] (GO getting out of
-/// it): the ones taken green and named, under the others' signs being in the way of their name
+/// it): the ones taken green and named, over the others' signs that would be in the way of their name
 List<MapPin> stationAccessPins(List<StationAccesses> stations, {String? shown}) {
   final others = <MapPin>[];
   final taken = <MapPin>[];
@@ -151,8 +151,8 @@ List<MapPin> stationAccessPins(List<StationAccesses> stations, {String? shown}) 
             label: stationAccessName(entrance, exit: exit),
             closeUp: closeUp,
             childSize: StationAccessSign.takenSize,
-            image: StationAccessSign.imageOf(entrance, taken: true),
-            child: StationAccessSign(entrance: entrance, taken: true),
+            image: StationAccessSign.imageOf(entrance, exit: exit, taken: true),
+            child: StationAccessSign(entrance: entrance, exit: exit, taken: true),
           ));
         case null:
           others.add(MapPin(
@@ -161,8 +161,8 @@ List<MapPin> stationAccessPins(List<StationAccesses> stations, {String? shown}) 
             label: stationAccessName(entrance, exit: station.exit),
             closeUp: closeUp,
             childSize: StationAccessSign.size,
-            image: StationAccessSign.imageOf(entrance),
-            child: StationAccessSign(entrance: entrance),
+            image: StationAccessSign.imageOf(entrance, exit: station.exit),
+            child: StationAccessSign(entrance: entrance, exit: station.exit),
           ));
       }
     }

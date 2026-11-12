@@ -29,14 +29,21 @@ void main() {
         accesses: accesses,
       );
 
-  test("the metro and train stations of a journey, not its bus stops", () {
+  test("the metro and train stations a journey walks into or out of, not its bus stops nor its transfers", () {
     final trip = journey([
+      walkTo(const []),
+      transit(start.add(const Duration(minutes: 5)), 600),
+      walkFromNation(const []),
+    ]);
+    expect(journeyStationIds(trip), {'IDFM:70001', 'IDFM:70003'});
+
+    // From the metro to a bus at Nation: never through its ways in and out
+    final toBus = journey([
       walkTo(const []),
       transit(start.add(const Duration(minutes: 5)), 600),
       transit(start.add(const Duration(minutes: 16)), 600, line: bus38, from: nation, to: gareDeLyon),
     ]);
-
-    expect(journeyStationIds(trip), {'IDFM:70001', 'IDFM:70003'});
+    expect(journeyStationIds(toBus), {'IDFM:70001'});
   });
 
   test("the ways a journey takes: Navitia's, else the best guess; in at the start, out at the end", () {
@@ -62,7 +69,7 @@ void main() {
     expect(guesses, {'IDFM:70001': {'chatelet-west': false}, 'IDFM:70003': {'nation-way': true}});
   });
 
-  test('a transfer within a station takes no way in or out; a station whose page is not there yet is left out', () {
+  test('the stations of a transfer within them are left out, as a station whose page is not there yet', () {
     final trip = journey([
       walkTo(const [chateletEast]),
       transit(start.add(const Duration(minutes: 5)), 600),
@@ -71,9 +78,8 @@ void main() {
     ]);
     final stations = {for (final station in journeyStationAccesses(trip, entrances)) station.stopAreaId: station};
 
-    expect(stations.keys, ['IDFM:70001', 'IDFM:70003']);
-    expect(stations['IDFM:70003']!.taken, isEmpty);
-    // Getting off there all the same: its ways are exits
-    expect(stations['IDFM:70003']!.exit, isTrue);
+    // Nation: changing from the metro to the RER within the station, its ways in and out of no use
+    expect(stations.keys, ['IDFM:70001']);
+    expect(journeyStationIds(trip), {'IDFM:70001'});
   });
 }
