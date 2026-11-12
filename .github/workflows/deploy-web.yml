@@ -58,11 +58,12 @@ jobs:
         run: |
           name="web-${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
           tar -C build/web -czf "$name.tar.gz" .
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$name.tar.gz" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" "$name.tar.gz" --title "$GITHUB_REF_NAME" --generate-notes
-          fi
+          # release.yml creates it too, whichever comes first
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
+              --notes "Installation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release" ||
+            gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" "$name.tar.gz" --clobber
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$name.tar.gz" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$name.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"

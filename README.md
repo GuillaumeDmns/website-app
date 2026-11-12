@@ -47,6 +47,13 @@ Aucun test n'appelle le backend : un faux backend répond à la place de l'API (
 
 - Chaque pull request et chaque push sur `master` : check « Test » (analyse, tests, tests d'intégration de l'app Linux sous écran virtuel) et check « Build » (builds de prod : web, APK Android en artefact). Les deux doivent passer pour fusionner dans `master` : sur GitHub, *Settings → Rules → Rulesets → New branch ruleset*, cible *Default branch*, cocher *Require a pull request before merging*, *Require status checks to pass* (« Test » et « Build », visibles après un premier passage) et *Block force pushes*.
 - Tag `v*` (ou lancement à la main sur un tag) : l'app web de prod est publiée dans la release GitHub du tag, puis le VPS la télécharge (`/var/www/guillaumedamiens-app`, lien `current`). Secrets GitHub du dépôt : `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, les mêmes que ceux de `website-back`.
+- Tag `v*` aussi (`release.yml`) : les apps de prod sont construites et attachées à la même release GitHub (Android, Linux, Windows, voir « Installer une release »). L'APK n'est publié que s'il est signé avec la clé de release, donnée par quatre secrets du dépôt : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (les valeurs de `android/key.properties` ; sans eux, la clé de debug du runner change à chaque build et l'APK ne pourrait jamais être mis à jour). Une pull request qui touche `release.yml` le lance à blanc : mêmes builds, gardés 7 jours en artefacts du run, rien de publié.
+
+```bash
+base64 -w0 <le keystore> | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD      # puis ANDROID_KEY_ALIAS et ANDROID_KEY_PASSWORD : la valeur est demandée
+```
+
 
 ## Builds de production
 
@@ -57,3 +64,15 @@ flutter build linux --flavor prod --dart-define=APP_ENV=prod
 ```
 
 La variante `prod` (ou `APP_ENV=prod`) ne connaît que `guillaumedamiens.com`.
+
+## Installer une release
+
+Chaque tag `vX.Y.Z` a sa [release GitHub](https://github.com/GuillaumeDmns/website-app/releases) avec les apps de prod. Rien pour iOS et macOS : sans compte Apple Developer payant, leurs builds ne peuvent pas être signés pour d'autres appareils.
+
+| Fichier | Installation |
+|---|---|
+| `android-<tag>.apk` | L'ouvrir sur le téléphone et autoriser l'installation depuis cette source. |
+| `linux-x64-<tag>.tar.gz` | Décompresser, lancer `website_app/website_app` (GTK 3 et libsecret, présents sur les bureaux courants). |
+| `windows-x64-<tag>.zip` | Décompresser, lancer `website_app.exe` ; SmartScreen prévient que l'éditeur est inconnu (*Informations complémentaires → Exécuter quand même*). |
+
+Le build Windows n'est vérifié que par la CI (compilation) : personne ne l'a essayé sur une vraie machine.
