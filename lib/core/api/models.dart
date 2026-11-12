@@ -56,6 +56,23 @@ abstract class AuthTokens with _$AuthTokens {
   factory AuthTokens.fromJson(Map<String, dynamic> json) => _$AuthTokensFromJson(json);
 }
 
+/// A Google sign-in started for a desktop app (`POST /api/auth/google/desktop`)
+@freezed
+abstract class DesktopSignInStart with _$DesktopSignInStart {
+  const factory DesktopSignInStart({
+    /// Google's page, opened in the system browser
+    required String authorizationUrl,
+
+    /// Comes back to the app's port with the one-time code
+    required String state,
+
+    /// This sign-in's secret, sent back with the one-time code: the browser never sees it
+    required String verifier,
+  }) = _DesktopSignInStart;
+
+  factory DesktopSignInStart.fromJson(Map<String, dynamic> json) => _$DesktopSignInStartFromJson(json);
+}
+
 @freezed
 abstract class LineSummary with _$LineSummary {
   const factory LineSummary({

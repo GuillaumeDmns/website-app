@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/router.dart';
 import 'package:website_app/app/routes.dart';
+import 'package:website_app/core/api/api_exception.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/auth/google/browser_sign_in.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/fake_backend.dart';
@@ -50,6 +54,53 @@ void main() {
     expect(find.text(currentL10n.continueWithGoogle), findsNothing);
     await tapOn(tester, find.text(currentL10n.continueAsGuest));
     expect(find.text(currentL10n.homeNearby), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('on Linux and Windows, signs in through the browser', (tester) async {
+    final backend = standardBackend();
+    final browser = _TestBrowserSignIn();
+    await pumpApp(tester, backend, googleAccountChooser: null, googleBrowserSignIn: browser);
+
+    await tapOn(tester, find.byTooltip(currentL10n.account));
+    await tapOn(tester, find.text(currentL10n.signInAction));
+    await tapOn(tester, find.text(currentL10n.continueWithGoogle));
+
+    // The browser is open on Google's page: the app waits, and offers to give up
+    expect(find.text(currentL10n.browserSignInWaiting), findsOneWidget);
+    expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, currentL10n.continueWithGoogle)).onPressed, isNull);
+
+    browser.comesBackWith(const AuthTokens(jwt: 'desktop-access-token', refreshToken: 'desktop-refresh-token', expiresIn: 3600));
+    await settle(tester);
+
+    expect(find.text(currentL10n.homeNearby), findsOneWidget);
+    expect(backend.requestsTo('/api/v2/me/favorites').last.headers['Authorization'], 'Bearer desktop-access-token');
+    // No ID token on these platforms: the backend got it from Google itself
+    expect(backend.requestsTo('/api/auth/google'), isEmpty);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('giving up the sign-in in the browser leaves the app as it was', (tester) async {
+    final backend = standardBackend();
+    final browser = _TestBrowserSignIn();
+    await pumpApp(tester, backend, googleAccountChooser: null, googleBrowserSignIn: browser);
+
+    await tapOn(tester, find.byTooltip(currentL10n.account));
+    await tapOn(tester, find.text(currentL10n.signInAction));
+    await tapOn(tester, find.text(currentL10n.continueWithGoogle));
+    await tapOn(tester, find.text(MaterialLocalizations.of(tester.element(find.text(currentL10n.browserSignInWaiting))).cancelButtonLabel));
+
+    expect(browser.cancelled, isTrue);
+    expect(find.text(currentL10n.browserSignInWaiting), findsNothing);
+    expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, currentL10n.continueWithGoogle)).onPressed, isNotNull);
+
+    // A sign-in that fails says so, and can be tried again
+    browser.failure = ApiException(currentL10n.browserOpenFailed);
+    await tapOn(tester, find.text(currentL10n.continueWithGoogle));
+    expect(find.text(currentL10n.browserOpenFailed), findsOneWidget);
+    expect(find.text(currentL10n.browserSignInWaiting), findsNothing);
 
     await closeApp(tester);
   });
@@ -161,4 +212,33 @@ void main() {
 
     await closeApp(tester);
   });
+}
+
+/// The sign-in through the system browser, with the user in the tests' hands
+class _TestBrowserSignIn implements BrowserSignIn {
+  Completer<AuthTokens?>? _waiting;
+  bool cancelled = false;
+
+  /// What the next sign-in fails with
+  ApiException? failure;
+
+  @override
+  Future<AuthTokens?> signIn() async {
+    final failure = this.failure;
+    if (failure != null) {
+      throw failure;
+    }
+    return (_waiting = Completer<AuthTokens?>()).future;
+  }
+
+  void comesBackWith(AuthTokens tokens) => _waiting!.complete(tokens);
+
+  @override
+  void cancel() {
+    final waiting = _waiting;
+    if (waiting != null && !waiting.isCompleted) {
+      cancelled = true;
+      waiting.complete(null);
+    }
+  }
 }
