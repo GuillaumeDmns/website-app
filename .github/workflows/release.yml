@@ -153,10 +153,11 @@ jobs:
       - name: Linux (prod)
         run: tool/build.sh linux --flavor prod --dart-define=APP_ENV=prod
       # One folder, website_app/, with the binary of the same name
+      # (Flutter puts a flavored desktop build under the flavor's folder)
       - name: Package
         run: |
-          test -x build/linux/x64/release/bundle/website_app
-          tar -C build/linux/x64/release -czf "$FILE" --transform 's,^bundle,website_app,' bundle
+          test -x build/linux/x64/prod/release/bundle/website_app
+          tar -C build/linux/x64/prod/release -czf "$FILE" --transform 's,^bundle,website_app,' bundle
           ls -lh "$FILE"
       - name: Publish in the release
         if: needs.check.outputs.publish == 'true'
@@ -198,11 +199,11 @@ jobs:
           flutter pub get
           dart run build_runner build -d
       - name: Windows (prod)
-        run: tool/build.sh windows --dart-define=APP_ENV=prod
+        run: tool/build.sh windows --flavor prod --dart-define=APP_ENV=prod
       # With Visual C++'s runtime next to the app, for the PCs that don't have it (Flutter's advice)
       - name: Package
         run: |
-          out=build/windows/x64/runner/Release
+          out=build/windows/x64/prod/runner/Release
           test -f "$out/website_app.exe"
           cp /c/Windows/System32/msvcp140.dll /c/Windows/System32/vcruntime140.dll /c/Windows/System32/vcruntime140_1.dll "$out/"
           (cd "$out" && 7z a -tzip "$GITHUB_WORKSPACE/$FILE" . > /dev/null)
