@@ -107,6 +107,27 @@ abstract final class AppTheme {
 
   static ThemeData get darkTheme => _build(Brightness.dark);
 
+  /// [theme] in Inter. Not `GoogleFonts.interTextTheme`: since google_fonts 9 it takes and gives the `TextTheme` of
+  /// the package material_ui, another class than the one of `package:flutter/material.dart` this app is built with.
+  /// Text styles are the same class for both.
+  static TextTheme _inter(TextTheme theme) => theme.copyWith(
+        displayLarge: GoogleFonts.inter(textStyle: theme.displayLarge),
+        displayMedium: GoogleFonts.inter(textStyle: theme.displayMedium),
+        displaySmall: GoogleFonts.inter(textStyle: theme.displaySmall),
+        headlineLarge: GoogleFonts.inter(textStyle: theme.headlineLarge),
+        headlineMedium: GoogleFonts.inter(textStyle: theme.headlineMedium),
+        headlineSmall: GoogleFonts.inter(textStyle: theme.headlineSmall),
+        titleLarge: GoogleFonts.inter(textStyle: theme.titleLarge),
+        titleMedium: GoogleFonts.inter(textStyle: theme.titleMedium),
+        titleSmall: GoogleFonts.inter(textStyle: theme.titleSmall),
+        bodyLarge: GoogleFonts.inter(textStyle: theme.bodyLarge),
+        bodyMedium: GoogleFonts.inter(textStyle: theme.bodyMedium),
+        bodySmall: GoogleFonts.inter(textStyle: theme.bodySmall),
+        labelLarge: GoogleFonts.inter(textStyle: theme.labelLarge),
+        labelMedium: GoogleFonts.inter(textStyle: theme.labelMedium),
+        labelSmall: GoogleFonts.inter(textStyle: theme.labelSmall),
+      );
+
   static ThemeData _build(Brightness brightness) {
     final light = brightness == Brightness.light;
     final colors = light ? AppColors.light : AppColors.dark;
@@ -131,7 +152,7 @@ abstract final class AppTheme {
     );
 
     final base = ThemeData(useMaterial3: true, brightness: brightness, colorScheme: scheme);
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(bodyColor: text, displayColor: text).copyWith(
+    final textTheme = _inter(base.textTheme).apply(bodyColor: text, displayColor: text).copyWith(
           headlineSmall: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w600, color: text, letterSpacing: -0.4),
           titleLarge: GoogleFonts.inter(fontSize: 21, fontWeight: FontWeight.w600, color: text, letterSpacing: -0.3),
           titleMedium: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w600, color: text, letterSpacing: -0.2),
@@ -147,7 +168,7 @@ abstract final class AppTheme {
     return base.copyWith(
       extensions: [colors],
       textTheme: textTheme,
-      primaryTextTheme: GoogleFonts.interTextTheme(base.primaryTextTheme),
+      primaryTextTheme: _inter(base.primaryTextTheme),
       scaffoldBackgroundColor: page,
       canvasColor: page,
       splashFactory: InkSparkle.splashFactory,
