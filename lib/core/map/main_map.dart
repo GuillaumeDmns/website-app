@@ -11,7 +11,7 @@ import 'maplibre_main_map.dart';
 final mapTilesEnabledProvider = Provider<bool>((ref) => true);
 
 /// MapLibre where it runs natively or in the browser (Android, iOS, web): vector tiles drawn by the GPU. flutter_map
-/// with the Plan IGN elsewhere (desktop) and in the tests.
+/// with the same vector tiles drawn in Dart elsewhere (desktop), and in the tests (the tiles off).
 final useMapLibreProvider = Provider<bool>((ref) =>
     ref.watch(mapTilesEnabledProvider) &&
     (kIsWeb || defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS));

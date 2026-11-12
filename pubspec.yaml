@@ -33,6 +33,8 @@ dependencies:
   google_sign_in: ^7.2.0
   google_sign_in_web: ^1.1.3
   maplibre: ^0.3.7+1
+  vector_map_tiles: 9.0.0-beta.13
+  vector_tile_renderer: ^6.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
