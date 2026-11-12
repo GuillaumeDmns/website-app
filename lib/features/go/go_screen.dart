@@ -16,6 +16,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/size_reporter.dart';
 import '../../l10n/l10n.dart';
+import '../journey/station_accesses.dart';
 import '../journey/widgets/journey_map.dart';
 import '../stops/stop_screen.dart';
 import 'go_cards.dart';
@@ -25,7 +26,6 @@ import 'go_instruction.dart';
 import 'go_state.dart';
 import 'go_tracker.dart';
 import 'widgets/go_arrival_card.dart';
-import 'widgets/go_card_parts.dart';
 import 'widgets/go_departures_card.dart';
 import 'widgets/go_exit_card.dart';
 import 'widgets/go_ride_card.dart';
@@ -46,7 +46,7 @@ class GoScreen extends ConsumerStatefulWidget {
 
 /// The stations' ways in and out along the journey, by move step: the best way out of the one got off at before the
 /// move (and all of its ways out, for the map), the best way into the one the move ends at
-typedef _Stations = ({Map<int, StationAccess> exits, Map<int, List<StationEntrance>> exitsAll, Map<int, StationAccess> entrances});
+typedef _Stations = ({Map<int, StationAccess> exits, Map<int, StationAccess> entrances});
 
 class _GoScreenState extends ConsumerState<GoScreen> {
   PageController? _pages;
@@ -197,14 +197,12 @@ class _GoScreenState extends ConsumerState<GoScreen> {
   _Stations _stations(GoTracker tracker, List<GoCard> cards) {
     final steps = tracker.steps;
     final exits = <int, StationAccess>{};
-    final exitsAll = <int, List<StationEntrance>>{};
     final entrances = <int, StationAccess>{};
     List<StationEntrance> of(String? stopAreaId) =>
         stopAreaId == null ? const [] : ref.watch(stopAreaProvider(stopAreaId)).value?.entrances ?? const [];
     for (final card in cards) {
       if (card.kind == GoCardKind.exit) {
         final all = of(steps[card.step - 1].section.to?.stopAreaId);
-        exitsAll[card.step] = all;
         final walk = steps[card.step];
         if ((takenExit(walk.line, walk.section.accesses, all) ?? bestExit(walk.line, all)) case final best?) {
           exits[card.step] = best;
@@ -221,13 +219,14 @@ class _GoScreenState extends ConsumerState<GoScreen> {
         }
       }
     }
-    return (exits: exits, exitsAll: exitsAll, entrances: entrances);
+    return (exits: exits, entrances: entrances);
   }
 
   /// The journey on the map, framing the card shown: for the card going on, the stop where to board (and the user close
   /// to it) while waiting, like Citymapper; on board what is left of the ride (from the last stop passed to where to get
   /// off), the next stop marked; on foot, the user followed
-  /// with the next turn named; getting out of a station, its ways out, the best one named
+  /// with the next turn named; getting out of a station, its ways out, the best one named. Close up, the ways in and out
+  /// of the journey's stations, the ones taken named.
   MapOverlay _overlay(GoState state, List<GoCard> cards, int current, _Stations stations) {
     final tracker = state.tracker;
     final progress = state.progress;
@@ -235,6 +234,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     final shown = cards[math.min(_shown, cards.length - 1)];
     final shownStep = shown.step < tracker.steps.length ? tracker.steps[shown.step] : null;
     final onBoardOrMoving = progress.phase == GoPhase.moving || progress.phase == GoPhase.onBoard;
+    final exit = shown.kind == GoCardKind.exit ? stations.exits[shown.step] : null;
     final overlay = journeyOverlay(
       context,
       state.journey,
@@ -243,11 +243,14 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       // them on board (the dot left behind in a tunnel, the faded part running ahead of it)
       currentAlong: onBoardOrMoving ? progress.along : 0,
       fitSection: shownStep?.sectionIndex,
+      stations: journeyStationAccesses(state.journey, watchStationEntrances(ref, state.journey)),
+      // Getting out of a station: its ways out whatever the zoom
+      stationShown: exit == null ? null : tracker.steps[shown.step - 1].section.to?.stopAreaId,
     );
     final step = tracker.stepOf(progress);
     final isLive = _shown == current;
-    if (shown.kind == GoCardKind.exit && stations.exits[shown.step] != null) {
-      return _exitOverlay(overlay, tracker, shown.step, stations.exits[shown.step]!, stations.exitsAll[shown.step] ?? const []);
+    if (exit != null) {
+      return _exitOverlay(overlay, tracker, shown.step, exit);
     }
     if (isLive && step != null && progress.phase == GoPhase.waiting) {
       return MapOverlay(pins: overlay.pins, paths: overlay.paths, fit: goWaitingFit(step, state.position));
@@ -299,37 +302,15 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     );
   }
 
-  /// Getting out of a station: its ways out on the map, the best one named, framed with the start of the walk
-  MapOverlay _exitOverlay(MapOverlay overlay, GoTracker tracker, int step, StationAccess exit, List<StationEntrance> all) {
+  /// Getting out of a station: its ways out on the map (the journey's overlay shows them, the best one named), framed
+  /// with the start of the walk
+  MapOverlay _exitOverlay(MapOverlay overlay, GoTracker tracker, int step, StationAccess exit) {
     final walk = tracker.steps[step];
     final station = tracker.steps[step - 1].end;
-    final best = LatLng(exit.entrance.lat, exit.entrance.lon);
-    final name = stationAccessName(exit.entrance, exit: true);
     return MapOverlay(
-      pins: [
-        ...overlay.pins,
-        for (final entrance in all)
-          if (entrance.id != exit.entrance.id)
-            MapPin(
-              point: LatLng(entrance.lat, entrance.lon),
-              color: walkPathColor,
-              label: stationAccessName(entrance, exit: true),
-              childSize: const Size(20, 20),
-              image: 'station-access',
-              child: const _AccessIcon(),
-            ),
-        MapPin(
-          point: best,
-          color: AppTheme.brand,
-          label: name,
-          above: true,
-          childSize: const Size(240, 44),
-          image: 'callout-${Icons.exit_to_app.codePoint}-$name',
-          child: _MapCallout(icon: Icons.exit_to_app, text: name),
-        ),
-      ],
+      pins: overlay.pins,
       paths: overlay.paths,
-      fit: [?station, best, walk.line.pointAt(math.min(walk.line.length, exit.along + 60))],
+      fit: [?station, LatLng(exit.entrance.lat, exit.entrance.lon), walk.line.pointAt(math.min(walk.line.length, exit.along + 60))],
     );
   }
 }
@@ -444,16 +425,6 @@ class _CalloutArrow extends CustomPainter {
 }
 
 /// A station's other ways out on the map: a small dark square
-class _AccessIcon extends StatelessWidget {
-  const _AccessIcon();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(color: walkPathColor, borderRadius: BorderRadius.circular(4)),
-        child: const Icon(Icons.exit_to_app, size: 14, color: Colors.white),
-      );
-}
-
 /// How the fixes come (development builds): is the device's GPS giving one a second?
 class GoGpsStats extends ConsumerWidget {
   const GoGpsStats({super.key});

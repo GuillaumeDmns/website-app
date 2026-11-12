@@ -16,6 +16,7 @@ import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'widgets/journey_card.dart';
+import 'station_accesses.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_options_sheet.dart';
 import 'widgets/journey_time_sheet.dart';
@@ -77,7 +78,11 @@ class JourneyScreen extends ConsumerWidget {
 
     return MapOverlayScope(
       overlay: selectedJourney != null
-          ? journeyOverlay(context, selectedJourney)
+          ? journeyOverlay(
+              context,
+              selectedJourney,
+              stations: journeyStationAccesses(selectedJourney, watchStationEntrances(ref, selectedJourney)),
+            )
           : MapOverlay(
               pins: [
                 if (point(request.from) case final from?) MapPin(point: from, color: Theme.of(context).colorScheme.primary, size: 16),

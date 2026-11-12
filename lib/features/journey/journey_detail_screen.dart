@@ -19,6 +19,7 @@ import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
+import 'station_accesses.dart';
 import 'widgets/journey_map.dart';
 import 'widgets/journey_sections.dart';
 import 'widgets/journey_timeline.dart';
@@ -111,7 +112,12 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
     final journey = retimed.journey;
 
     return MapOverlayScope(
-      overlay: journeyOverlay(context, journey, fitSection: _focused),
+      overlay: journeyOverlay(
+        context,
+        journey,
+        fitSection: _focused,
+        stations: journeyStationAccesses(journey, watchStationEntrances(ref, journey)),
+      ),
       // Citymapper's big green GO stays at hand at the bottom, whatever is scrolled
       child: Column(
         children: [

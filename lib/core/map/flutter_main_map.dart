@@ -337,43 +337,50 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
               ),
             ]);
           }),
-        MarkerLayer(
-          // Upright when the map turns (GO on foot)
-          rotate: true,
-          markers: [
-            for (final pin in overlay.pins)
-              Marker(
-                point: pin.point,
-                width: PinView.boxOf(pin).width,
-                height: PinView.boxOf(pin).height,
-                alignment: pin.above ? Alignment.topCenter : Alignment.center,
-                child: switch (pin.rotation) {
-                  null => PinView(pin: pin, outline: scheme.surface),
-                  // Turned from north, with the map: its rotation plus the map's (the layer keeps markers upright)
-                  final rotation => Builder(
-                      builder: (context) => Transform.rotate(
-                        angle: (rotation + MapCamera.of(context).rotation) * math.pi / 180,
-                        child: PinView(pin: pin, outline: scheme.surface),
-                      ),
+        // Rebuilt as the camera moves: pins shown close up only come and go with the zoom
+        Builder(builder: (context) {
+          final zoom = MapCamera.of(context).zoom;
+          // Those shown close up only under the others, as on MapLibre
+          final pins = [...overlay.pins.where((pin) => pin.closeUp), ...overlay.pins.where((pin) => !pin.closeUp)];
+          return MarkerLayer(
+            // Upright when the map turns (GO on foot)
+            rotate: true,
+            markers: [
+              for (final pin in pins)
+                if (pin.shownAt(zoom))
+                  Marker(
+                    point: pin.point,
+                    width: PinView.boxOf(pin).width,
+                    height: PinView.boxOf(pin).height,
+                    alignment: pin.above ? Alignment.topCenter : Alignment.center,
+                    child: switch (pin.rotation) {
+                      null => PinView(pin: pin, outline: scheme.surface),
+                      // Turned from north, with the map: its rotation plus the map's (the layer keeps markers upright)
+                      final rotation => Builder(
+                          builder: (context) => Transform.rotate(
+                            angle: (rotation + MapCamera.of(context).rotation) * math.pi / 180,
+                            child: PinView(pin: pin, outline: scheme.surface),
+                          ),
+                        ),
+                    },
+                  ),
+              if (user != null)
+                Marker(
+                  point: user,
+                  width: UserDot.size.width,
+                  height: UserDot.size.height,
+                  // Upright marker: the heading on the screen is the map's rotation plus the heading
+                  child: Builder(
+                    builder: (context) => UserDot(
+                      screenHeading: overlay.follow == null || overlay.follow!.overhead
+                          ? null
+                          : _heading.apply(overlay.follow!).bearing + MapCamera.of(context).rotation,
                     ),
-                },
-              ),
-            if (user != null)
-              Marker(
-                point: user,
-                width: UserDot.size.width,
-                height: UserDot.size.height,
-                // Upright marker: the heading on the screen is the map's rotation plus the heading
-                child: Builder(
-                  builder: (context) => UserDot(
-                    screenHeading: overlay.follow == null || overlay.follow!.overhead
-                        ? null
-                        : _heading.apply(overlay.follow!).bearing + MapCamera.of(context).rotation,
                   ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          );
+        }),
         if (_following != null && _followPaused)
           ListenableBuilder(
             listenable: widget.panel ?? const AlwaysStoppedAnimation(0),

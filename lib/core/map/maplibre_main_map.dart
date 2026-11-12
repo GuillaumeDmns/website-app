@@ -494,7 +494,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
             allowInteraction: true,
             markers: [
               for (final pin in overlay.pins)
-                if (pin.label != null)
+                if (pin.label != null && pin.shownAt(MapCamera.maybeOf(context)?.zoom ?? 0))
                   Marker(
                     point: _geo(pin.point),
                     size: PinView.boxOf(pin),

@@ -15,7 +15,8 @@ import 'map_pins.dart';
 /// once it has moved, a frame or more behind (they trailed it as it panned). Pins and the dot keep their looks: each
 /// look is drawn once from its widget into an image the map draws (`MapPin.image`).
 ///
-/// From the bottom: the paths, the circle of accuracy, the pins turned with the map (a vehicle's pointer), the
+/// From the bottom: the paths, the circle of accuracy, the pins shown close up only (a station's ways in and out), the
+/// pins turned with the map (a vehicle's pointer), the
 /// upright pins, the user's heading lying on the map, the user dot.
 class MapLibreOverlay {
   MapLibreOverlay(this._style, {required this.theme, required double pixelRatio})
@@ -36,6 +37,7 @@ class MapLibreOverlay {
   static const userSource = 'overlay-user';
 
   static const accuracyLayer = 'overlay-accuracy';
+  static const closeUpPinsLayer = 'overlay-pins-close-up';
   static const turnedPinsLayer = 'overlay-pins-turned';
   static const pinsLayer = 'overlay-pins';
   static const headingLayer = 'overlay-user-heading';
@@ -204,7 +206,7 @@ class MapLibreOverlay {
   MapPin? tappedPin(MapController controller, Offset screenPoint) {
     MapPin? tapped;
     var top = -1;
-    for (final feature in controller.featuresAtPoint(screenPoint, layerIds: const [pinsLayer, turnedPinsLayer])) {
+    for (final feature in controller.featuresAtPoint(screenPoint, layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer])) {
       final index = switch (feature.properties['pin']) {
         final num value => value.toInt(),
         final String value => int.tryParse(value),
@@ -303,6 +305,7 @@ String pinsGeoJson(List<MapPin> pins, {required String Function(MapPin pin) imag
                 'anchor': pin.above ? 'bottom' : 'center',
                 'rotate': pin.rotation ?? 0,
                 'turned': pin.rotation != null,
+                'closeUp': pin.closeUp,
               },
             },
       ],
@@ -401,6 +404,14 @@ List<StyleLayer> overlayStyleLayers({required double iconSize}) {
         'circle-pitch-scale': 'map',
       },
     ),
+    // A station's ways in and out, close up only: under the other pins
+    SymbolStyleLayer(
+      id: MapLibreOverlay.closeUpPinsLayer,
+      sourceId: MapLibreOverlay.pinsSource,
+      minZoom: MapPin.closeUpZoom,
+      filter: const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], true]],
+      layout: symbols(turned: false),
+    ),
     SymbolStyleLayer(
       id: MapLibreOverlay.turnedPinsLayer,
       sourceId: MapLibreOverlay.pinsSource,
@@ -410,7 +421,7 @@ List<StyleLayer> overlayStyleLayers({required double iconSize}) {
     SymbolStyleLayer(
       id: MapLibreOverlay.pinsLayer,
       sourceId: MapLibreOverlay.pinsSource,
-      filter: const ['==', ['get', 'turned'], false],
+      filter: const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], false]],
       layout: symbols(turned: false),
     ),
     SymbolStyleLayer(

@@ -8,6 +8,8 @@ import '../../bikes/bike_widgets.dart';
 import '../../../core/utils/geo.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../app/theme.dart';
+import '../station_accesses.dart';
+import 'station_access_sign.dart';
 
 /// Walks on the map: dark, since the map stays light in dark mode too (the theme's grey is light there)
 const walkPathColor = Color(0xFF3C4654);
@@ -17,7 +19,8 @@ const bikePathColor = Color(0xFF2E7D32);
 
 /// Map overlay of a journey: rides in their line color, bikes green, walks dotted, the line badge where you board, a
 /// dot where you get off, small dots at the stops between (named in the sheet, not here: the map stays light), start
-/// and end.
+/// and end; close up, the ways in and out of its metro and train [stations] ([journeyStationAccesses]), the ones it
+/// takes named.
 ///
 /// The camera frames the section [fitSection] instead of the whole journey. GO mode: sections before [currentSection]
 /// and the first [currentAlong] meters of it are faded.
@@ -27,6 +30,8 @@ MapOverlay journeyOverlay(
   int currentSection = -1,
   double currentAlong = 0,
   int? fitSection,
+  List<StationAccesses> stations = const [],
+  String? stationShown,
 }) {
   final scheme = Theme.of(context).colorScheme;
   final paths = <MapPath>[];
@@ -118,6 +123,7 @@ MapOverlay journeyOverlay(
   return MapOverlay(
     paths: paths,
     pins: [
+      ...stationAccessPins(stations, shown: stationShown),
       ...stopDots,
       ...dots,
       if (start != null) MapPin(point: LatLng(start.lat, start.lon), color: context.colors.live, size: 16, label: start.name),
@@ -126,6 +132,42 @@ MapOverlay journeyOverlay(
     ],
     fit: sectionPoints.isNotEmpty ? sectionPoints : points,
   );
+}
+
+/// The ways in and out of [stations] as signs on the map, close up only but at the station [shown] (GO getting out of
+/// it): the ones taken green and named, under the others' signs being in the way of their name
+List<MapPin> stationAccessPins(List<StationAccesses> stations, {String? shown}) {
+  final others = <MapPin>[];
+  final taken = <MapPin>[];
+  for (final station in stations) {
+    for (final entrance in station.entrances) {
+      final point = LatLng(entrance.lat, entrance.lon);
+      final closeUp = station.stopAreaId != shown;
+      switch (station.taken[entrance.id]) {
+        case final exit?:
+          taken.add(MapPin(
+            point: point,
+            color: AppTheme.brand,
+            label: stationAccessName(entrance, exit: exit),
+            closeUp: closeUp,
+            childSize: StationAccessSign.takenSize,
+            image: StationAccessSign.imageOf(entrance, taken: true),
+            child: StationAccessSign(entrance: entrance, taken: true),
+          ));
+        case null:
+          others.add(MapPin(
+            point: point,
+            color: stationAccessColor,
+            label: stationAccessName(entrance, exit: station.exit),
+            closeUp: closeUp,
+            childSize: StationAccessSign.size,
+            image: StationAccessSign.imageOf(entrance),
+            child: StationAccessSign(entrance: entrance),
+          ));
+      }
+    }
+  }
+  return [...others, ...taken];
 }
 
 class _StopDot extends StatelessWidget {

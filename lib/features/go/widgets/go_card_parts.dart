@@ -270,12 +270,6 @@ class GoHereButton extends ConsumerWidget {
       );
 }
 
-/// A station's way in or out: its number on the signs and its street, else the street alone
-String stationAccessName(StationEntrance entrance, {required bool exit}) => switch (entrance.code) {
-      final code? => exit ? currentL10n.goExitNamed(code, entrance.name) : currentL10n.goEntranceNamed(code, entrance.name),
-      null => entrance.name,
-    };
-
 /// The best way in or out of a station, as Citymapper says it: `Meilleure sortie` over `Sortie 7 – r. de Presbourg`
 class GoStationAccess extends StatelessWidget {
   const GoStationAccess({super.key, required this.entrance, required this.exit});
