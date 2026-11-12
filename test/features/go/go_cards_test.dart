@@ -100,6 +100,29 @@ void main() {
     expect(bestExit(walk, const []), isNull);
   });
 
+  test("the way out and in Navitia's path takes wins over the best guess", () {
+    // A walk east from the station, 400 m, Navitia's path leaving by the entrance behind it
+    final walk = MeasuredPolyline(const [LatLng(48.8484, 2.3950), LatLng(48.8484, 2.4013)]);
+    const behind = StationEntrance(id: 'behind', code: '1', name: 'Behind', lat: 48.8484, lon: 2.3950, wheelchairBoarding: 1);
+    const onTheWay = StationEntrance(id: 'way', code: '2', name: 'On the way', lat: 48.8486, lon: 2.3968);
+    // Navitia's access point: the same GTFS entrance, then another station's on the way
+    const taken = StationEntrance(id: 'behind', name: 'Behind', lat: 48.8484, lon: 2.3950);
+    const elsewhere = StationEntrance(id: 'elsewhere', name: 'Elsewhere', lat: 48.8484, lon: 2.4013);
+
+    expect(bestExit(walk, const [behind, onTheWay])!.entrance.id, 'way');
+    final exit = takenExit(walk, const [taken, elsewhere], const [behind, onTheWay])!;
+    // The station's own entrance, with what its page says of it
+    expect(exit.entrance, behind);
+    expect(exit.along, closeTo(0, 1));
+
+    // Walking the other way, into the station by the entrance Navitia's path ends at
+    final reversed = MeasuredPolyline(walk.points.reversed.toList());
+    expect(takenEntrance(reversed, const [elsewhere, taken], const [behind, onTheWay])!.entrance.id, 'behind');
+    // Without an access of this station, the guess
+    expect(takenExit(walk, const [elsewhere], const [behind, onTheWay]), isNull);
+    expect(takenExit(walk, const [], const [behind, onTheWay]), isNull);
+  });
+
   test('"Je suis ici" on a walk after a station: out of it already', () {
     final progress = metro.jumpTo(const GoProgress(step: 1, phase: GoPhase.onBoard), 2, along: 120);
 

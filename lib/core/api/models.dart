@@ -480,6 +480,10 @@ abstract class JourneySection with _$JourneySection {
 
     /// `[lon, lat]` points
     @Default([]) List<List<double>> shape,
+
+    /// Ways in and out of stations the walk goes through, in walking order: the ones Navitia's path takes (their ids
+    /// are the GTFS entrances' of the stations' pages)
+    @Default([]) List<StationEntrance> accesses,
   }) = _JourneySection;
 
   factory JourneySection.fromJson(Map<String, dynamic> json) => _$JourneySectionFromJson(json);
