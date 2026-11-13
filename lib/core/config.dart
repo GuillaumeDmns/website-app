@@ -17,7 +17,7 @@ abstract final class AppConfig {
   /// Forces the web app root used in shared links
   static const _webAppUrl = String.fromEnvironment('WEB_APP_URL');
 
-  /// OAuth client "Guillaume web" of the Google Cloud project: Google ID tokens are issued for it (web, and Android
+  /// OAuth client "Nav' web" of the Google Cloud project: Google ID tokens are issued for it (web, and Android
   /// as `serverClientId`), the backend accepts it (`application.google.client-ids`). Not a secret.
   static const googleWebClientId = '98249637445-ok2b6a7v9eckahd9mdcmbqqcthfo2rjp.apps.googleusercontent.com';
 
@@ -53,9 +53,18 @@ abstract final class AppConfig {
     if (kIsWeb) {
       return Uri.base.host == Uri.parse(prodWebAppUrl).host ? AppEnvironment.prod : AppEnvironment.dev;
     }
-    // Android flavor, or Xcode scheme on iOS and macOS (`dev`, `prod`)
-    return appFlavor == 'prod' ? AppEnvironment.prod : AppEnvironment.dev;
+    // Android flavor, or Xcode scheme on iOS and macOS (`dev`, `prod`; `beta`, Android only, is a prod app too)
+    return environmentOfFlavor(appFlavor);
   }
+
+  /// The environment of an Android flavor or Xcode scheme: `prod` and `beta` (a build of the development machine on the
+  /// production backend, next to the store's app) are prod, anything else dev
+  @visibleForTesting
+  static AppEnvironment environmentOfFlavor(String? flavor) =>
+      flavor == 'prod' || flavor == 'beta' ? AppEnvironment.prod : AppEnvironment.dev;
+
+  /// The beta app (Android flavor `beta`): production backend, shown with a "BETA" banner
+  static bool get isBeta => !kIsWeb && _environment.isEmpty && appFlavor == 'beta';
 
   /// Backend root, without `/api`
   static String get apiBaseUrl => _apiBaseUrl.isNotEmpty ? _apiBaseUrl : (isDev ? devApiUrl : prodApiUrl);

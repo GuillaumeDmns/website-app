@@ -7,7 +7,10 @@
       "namespace": "android_app",
       "package_name": "com.guillaumedamiens.app",
       "sha256_cert_fingerprints": [
-        "16:D9:55:5D:93:60:5B:CC:BD:F3:5A:3A:87:B3:67:F9:CA:28:8B:80:A8:CC:1A:15:FF:C3:59:1E:2E:8C:72:98"
+        "16:D9:55:5D:93:60:5B:CC:BD:F3:5A:3A:87:B3:67:F9:CA:28:8B:80:A8:CC:1A:15:FF:C3:59:1E:2E:8C:72:98",
+        "32:A8:E3:F1:37:88:6A:D3:1B:40:A6:13:F1:B2:24:68:89:A4:74:56:72:E2:3E:F0:D6:DE:06:50:4D:CD:E7:D5",
+        "E1:E4:91:62:F1:F6:0E:0B:37:5B:5B:81:95:A0:1E:30:BF:A0:E4:8F:9F:1F:1E:11:57:52:7C:16:CC:A1:04:57",
+        "4B:54:78:DF:D2:23:AB:7F:DE:55:16:F5:52:91:65:B3:11:60:94:34:B7:B0:23:5D:E9:65:6B:E2:FE:B2:21:8D"
       ]
     }
   }

@@ -4,7 +4,7 @@
 #include "Warnings.xcconfig"
 
 APP_BUNDLE_ID = com.guillaumedamiens.app.dev
-APP_DISPLAY_NAME = Guillaume Dev
+APP_DISPLAY_NAME = Nav' Dev
 // Shared with the widget extension; prefixed with the team on macOS
 APP_GROUP_ID = $(DEVELOPMENT_TEAM).com.guillaumedamiens.app.dev
 // Reversed id of the flavor's Google iOS OAuth client (AppConfig.googleAppleClientId, the same client as iOS), the URL

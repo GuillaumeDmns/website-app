@@ -7,12 +7,12 @@ Android, iOS, macOS, web et desktop (Linux, Windows). Architecture et convention
 | | Dev (chez toi) | Prod |
 |---|---|---|
 | Backend | `website-back` lancé sur ta machine (`./mvnw spring-boot:run`) : `http://localhost:8080`, base PostgreSQL locale | `https://guillaumedamiens.com` (VPS, base sur le VPS) |
-| App Android | **Guillaume Dev**, `com.guillaumedamiens.app.dev`, icône orange « DEV » | **Guillaume**, `com.guillaumedamiens.app` |
-| App iOS / macOS | **Guillaume Dev**, `com.guillaumedamiens.app.dev` (schéma Xcode `dev`) | **Guillaume**, `com.guillaumedamiens.app` (schéma `prod`) |
+| App Android | **Nav' Dev**, `com.guillaumedamiens.app.dev`, icône orange « DEV » | **Nav'**, `com.guillaumedamiens.app` (Google Play) ; **Nav' Beta**, `com.guillaumedamiens.app.beta`, icône verte « BETA » (build de ta machine, installé avec adb) |
+| App iOS / macOS | **Nav' Dev**, `com.guillaumedamiens.app.dev` (schéma Xcode `dev`) | **Nav'**, `com.guillaumedamiens.app` (schéma `prod`) |
 | Web | `http://localhost:5000` | `https://app.guillaumedamiens.com` |
-| Repère | bandeau « DEV » en haut à droite | aucun |
+| Repère | bandeau « DEV » en haut à droite | aucun (bandeau vert « BETA » pour la bêta) |
 
-Les deux apps Android s'installent côte à côte. Une build de dev garde ses jetons et ses données à part (clés préfixées `dev.` sur desktop, autre app sur Android, autre site sur le web).
+Les trois apps Android s'installent côte à côte. La bêta sert à essayer sur les vraies données un build pas encore publié, sans toucher à l'app du Play Store (sans App Links : les liens partagés ouvrent l'app du Play Store). Une build de dev garde ses jetons et ses données à part (clés préfixées `dev.` sur desktop, autre app sur Android, autre site sur le web).
 
 ## Développer
 
@@ -58,12 +58,13 @@ gh secret set ANDROID_KEYSTORE_PASSWORD      # puis ANDROID_KEY_ALIAS et ANDROID
 ## Builds de production
 
 ```bash
-flutter build apk --flavor prod              # ou appbundle (Play Store)
+tool/build.sh appbundle --flavor prod        # Google Play (versionné depuis git)
+tool/build.sh apk --flavor beta              # bêta, puis adb install -r build/app/outputs/flutter-apk/app-beta-release.apk
 flutter build web --dart-define=APP_ENV=prod --no-web-resources-cdn   # CanvasKit servi par nous, pas par Google
 flutter build linux --flavor prod --dart-define=APP_ENV=prod
 ```
 
-La variante `prod` (ou `APP_ENV=prod`) ne connaît que `guillaumedamiens.com`.
+Les variantes `prod` et `beta` (ou `APP_ENV=prod`) ne connaissent que `guillaumedamiens.com`.
 
 ## Installer une release
 
