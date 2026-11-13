@@ -20,4 +20,14 @@ void main() {
       expect(tag, contains(RegExp(r'@\d+\.\d+\.\d+/')), reason: tag);
     }
   });
+
+  test('the web page names the app and links its privacy policy without JavaScript', () {
+    // Google checks the OAuth consent screen's home page (app.guillaumedamiens.com): the app's name, its privacy policy
+    final page = File('web/index.html').readAsStringSync();
+    expect(page, contains("<title>Nav'</title>"));
+    final noscript = RegExp(r'<noscript>(.*?)</noscript>', dotAll: true).firstMatch(page)?.group(1);
+    expect(noscript, isNotNull);
+    expect(noscript, contains("Nav'"));
+    expect(noscript, contains('href="/privacy"'));
+  });
 }
