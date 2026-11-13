@@ -47,6 +47,11 @@ dev_dependencies:
   freezed: ^4.0.2
   json_serializable: ^6.14.1
 
+dependency_overrides:
+  # maplibre_android 0.3.7+1 with its images decoded at the screen's density, not scaled up again (third_party/README.md)
+  maplibre_android:
+    path: third_party/maplibre_android
+
 flutter:
 
   uses-material-design: true

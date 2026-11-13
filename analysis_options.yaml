@@ -19,6 +19,8 @@ analyzer:
     # Written by flutter gen-l10n, whose template still lists the delegates of flutter_localizations deprecated for
     # material_ui's (the app uses GlobalMaterialLocalizations.delegates of material_ui instead)
     - lib/l10n/generated/**
+    # A patched copy of a package (third_party/README.md), analyzed upstream
+    - third_party/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

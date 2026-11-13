@@ -741,12 +741,11 @@ packages:
     source: hosted
     version: "0.3.7+1"
   maplibre_android:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: maplibre_android
-      sha256: "8716f36ee839caea21adac9d4c5509f08388e2d59d06b754f7f050a3a2e26bd2"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/maplibre_android"
+      relative: true
+    source: path
     version: "0.3.7+1"
   maplibre_ios:
     dependency: transitive
