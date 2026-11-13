@@ -67,9 +67,14 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
           child: MaterialUiCompatibilityBridge(child: child!),
         );
         // Never mistaken for the production app
-        return AppConfig.isDev
-            ? Banner(message: 'DEV', location: BannerLocation.topEnd, color: Colors.orange.shade800, child: app)
-            : app;
+        if (AppConfig.isDev) {
+          return Banner(message: 'DEV', location: BannerLocation.topEnd, color: Colors.orange.shade800, child: app);
+        }
+        // Nor the beta app, which uses the production backend too
+        if (AppConfig.isBeta) {
+          return Banner(message: 'BETA', location: BannerLocation.topEnd, color: AppTheme.brand, child: app);
+        }
+        return app;
       },
     );
   }

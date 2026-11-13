@@ -3,7 +3,7 @@
 #include "Generated.xcconfig"
 
 APP_BUNDLE_ID = com.guillaumedamiens.app.dev
-APP_DISPLAY_NAME = Guillaume Dev
+APP_DISPLAY_NAME = Nav' Dev
 // Shared with the widget extension (AppConfig.iosAppGroup on the Dart side)
 APP_GROUP_ID = group.com.guillaumedamiens.app.dev
 // Reversed id of the flavor's Google iOS OAuth client (AppConfig.googleAppleClientId), the URL scheme Google returns

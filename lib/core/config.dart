@@ -53,9 +53,18 @@ abstract final class AppConfig {
     if (kIsWeb) {
       return Uri.base.host == Uri.parse(prodWebAppUrl).host ? AppEnvironment.prod : AppEnvironment.dev;
     }
-    // Android flavor, or Xcode scheme on iOS and macOS (`dev`, `prod`)
-    return appFlavor == 'prod' ? AppEnvironment.prod : AppEnvironment.dev;
+    // Android flavor, or Xcode scheme on iOS and macOS (`dev`, `prod`; `beta`, Android only, is a prod app too)
+    return environmentOfFlavor(appFlavor);
   }
+
+  /// The environment of an Android flavor or Xcode scheme: `prod` and `beta` (a build of the development machine on the
+  /// production backend, next to the store's app) are prod, anything else dev
+  @visibleForTesting
+  static AppEnvironment environmentOfFlavor(String? flavor) =>
+      flavor == 'prod' || flavor == 'beta' ? AppEnvironment.prod : AppEnvironment.dev;
+
+  /// The beta app (Android flavor `beta`): production backend, shown with a "BETA" banner
+  static bool get isBeta => !kIsWeb && _environment.isEmpty && appFlavor == 'beta';
 
   /// Backend root, without `/api`
   static String get apiBaseUrl => _apiBaseUrl.isNotEmpty ? _apiBaseUrl : (isDev ? devApiUrl : prodApiUrl);

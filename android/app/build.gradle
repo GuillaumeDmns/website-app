@@ -34,18 +34,25 @@ android {
         multiDexEnabled = true
     }
 
-    // Two apps side by side: dev talks to the backend of the development machine, prod to guillaumedamiens.com
-    // (lib/core/config.dart reads the flavor). flutter run / build without --flavor is dev (pubspec.yaml).
+    // Three apps side by side (lib/core/config.dart reads the flavor; flutter run / build without --flavor is dev,
+    // pubspec.yaml): dev talks to the backend of the development machine (orange icon); beta is a build of this
+    // machine on guillaumedamiens.com, installed with adb next to the store's app (green icon, no App Links); prod is
+    // the Google Play app.
     flavorDimensions = ["environment"]
     productFlavors {
         dev {
             dimension = "environment"
             applicationIdSuffix = ".dev"
-            resValue "string", "app_name", "Guillaume Dev"
+            resValue "string", "app_name", "Nav\\' Dev"
+        }
+        beta {
+            dimension = "environment"
+            applicationIdSuffix = ".beta"
+            resValue "string", "app_name", "Nav\\' Beta"
         }
         prod {
             dimension = "environment"
-            resValue "string", "app_name", "Guillaume"
+            resValue "string", "app_name", "Nav\\'"
         }
     }
 

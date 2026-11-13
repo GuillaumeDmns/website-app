@@ -123,7 +123,7 @@ String appVersionLabel(AppLocalizations l10n, {String version = AppConfig.versio
 /// What else a bug report needs: the commit, the environment, the backend and its release, the platform
 String appBuildDetails(AppLocalizations l10n, {String commit = AppConfig.commit, String? server}) => [
       if (commit.isNotEmpty) 'commit $commit',
-      AppConfig.environment.name,
+      AppConfig.isBeta ? 'beta' : AppConfig.environment.name,
       Uri.parse(AppConfig.apiBaseUrl).host,
       if (server != null) l10n.aboutServerVersion(server),
       AppConfig.platform,

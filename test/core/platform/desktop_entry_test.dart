@@ -19,8 +19,8 @@ void main() {
       expect(entry, endsWith('\n'));
       expect(lines, containsAll([
         'Type=Application',
-        'Name=Guillaume',
-        'Name[fr]=Guillaume',
+        "Name=Nav'",
+        "Name[fr]=Nav'",
         'Comment=${lookupAppLocalizations(const Locale('en')).welcomeText}',
         'Comment[fr]=${lookupAppLocalizations(const Locale('fr')).welcomeText}',
         'Exec="/opt/website_app/website_app"',
