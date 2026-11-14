@@ -25,12 +25,17 @@ class JourneySectionTile extends StatelessWidget {
     required this.section,
     required this.isFirst,
     this.ride,
+    this.waitAfter,
     required this.onChoose,
     required this.focused,
     required this.onFocus,
   });
 
   final JourneySection section;
+
+  /// Seconds waited after a move, at the stop it leads to: said on the move's line (`4 min à pied, 3 min d'attente`),
+  /// the wait having no row of its own then
+  final int? waitAfter;
 
   /// A ride's departures and the one taken
   final RidePlan? ride;
@@ -63,18 +68,19 @@ class JourneySectionTile extends StatelessWidget {
       case SectionKind.bike when section.from?.name.startsWith('Station Vélib') ?? false:
         return _BikeShareTile(section: section);
       case SectionKind.walk || SectionKind.transfer || SectionKind.bike || SectionKind.car || SectionKind.other:
-        final verb = switch (section.kind) {
-          SectionKind.bike => context.l10n.sectionBike,
-          SectionKind.car => context.l10n.sectionCar,
-          SectionKind.transfer => context.l10n.sectionTransfer,
-          _ => context.l10n.sectionWalk,
+        // Its icon first, then each thing once: `11 min à pied · 615 m`, `Correspondance · 4 min à pied`,
+        // `Vélo · 6 min · 1,2 km`; the wait after it on the same line
+        final distance = (section.length ?? 0) > 0 ? formatDistance(section.length!) : null;
+        final move = switch (section.kind) {
+          SectionKind.bike => [context.l10n.sectionBike, formatDuration(section.duration), ?distance],
+          SectionKind.car => [context.l10n.sectionCar, formatDuration(section.duration), ?distance],
+          SectionKind.transfer => [context.l10n.goTransferWalk(formatDuration(section.duration))],
+          _ => [context.l10n.walkFor(formatDuration(section.duration)), ?distance],
+        }.join(' · ');
+        final label = switch (waitAfter) {
+          final wait? when wait >= 60 => '$move, ${context.l10n.waitAfterMove(formatDuration(wait))}',
+          _ => move,
         };
-        // `Marche · 6 min · 450 m`, its icon first
-        final label = [
-          verb,
-          formatDuration(section.duration),
-          if ((section.length ?? 0) > 0) formatDistance(section.length!),
-        ].join(' · ');
         final icon = section.kind == SectionKind.transfer ? Icons.transfer_within_a_station : moveIcon(section.kind);
         final title = Row(
           children: [
@@ -92,7 +98,7 @@ class JourneySectionTile extends StatelessWidget {
                 time: formatClock(section.departure),
                 dot: true,
                 dotted: true,
-                child: Text(section.from!.name, style: theme.textTheme.titleSmall),
+                child: PlaceName(section.from!),
               ),
             TimelineRow(
               color: muted,
@@ -121,6 +127,31 @@ class JourneySectionTile extends StatelessWidget {
           ],
         );
     }
+  }
+}
+
+/// Where a journey starts or ends: a stop by its name, an address with its town beside it, lighter
+/// (`14 Rue Auber` `Paris`)
+class PlaceName extends StatelessWidget {
+  const PlaceName(this.point, {super.key});
+
+  final JourneyPoint point;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (:name, :town) = placeParts(point.name);
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: name),
+        if (town != null && point.stopAreaId == null)
+          TextSpan(
+            text: ' $town',
+            style: TextStyle(fontWeight: FontWeight.w400, color: theme.colorScheme.onSurfaceVariant),
+          ),
+      ]),
+      style: theme.textTheme.titleSmall,
+    );
   }
 }
 
@@ -186,9 +217,9 @@ class _BikeShareTile extends ConsumerWidget {
   }
 }
 
-/// A ride: where to board, the line and its direction with one small icon when something goes wrong (its alerts in a
-/// sheet), its tags and departures, the stops between (folded), where to get off. Where to board along the train and
-/// the platform are GO's and the departures' (each row has its platform).
+/// A ride, each thing said once: where to board, the line and its direction, what goes wrong written in clear (its
+/// alerts in a sheet), its departures, the stops between (folded), where to get off. Where to board along the train
+/// and the platform are GO's and the departures' (each row has its platform).
 class _RideTile extends StatelessWidget {
   const _RideTile({required this.section, required this.plan, required this.onChoose, required this.focused, required this.onFocus});
 
@@ -227,7 +258,7 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.from?.stopAreaId == null ? null : () => context.push(Routes.stop(section.from!.stopAreaId!)),
-            child: Text(section.from?.name ?? '', style: theme.textTheme.titleSmall),
+            child: Text(stopName(section.from?.name ?? ''), style: theme.textTheme.titleSmall),
           ),
         ),
         TimelineRow(
@@ -251,9 +282,9 @@ class _RideTile extends StatelessWidget {
                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                       ),
                     ),
-                    if (hasLine) RideAlertsButton(section: section),
                   ],
                 ),
+                if (hasLine) RideAlertsLine(section: section, padding: const EdgeInsets.only(top: 10)),
                 // The real time shows in its departures (their minutes in green, with its signal): no tag for it here
                 if (hasLine) Padding(padding: const EdgeInsets.only(top: 6), child: LastRideTag(ride: section)),
                 if (plan != null) _RideDepartures(plan: plan!, mode: section.line?.mode, onChoose: onChoose),
@@ -278,9 +309,9 @@ class _RideTile extends StatelessWidget {
                   )
                 else
                   Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      formatDuration(section.duration),
+                      '${formatDuration(section.duration)} · ${context.l10n.rideDirect}',
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ),
@@ -296,7 +327,7 @@ class _RideTile extends StatelessWidget {
               stopDot: true,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(stop.name, style: theme.textTheme.bodyMedium),
+                child: Text(stopName(stop.name), style: theme.textTheme.bodyMedium),
               ),
             ),
         TimelineRow(
@@ -305,7 +336,7 @@ class _RideTile extends StatelessWidget {
           dot: true,
           child: InkWell(
             onTap: section.to?.stopAreaId == null ? null : () => context.push(Routes.stop(section.to!.stopAreaId!)),
-            child: Text(context.l10n.getOffAt(section.to?.name ?? ''), style: theme.textTheme.titleSmall),
+            child: Text(context.l10n.getOffAt(stopName(section.to?.name ?? '')), style: theme.textTheme.titleSmall),
           ),
         ),
       ],
@@ -332,21 +363,16 @@ class _RideDepartures extends ConsumerWidget {
     final taken = plan.ride;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RideDepartureList(
-            rides: rides,
-            now: now,
-            mode: mode,
-            selected: taken,
-            earliest: plan.earliest,
-            onSelect: onChoose,
-            onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
-          ),
-          // If it is missed: the next one
-          IfMissedLine(rides: rides, taken: taken),
-        ],
+      // The list says it all: the departure taken raised, the next one under it should it be missed
+      child: RideDepartureList(
+        rides: rides,
+        now: now,
+        mode: mode,
+        selected: taken,
+        earliest: plan.earliest,
+        compact: true,
+        onSelect: onChoose,
+        onAllDepartures: () => context.push(Routes.stop(plan.key.from)),
       ),
     );
   }

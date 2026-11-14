@@ -39,9 +39,15 @@ void main() {
     // At work already: no suggestion to go there, whatever the time, so the trip stays under "Mes trajets"
     await pumpApp(tester, backend, store: store, position: LatLng(nation.lat, nation.lon));
 
-    // Named after the saved places, timed from the métro's departures (the next one in 7 min, 5 min on foot)
+    // Under the departures around. Named after the saved places, timed from the métro's departures (the next one in
+    // 7 min, 5 min on foot)
+    await scrollTo(tester, find.byType(DailyTripCard));
     expect(find.text(currentL10n.dailyTripsTitle), findsOneWidget);
     expect(find.text(currentL10n.dailyTripName('10 Rue de Rivoli', currentL10n.work)), findsOneWidget);
+    // The times at the station: the métro's next departures from Châtelet, to know when to leave without a sum
+    expect(find.bySemanticsLabel(RegExp('${RegExp.escape(currentL10n.dailyTripAtStop('Châtelet', ''))}\\d\\d:\\d\\d')), findsOneWidget);
+    // Another trip can be added from the title
+    expect(find.byTooltip(currentL10n.dailyTripAdd), findsOneWidget);
     // The last métro within the hour: when to leave at the latest is the main information
     expect(find.textContaining(currentL10n.leaveBefore('').trim()), findsOneWidget);
     expect(backend.requestsTo('/api/v2/lines/C01371/rides').first.queryParameters, containsPair('to', 'IDFM:70003'));
@@ -81,11 +87,26 @@ void main() {
       goControllerProvider.overrideWith(() => go),
     ]);
 
+    await scrollTo(tester, find.widgetWithText(FilledButton, currentL10n.go));
     await tapOn(tester, find.widgetWithText(FilledButton, currentL10n.go));
 
     // The métro in 7 min, not the one saved a few days ago
     expect(go.started?.rides.single.departure.isAfter(DateTime.now().toUtc()), isTrue);
     expect(find.byType(GoScreen), findsOneWidget);
+    expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('without any trip, the home page offers to add one: the journey search', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+
+    expect(find.text(currentL10n.dailyTripsTitle), findsNothing);
+    await tapOn(tester, find.text(currentL10n.dailyTripAdd));
+    // From here, the destination left to choose
+    expect(find.text(currentL10n.chooseFromTo), findsOneWidget);
+    expect(find.text(currentL10n.myLocation), findsOneWidget);
     expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
 
     await closeApp(tester);
@@ -99,7 +120,11 @@ void main() {
     });
     await pumpApp(tester, backend, store: store);
 
-    await tapOn(tester, find.text(currentL10n.dailyTripChoose));
+    // One line, without a title over it
+    final shortcut = find.text(currentL10n.dailyTripSaveCommute(currentL10n.home, currentL10n.work));
+    await scrollTo(tester, shortcut);
+    expect(find.text(currentL10n.dailyTripsTitle), findsNothing);
+    await tapOn(tester, shortcut);
     expect(backend.requestsTo('/api/v2/journeys').single.queryParameters, containsPair('from', '48.86,2.34'));
     await tapOn(tester, find.byType(JourneyCard));
     await tapOn(tester, find.byTooltip(currentL10n.dailyTripSave));
@@ -109,7 +134,8 @@ void main() {
     // Back home: the trip instead of the invitation, without searching again
     await tapOn(tester, find.byTooltip(currentL10n.back));
     await tapOn(tester, find.byTooltip(currentL10n.back));
-    expect(find.text(currentL10n.dailyTripChoose), findsNothing);
+    await scrollTo(tester, find.byType(DailyTripCard));
+    expect(shortcut, findsNothing);
     expect(find.byType(DailyTripCard), findsOneWidget);
     expect(backend.requestsTo('/api/v2/journeys'), hasLength(1));
 

@@ -16,6 +16,7 @@ import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
+import 'map_view.dart';
 
 /// The map with flutter_map and OpenFreeMap's vector tiles in the MapLibre map's style (vector_map_tiles, flat: no
 /// tilt nor 3D buildings): on desktop, where MapLibre doesn't run, and in the tests (the tiles off). flutter_map has
@@ -247,14 +248,20 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     // Moves by hand, and framings: the center nearby searches start from without a position
     if (event is MapEventMove || event is MapEventMoveEnd || event is MapEventFlingAnimationEnd ||
         event is MapEventDoubleTapZoomEnd || event is MapEventScrollWheelZoom) {
-      _centerDebounce?.cancel();
-      _centerDebounce = Timer(const Duration(milliseconds: 600), () {
-        if (mounted) {
-          final camera = _controller.mapController.camera;
-          ref.read(mapCenterProvider.notifier).update(camera.center);
-        }
-      });
+      _publishView();
     }
+  }
+
+  /// Once the camera rests: where it is, and what it shows (the stops there)
+  void _publishView() {
+    _centerDebounce?.cancel();
+    _centerDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        final camera = _controller.mapController.camera;
+        ref.read(mapCenterProvider.notifier).update(camera.center);
+        ref.read(mapViewProvider.notifier).update(mapViewOf(camera.center, camera.zoom, camera.nonRotatedSize, tileSize: 256));
+      }
+    });
   }
 
   @override
@@ -290,6 +297,7 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
           _ready = true;
           _centeredOnUser = user != null;
           _frame(overlay);
+          _publishView();
         },
         onMapEvent: _onMapEvent,
         onLongPress: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),

@@ -95,6 +95,13 @@ Future<void> tapOn(WidgetTester tester, Finder finder) async {
   await settle(tester);
 }
 
+/// Scrolls the home page down until [finder] is on screen: what is below its departures is under the sheet's edge.
+/// By long swipes: the first one raises the sheet, which a short one would let fall back to its middle size.
+Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+  await tester.dragUntilVisible(finder, find.byType(CustomScrollView), const Offset(0, -400));
+  await settle(tester);
+}
+
 /// Unmounts the app so that its timers stop before the test ends
 Future<void> closeApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox());

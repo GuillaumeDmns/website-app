@@ -17,6 +17,7 @@ import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
+import '../home/map_stops.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import '../service_hours/service_hours.dart';
@@ -55,12 +56,16 @@ class StopScreen extends ConsumerWidget {
               pins: [
                 for (final quay in detail.quays)
                   MapPin(point: LatLng(quay.lat, quay.lon), color: scheme.secondary, size: 8, label: quay.name),
-                MapPin(
-                  point: LatLng(detail.lat, detail.lon),
-                  color: scheme.primary,
-                  icon: Icons.directions_transit,
-                  size: 26,
-                  label: detail.name,
+                // The same marker as on the page it was opened from, with its lines, and the stops around it: the map
+                // doesn't change as a stop opens
+                ...stopPins(
+                  context,
+                  [
+                    ...ref.watch(mapStopsProvider).value ?? const <StopAreaSummary>[],
+                    StopAreaSummary(id: detail.id, name: detail.name, lat: detail.lat, lon: detail.lon, lines: detail.lines),
+                  ],
+                  severities: ref.watch(lineSeveritiesProvider),
+                  opened: detail.id,
                 ),
               ],
               fit: [LatLng(detail.lat, detail.lon)],
@@ -295,10 +300,15 @@ class _DepartureList extends StatelessWidget {
             child: Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ),
         for (final (index, item) in _items(rows).indexed) ...[
-          if (index > 0) const Divider(indent: 40),
+          if (index > 0) const Divider(indent: 48),
           switch (item) {
             (final LineDepartures row, null) =>
-              LineDeparturesRow(row: row, now: now, onTap: () => context.push(Routes.line(row.line.id))),
+              LineDeparturesRow(
+                row: row,
+                now: now,
+                realtimeAvailable: departures.realtimeAvailable,
+                onTap: () => context.push(Routes.line(row.line.id)),
+              ),
             (final LineDepartures row, (:final departure, :final destination)) => TrainDepartureRow(
                 line: row.line,
                 departure: departure,

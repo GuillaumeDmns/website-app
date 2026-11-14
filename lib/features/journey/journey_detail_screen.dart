@@ -15,7 +15,6 @@ import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../go/go_controller.dart';
-import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'journey_retime.dart';
@@ -140,7 +139,8 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
         controller: PanelScrollScope.of(context),
         padding: const EdgeInsets.fromLTRB(4, 0, 16, 24),
         children: [
-          // The essentials on one line with the back button: the duration, when, when to leave; saving and sharing
+          // The essentials with the back button, each said once: the duration and the arrival, then when to leave
+          // (the timeline has the times), the transfers and the fare; saving and sharing
           Row(
             children: [
               IconButton(tooltip: context.l10n.back, icon: const Icon(Icons.arrow_back), onPressed: back),
@@ -148,19 +148,30 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge),
                     Text.rich(
                       TextSpan(children: [
-                        TextSpan(text: '${formatClock(journey.departure)} → ${formatClock(journey.arrival)} · '),
+                        TextSpan(text: formatDuration(journey.duration)),
+                        TextSpan(
+                          text: ' · ${context.l10n.arrivalAt(formatClock(journey.arrival))}',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, letterSpacing: 0, color: context.colors.muted),
+                        ),
+                      ]),
+                      style: theme.textTheme.titleLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                    ),
+                    Text.rich(
+                      TextSpan(children: [
                         TextSpan(
                           text: leaveInLabel(journey.departure.difference(now)),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: journey.rides.firstOrNull?.realtime == true ? context.colors.live : null,
+                            color: journey.rides.firstOrNull?.realtime == true ? context.colors.live : theme.colorScheme.onSurface,
                           ),
                         ),
+                        // On one line on a phone; a larger text breaks after a dot, not before
+                        if (journey.transfers > 0) TextSpan(text: '\u00a0· ${context.l10n.transfersShort(journey.transfers).replaceAll(' ', '\u00a0')}'),
+                        if (journey.fare != null && journey.fare! > 0) TextSpan(text: '\u00a0· ${formatFare(journey.fare!).replaceAll(' ', '\u00a0')}'),
                       ]),
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(letterSpacing: 0),
                     ),
                   ],
                 ),
@@ -187,41 +198,51 @@ class _JourneyDetailScreenState extends ConsumerState<JourneyDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (index, section) in journey.sections.indexed)
-                  JourneySectionTile(
-                    section: section,
-                    isFirst: index == 0,
-                    ride: retimed.rides[index],
-                    onChoose: (ride) => _choose(index, ride),
-                    focused: _focused == index,
-                    onFocus: (focus) => _focus(index, focus),
-                  ),
+                  // A wait after a move is said on the move's line
+                  if (!_waitsAfterMove(journey, index))
+                    JourneySectionTile(
+                      section: section,
+                      isFirst: index == 0,
+                      ride: retimed.rides[index],
+                      waitAfter: _waitsAfterMove(journey, index + 1) ? journey.sections[index + 1].duration : null,
+                      onChoose: (ride) => _choose(index, ride),
+                      focused: _focused == index,
+                      onFocus: (focus) => _focus(index, focus),
+                    ),
                 if (journey.sections.lastOrNull?.to case final end?)
                   TimelineRow(
                     color: _endColor(context, journey),
                     time: formatClock(journey.arrival),
                     dot: true,
                     isLast: true,
-                    child: Text(end.name, style: theme.textTheme.titleSmall),
+                    child: PlaceName(end),
                   ),
               ],
             ),
           ),
-          // What the journey is and costs, under it
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
-            child: Text(
-              [
-                journeyTypeLabel(journey.type),
-                if (journey.transfers > 0) context.l10n.transfersShort(journey.transfers),
-                if (journey.fare != null && journey.fare! > 0) formatFare(journey.fare!),
-                if (journey.co2 != null) context.l10n.co2(journey.co2!.round()),
-              ].join(' · '),
-              style: theme.textTheme.bodySmall,
+          // The transfers and the fare are in the header: only what the journey emits is left to say
+          if (journey.co2 case final co2?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
+              child: Text(context.l10n.co2(co2.round()), style: theme.textTheme.bodySmall),
             ),
-          ),
         ],
     );
   }
+}
+
+/// Whether the section at [index] is a wait right after a walk, a transfer or another move (not a Vélib ride, whose
+/// stations have their own rows): the move's line says it, `4 min à pied, 3 min d'attente`
+bool _waitsAfterMove(JourneyOption journey, int index) {
+  if (index <= 0 || index >= journey.sections.length || journey.sections[index].kind != SectionKind.wait) {
+    return false;
+  }
+  final before = journey.sections[index - 1];
+  return switch (before.kind) {
+    SectionKind.walk || SectionKind.transfer || SectionKind.car || SectionKind.other => true,
+    SectionKind.bike => !(before.from?.name.startsWith('Station Vélib') ?? false),
+    SectionKind.transit || SectionKind.wait => false,
+  };
 }
 
 /// The last ride's color, for where the journey ends (the walk's dark grey after it, red without any ride)

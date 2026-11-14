@@ -10,14 +10,44 @@ import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../../traffic/disruption_widgets.dart';
 import '../journey_labels.dart';
-import '../journey_providers.dart';
-import '../journey_retime.dart';
 import '../../traffic/traffic_providers.dart';
 import '../../../app/theme.dart';
 
-/// Result row, like Citymapper, in three lines: the chain of lines and the duration in large figures; when to leave
-/// (green), the times and the fare; the first ride's departures and where it leaves from. The transfers and the walks
-/// are in the chain.
+/// What the journey planner says of [journey] among the options it gives, for its card; null when it says nothing
+/// that sets it apart. Navitia's own words, never worked out here: its tags first (`asap`, `less_transfers`,
+/// `less_fallbacks`, `proposal`: IDFM's), then its type for a way without public transport or an older planner. Tags
+/// most options carry (`walking`, `ecologic`, `reliable`) and the types `rapid` and `comfort`, given to several
+/// options at once, say nothing.
+String? journeyTag(JourneyOption journey) {
+  final l10n = currentL10n;
+  for (final (tag, label) in [
+    ('asap', l10n.journeyAsap),
+    ('less_transfers', l10n.journeyComfort),
+    ('less_fallbacks', l10n.journeyLessWalk),
+    ('proposal', l10n.journeyBest),
+  ]) {
+    if (journey.tags.contains(tag)) {
+      return label;
+    }
+  }
+  return switch (journey.type) {
+    'best' => l10n.journeyBest,
+    'fastest' => l10n.journeyRapid,
+    'less_fallback_walk' => l10n.journeyLessWalk,
+    'non_pt_walk' => l10n.journeyWalk,
+    'non_pt_bike' || 'non_pt_bss' => l10n.journeyBike,
+    'bike_share' => l10n.journeyBikeShare,
+    'car' => l10n.journeyCar,
+    _ => null,
+  };
+}
+
+/// Whether the fare is worth a place on the cards of [journeys]: only when they don't all cost the same
+bool faresDiffer(List<JourneyOption> journeys) => {for (final journey in journeys) journey.fare ?? 0}.length > 1;
+
+/// Result row in two lines: the chain of lines and walks with the duration in large figures (the fare by it when the
+/// options don't cost the same); when to leave (green), the arrival and what sets the option apart ([tag]). A third line only when one of its lines is disrupted, written in
+/// clear. The first ride's next departures and where it leaves from are in the detail.
 class JourneyCard extends ConsumerWidget {
   const JourneyCard({
     super.key,
@@ -25,7 +55,8 @@ class JourneyCard extends ConsumerWidget {
     required this.now,
     required this.onTap,
     this.selected = false,
-    this.onOpen,
+    this.tag,
+    this.showFare = false,
     this.onHover,
   });
 
@@ -36,8 +67,11 @@ class JourneyCard extends ConsumerWidget {
   /// Shown on the map
   final bool selected;
 
-  /// Opens the detail ("Détails" button)
-  final VoidCallback? onOpen;
+  /// What sets it apart among the results ([journeyTag])
+  final String? tag;
+
+  /// See [faresDiffer]
+  final bool showFare;
 
   /// Mouse over the card (desktop / web)
   final VoidCallback? onHover;
@@ -47,16 +81,21 @@ class JourneyCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final colors = context.colors;
-    final firstRide = journey.rides.firstOrNull;
-    final later = _laterDepartures(ref, firstRide);
     final leaveIn = journey.departure.difference(now);
     final minutes = (journey.duration / 60).round();
     final fare = journey.fare;
+    final severities = ref.watch(lineSeveritiesProvider);
+    // Its lines that go wrong, the interrupted ones first
+    final troubles = <({LineSummary line, DisruptionSeverity severity})>[
+      for (final severity in [DisruptionSeverity.blocking, DisruptionSeverity.disrupted])
+        for (final line in {for (final ride in journey.rides) ?ride.line})
+          if (severities[line.id] == severity) (line: line, severity: severity),
+    ];
 
     final card = AppCard(
       onTap: onTap,
       border: selected ? scheme.primary : null,
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -64,6 +103,11 @@ class JourneyCard extends ConsumerWidget {
             children: [
               Expanded(child: SectionsStrip(journey: journey)),
               const SizedBox(width: 8),
+              // Only when the options don't cost the same: by the duration, what is weighed against it
+              if (showFare && fare != null && fare > 0) ...[
+                Text(formatFare(fare), style: theme.textTheme.bodySmall?.copyWith(color: colors.muted, letterSpacing: 0)),
+                const SizedBox(width: 10),
+              ],
               // Like Citymapper: the duration in large figures
               if (minutes < 60) ...[
                 Text('$minutes', style: theme.textTheme.headlineSmall?.copyWith(fontSize: 28, height: 1.05)),
@@ -73,80 +117,61 @@ class JourneyCard extends ConsumerWidget {
                 ),
               ] else
                 Text(formatDuration(journey.duration), style: theme.textTheme.titleLarge),
-              if (onOpen != null)
-                IconButton(
-                  tooltip: context.l10n.details,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(Icons.chevron_right, color: colors.muted),
-                  onPressed: onOpen,
-                )
-              else
-                const SizedBox(width: 12),
             ],
           ),
           const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Row(
+          // The departure is said by when to leave, the arrival alone after it; the planner's tag beside them when it
+          // fits, under them otherwise (`Moins de correspondances`): never cutting the times in two
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
               children: [
-                Flexible(
-                  child: Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                        text: leaveInLabel(leaveIn),
-                        style: theme.textTheme.titleSmall?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
-                      ),
-                      TextSpan(text: '  ${formatClock(journey.departure)} → ${formatClock(journey.arrival)}'),
-                    ]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
+                Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                      text: leaveInLabel(leaveIn),
+                      style: theme.textTheme.titleSmall?.copyWith(color: colors.live, fontWeight: FontWeight.w600),
+                    ),
+                    TextSpan(text: ' ·\u00a0${context.l10n.arrivalAt(formatClock(journey.arrival)).replaceAll(' ', '\u00a0')}'),
+                  ]),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.muted,
+                    letterSpacing: 0,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-                if (fare != null && fare > 0) ...[
-                  const SizedBox(width: 8),
-                  Text(formatFare(fare), style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
-                ],
+                if (tag case final tag?)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: colors.subtle, borderRadius: BorderRadius.circular(6)),
+                    child: Text(tag, style: theme.textTheme.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
               ],
             ),
           ),
-          if (firstRide != null) ...[
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                // `L à 20:30 · 20:45 · 21:00 de Asnières-sur-Seine`: the departure taken, then the next ones
-                context.l10n.firstRide(
-                  firstRide.line?.name ?? '',
-                  [firstRide.departure, ...later].map(formatClock).join(' · '),
-                  firstRide.from?.name ?? '',
+          if (troubles.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Divider(height: 1, color: scheme.outline),
+            const SizedBox(height: 3),
+            for (final trouble in troubles.take(2))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: NoticeLine(
+                  icon: severityIcon(trouble.severity),
+                  // `N16 : trafic interrompu`
+                  text: context.l10n.lineSeverity(trouble.line.name ?? trouble.line.label, severityLabel(trouble.severity).toLowerCase()),
+                  color: severityColor(trouble.severity, scheme),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(color: colors.muted),
               ),
-            ),
           ],
         ],
       ),
     );
     return onHover == null ? card : MouseRegion(onEnter: (_) => onHover!(), child: card);
-  }
-
-  /// The next two departures of the first ride after the one of this option, from its line's departures
-  List<DateTime> _laterDepartures(WidgetRef ref, JourneySection? firstRide) {
-    if (firstRide == null) {
-      return const [];
-    }
-    final key = rideKey(firstRide, firstRide.departure.subtract(const Duration(minutes: 1)), now);
-    if (key == null) {
-      return const [];
-    }
-    return (ref.watch(rideOptionsProvider(key)).value ?? const <Ride>[])
-        .map((ride) => ride.departure.time)
-        .where((time) => time.isAfter(firstRide.departure.add(const Duration(seconds: 30))))
-        .take(2)
-        .toList();
   }
 }
 

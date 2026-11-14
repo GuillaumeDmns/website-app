@@ -3,18 +3,20 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/api/models.dart';
 import '../../l10n/l10n.dart';
 
-/// User-facing name of a Navitia journey type
-String journeyTypeLabel(String? type) => switch (type) {
-      'best' => currentL10n.journeyBest,
-      'rapid' => currentL10n.journeyRapid,
-      'comfort' => currentL10n.journeyComfort,
-      'less_fallback_walk' => currentL10n.journeyLessWalk,
-      'non_pt_walk' => currentL10n.journeyWalk,
-      'non_pt_bike' || 'non_pt_bss' => currentL10n.journeyBike,
-      'bike_share' => currentL10n.journeyBikeShare,
-      'car' => currentL10n.journeyCar,
-      _ => currentL10n.journeyOther,
-    };
+/// A place of a journey as Navitia names it, `14 Rue Auber (Paris)`: its name and its town apart; no town when the
+/// label has none or only repeats the name (`Asnières-sur-Seine (Asnières-sur-Seine)`)
+({String name, String? town}) placeParts(String label) {
+  final match = RegExp(r'^(.*\S)\s*\(([^()]+)\)$').firstMatch(label.trim());
+  if (match == null) {
+    return (name: label, town: null);
+  }
+  final name = match.group(1)!;
+  final town = match.group(2)!.trim();
+  return (name: name, town: town.toLowerCase() == name.toLowerCase() ? null : town);
+}
+
+/// A stop of a journey without its town: the timeline and the map say where it is
+String stopName(String label) => placeParts(label).name;
 
 /// Icon of a move: a bike for a bike ride, a walker otherwise
 IconData moveIcon(SectionKind kind) => kind == SectionKind.bike ? Icons.pedal_bike : Icons.directions_walk;

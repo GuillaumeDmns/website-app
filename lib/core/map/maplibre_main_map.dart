@@ -13,6 +13,7 @@ import 'base_map_style.dart';
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
+import 'map_view.dart';
 import 'maplibre_overlay.dart';
 
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
@@ -387,6 +388,8 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
         if (_ready) {
           _reframe();
         }
+        // What the map shows from the start, should its camera never move
+        _publishView();
       case MapEventMoveCamera(:final camera):
         _layers?.zoomed(camera.zoom);
       case MapEventClick(:final screenPoint):
@@ -400,19 +403,32 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           setState(() => _followPaused = true);
         }
       case MapEventCameraIdle():
-        _centerDebounce?.cancel();
-        _centerDebounce = Timer(const Duration(milliseconds: 600), () {
-          final controller = _controller;
-          final center = controller?.camera?.center;
-          if (mounted && controller != null && center != null) {
-            ref.read(mapCenterProvider.notifier).update(LatLng(center.lat, center.lon));
-          }
-        });
+        _publishView();
       case MapEventLongClick(:final point) || MapEventSecondaryClick(:final point):
         widget.onLongPress?.call(context, LatLng(point.lat, point.lon));
       default:
         break;
     }
+  }
+
+  /// Once the camera rests: where it is, and what it shows (the stops there; MapLibre's world is 512 px wide at
+  /// zoom 0)
+  void _publishView() {
+    _centerDebounce?.cancel();
+    _centerDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted) {
+        return;
+      }
+      final camera = _controller?.camera;
+      final size = _size ?? context.size;
+      if (camera != null) {
+        final center = LatLng(camera.center.lat, camera.center.lon);
+        ref.read(mapCenterProvider.notifier).update(center);
+        if (size != null) {
+          ref.read(mapViewProvider.notifier).update(mapViewOf(center, camera.zoom, size, tileSize: 512));
+        }
+      }
+    });
   }
 
   @override

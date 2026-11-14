@@ -17,6 +17,7 @@ import 'package:website_app/features/go/widgets/go_departures_card.dart';
 import 'package:website_app/features/go/widgets/go_exit_card.dart';
 import 'package:website_app/features/go/widgets/go_ride_card.dart';
 import 'package:website_app/features/go/widgets/go_top_bar.dart';
+import 'package:website_app/features/journey/widgets/ride_departures.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -205,9 +206,10 @@ void main() {
     expect(find.descendant(of: card, matching: find.textContaining(currentL10n.goOnTime, findRichText: true)), findsOneWidget);
     expect(find.text(currentL10n.minutesUnit), findsWidgets);
     expect(find.text(currentL10n.direction('Nation')), findsOneWidget);
-    // Where to board along the train, the departures and the next one if missed
+    // Where to board along the train and the departures; the row after the one taken says what comes if it is missed
     expect(find.byType(TrainPositions), findsOneWidget);
-    expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
+    expect(find.byType(RideDepartureList), findsOneWidget);
+    expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsNothing);
     // The map frames the stop where to board, the user there, not the whole ride
     expect(container.read(mapOverlaysProvider)[Routes.go]!.fit, [LatLng(chatelet.lat, chatelet.lon), LatLng(chatelet.lat, chatelet.lon)]);
 
@@ -372,7 +374,7 @@ void main() {
     expect(find.byType(GoScreen), findsOneWidget);
 
     // The card lists them, the controller follows the planned vehicle in them
-    expect(find.textContaining(currentL10n.goIfMissed('', 0).split(':').first), findsOneWidget);
+    expect(find.byType(RideDepartureList), findsOneWidget);
     expect(backend.requests.where((request) => request.uri.path.endsWith('/rides')), hasLength(1));
     // With real time: a vehicle gone from them has left (the tracker gives it up sooner than one only scheduled)
     expect(container.read(goControllerProvider)?.realtimeDepartures, isTrue);

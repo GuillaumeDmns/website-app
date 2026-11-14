@@ -396,20 +396,15 @@ class _Departures extends ConsumerWidget {
           ? const SkeletonCards(height: 62)
           : Text(context.l10n.goPlannedDeparture(formatClock(planned)), style: Theme.of(context).textTheme.titleMedium);
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RideDepartureList(
-          rides: rides,
-          now: now,
-          mode: step.section.line?.mode,
-          selected: selected,
-          earliest: earliest,
-          onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
-          onAllDepartures: () => context.push(Routes.stop(departures!.from)),
-        ),
-        IfMissedLine(rides: rides, taken: selected),
-      ],
+    // The row under the one taken is the next one should it be missed: no line saying it again
+    return RideDepartureList(
+      rides: rides,
+      now: now,
+      mode: step.section.line?.mode,
+      selected: selected,
+      earliest: earliest,
+      onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
+      onAllDepartures: () => context.push(Routes.stop(departures!.from)),
     );
   }
 }

@@ -107,14 +107,11 @@ class JourneyRequest {
   /// [mode] is allowed (all are without a choice)
   bool allows(TransportMode mode) => modes.isEmpty || modes.contains(mode);
 
-  /// Only [mode] (and its linked ones)
-  JourneyRequest withOnly(TransportMode mode) {
-    var request = this;
-    for (final other in choosableModes) {
-      request = request.withMode(other, other == mode);
-    }
-    return request.withMode(mode, true);
-  }
+  /// [mode] is left out of the journeys (never without a choice)
+  bool avoids(TransportMode mode) => !allows(mode);
+
+  /// How many of the [choosableModes] journeys may use
+  int get allowedCount => choosableModes.where(allows).length;
 
   /// [mode] allowed or not; never none, and all of them is no choice
   JourneyRequest withMode(TransportMode mode, bool allowed) {

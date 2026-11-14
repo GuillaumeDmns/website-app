@@ -12,6 +12,7 @@ import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
+import 'map_stops.dart';
 import 'nearby_departures.dart';
 
 /// Departures around a searched address or place
@@ -31,7 +32,7 @@ class AroundScreen extends ConsumerWidget {
       overlay: MapOverlay(
         pins: [
           MapPin(point: position, color: theme.colorScheme.error, icon: Icons.place, size: 26, label: name),
-          ...nearbyStopPins(context, stops),
+          ...stopPins(context, [for (final departures in stops.reversed) markerStop(departures)]),
         ],
         fit: [position],
       ),

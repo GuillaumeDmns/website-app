@@ -14,7 +14,8 @@ import '../../core/utils/geo.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
-import '../auth/auth_controller.dart';
+import '../auth/account_photo.dart';
+import '../auth/account_sheet.dart';
 import '../bikes/bike_widgets.dart';
 import '../daily_trips/daily_trip_widgets.dart';
 import '../daily_trips/daily_trips.dart';
@@ -22,6 +23,8 @@ import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import '../home_widget/home_widget_sync.dart';
 import '../traffic/traffic_screen.dart';
+import '../traffic/traffic_providers.dart';
+import 'map_stops.dart';
 import 'nearby_departures.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -40,14 +43,21 @@ class HomeScreen extends ConsumerWidget {
     final commute = place == null ? null : tripTo(ref.watch(dailyTripsProvider).value ?? const [], place);
 
     return MapOverlayScope(
-      // Stops above the stations; only what the filter shows
+      // Stops above the stations; only what the filter shows. Close enough, every stop of the part of the map shown
+      // has its marker with its lines; the ones around the user, listed at the bottom of the page, on top.
       overlay: MapOverlay(pins: [
         if (filter == NearbyFilter.all || filter == NearbyFilter.bikes) ...bikeStationPins(context, bikes),
         if (filter != NearbyFilter.bikes)
-          ...nearbyStopPins(context, [
-            for (final departures in stops)
-              if (filter == NearbyFilter.all || departures.lines.any((line) => filter.shows(line.line.mode))) departures,
-          ]),
+          ...stopPins(
+            context,
+            [
+              ...ref.watch(mapStopsProvider).value ?? const <StopAreaSummary>[],
+              // The closest one last: on top
+              for (final departures in stops.reversed) markerStop(departures),
+            ],
+            shows: filter == NearbyFilter.all ? null : filter.shows,
+            severities: ref.watch(lineSeveritiesProvider),
+          ),
       ]),
       child: RefreshIndicator(
         onRefresh: () => ref.refresh(nearbyDeparturesProvider(key).future),
@@ -55,15 +65,9 @@ class HomeScreen extends ConsumerWidget {
           controller: PanelScrollScope.of(context),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Expanded(child: _SearchBox(onTap: () => context.push(Routes.search))),
-                    const SizedBox(width: 4),
-                    const _AccountMenu(),
-                  ],
-                ),
+                child: _SearchBox(onTap: () => context.push(Routes.search)),
               ),
             ),
             if (place != null)
@@ -75,10 +79,8 @@ class HomeScreen extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               sliver: SliverToBoxAdapter(child: FavoriteShortcuts()),
             ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
-              sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
-            ),
+            // What the user saved first: their trips, stops and lines; then the traffic, and what is around last (its
+            // stops are on the map already)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: DailyTripsSection(except: commute?.id)),
@@ -91,16 +93,25 @@ class HomeScreen extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: FavoriteLinesSection()),
             ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
+            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SectionTitle(context.l10n.homeNearby, trailing: UpdatedAgo(value: ref.watch(nearbyDeparturesProvider(key)))),
+                    SectionTitle(
+                      context.l10n.homeNearby,
+                      trailing: UpdatedAgo(value: ref.watch(nearbyDeparturesProvider(key))),
+                    ),
+                    // Which kind of departures, and of stops on the map
+                    const NearbyFilterChips(),
                     if (!origin.isUser)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                        padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
                         child: Text(context.l10n.homeNoPosition, style: theme.textTheme.bodySmall),
                       ),
                     // Settings can only be opened on phones
@@ -201,7 +212,7 @@ class _SearchBox extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+          padding: const EdgeInsets.fromLTRB(18, 3, 4, 3),
           child: Row(
             children: [
               Icon(Icons.search, color: scheme.primary),
@@ -214,6 +225,7 @@ class _SearchBox extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
                 ),
               ),
+              const _AccountButton(),
             ],
           ),
         ),
@@ -222,51 +234,19 @@ class _SearchBox extends StatelessWidget {
   }
 }
 
-class _AccountMenu extends ConsumerWidget {
-  const _AccountMenu();
+/// Who uses the app, at the end of the search box like Google's apps: opens the account and the app's settings
+/// ([showAccountSheet])
+class _AccountButton extends StatelessWidget {
+  const _AccountButton();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = context.l10n;
-    final signedIn = ref.watch(authControllerProvider) == AuthStatus.signedIn;
-    return PopupMenuButton<void>(
-      tooltip: l10n.account,
-      icon: CircleAvatar(
-        radius: 20,
-        backgroundColor: signedIn ? Theme.of(context).colorScheme.primary : context.colors.card,
-        foregroundColor: signedIn ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
-        child: Icon(signedIn ? Icons.person : Icons.person_outline, size: 22),
-      ),
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          onTap: () => ref.read(localeProvider.notifier).toggle(),
-          child: ListTile(leading: const Icon(Icons.translate), title: Text(l10n.otherLanguage), contentPadding: EdgeInsets.zero),
-        ),
-        PopupMenuItem(
-          onTap: () => context.push(Routes.about),
-          child: ListTile(leading: const Icon(Icons.info_outline), title: Text(l10n.about), contentPadding: EdgeInsets.zero),
-        ),
-        if (signedIn)
-          PopupMenuItem(
-            onTap: () => context.push(Routes.account),
-            child: ListTile(leading: const Icon(Icons.manage_accounts_outlined), title: Text(l10n.accountTitle), contentPadding: EdgeInsets.zero),
-          ),
-        if (signedIn)
-          PopupMenuItem(
-            onTap: () => ref.read(authControllerProvider.notifier).signOut(),
-            child: ListTile(leading: const Icon(Icons.logout), title: Text(l10n.signOut), contentPadding: EdgeInsets.zero),
-          )
-        else
-          PopupMenuItem(
-            onTap: () => context.go(Routes.signIn(Routes.home)),
-            child: ListTile(
-              leading: const Icon(Icons.login),
-              title: Text(l10n.signInAction),
-              subtitle: Text(l10n.guestModeHint),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-      ],
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: context.l10n.account,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(),
+      icon: const AccountAvatar(size: 36),
+      onPressed: () => showAccountSheet(context),
     );
   }
 }

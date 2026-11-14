@@ -5,6 +5,7 @@ import '../../core/api/models.dart';
 import '../../core/offline/offline_cache.dart';
 import '../../core/storage/local_store.dart';
 import '../home_widget/home_widget_sync.dart';
+import 'account_photo.dart';
 import 'google/google_auth.dart';
 
 /// [guest]: the app is used without account (guest token, capped usage, data on the device only)
@@ -38,6 +39,7 @@ class AuthController extends Notifier<AuthStatus> {
     await store.remove('journey_preferences');
     await store.remove('daily_trips');
     await OfflineCacheInterceptor.clear(store);
+    await ref.read(accountPhotoProvider.notifier).set(null);
     await clearHomeWidget();
   }
 
@@ -45,6 +47,8 @@ class AuthController extends Notifier<AuthStatus> {
   Future<void> signInWithGoogle(String idToken) async {
     final tokens = await ref.read(authApiProvider).google(idToken);
     await _signedIn(tokens);
+    // The account's picture, for its avatar: Google's own address of it, kept here only
+    await ref.read(accountPhotoProvider.notifier).set(googlePhotoOf(idToken));
   }
 
   /// Linux, Windows: the sign-in through the browser ends with the account's tokens (`BrowserSignIn`)

@@ -4,13 +4,18 @@ import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/map_place/map_place_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
+import 'package:website_app/features/traffic/traffic_screen.dart';
 
 import '../support/standard_backend.dart';
 import '../support/test_app.dart';
 
 /// Browsing the network as a guest: home, search, stop, line, traffic, favorites
 void main() {
-  Finder badgeOf(String lineId) => find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == lineId);
+  /// In the page, not on a stop's marker of the map
+  Finder badgeOf(String lineId) => find.descendant(
+        of: find.byType(DraggableScrollableSheet),
+        matching: find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == lineId),
+      );
 
   testWidgets('from the nearby stop to its line, saved as a favorite', (tester) async {
     final backend = standardBackend();
@@ -104,7 +109,10 @@ void main() {
     final backend = standardBackend();
     await pumpApp(tester, backend);
 
-    await tapOn(tester, find.text(currentL10n.trafficTitle));
+    // One line under the departures around: how many lines, the worst ones
+    await scrollTo(tester, find.byType(TrafficSummaryCard));
+    expect(find.descendant(of: find.byType(TrafficSummaryCard), matching: find.textContaining('perturbée')), findsOneWidget);
+    await tapOn(tester, find.byType(TrafficSummaryCard));
     expect(find.textContaining('Métro 1 : trafic interrompu'), findsWidgets);
     // Bus lines are folded
     expect(find.textContaining('ligne de bus perturbée'), findsOneWidget);
@@ -144,7 +152,8 @@ void main() {
         const PlaceResult(type: PlaceType.address, id: 'address:1', name: '2 Rue Jean Lantier 75001 Paris', lat: 48.8584, lon: 2.347).toJson());
     await pumpApp(tester, backend);
 
-    await tester.longPressAt(const Offset(206, 200));
+    // Beside Châtelet's marker, in the middle of the map
+    await tester.longPressAt(const Offset(80, 120));
     await settle(tester);
 
     expect(backend.requestsTo('/api/v2/places/reverse'), hasLength(1));
@@ -165,7 +174,8 @@ void main() {
     backend.get('/api/v2/places/reverse', {'status': 404, 'detail': 'Not found'}, status: 404);
     await pumpApp(tester, backend);
 
-    await tester.longPressAt(const Offset(206, 200));
+    // Beside Châtelet's marker, in the middle of the map
+    await tester.longPressAt(const Offset(80, 120));
     await settle(tester);
     await tapOn(tester, find.descendant(of: find.byType(MapPlaceSheet), matching: find.text(currentL10n.departuresAround)));
 

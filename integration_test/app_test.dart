@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/journey/widgets/journey_card.dart';
+import 'package:website_app/features/traffic/traffic_screen.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../test/support/standard_backend.dart';
@@ -18,7 +19,7 @@ void main() {
     // Phone layout (bottom sheet over the map)
     await pumpApp(tester, backend, size: const Size(412, 915));
 
-    expect(find.text(currentL10n.homeNearby), findsOneWidget);
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
 
     // Search
     await tapOn(tester, find.text(currentL10n.homeSearchHint));
@@ -28,7 +29,14 @@ void main() {
     expect(find.text(currentL10n.walkingConnections), findsOneWidget);
 
     // Line
-    await tapOn(tester, find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == 'C01371'));
+    // Its badge in the page (the stop's marker on the map has one too)
+    await tapOn(
+      tester,
+      find.descendant(
+        of: find.byType(Scrollable),
+        matching: find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == 'C01371'),
+      ),
+    );
     expect(find.text('Gare de Lyon'), findsWidgets);
     await tapOn(tester, find.byTooltip(currentL10n.back));
 
@@ -45,8 +53,9 @@ void main() {
     final backend = standardBackend();
     await pumpApp(tester, backend, size: const Size(1280, 800));
 
-    expect(find.text(currentL10n.homeNearby), findsOneWidget);
-    await tapOn(tester, find.text(currentL10n.trafficTitle));
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
+    await scrollTo(tester, find.byType(TrafficSummaryCard));
+    await tapOn(tester, find.byType(TrafficSummaryCard));
     expect(find.textContaining('Métro 1 : trafic interrompu'), findsWidgets);
 
     await closeApp(tester);

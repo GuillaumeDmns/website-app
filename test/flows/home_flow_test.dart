@@ -1,15 +1,24 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/traffic/traffic_screen.dart';
+import 'package:website_app/core/map/map_overlay.dart';
+import 'package:website_app/app/routes.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:website_app/core/location/location_providers.dart';
+import 'package:website_app/core/map/map_view.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/daily_trips/daily_trip_widgets.dart';
 import 'package:website_app/features/daily_trips/daily_trips.dart';
 import 'package:website_app/features/favorites/favorite_widgets.dart';
+import 'package:website_app/features/home/map_stops.dart';
 import 'package:website_app/features/home/nearby_departures.dart';
 import 'package:website_app/features/journey/journey_request.dart';
+import 'package:website_app/features/stops/widgets/stop_departures_card.dart';
 import 'package:website_app/l10n/l10n.dart';
 
+import '../support/fake_backend.dart';
 import '../support/memory_store.dart';
 import '../support/samples.dart';
 import '../support/standard_backend.dart';
@@ -148,14 +157,103 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets('the kinds of departures are chosen over the map, Vélib undone in one tap', (tester) async {
+  testWidgets('the kinds of departures are chosen under "À proximité", Vélib undone in one tap', (tester) async {
     await pumpApp(tester, standardBackend());
 
-    expect(find.byType(NearbyMapFilters), findsOneWidget);
-    await tapOn(tester, find.descendant(of: find.byType(NearbyMapFilters), matching: find.text('Vélib')));
-    expect(find.descendant(of: find.byType(NearbyMapFilters), matching: find.byIcon(Icons.close)), findsOneWidget);
-    await tapOn(tester, find.descendant(of: find.byType(NearbyMapFilters), matching: find.text('Vélib')));
-    expect(find.descendant(of: find.byType(NearbyMapFilters), matching: find.byIcon(Icons.close)), findsNothing);
+    // Right under the search and the places: the departures around, no scroll needed
+    expect(find.byType(NearbyFilterChips), findsOneWidget);
+    expect(find.byType(StopDeparturesCard), findsWidgets);
+    final velib = find.descendant(of: find.byType(NearbyFilterChips), matching: find.text('Vélib'));
+    await tapOn(tester, velib);
+    expect(find.byType(StopDeparturesCard), findsNothing);
+    await tapOn(tester, velib);
+    expect(find.byType(StopDeparturesCard), findsWidgets);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('what the user saved comes first, the traffic then the departures around last', (tester) async {
+    final store = MemoryStore({
+      'favorites': [
+        Favorite(id: -1, kind: FavoriteKind.stop, label: 'Nation', stopAreaId: nation.id, stop: nation).toJson(),
+      ],
+    });
+    await pumpApp(tester, standardBackend(), store: store);
+
+    double top(Finder finder) => tester.getTopLeft(finder.first).dy;
+    expect(top(find.text(currentL10n.myStops)), lessThan(top(find.byType(TrafficSummaryCard))));
+    await scrollTo(tester, find.text(currentL10n.homeNearby));
+    expect(top(find.byType(TrafficSummaryCard, skipOffstage: false)), lessThan(top(find.text(currentL10n.homeNearby))));
+    expect(top(find.text(currentL10n.homeNearby)), lessThan(top(find.byType(NearbyFilterChips))));
+
+    await closeApp(tester);
+  });
+
+  testWidgets("a stop opened keeps its marker with its lines, and the stops around theirs", (tester) async {
+    final backend = standardBackend();
+    const hotelDeVille = StopAreaSummary(id: 'IDFM:70010', name: 'Hôtel de Ville', lat: 48.8592, lon: 2.3486, lines: [bus38]);
+    backend.on('GET', '/api/v2/nearby', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
+    backend.get('/api/v2/stops/IDFM:70010', StopAreaDetail(id: hotelDeVille.id, name: hotelDeVille.name, lat: hotelDeVille.lat, lon: hotelDeVille.lon, lines: const [bus38]).toJson());
+    await pumpApp(tester, backend);
+
+    await tapOn(tester, find.text('Châtelet'));
+    expect(find.text(currentL10n.walkingConnections), findsOneWidget);
+    // The marker with its lines, not a plain pin; its own opens nothing
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    List<MapPin> pins() => container.read(mapOverlaysProvider)[container.read(routerLocationProvider)]!.pins;
+    final own = pins().singleWhere((pin) => pin.child is StopMarker && pin.label == 'Châtelet');
+    expect((own.child! as StopMarker).lines, [rerA, metro1, bus38]);
+    expect(own.onTap, isNull);
+    expect(pins().where((pin) => pin.icon == Icons.directions_transit), isEmpty);
+
+    // Another stop's marker: its page instead of this one, going back leaves the stops
+    pins().singleWhere((pin) => pin.child is StopMarker && pin.label == 'Hôtel de Ville').onTap!();
+    await settle(tester);
+    expect(container.read(routerLocationProvider), Routes.stop(hotelDeVille.id));
+    await tapOn(tester, find.byTooltip(currentL10n.back));
+    expect(container.read(routerLocationProvider), Routes.home);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('close enough, the stops of the part of the map shown have their markers; a tap opens one', (tester) async {
+    final backend = standardBackend();
+    // A stop the map shows, further than the departures listed around
+    const hotelDeVille = StopAreaSummary(id: 'IDFM:70010', name: 'Hôtel de Ville', lat: 48.8592, lon: 2.3486, lines: [bus38]);
+    backend.on('GET', '/api/v2/nearby', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
+    await pumpApp(tester, backend);
+
+    // Asked around the middle of the map, as far as its corners, from the GTFS
+    final request = backend.requestsTo('/api/v2/nearby').last.queryParameters;
+    expect(request['lat'], closeTo(48.858, 0.005));
+    expect(request['radius'], inInclusiveRange(500, 2000));
+    // One marker per stop with its lines: Châtelet once, though listed around too
+    StopMarker marker(Element element) => element.widget as StopMarker;
+    expect([for (final element in find.byType(StopMarker).evaluate()) marker(element).lines.length]..sort(), [1, 3]);
+
+    // Further out, only the stops around the user are left
+    final container = ProviderScope.containerOf(tester.element(find.byType(StopMarker).first));
+    container.read(mapViewProvider.notifier).update(mapViewOf(const LatLng(48.8584, 2.347), 12, const Size(412, 915), tileSize: 256));
+    await settle(tester);
+    expect([for (final element in find.byType(StopMarker).evaluate()) marker(element).lines], [
+      [rerA, metro1, bus38],
+    ]);
+
+    // A tap: the stop's page
+    await tester.tap(find.byType(StopMarker));
+    await settle(tester);
+    expect(find.text(currentL10n.walkingConnections), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a kind of departures chosen: the stops of that kind only on the map, with those lines', (tester) async {
+    await pumpApp(tester, standardBackend());
+
+    await tapOn(tester, find.descendant(of: find.byType(NearbyFilterChips), matching: find.text(currentL10n.filterBus)));
+    expect([for (final element in find.byType(StopMarker).evaluate()) (element.widget as StopMarker).lines], [
+      [bus38],
+    ]);
 
     await closeApp(tester);
   });

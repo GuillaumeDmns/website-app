@@ -1,15 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../app/routes.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
-import '../../app/theme.dart';
-import '../../core/map/map_overlay.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
@@ -31,19 +27,6 @@ final nearbyDeparturesProvider = FutureProvider.autoDispose.family<List<StopDepa
   return ref.watch(mobilityApiProvider).nearbyDepartures(key.lat, key.lon);
 });
 
-/// Map pins of the stop areas of [stops]
-List<MapPin> nearbyStopPins(BuildContext context, List<StopDepartures> stops) => [
-  for (final departures in stops)
-    MapPin(
-      point: LatLng(departures.stop.lat, departures.stop.lon),
-      color: Theme.of(context).colorScheme.primary,
-      icon: Icons.directions_transit,
-      size: 22,
-      label: departures.stop.name,
-      onTap: () => context.push(Routes.stop(departures.stop.id)),
-    ),
-];
-
 /// Kind of departures shown around: all, rail (metro, RER, trains), buses (and Noctiliens), trams, Vélib
 enum NearbyFilter {
   all,
@@ -58,14 +41,6 @@ enum NearbyFilter {
     bus => currentL10n.filterBus,
     tram => currentL10n.filterTram,
     bikes => 'Vélib',
-  };
-
-  IconData get icon => switch (this) {
-    all => Icons.near_me_outlined,
-    rail => Icons.subway_outlined,
-    bus => Icons.directions_bus_outlined,
-    tram => Icons.tram_outlined,
-    bikes => Icons.pedal_bike,
   };
 
   bool shows(TransportMode mode) => switch (this) {
@@ -87,22 +62,18 @@ class _NearbyFilterController extends Notifier<NearbyFilter> {
 /// The kind of departures shown around, for the time the app runs
 final nearbyFilterProvider = NotifierProvider<_NearbyFilterController, NearbyFilter>(_NearbyFilterController.new);
 
-/// Over the map of the home page, like Citymapper: chips choosing [nearbyFilterProvider], scrolled sideways, so that
-/// the panel keeps its room. The kind chosen is dark; a chosen Vélib offers to go back to everything.
-class NearbyMapFilters extends ConsumerWidget {
-  const NearbyMapFilters({super.key});
+/// Under "À proximité": chips choosing [nearbyFilterProvider], scrolled sideways, which also choose the stops on the
+/// map. The kind chosen is filled; tapped again, it goes back to everything.
+class NearbyFilterChips extends ConsumerWidget {
+  const NearbyFilterChips({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(routerLocationProvider) != Routes.home) {
-      return const SizedBox.shrink();
-    }
     final selected = ref.watch(nearbyFilterProvider);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
       child: Row(
         children: [
           for (final filter in NearbyFilter.values)
@@ -111,39 +82,22 @@ class NearbyMapFilters extends ConsumerWidget {
               child: Semantics(
                 button: true,
                 selected: filter == selected,
-                child: DecoratedBox(
-                  decoration: const ShapeDecoration(
-                    shape: StadiumBorder(),
-                    shadows: [BoxShadow(color: Color(0x2E000000), blurRadius: 8, offset: Offset(0, 2))],
-                  ),
-                  child: Material(
-                    color: filter == selected ? scheme.onSurface : context.colors.card,
-                    shape: const StadiumBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () => ref
-                          .read(nearbyFilterProvider.notifier)
-                          .select(filter == selected && filter != NearbyFilter.all ? NearbyFilter.all : filter),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(filter.icon, size: 18, color: filter == selected ? scheme.surface : scheme.onSurface),
-                            const SizedBox(width: 6),
-                            Text(
-                              filter.label,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontSize: 14,
-                                fontWeight: filter == selected ? FontWeight.w600 : FontWeight.w500,
-                                color: filter == selected ? scheme.surface : scheme.onSurface,
-                              ),
-                            ),
-                            if (filter == selected && filter != NearbyFilter.all) ...[
-                              const SizedBox(width: 4),
-                              Icon(Icons.close, size: 16, color: scheme.surface),
-                            ],
-                          ],
+                child: Material(
+                  color: filter == selected ? scheme.onSurface : Colors.transparent,
+                  shape: StadiumBorder(side: filter == selected ? BorderSide.none : BorderSide(color: scheme.outline)),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => ref
+                        .read(nearbyFilterProvider.notifier)
+                        .select(filter == selected && filter != NearbyFilter.all ? NearbyFilter.all : filter),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      child: Text(
+                        filter.label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: 14,
+                          fontWeight: filter == selected ? FontWeight.w600 : FontWeight.w500,
+                          color: filter == selected ? scheme.surface : scheme.onSurface,
                         ),
                       ),
                     ),
@@ -157,7 +111,7 @@ class NearbyMapFilters extends ConsumerWidget {
   }
 }
 
-/// Cards of the departures around [position], of the kind chosen with [NearbyFilterBar]
+/// Cards of the departures around [position], of the kind chosen with [NearbyFilterChips]
 class NearbyDeparturesList extends ConsumerWidget {
   const NearbyDeparturesList({super.key, required this.position});
 

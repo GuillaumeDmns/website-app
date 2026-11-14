@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,9 +14,11 @@ import '../../core/location/location_providers.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
+import '../../core/widgets/line_badge.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
+import '../journey/journey_labels.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
@@ -164,58 +168,115 @@ class DailyTripsSection extends ConsumerWidget {
     final names = [for (final trip in all) {tripPlaceName(trip.start, favorites), tripPlaceName(trip.end, favorites)}];
     final commuteSaved = names.any((pair) => pair.contains(context.l10n.home) && pair.contains(context.l10n.work));
 
-    if (trips.isEmpty && (home == null || work == null || commuteSaved)) {
-      return const SizedBox.shrink();
-    }
+    final commute = home != null && work != null && !commuteSaved;
+    final preferences = ref.watch(journeyPreferencesProvider);
+    void search(JourneyRequest request) => context.push(Routes.journey(preferences.apply(request)));
+    void add() => search(const JourneyRequest(from: JourneyPlace.currentLocation()));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionTitle(context.l10n.dailyTripsTitle),
+        // Without any trip yet, the invitation alone: no title over a single line
+        if (trips.isNotEmpty)
+          SectionTitle(
+            context.l10n.dailyTripsTitle,
+            trailing: all.length < DailyTrips.max && !commute
+                ? IconButton(
+                    tooltip: context.l10n.dailyTripAdd,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add, size: 20),
+                    onPressed: add,
+                  )
+                : null,
+            padding: const EdgeInsets.fromLTRB(4, 10, 0, 4),
+          )
+        else
+          const SizedBox(height: 12),
         for (final trip in trips)
           Padding(padding: const EdgeInsets.only(bottom: 10), child: DailyTripCard(key: ValueKey(trip.id), trip: trip)),
-        if (home != null && work != null && !commuteSaved) _CommuteHint(home: home, work: work),
+        // Home and work saved without a trip between them: that one first; else, without any trip, any
+        if (commute)
+          _AddTripLine(
+            text: context.l10n.dailyTripSaveCommute(context.l10n.home, context.l10n.work),
+            onTap: () => search(JourneyRequest(from: favoritePlace(home), to: favoritePlace(work))),
+          )
+        else if (all.isEmpty)
+          _AddTripLine(text: context.l10n.dailyTripAdd, hint: context.l10n.dailyTripAddHint, onTap: add),
       ],
     );
   }
 }
 
-class _CommuteHint extends ConsumerWidget {
-  const _CommuteHint({required this.home, required this.work});
+/// An invitation to save a trip, on one dashed line (nothing saved yet): "Enregistrer le trajet Maison → Travail",
+/// or "Ajouter un trajet" with what it gives ([hint]). It opens the journey search, where an option is chosen and
+/// saved from its detail.
+class _AddTripLine extends StatelessWidget {
+  const _AddTripLine({required this.text, this.hint, required this.onTap});
 
-  final Favorite home;
-  final Favorite work;
+  final String text;
+  final String? hint;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconBubble(Icons.route, color: theme.colorScheme.primary, size: 34),
-              const SizedBox(width: 12),
-              Expanded(child: Text(context.l10n.dailyTripHint(context.l10n.home, context.l10n.work), style: theme.textTheme.bodyMedium)),
-            ],
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              icon: const Icon(Icons.arrow_forward, size: 18),
-              label: Text(context.l10n.dailyTripChoose),
-              onPressed: () => context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
-                    from: favoritePlace(home),
-                    to: favoritePlace(work),
-                  )))),
+    final radius = BorderRadius.circular(AppTheme.radius);
+    return CustomPaint(
+      foregroundPainter: _DashedBorder(color: theme.colorScheme.outline, radius: AppTheme.radius),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Row(
+              children: [
+                Icon(Icons.route, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(text, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15, fontWeight: FontWeight.w500)),
+                      if (hint case final hint?)
+                        Text(hint, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// A dashed rounded outline
+class _DashedBorder extends CustomPainter {
+  const _DashedBorder({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final outline = ui.Path()..addRRect(RRect.fromRectAndRadius((Offset.zero & size).deflate(0.5), Radius.circular(radius)));
+    for (final metric in outline.computeMetrics()) {
+      for (var start = 0.0; start < metric.length; start += 8) {
+        canvas.drawPath(metric.extractPath(start, start + 4), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorder oldDelegate) => oldDelegate.color != color || oldDelegate.radius != radius;
 }
 
 /// A daily trip: when to leave for its next departures (large, green) and when it arrives, from the departures of its
@@ -353,11 +414,7 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
                                 if (last!.ride.line case final line? when last.lastDeparture != null)
                                   context.l10n.lastRideOf(modeNoun(line.mode), line.name ?? '', formatClock(last.lastDeparture!)),
                               ].join(' · ')
-                            : [
-                                '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
-                                if (options.length > 1)
-                                  context.l10n.dailyTripThen(options.skip(1).map((option) => formatClock(option.departure)).join(', ')),
-                              ].join(' · '),
+                            : '${formatClock(next.departure)} → ${formatClock(next.arrival)}',
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -389,6 +446,7 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
             ),
           ),
           Padding(padding: const EdgeInsets.only(top: 10, right: 12), child: SectionsStrip(journey: next)),
+          Padding(padding: const EdgeInsets.only(top: 10, right: 12), child: _StationDepartures(options: options)),
           if (disrupted != null)
             Padding(
               padding: const EdgeInsets.only(top: 10, right: 12),
@@ -410,6 +468,51 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
               padding: const EdgeInsets.only(top: 10, right: 12),
               child: NoticeLine(icon: last?.over == true ? Icons.bedtime_outlined : Icons.nightlight_round, text: alert),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The times at the station: when the trip's first ride leaves its stop, for the next departures of the trip. What
+/// a regular needs to know when to leave home, without doing the sum from "leave in".
+class _StationDepartures extends StatelessWidget {
+  const _StationDepartures({required this.options});
+
+  /// The trip on its next departures ([upcomingTrips])
+  final List<JourneyOption> options;
+
+  @override
+  Widget build(BuildContext context) {
+    final rides = [for (final option in options) ?option.rides.firstOrNull];
+    final first = rides.firstOrNull;
+    final from = first?.from;
+    if (first == null || from == null) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final stop = stopName(from.name);
+    final times = [for (final ride in rides) formatClock(ride.departure)];
+    return Semantics(
+      label: context.l10n.dailyTripAtStop(stop, times.join(', ')),
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          if (first.line case final line?) ...[LineBadge(line, size: 20), const SizedBox(width: 8)],
+          Flexible(
+            child: Text(stop, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+          ),
+          const SizedBox(width: 10),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: times.first, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                if (times.length > 1) TextSpan(text: ' · ${times.skip(1).join(' · ')}'),
+              ],
+            ),
+            maxLines: 1,
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, letterSpacing: 0, color: context.colors.muted),
+          ),
         ],
       ),
     );

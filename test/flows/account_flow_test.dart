@@ -1,4 +1,6 @@
+
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:website_app/app/router.dart';
 import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/api/api_exception.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/features/auth/account_photo.dart';
 import 'package:website_app/features/auth/google/browser_sign_in.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -39,6 +42,43 @@ void main() {
 
     await tapOn(tester, find.text(currentL10n.signOut));
     expect(backend.requestsTo('/api/logout'), hasLength(1));
+
+    await closeApp(tester);
+  });
+
+  testWidgets("the avatar of the search opens who uses the app and its settings; signed in, the Google picture", (tester) async {
+    final backend = standardBackend();
+    backend.post('/api/logout', null, status: 204);
+    const picture = 'https://lh3.googleusercontent.com/a/ada=s96-c';
+    String part(Object value) => base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+    final idToken = '${part({'alg': 'RS256'})}.${part({'sub': '42', 'picture': picture})}.signature';
+    final store = await pumpApp(tester, backend, googleAccountChooser: () async => idToken);
+
+    // In the search box, not beside it
+    final avatar = find.byTooltip(currentL10n.account);
+    final photo = find.descendant(of: find.byType(AccountAvatar), matching: find.byType(Image));
+    expect(find.descendant(of: find.widgetWithText(InkWell, currentL10n.homeSearchHint), matching: avatar), findsOneWidget);
+    await tapOn(tester, avatar);
+    // A guest: what signing in adds, then the settings
+    expect(find.text(currentL10n.accountSheetGuest), findsOneWidget);
+    expect(find.text(currentL10n.guestModeHint), findsOneWidget);
+    expect(find.text(currentL10n.language), findsOneWidget);
+    expect(find.text(currentL10n.about), findsOneWidget);
+    expect(find.text(currentL10n.signOut), findsNothing);
+    expect(photo, findsNothing);
+
+    await tapOn(tester, find.text(currentL10n.signInAction));
+    await tapOn(tester, find.text(currentL10n.continueWithGoogle));
+    // The picture's address from the ID token, kept on the device only
+    expect(store.values['account_photo'], jsonEncode(picture));
+    expect(tester.widget<Image>(photo).image, isA<NetworkImage>().having((image) => image.url, 'url', picture));
+
+    await tapOn(tester, avatar);
+    expect(find.text('Ada'), findsOneWidget);
+    expect(find.text('ada@example.com'), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.signOut));
+    expect(store.values.containsKey('account_photo'), isFalse);
+    expect(photo, findsNothing);
 
     await closeApp(tester);
   });
@@ -161,6 +201,30 @@ void main() {
     await tapOn(tester, find.text(currentL10n.skip));
 
     expect(find.text(currentL10n.homeNearby), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('welcome pages: an address saved is said above the buttons, not over them', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend, onboardingDone: false);
+
+    await tapOn(tester, find.text(currentL10n.next));
+    await tapOn(tester, find.text(currentL10n.next));
+    expect(find.text(currentL10n.welcomePlacesTitle), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.home));
+    await tester.enterText(find.byType(TextField), 'rivoli');
+    await settle(tester);
+    await tapOn(tester, find.text('10 Rue de Rivoli (Paris)'));
+
+    final saved = find.text(currentL10n.favoriteSaved(currentL10n.home));
+    expect(saved, findsOneWidget);
+    final message = tester.getRect(find.ancestor(of: saved, matching: find.byType(SnackBar)));
+    final next = tester.getRect(find.widgetWithText(FilledButton, currentL10n.next));
+    expect(message.bottom, lessThanOrEqualTo(next.top));
+    // Still reachable under it
+    await tapOn(tester, find.text(currentL10n.next));
+    expect(find.text(currentL10n.welcomeAccountTitle), findsOneWidget);
 
     await closeApp(tester);
   });
