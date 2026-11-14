@@ -45,6 +45,8 @@ void main() {
       (tester) async {
     // A lower screen, where a stop's page is longer than the highest sheet
     await pumpApp(tester, standardBackend(), size: const Size(412, 600));
+    // The stops around are at the bottom of the home page
+    await scrollTo(tester, find.text('Châtelet'));
     await tapOn(tester, find.text('Châtelet'));
 
     // Raised, then its list scrolled down: its header out of sight

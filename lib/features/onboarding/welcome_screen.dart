@@ -54,6 +54,40 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     ref.watch(authControllerProvider);
     return Scaffold(
+      // The page's buttons as the scaffold's bottom bar: a message (an address saved) shows above them, not over them
+      bottomNavigationBar: SafeArea(
+        child: Align(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: Row(
+                children: [
+                  for (var i = 0; i < _pageCount; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 6),
+                      width: i == _page ? 22 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: i == _page ? scheme.primary : scheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  const Spacer(),
+                  FilledButton(
+                    // The theme makes filled buttons full width
+                    style: FilledButton.styleFrom(minimumSize: const Size(140, 48)),
+                    onPressed: _next,
+                    child: Text(_page == _pageCount - 1 ? context.l10n.letsGo : context.l10n.next),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -73,31 +107,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       const _LocationPage(),
                       const _PlacesPage(),
                       if (_pageCount == 4) _AccountPage(onSignIn: () => _finish(signIn: true)),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                  child: Row(
-                    children: [
-                      for (var i = 0; i < _pageCount; i++)
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.only(right: 6),
-                          width: i == _page ? 22 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: i == _page ? scheme.primary : scheme.outlineVariant,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      const Spacer(),
-                      FilledButton(
-                        // The theme makes filled buttons full width
-                        style: FilledButton.styleFrom(minimumSize: const Size(140, 48)),
-                        onPressed: _next,
-                        child: Text(_page == _pageCount - 1 ? context.l10n.letsGo : context.l10n.next),
-                      ),
                     ],
                   ),
                 ),

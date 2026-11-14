@@ -83,13 +83,31 @@ RideAlerts rideAlerts({
   );
 }
 
-/// A ride's [RideAlerts] as one small icon at the end of its line's row in the journey detail, in the color of the
-/// worst of them (red interrupted, orange disrupted or elevators out of order), its kind's icon; a tap shows them in a
-/// sheet
-class RideAlertsButton extends ConsumerWidget {
-  const RideAlertsButton({super.key, required this.section});
+/// What a ride's [RideAlerts] say in one line: the worst disruption's title (`Travaux sur la ligne J`), else what it
+/// is (`Trafic perturbé`), then its elevators out of order
+String rideAlertsText(RideAlerts alerts) {
+  final severity = alerts.severity;
+  final worst = [...alerts.line, for (final stop in alerts.stops) ...stop.disruptions]
+      .where((disruption) => disruption.severity == severity)
+      .firstOrNull;
+  final title = worst?.title?.trim();
+  final elevators = alerts.elevatorCount;
+  return [
+    if (title != null && title.isNotEmpty) title else if (severity != null) severityLabel(severity),
+    if (elevators > 0) currentL10n.brokenElevators(elevators),
+  ].join(' · ');
+}
+
+/// A ride's [RideAlerts] under its line's row in the journey detail, written in clear: what goes wrong in the color of
+/// the worst of them (red interrupted, orange disrupted or elevators out of order), on a tint of it; a tap shows them
+/// in a sheet. Nothing when all is well.
+class RideAlertsLine extends ConsumerWidget {
+  const RideAlertsLine({super.key, required this.section, this.padding = EdgeInsets.zero});
 
   final JourneySection section;
+
+  /// Around the line, when there is one
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -110,18 +128,40 @@ class RideAlertsButton extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final severity = alerts.severity;
-    final elevators = alerts.elevatorCount;
-    final summary = [
-      if (severity != null) severityLabel(severity),
-      if (elevators > 0) context.l10n.brokenElevators(elevators),
-    ].join(' · ');
-    return IconButton(
-      tooltip: context.l10n.rideAlertsOf(summary),
-      visualDensity: VisualDensity.compact,
-      icon: severity == null
-          ? Icon(Icons.elevator_outlined, size: 20, color: context.colors.warning)
-          : Icon(severityIcon(severity), size: 20, color: severityColor(severity, Theme.of(context).colorScheme)),
-      onPressed: () => showRideAlertsSheet(context, section: section, alerts: alerts),
+    final color = severity == null ? context.colors.warning : severityColor(severity, Theme.of(context).colorScheme);
+    return Padding(
+      padding: padding,
+      child: Semantics(
+        button: true,
+        label: context.l10n.rideAlertsOf(rideAlertsText(alerts)),
+        excludeSemantics: true,
+        child: Material(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(10),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => showRideAlertsSheet(context, section: section, alerts: alerts),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+              child: Row(
+                children: [
+                  Icon(severity == null ? Icons.elevator_outlined : severityIcon(severity), size: 17, color: color),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      rideAlertsText(alerts),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 18, color: color),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

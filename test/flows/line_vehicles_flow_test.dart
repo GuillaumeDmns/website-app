@@ -48,7 +48,14 @@ void main() {
     await pumpApp(tester, backend);
 
     await tapOn(tester, find.text('Châtelet'));
-    await tapOn(tester, find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == metro1.id));
+    // Its badge in the stop's page (the stop's marker on the map has one too)
+    await tapOn(
+      tester,
+      find.descendant(
+        of: find.byType(DraggableScrollableSheet),
+        matching: find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == metro1.id),
+      ),
+    );
 
     // On the map, its circle over its pointer turned the way it goes (the map turns it); on the stop list, its circle
     final map = find.byType(fm.FlutterMap);

@@ -9,7 +9,9 @@ import '../journey_retime.dart';
 import '../../../app/theme.dart';
 
 /// Next departures for a ride, like Citymapper: one row per departure with its times at both stops, mission code,
-/// destination and platform. The [selected] one is raised and scrolled into view when it changes.
+/// destination and platform. The [selected] one is raised and scrolled into view when it changes. [compact] (the
+/// journey detail, read before leaving) says each thing once: no ride time per row (the same on each, said under the
+/// list), no clock time on the right repeating the row's, the destinations only when they differ.
 class RideDepartureList extends StatefulWidget {
   const RideDepartureList({
     super.key,
@@ -18,6 +20,7 @@ class RideDepartureList extends StatefulWidget {
     this.mode,
     this.selected,
     this.earliest,
+    this.compact = false,
     this.onSelect,
     this.onAllDepartures,
   });
@@ -32,6 +35,9 @@ class RideDepartureList extends StatefulWidget {
   /// When the traveller can be at the stop: departures before are faded
   final DateTime? earliest;
 
+  /// See [RideDepartureList]
+  final bool compact;
+
   /// Choosing another departure; rows are not tappable without it
   final ValueChanged<Ride>? onSelect;
 
@@ -44,6 +50,9 @@ class RideDepartureList extends StatefulWidget {
 
 class _RideDepartureListState extends State<RideDepartureList> {
   static const _rowHeight = 62.0;
+
+  /// Compact rows: the times alone
+  static const _timesRowHeight = 46.0;
 
   /// Rows visible at once; the half row shows the list goes on
   static const _visibleRows = 3.5;
@@ -100,7 +109,9 @@ class _RideDepartureListState extends State<RideDepartureList> {
     final rides = widget.rides;
     final selected = widget.selected;
     final selectedIndex = _selectedIndex(rides, selected);
-    _rowExtent = MediaQuery.textScalerOf(context).scale(_rowHeight);
+    // Compact: a second line only for destinations that differ (the direction is said above the list)
+    final destinations = !widget.compact || {for (final ride in rides) ride.destination}.length > 1;
+    _rowExtent = MediaQuery.textScalerOf(context).scale(destinations ? _rowHeight : _timesRowHeight);
     final height = (rides.length < _visibleRows ? rides.length : _visibleRows) * _rowExtent + 8;
 
     return Container(
@@ -129,6 +140,8 @@ class _RideDepartureListState extends State<RideDepartureList> {
                   now: widget.now,
                   mode: widget.mode,
                   selected: isSelected,
+                  compact: widget.compact,
+                  destination: destinations,
                   tooEarly:
                       earliest != null && ride.departure.time.isBefore(earliest.subtract(const Duration(minutes: 1))),
                   onTap: widget.onSelect == null || isSelected || ride.departure.cancelled
@@ -177,6 +190,8 @@ class _RideRow extends StatelessWidget {
     required this.now,
     this.mode,
     required this.selected,
+    required this.compact,
+    required this.destination,
     required this.tooEarly,
     this.onTap,
   });
@@ -185,6 +200,12 @@ class _RideRow extends StatelessWidget {
   final DateTime now;
   final TransportMode? mode;
   final bool selected;
+
+  /// See [RideDepartureList.compact]
+  final bool compact;
+
+  /// Its mission and destination on a second line
+  final bool destination;
 
   /// Leaves before the traveller can be at the stop
   final bool tooEarly;
@@ -199,6 +220,8 @@ class _RideRow extends StatelessWidget {
     final minutes = arrival?.difference(departure.time).roundedMinutes;
     const figures = [FontFeature.tabularFigures()];
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
+    // Over an hour ahead, the time left would be the clock time of the row once more
+    final countdown = !compact || departure.cancelled || departure.atStop == true || departure.time.difference(now).inMinutes < 60;
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -241,7 +264,7 @@ class _RideRow extends StatelessWidget {
                           '${ride.arrivalSource == ArrivalSource.typical ? '~' : ''}${formatClock(arrival)}',
                           style: TextStyle(color: muted, fontSize: 15, fontFeatures: figures),
                         ),
-                        if (minutes != null && minutes > 0 && !largeText)
+                        if (minutes != null && minutes > 0 && !largeText && !compact)
                           Padding(
                             padding: const EdgeInsets.only(left: 6),
                             child: Text(
@@ -253,8 +276,8 @@ class _RideRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
+                if (destination) const SizedBox(height: 2),
+                if (destination) Row(
                   children: [
                     if (departure.mission != null)
                       Padding(
@@ -282,7 +305,7 @@ class _RideRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              DepartureTime(departure, now: now, mode: mode, emphasized: true),
+              if (countdown) DepartureTime(departure, now: now, mode: mode, emphasized: true),
               if (departure.platform != null)
                 Text(
                   context.l10n.platform(departure.platform!),
@@ -307,31 +330,6 @@ class _RideRow extends StatelessWidget {
           onTap: onTap,
           child: tooEarly && !selected ? Opacity(opacity: 0.45, child: content) : content,
         ),
-      ),
-    );
-  }
-}
-
-/// Under a ride's departures: when the one after the [taken] one leaves, in case it is missed
-class IfMissedLine extends StatelessWidget {
-  const IfMissedLine({super.key, required this.rides, required this.taken});
-
-  final List<Ride> rides;
-  final Ride? taken;
-
-  @override
-  Widget build(BuildContext context) {
-    final taken = this.taken;
-    // The next vehicle: not the taken one listed again
-    final after = taken == null ? null : rides.skipWhile((ride) => ride != taken).skip(1).where((ride) => !sameRide(ride, taken)).firstOrNull;
-    if (taken == null || after == null) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, left: 4),
-      child: Text(
-        context.l10n.goIfMissed(formatClock(after.departure.time), after.departure.time.difference(taken.departure.time).roundedMinutes),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
       ),
     );
   }

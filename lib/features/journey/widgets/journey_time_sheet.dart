@@ -31,7 +31,6 @@ class _TimeSheet extends StatefulWidget {
 }
 
 class _TimeSheetState extends State<_TimeSheet> {
-  static const _minuteStep = 5;
   static const _itemExtent = 40.0;
 
   late _When _when = widget.request.datetime == null
@@ -50,16 +49,13 @@ class _TimeSheetState extends State<_TimeSheet> {
   @override
   void initState() {
     super.initState();
-    // A time already chosen, else now rounded up to the next 5 minutes
-    var initial = (widget.request.datetime ?? DateTime.now()).toLocal();
-    if (widget.request.datetime == null) {
-      initial = initial.add(Duration(minutes: (_minuteStep - initial.minute % _minuteStep) % _minuteStep));
-    }
+    // A time already chosen, else now; to the minute (a train leaves at 8:07)
+    final initial = (widget.request.datetime ?? DateTime.now()).toLocal();
     _day = DateTime(initial.year, initial.month, initial.day);
     _hour = initial.hour;
-    _minute = initial.minute - initial.minute % _minuteStep;
+    _minute = initial.minute;
     _hours = FixedExtentScrollController(initialItem: _hour);
-    _minutes = FixedExtentScrollController(initialItem: _minute ~/ _minuteStep);
+    _minutes = FixedExtentScrollController(initialItem: _minute);
   }
 
   @override
@@ -262,9 +258,9 @@ class _TimeSheetState extends State<_TimeSheet> {
                         Text(':', style: theme.textTheme.headlineSmall),
                         wheel(
                           controller: _minutes,
-                          count: 60 ~/ _minuteStep,
-                          label: (i) => (i * _minuteStep).toString().padLeft(2, '0'),
-                          onChanged: (i) => setState(() => _minute = i * _minuteStep),
+                          count: 60,
+                          label: (i) => i.toString().padLeft(2, '0'),
+                          onChanged: (i) => setState(() => _minute = i),
                           semantics: context.l10n.timeMinutes,
                         ),
                       ],

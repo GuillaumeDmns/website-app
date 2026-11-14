@@ -52,14 +52,22 @@ void main() {
     expect((await dio.get<Object>('/api/v2/stops/IDFM:1/departures')).data, {'stop': 'IDFM:1'});
   });
 
-  test('never keeps real-time-only answers nor the account', () async {
-    for (final path in ['/api/v2/lines/C1/vehicles', '/api/v2/lines/C1/rides', '/api/v2/bikes/nearby', '/api/v2/search', '/api/v2/me', '/api/v2/me/export']) {
+  test('never keeps real-time-only answers, the stops of the map nor the account', () async {
+    for (final path in ['/api/v2/lines/C1/vehicles', '/api/v2/lines/C1/rides', '/api/v2/bikes/nearby', '/api/v2/search', '/api/v2/nearby', '/api/v2/me', '/api/v2/me/export']) {
       backend.get(path, {'path': path});
       await dio.get<Object>(path);
     }
     await settle();
 
     expect(store.values.keys.where((key) => key.startsWith('http_cache:')), isEmpty);
+  });
+
+  test('keeps the departures around, which the home page shows offline', () async {
+    backend.get('/api/v2/nearby/departures', [{'stop': 'IDFM:1'}]);
+    await dio.get<Object>('/api/v2/nearby/departures');
+    await settle();
+
+    expect(store.values.keys.where((key) => key.startsWith('http_cache:')), hasLength(1));
   });
 
   test('does not hide server errors', () async {

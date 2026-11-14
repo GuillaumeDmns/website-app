@@ -65,12 +65,12 @@ class StopDeparturesCard extends StatelessWidget {
               child: Text(context.l10n.noDepartureTwoHours, style: theme.textTheme.bodySmall),
             ),
           for (final (index, row) in rows.take(maxRows).indexed) ...[
-            if (index > 0) const Divider(indent: 40),
-            LineDeparturesRow(row: row, now: now),
+            if (index > 0) const Divider(indent: 48),
+            LineDeparturesRow(row: row, now: now, realtimeAvailable: departures.realtimeAvailable),
           ],
           if (hidden > 0)
             Padding(
-              padding: const EdgeInsets.only(top: 6, bottom: 6, left: 40),
+              padding: const EdgeInsets.only(top: 6, bottom: 6, left: 48),
               child: Text(
                 context.l10n.otherDirections(hidden),
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
@@ -82,30 +82,56 @@ class StopDeparturesCard extends StatelessWidget {
   }
 }
 
-/// Line badge, destination, then the next departures: the first one large, the following ones beside
+/// `puis 12 et 47 min`: the departures after the first one (cancelled ones left out), at most [count]; null without
+/// any. Minutes are counted once (`12 et 47 min`), other labels said whole (`puis 58 min et 14:05`).
+String? followingDepartures(List<Departure> departures, DateTime now, {TransportMode? mode, int count = 2}) {
+  final labels = [
+    for (final departure in departures.skip(1).where((departure) => !departure.cancelled).take(count))
+      departureLabel(departure, now, mode: mode),
+  ];
+  if (labels.isEmpty) {
+    return null;
+  }
+  final unit = RegExp(r'^(\d+)[\s\u00a0]*min$');
+  final allMinutes = labels.every(unit.hasMatch);
+  final items = allMinutes ? [for (final label in labels) unit.firstMatch(label)!.group(1)!] : labels;
+  final joined = items.length == 1
+      ? items.single
+      : '${items.sublist(0, items.length - 1).join(', ')} ${currentL10n.and} ${items.last}';
+  return currentL10n.thenDepartures(allMinutes ? '$joined min' : joined);
+}
+
+/// Line badge, the destination in clear, the next departure large on the right; the following ones under the
+/// destination (`puis 12 et 47 min`), with what there is to know about the first one: only scheduled, its platform
 class LineDeparturesRow extends StatelessWidget {
-  const LineDeparturesRow({super.key, required this.row, required this.now, this.onTap});
+  const LineDeparturesRow({super.key, required this.row, required this.now, this.realtimeAvailable = true, this.onTap});
 
   final LineDepartures row;
   final DateTime now;
+
+  /// False when the whole stop only has scheduled times, already said above its rows
+  final bool realtimeAvailable;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final departures = row.departures;
-    // Large text: fewer times, so that the destination stays readable
+    final first = departures.firstOrNull;
+    // Large text: fewer times, so that the line stays readable
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final more = textScale >= 1.6
-        ? 0
-        : textScale >= 1.25
-        ? 1
-        : 2;
-    final platform = departures.firstOrNull?.platform;
+    final following = followingDepartures(departures, now, mode: row.line.mode, count: textScale >= 1.3 ? 1 : 2);
+    final notes = [
+      ?following,
+      if (first != null && !first.realtime && !first.cancelled && realtimeAvailable) context.l10n.goScheduled,
+      ?platformLabel(row.line, first?.platform),
+    ].join(' · ');
+    // `puis 12 et 47 min · voie 2` goes on from the departure on the right; alone, a note starts its own line
+    final details = following != null || notes.isEmpty ? notes : '${notes[0].toUpperCase()}${notes.substring(1)}';
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          SizedBox(width: 40, child: Align(alignment: Alignment.centerLeft, child: LineBadge(row.line, size: 28))),
+          SizedBox(width: 48, child: Align(alignment: Alignment.centerLeft, child: LineBadge(row.line, size: 28))),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,17 +142,24 @@ class LineDeparturesRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
                 ),
-                if (platformLabel(row.line, platform) case final label? when textScale < 1.3)
-                  Text('${label[0].toUpperCase()}${label.substring(1)}', style: Theme.of(context).textTheme.bodySmall),
+                if (details.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      details,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.colors.muted,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          for (final departure in departures.skip(1).take(more).toList().reversed) ...[
-            DepartureTime(departure, now: now, mode: row.line.mode),
-            const SizedBox(width: 10),
-          ],
-          if (departures.isNotEmpty) DepartureTime(departures.first, now: now, mode: row.line.mode, emphasized: true),
+          const SizedBox(width: 12),
+          if (first != null) DepartureTime(first, now: now, mode: row.line.mode, emphasized: true),
         ],
       ),
     );
@@ -172,7 +205,7 @@ class TrainDepartureRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          SizedBox(width: 40, child: Align(alignment: Alignment.centerLeft, child: LineBadge(line, size: 28))),
+          SizedBox(width: 48, child: Align(alignment: Alignment.centerLeft, child: LineBadge(line, size: 28))),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

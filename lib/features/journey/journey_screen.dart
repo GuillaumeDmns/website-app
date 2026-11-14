@@ -12,7 +12,6 @@ import '../../core/map/map_overlay.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
-import 'journey_labels.dart';
 import 'journey_providers.dart';
 import 'journey_request.dart';
 import 'widgets/journey_card.dart';
@@ -103,50 +102,10 @@ class JourneyScreen extends ConsumerWidget {
             onPickTo: () => _pickPlace(context, from: false),
             onSwap: () => _update(context, request.swapped()),
           )),
+          // When, then how, on one row scrolled sideways: the time, step-free journeys, the options, the modes
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: _Toolbar(
-              time: _TimeButton(request: request, onChanged: (next) => _update(context, next)),
-              actions: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Step-free journeys in one tap
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: request.wheelchair
-                        ? IconButton.filled(
-                            tooltip: context.l10n.wheelchairJourneysOn,
-                            icon: const Icon(Icons.accessible),
-                            onPressed: () => _update(context, request.copyWith(wheelchair: false)),
-                          )
-                        : IconButton.outlined(
-                            tooltip: context.l10n.wheelchairJourneys,
-                            icon: const Icon(Icons.accessible),
-                            onPressed: () => _update(context, request.copyWith(wheelchair: true)),
-                          ),
-                  ),
-                  Badge(
-                    isLabelVisible: request.optionCount > 0,
-                    label: Text('${request.optionCount}'),
-                    child: OutlinedButton.icon(
-                      style: _compact,
-                      icon: const Icon(Icons.tune, size: 18),
-                      label: Text(context.l10n.options),
-                      onPressed: () async {
-                        final next = await showJourneyOptions(context, request);
-                        if (next != null && context.mounted) {
-                          _update(context, next);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 4),
-            child: _QuickFilters(request: request, onChanged: (next) => _update(context, next)),
+            padding: const EdgeInsets.fromLTRB(16, 10, 0, 8),
+            child: _Filters(request: request, onChanged: (next) => _update(context, next)),
           ),
           Expanded(
             child: ListView(
@@ -176,6 +135,11 @@ class JourneyScreen extends ConsumerWidget {
                       onShift: (by) => _update(
                         context,
                         request.copyWith(datetime: () => (request.datetime ?? DateTime.now()).add(by)),
+                      ),
+                      leavingNow: request.datetime == null,
+                      onLeave: (later) => _update(
+                        context,
+                        request.copyWith(datetime: () => later == null ? null : DateTime.now().add(later), arriveBy: false),
                       ),
                     ),
                   ),
@@ -308,10 +272,6 @@ class _PlaceField extends StatelessWidget {
 }
 
 
-/// Narrower than the theme's outlined buttons: the time and the options fit on a phone
-final _compact = OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12));
-
-/// Time on the left, options on the right; on two lines with a large text size
 /// Swaps the start and the destination, the arrows turning
 class _SwapButton extends StatefulWidget {
   const _SwapButton({required this.onSwap});
@@ -341,96 +301,19 @@ class _SwapButtonState extends State<_SwapButton> {
       );
 }
 
-/// The usual changes in one tap, without the options sheet: leaving a bit later, the modes, Vélib
-class _QuickFilters extends StatelessWidget {
-  const _QuickFilters({required this.request, required this.onChanged});
+/// When and how, in one row scrolled sideways: the time ("Maintenant", opening "Quand partir ?"), step-free journeys
+/// and the options as round buttons, then the modes and Vélib in one tap. Leaving a bit later is at the end of the
+/// results, where another time is looked for.
+class _Filters extends StatelessWidget {
+  const _Filters({required this.request, required this.onChanged});
 
   final JourneyRequest request;
   final ValueChanged<JourneyRequest> onChanged;
 
-  @override
-  Widget build(BuildContext context) {
-    JourneyRequest leaving(Duration? later) =>
-        request.copyWith(datetime: () => later == null ? null : DateTime.now().add(later), arriveBy: false);
-    // Few chips: all built (scrolled to when focused or tapped)
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          if (request.datetime != null) ...[
-            ActionChip(
-              avatar: const Icon(Icons.schedule, size: 18),
-              label: Text(context.l10n.leaveNow),
-              onPressed: () => onChanged(leaving(null)),
-            ),
-            const SizedBox(width: 6),
-          ],
-          for (final minutes in [15, 30]) ...[
-            ActionChip(
-              label: Text(context.l10n.leaveInMinutes(minutes)),
-              onPressed: () => onChanged(leaving(Duration(minutes: minutes))),
-            ),
-            const SizedBox(width: 6),
-          ],
-          const SizedBox(height: 24, child: VerticalDivider(width: 12)),
-          for (final mode in JourneyRequest.choosableModes) ...[
-            FilterChip(
-              label: Text(mode.label),
-              selected: request.modes.isNotEmpty && request.allows(mode),
-              showCheckmark: false,
-              onSelected: (_) => onChanged(
-                // Without a choice, a tap keeps this mode only; then each tap adds or removes one
-                request.modes.isEmpty ? request.withOnly(mode) : request.withMode(mode, !request.allows(mode)),
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          FilterChip(
-            avatar: const Icon(Icons.pedal_bike, size: 18),
-            label: Text(context.l10n.journeyBikeShare),
-            selected: request.bikeShare,
-            showCheckmark: false,
-            onSelected: (selected) => onChanged(request.copyWith(bikeShare: selected)),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-    );
-  }
-}
-
-class _Toolbar extends StatelessWidget {
-  const _Toolbar({required this.time, required this.actions});
-
-  final Widget time;
-  final Widget actions;
-
-  @override
-  Widget build(BuildContext context) {
-    if (MediaQuery.textScalerOf(context).scale(1) >= 1.3) {
-      return Wrap(runSpacing: 8, children: [time, actions]);
-    }
-    return Row(
-      children: [
-        Expanded(
-          child: Align(alignment: Alignment.centerLeft, child: time),
-        ),
-        actions,
-      ],
-    );
-  }
-}
-
-class _TimeButton extends StatelessWidget {
-  const _TimeButton({required this.request, required this.onChanged});
-
-  final JourneyRequest request;
-  final ValueChanged<JourneyRequest> onChanged;
-
-  String get _label {
+  String get _time {
     final datetime = request.datetime;
     if (datetime == null) {
-      return currentL10n.leaveNow;
+      return currentL10n.nowShort;
     }
     final local = datetime.toLocal();
     final now = DateTime.now();
@@ -441,17 +324,128 @@ class _TimeButton extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-        style: _compact,
-        icon: const Icon(Icons.schedule, size: 18),
-        label: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        onPressed: () async {
-          final next = await showJourneyTimeSheet(context, request);
-          if (next != null) {
-            onChanged(next);
-          }
-        },
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final round = IconButton.styleFrom(
+      backgroundColor: context.colors.card,
+      side: BorderSide(color: scheme.outline),
+      visualDensity: VisualDensity.compact,
+    );
+    // Few chips: all built (scrolled to when focused or tapped)
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          ActionChip(
+            tooltip: context.l10n.timeSheetTitle,
+            avatar: const Icon(Icons.schedule, size: 18),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_time, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Icon(Icons.expand_more, size: 18, color: context.colors.muted),
+              ],
+            ),
+            labelPadding: const EdgeInsets.only(left: 2),
+            onPressed: () async {
+              final next = await showJourneyTimeSheet(context, request);
+              if (next != null) {
+                onChanged(next);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          // Step-free journeys in one tap
+          request.wheelchair
+              ? IconButton.filled(
+                  tooltip: context.l10n.wheelchairJourneysOn,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.accessible_forward, size: 20),
+                  onPressed: () => onChanged(request.copyWith(wheelchair: false)),
+                )
+              : IconButton(
+                  tooltip: context.l10n.wheelchairJourneys,
+                  style: round,
+                  icon: const Icon(Icons.accessible_forward, size: 20),
+                  onPressed: () => onChanged(request.copyWith(wheelchair: true)),
+                ),
+          const SizedBox(width: 4),
+          Badge(
+            isLabelVisible: request.optionCount > 0,
+            label: Text('${request.optionCount}'),
+            offset: const Offset(-2, 2),
+            child: IconButton(
+              tooltip: context.l10n.options,
+              style: round,
+              icon: const Icon(Icons.tune, size: 20),
+              onPressed: () async {
+                final next = await showJourneyOptions(context, request);
+                if (next != null) {
+                  onChanged(next);
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          // A Vélib option added to the results
+          FilterChip(
+            avatar: const Icon(Icons.pedal_bike, size: 18),
+            label: Text(context.l10n.journeyBikeShare),
+            selected: request.bikeShare,
+            showCheckmark: false,
+            onSelected: (selected) => onChanged(request.copyWith(bikeShare: selected)),
+          ),
+          const SizedBox(height: 24, child: VerticalDivider(width: 20)),
+          // The modes to do without, each on its own: nothing chosen is every mode, a tap crosses one out, another
+          // tap brings it back; the last one left can't be crossed out
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(context.l10n.avoidModes, style: theme.textTheme.labelLarge?.copyWith(color: context.colors.muted)),
+          ),
+          for (final mode in JourneyRequest.choosableModes) ...[
+            _AvoidChip(
+              mode: mode,
+              avoided: request.avoids(mode),
+              onChanged: request.avoids(mode) || request.allowedCount > 1
+                  ? (avoided) => onChanged(request.withMode(mode, !avoided))
+                  : null,
+            ),
+            const SizedBox(width: 6),
+          ],
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+}
+
+/// A mode of the "Éviter" row: plain while journeys may use it, dark and crossed out once avoided
+class _AvoidChip extends StatelessWidget {
+  const _AvoidChip({required this.mode, required this.avoided, required this.onChanged});
+
+  final TransportMode mode;
+  final bool avoided;
+
+  /// Null: the only mode left, which can't be avoided
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FilterChip(
+      tooltip: avoided ? context.l10n.modeAvoided(mode.label) : context.l10n.avoidMode(mode.label),
+      avatar: avoided ? Icon(Icons.block, size: 16, color: scheme.surface) : null,
+      label: Text(mode.label),
+      labelStyle: avoided
+          ? TextStyle(color: scheme.surface, decoration: TextDecoration.lineThrough, decorationColor: scheme.surface)
+          : null,
+      selected: avoided,
+      selectedColor: scheme.onSurface,
+      showCheckmark: false,
+      onSelected: onChanged,
+    );
+  }
 }
 
 class _Results extends StatelessWidget {
@@ -463,6 +457,8 @@ class _Results extends StatelessWidget {
     required this.onOpen,
     required this.onPage,
     required this.onShift,
+    required this.leavingNow,
+    required this.onLeave,
   });
 
   final JourneyPlan plan;
@@ -476,6 +472,12 @@ class _Results extends StatelessWidget {
 
   /// Moves the search in time (no result: an hour earlier or later)
   final ValueChanged<Duration> onShift;
+
+  /// The search leaves now, not at a chosen time
+  final bool leavingNow;
+
+  /// Leaves that much later than now instead; null: now
+  final ValueChanged<Duration?> onLeave;
 
   @override
   Widget build(BuildContext context) {
@@ -514,24 +516,21 @@ class _Results extends StatelessWidget {
       );
     }
 
+    // What sets each option apart, from the list shown: no category titles between the cards
+    final fares = faresDiffer(plan.journeys);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final (index, journey) in plan.journeys.indexed) ...[
-          // Category header only when it changes (Navitia returns several "rapid" options in a row)
-          if (index == 0 || journeyTypeLabel(plan.journeys[index - 1].type) != journeyTypeLabel(journey.type))
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 6),
-              child: Text(journeyTypeLabel(journey.type), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
-            )
-          else
-            const SizedBox(height: 8),
+          const SizedBox(height: 8),
           // Like Citymapper, a tap opens the option, its detail showing it on the map; next to the map (wide layout),
           // hovering shows it there first
           JourneyCard(
             journey: journey,
             now: now,
             selected: wide && index == selectedIndex,
+            tag: journeyTag(journey),
+            showFare: fares,
             onTap: () => onOpen(journey),
             onHover: () => onSelect(index),
           ),
@@ -553,6 +552,24 @@ class _Results extends StatelessWidget {
                 onPressed: () => onPage(plan.later!),
               ),
           ],
+        ),
+        // Another time in one tap, where it is looked for: after the options
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 0, 0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(context.l10n.leaveLater, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+              if (!leavingNow) ActionChip(label: Text(context.l10n.nowShort), onPressed: () => onLeave(null)),
+              for (final minutes in [15, 30])
+                ActionChip(
+                  label: Text(context.l10n.leaveInMinutes(minutes)),
+                  onPressed: () => onLeave(Duration(minutes: minutes)),
+                ),
+            ],
+          ),
         ),
       ],
     );

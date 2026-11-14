@@ -215,7 +215,7 @@ class _LineTrafficTile extends StatelessWidget {
   }
 }
 
-/// Home page entry: worst state of the main lines in one line, opens the traffic page
+/// Home page entry, one line: how many main lines are disrupted and the worst ones, opens the traffic page
 class TrafficSummaryCard extends ConsumerWidget {
   const TrafficSummaryCard({super.key});
 
@@ -239,52 +239,52 @@ class TrafficSummaryCard extends ConsumerWidget {
     // Large text: the badges go under the text instead of squeezing it
     final below = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
     final badges = [
-      for (final line in disrupted.take(5))
-        WithSeverity(severity: line.severity, dotSize: 11, child: LineBadge(line.line, size: 24)),
-      if (disrupted.length > 5) Text('+${disrupted.length - 5}', style: theme.textTheme.bodySmall),
+      for (final line in disrupted.take(3))
+        WithSeverity(severity: line.severity, dotSize: 10, child: LineBadge(line.line, size: 22)),
+      if (disrupted.length > 3) Text('+${disrupted.length - 3}', style: theme.textTheme.bodySmall),
     ];
+    // One line: what the traffic is like, the worst lines, the way to the page
+    final title = Text(
+      traffic == null
+          ? context.l10n.trafficTitle
+          : disrupted.isEmpty
+          ? context.l10n.trafficMainNormal
+          : context.l10n.disruptedLines(disrupted.length),
+      maxLines: below ? 2 : 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+    );
 
     return AppCard(
       onTap: () => context.push(Routes.traffic),
-      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-          child: Row(
-            children: [
-              IconBubble(traffic == null ? Icons.traffic_outlined : severityIcon(worst), color: traffic == null ? null : color, size: 34),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.trafficTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      traffic == null
-                          ? context.l10n.trafficMainModes
-                          : disrupted.isEmpty
-                          ? context.l10n.trafficMainNormal
-                          : context.l10n.disruptedLines(disrupted.length),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                    if (below && badges.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: badges,
+      padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+      child: Semantics(
+        button: true,
+        label: context.l10n.trafficTitle,
+        child: Row(
+          children: [
+            IconBubble(traffic == null ? Icons.traffic_outlined : severityIcon(worst), color: traffic == null ? null : color, size: 30),
+            const SizedBox(width: 10),
+            Expanded(
+              child: below && badges.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        title,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: badges),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              if (!below)
-                for (final badge in badges) Padding(padding: const EdgeInsets.only(left: 6), child: badge),
-              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-            ],
-          ),
+                      ],
+                    )
+                  : title,
+            ),
+            if (!below)
+              for (final badge in badges) Padding(padding: const EdgeInsets.only(left: 6), child: badge),
+            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
     );
   }
 }

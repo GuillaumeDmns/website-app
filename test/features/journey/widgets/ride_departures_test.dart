@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/theme.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/utils/time_format.dart';
+import 'package:website_app/core/widgets/departure_time.dart';
 import 'package:website_app/features/journey/widgets/ride_departures.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -60,13 +61,42 @@ void main() {
     expect(find.textContaining(RegExp(r'^-\d')), findsNothing);
   });
 
-  testWidgets('if the departure taken is missed: the next vehicle, not the same one listed again', (tester) async {
-    final first = ride(inMinutes(10), ride: const Duration(minutes: 6));
-    final second = ride(inMinutes(10), ride: const Duration(minutes: 10));
-    final later = ride(inMinutes(21));
-    await pump(tester, IfMissedLine(rides: [first, second, later], taken: first));
+  group('compact, in the journey detail', () {
+    testWidgets('each thing once: no ride time per row, no destination every row has', (tester) async {
+      final rides = [for (final minutes in [10, 19, 30]) ride(inMinutes(minutes))];
+      await pump(tester, RideDepartureList(rides: rides, now: now, selected: rides.first, compact: true, onSelect: (_) {}));
 
-    expect(find.text(currentL10n.goIfMissed(formatClock(later.departure.time), 11)), findsOneWidget);
+      // The times at both stops, the time left: the direction is said above the list, the ride time under it
+      expect(find.text(formatClock(rides.first.departure.time)), findsOneWidget);
+      expect(find.text(formatClock(rides.first.arrivalAt!)), findsOneWidget);
+      expect(find.text('Nation'), findsNothing);
+      expect(find.text(currentL10n.minutesShort(8)), findsNothing);
+      expect(find.byType(DepartureTime), findsNWidgets(3));
+    });
+
+    testWidgets('destinations that differ are told, with their mission', (tester) async {
+      final rides = [
+        ride(inMinutes(10)).copyWith(departure: departure(inMinutes(10), mission: 'PAPE')),
+        ride(inMinutes(19)).copyWith(destination: 'Boissy-Saint-Léger'),
+      ];
+      await pump(tester, RideDepartureList(rides: rides, now: now, selected: rides.first, compact: true, onSelect: (_) {}));
+
+      expect(find.text('Nation'), findsOneWidget);
+      expect(find.text('PAPE'), findsOneWidget);
+      expect(find.text('Boissy-Saint-Léger'), findsOneWidget);
+    });
+
+    testWidgets("hours ahead, the row's clock time is not said again as the time left", (tester) async {
+      final rides = [for (final minutes in [364, 373]) ride(inMinutes(minutes))];
+      await pump(tester, RideDepartureList(rides: rides, now: now, selected: rides.first, compact: true, onSelect: (_) {}));
+
+      expect(find.text(formatClock(rides.first.departure.time)), findsOneWidget);
+      expect(find.byType(DepartureTime), findsNothing);
+
+      // Elsewhere (GO, at the stop), the full rows
+      await pump(tester, RideDepartureList(rides: rides, now: now, selected: rides.first, onSelect: (_) {}));
+      expect(find.byType(DepartureTime), findsNWidgets(2));
+      expect(find.text('Nation'), findsNWidgets(2));
+    });
   });
 }
-

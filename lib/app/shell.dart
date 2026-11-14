@@ -9,7 +9,6 @@ import '../core/map/map_overlay.dart';
 import '../core/map/map_panel.dart';
 import '../core/offline/offline_banner.dart';
 import '../features/go/go_bar.dart';
-import '../features/home/nearby_departures.dart';
 import '../features/map_place/map_place_sheet.dart';
 import 'panel_scope.dart';
 import 'routes.dart';
@@ -100,7 +99,7 @@ class _WideLayout extends StatelessWidget {
                     child: Center(
                       child: SizedBox(
                         width: 480,
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner(), NearbyMapFilters()]),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner()]),
                       ),
                     ),
                   ),
@@ -341,7 +340,7 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
             left: 12,
             right: 12,
             child: SafeArea(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner(), NearbyMapFilters()]),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [GoBar(), SizedBox(height: 8), OfflineBanner()]),
             ),
           ),
           DraggableScrollableSheet(
