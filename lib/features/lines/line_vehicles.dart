@@ -13,10 +13,15 @@ import '../../core/utils/geo.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
+import '../remote_config/remote_config.dart';
 
 /// Vehicles of a line and when they were fetched, refreshed every minute while shown, never with the app off screen
 /// (the backend keeps them a minute: the estimated-timetable quota is small)
 final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> vehicles, DateTime fetchedAt}), String>((ref, lineId) async {
+  // Switched off by the backend (its quota in danger): nothing asked
+  if (ref.watch(featureDisabledProvider('vehicles'))) {
+    return (vehicles: const <Vehicle>[], fetchedAt: DateTime.now());
+  }
   ref.refreshEvery(const Duration(seconds: 60));
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());

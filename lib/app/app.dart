@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config.dart';
 import '../core/location/location_providers.dart';
 import '../features/home_widget/home_widget_sync.dart';
+import '../features/remote_config/remote_config.dart';
+import '../features/remote_config/remote_config_widgets.dart';
 import '../l10n/l10n.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -64,7 +66,10 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
           // Material library, which only reads its own ThemeData and MaterialLocalizations: the bridge gives them
           // the app's. To drop once they have moved to material_ui.
           // ignore: deprecated_member_use
-          child: MaterialUiCompatibilityBridge(child: child!),
+          child: MaterialUiCompatibilityBridge(
+            // A version the backend no longer supports: nothing else to show
+            child: ref.watch(updateRequiredProvider) ? const UpdateRequiredScreen() : child!,
+          ),
         );
         // Never mistaken for the production app
         if (AppConfig.isDev) {

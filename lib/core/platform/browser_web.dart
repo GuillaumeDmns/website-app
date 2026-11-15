@@ -72,6 +72,16 @@ extension type _ShareData._(JSObject _) implements JSObject {
 }
 
 /// System share sheet of the browser (phones, some desktops); false when there is none or it failed
+@JS('location')
+external _Location get _location;
+
+extension type _Location._(JSObject _) implements JSObject {
+  external void reload();
+}
+
+/// Loads the page again: the web app's latest version
+void reload() => _location.reload();
+
 Future<bool> share(String title, String url) async {
   if (!_navigator.has('share')) {
     return false;

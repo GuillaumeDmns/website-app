@@ -22,6 +22,7 @@ import '../daily_trips/daily_trips.dart';
 import '../favorites/favorite_widgets.dart';
 import '../favorites/favorites_controller.dart';
 import '../home_widget/home_widget_sync.dart';
+import '../remote_config/remote_config_widgets.dart';
 import '../traffic/traffic_screen.dart';
 import '../traffic/traffic_providers.dart';
 import 'map_stops.dart';
@@ -69,6 +70,10 @@ class HomeScreen extends ConsumerWidget {
               sliver: SliverToBoxAdapter(
                 child: _SearchBox(onTap: () => context.push(Routes.search)),
               ),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+              sliver: SliverToBoxAdapter(child: RemoteNotice()),
             ),
             if (place != null)
               SliverPadding(

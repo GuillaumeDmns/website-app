@@ -4,4 +4,6 @@ Future<void> keepScreenOn(bool on) async {}
 
 Future<bool> share(String title, String url) async => false;
 
+void reload() {}
+
 bool download(String fileName, String content, {String type = 'application/json'}) => false;
