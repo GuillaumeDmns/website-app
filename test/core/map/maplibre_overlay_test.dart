@@ -14,11 +14,11 @@ void main() {
   test('a walk is round dots on the map itself, nothing under them', () {
     final layers = mapLibrePathLayers(const MapPath(points: points, color: Color(0xFF3C4654), dotted: true));
 
-    final dots = layers.single as PolylineLayer;
-    expect(dots.getLayout(), containsPair('line-cap', 'round'));
+    final dots = layers.single;
+    expect(dots.layout, containsPair('line-cap', 'round'));
     // Dashes of no length: only their round ends, as wide as the line, one every two widths
-    expect(dots.getPaint(), containsPair('line-dasharray', [0, 2]));
-    expect(dots.color, const Color(0xFF3C4654));
+    expect(dots.paint, containsPair('line-dasharray', [0, 2]));
+    expect(dots.paint, containsPair('line-color', styleColor(const Color(0xFF3C4654))));
   });
 
   test('a ride is solid, on a light edge as faded as it', () {
@@ -26,11 +26,11 @@ void main() {
     final layers = mapLibrePathLayers(MapPath(points: points, color: faded, width: 6));
 
     expect(layers, hasLength(2));
-    final [edge, line] = layers.cast<PolylineLayer>();
-    expect(edge.color, Colors.white.withValues(alpha: faded.a));
-    expect(edge.width, 9);
-    expect(line.color, faded);
-    expect(line.dashArray, isNull);
+    final [edge, line] = layers;
+    expect(edge.paint, containsPair('line-color', styleColor(Colors.white.withValues(alpha: faded.a))));
+    expect(edge.paint, containsPair('line-width', 9));
+    expect(line.paint, containsPair('line-color', styleColor(faded)));
+    expect(line.paint.containsKey('line-dasharray'), isFalse);
   });
 
   test('pins as the map draws them: their image once there, a callout standing on its place, turned ones apart', () {
@@ -84,20 +84,10 @@ void main() {
     expect((jsonDecode(accuracyGeoJson(at, null)) as Map)['features'], isEmpty);
   });
 
-  test('images shown at their size on every platform, drawn at 1 on Android where the map scales them up itself', () {
-    expect(overlayImageRatio(2.625, web: true), 2.625);
-    expect(overlayIconSize(2.625, web: true), 1);
-    // iOS takes them for points
-    expect(overlayImageRatio(2.625, web: false, platform: TargetPlatform.iOS), 2.625);
-    expect(overlayIconSize(2.625, web: false, platform: TargetPlatform.iOS), closeTo(1 / 2.625, 1e-9));
-    // Android decodes them scaled up to the screen's density: drawn at its density, they came 2.625² too big
-    expect(overlayImageRatio(2.625, web: false, platform: TargetPlatform.android), 1);
-    expect(overlayIconSize(2.625, web: false, platform: TargetPlatform.android), 1);
-  });
-
   test("the overlay's layers from the bottom: the circle, the close-up pins, the turned pins, the pins, the heading, the dot",
       () {
-    final layers = overlayStyleLayers(iconSize: 0.5);
+    final layers = overlayStyleLayers();
+    Map<String, Object?> layout(StyleLayer layer) => layer.toJson()['layout']! as Map<String, Object?>;
     expect([for (final layer in layers) layer.id], [
       MapLibreOverlay.accuracyLayer,
       MapLibreOverlay.closeUpPinsLayer,
@@ -112,13 +102,14 @@ void main() {
     expect(closeUp.filter.toString(), contains('closeUp'));
     expect((layers[3] as SymbolStyleLayer).minZoom, 0);
     expect(layers[3].filter.toString(), contains('closeUp'));
-    final turned = layers[2] as SymbolStyleLayer;
-    expect(turned.layout, containsPair('icon-rotation-alignment', 'map'));
-    expect(layers[3].layout, containsPair('icon-rotation-alignment', 'viewport'));
-    expect(layers[3].layout, containsPair('icon-size', 0.5));
-    expect(layers[3].layout, containsPair('icon-allow-overlap', true));
+    expect(layers[2], isA<SymbolStyleLayer>());
+    expect(layout(layers[2]), containsPair('icon-rotation-alignment', 'map'));
+    expect(layout(layers[3]), containsPair('icon-rotation-alignment', 'viewport'));
+    // Images made at the screen's density and the map told so: shown at their size, no icon-size
+    expect(layout(layers[3]).containsKey('icon-size'), isFalse);
+    expect(layout(layers[3]), containsPair('icon-allow-overlap', true));
     // The heading lies on the map; the circle too
-    expect(layers[4].layout, containsPair('icon-pitch-alignment', 'map'));
-    expect(layers[0].paint, containsPair('circle-pitch-alignment', 'map'));
+    expect(layout(layers[4]), containsPair('icon-pitch-alignment', 'map'));
+    expect(layers[0].toJson()['paint'], containsPair('circle-pitch-alignment', 'map'));
   });
 }

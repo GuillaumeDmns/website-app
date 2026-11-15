@@ -25,7 +25,7 @@ jobs:
       - name: Linux desktop toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libjsoncpp-dev xvfb
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libepoxy-dev libsecret-1-dev libjsoncpp-dev xvfb
       - name: Dependencies and generated code
         run: |
           flutter pub get
