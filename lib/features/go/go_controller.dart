@@ -15,6 +15,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/platform/app_shown.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
+import '../../core/utils/refresh.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
 import '../journey/journey_providers.dart';
@@ -235,6 +236,8 @@ class GoController extends Notifier<GoState?> {
       alightAlertsOff: latest.alightAlertsOff,
     );
     _save();
+    // The departures followed go on with the screen off
+    ref.read(followedOffScreenProvider.notifier).set(true);
     _watchDepartures();
     _update();
   }
@@ -536,6 +539,8 @@ class GoController extends Notifier<GoState?> {
       try {
         ref.read(preciseUserPositionProvider.notifier).set(null);
         ref.read(goFixStatsProvider.notifier).clear();
+        // Started again meanwhile (a recalculation): still followed
+        ref.read(followedOffScreenProvider.notifier).set(_tick != null);
       } catch (_) {
         // Disposed
       }

@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../platform/app_shown.dart';
 import '../utils/geo.dart';
+import '../utils/refresh.dart';
 import 'position_feed.dart';
 
 /// Châtelet, used before the map or the position is known
@@ -134,8 +136,7 @@ final nearbyOriginProvider = Provider<({LatLng position, bool isUser})>((ref) {
   return user != null ? (position: user, isUser: true) : (position: ref.watch(mapCenterProvider), isUser: false);
 });
 
-/// Current time, ticking every 15 s, for "3 min" labels
-final nowProvider = StreamProvider<DateTime>((ref) async* {
-  yield DateTime.now();
-  yield* Stream.periodic(const Duration(seconds: 15), (_) => DateTime.now());
-});
+/// Current time, ticking every 15 s while the app is on screen, for "3 min" labels
+final nowProvider = StreamProvider<DateTime>(
+  (ref) => clockEvery(const Duration(seconds: 15), shown: ref.watch(appShownProvider)),
+);

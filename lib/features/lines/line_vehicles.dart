@@ -7,23 +7,24 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
+import '../../core/platform/app_shown.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 
-/// Vehicles of a line and when they were fetched, refreshed every minute while shown (the backend keeps them a
-/// minute: the estimated-timetable quota is small)
+/// Vehicles of a line and when they were fetched, refreshed every minute while shown, never with the app off screen
+/// (the backend keeps them a minute: the estimated-timetable quota is small)
 final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> vehicles, DateTime fetchedAt}), String>((ref, lineId) async {
   ref.refreshEvery(const Duration(seconds: 60));
   final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());
 });
 
-/// Ticks every second while a line's vehicles are shown, so that they glide along their path
+/// Ticks every second while a line's vehicles are shown and the app is on screen, so that they glide along their path
 final vehicleClockProvider = StreamProvider.autoDispose<DateTime>(
-  (ref) => Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+  (ref) => clockEvery(const Duration(seconds: 1), shown: ref.watch(appShownProvider)),
 );
 
 /// Where a vehicle is on its branch's path

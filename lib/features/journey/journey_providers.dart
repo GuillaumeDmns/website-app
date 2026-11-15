@@ -37,10 +37,11 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
 });
 
 /// Next departures of a ride's line from its boarding stop that stop at its alighting stop, with their arrival there,
-/// from the time the traveller gets there (now when null), refreshed while shown: see [rideRefreshPeriod]. Those not
+/// from the time the traveller gets there (now when null), refreshed while shown, and with the screen off while GO
+/// follows a journey: see [rideRefreshPeriod]. Those not
 /// shown for a period are outdated, see [currentRides]: the journey detail under GO's page keeps them alive, paused.
 final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, RideKey>((ref, key) async {
-  ref.refreshEvery(rideRefreshPeriod(key.after, DateTime.now()), reloadWhenHidden: true);
+  ref.refreshEvery(rideRefreshPeriod(key.after, DateTime.now()), reloadWhenHidden: true, whileFollowed: true);
   return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
 });
 
