@@ -15,17 +15,6 @@ class LiveJourneySegment {
   final String color;
 }
 
-/// A moment of the journey marked on the progress bar: where a ride is left (a connection, the last stop)
-class LiveJourneyPoint {
-  const LiveJourneyPoint({required this.seconds, required this.color});
-
-  /// Seconds along the segments
-  final int seconds;
-
-  /// `#RRGGBB`
-  final String color;
-}
-
 /// How much the moment needs the user: what the system colors by (Android 17's semantic colors)
 enum LiveJourneyTone { fine, caution, danger }
 
@@ -52,7 +41,6 @@ class LiveJourneyUpdate {
     required this.chip,
     required this.info,
     required this.segments,
-    this.points = const [],
     this.tone = LiveJourneyTone.fine,
     this.line,
   });
@@ -70,9 +58,6 @@ class LiveJourneyUpdate {
   final String chip;
   final String info;
   final List<LiveJourneySegment> segments;
-
-  /// Where to get off each ride, on the progress bar
-  final List<LiveJourneyPoint> points;
 
   /// What its title asks: nothing special, attention (late, a vehicle missed), or to act now (get off, a platform)
   final LiveJourneyTone tone;
@@ -134,9 +119,6 @@ class _NativeLiveJourney implements LiveJourney {
         'longInfo': update.info,
         'segments': [
           for (final segment in update.segments) {'length': segment.seconds, 'color': segment.color},
-        ],
-        'points': [
-          for (final point in update.points) {'position': point.seconds, 'color': point.color},
         ],
         'tone': update.tone.name,
         if (update.line case final line?)

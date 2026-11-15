@@ -87,7 +87,6 @@ void main() {
           {'length': 600, 'color': '#FFCD00'},
         ],
         // Android's: the Apple side reads the keys it knows
-        'points': <Object>[],
         'tone': 'fine',
       });
       expect(stopped, isTrue);

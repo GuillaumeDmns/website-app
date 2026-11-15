@@ -77,7 +77,6 @@ object LiveJourneyNotification {
      * @param segments  one per step: `length` (seconds) and `color` (`#RRGGBB`)
      * @param progress  seconds done along the journey
      * @param line      the ride's line (`name`, `color`, `textColor` as `#RRGGBB`, `mode`), shown as a badge
-     * @param points    where each ride is left: `position` (seconds along the segments) and `color`
      * @param tone      `fine`, `caution` or `danger`: what the title asks, colored by the system on Android 17
      */
     fun journey(
@@ -90,7 +89,6 @@ object LiveJourneyNotification {
         longInfo: String,
         segments: List<Map<String, Any>>,
         line: Map<String, String>? = null,
-        points: List<Map<String, Any>> = emptyList(),
         tone: String = "fine",
     ): Notification {
         val builder = NotificationCompat.Builder(context, JOURNEY_CHANNEL_ID)
@@ -141,15 +139,6 @@ object LiveJourneyNotification {
                 }
                 style.addProgressSegment(segment)
                 total += maxOf(length, 1)
-            }
-            // Where each ride is left, strictly inside the bar (its ends have their own marks)
-            points.forEach { data ->
-                val position = (data["position"] as? Int) ?: 0
-                if (position in 1 until total) {
-                    val point = NotificationCompat.ProgressStyle.Point(position)
-                    runCatching { point.setColor(((data["color"] as? String) ?: "").toColorInt()) }
-                    style.addProgressPoint(point)
-                }
             }
             style.setProgressTrackerIcon(trackerIcon)
             style.setProgress(progress.coerceIn(0, maxOf(total, 1)))

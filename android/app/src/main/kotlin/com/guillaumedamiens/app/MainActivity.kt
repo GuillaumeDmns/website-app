@@ -62,7 +62,6 @@ class MainActivity: FlutterFragmentActivity() {
                         longInfo = call.argument<String>("longInfo") ?: "",
                         segments = call.argument<List<Map<String, Any>>>("segments") ?: emptyList(),
                         line = call.argument<Map<String, String>>("line"),
-                        points = call.argument<List<Map<String, Any>>>("points") ?: emptyList(),
                         tone = call.argument<String>("tone") ?: "fine",
                     )
                     val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
