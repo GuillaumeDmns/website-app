@@ -10,6 +10,7 @@ void main() {
   late FakeBackend backend;
   late MemoryStore store;
   late Dio dio;
+  late OfflineCacheInterceptor cache;
   DateTime? offlineSince;
   var online = 0;
 
@@ -18,11 +19,13 @@ void main() {
     store = MemoryStore();
     offlineSince = null;
     online = 0;
-    dio = backend.dio()
-      ..interceptors.add(OfflineCacheInterceptor(store: store, onOffline: (at) => offlineSince = at, onOnline: () => online++));
+    cache = OfflineCacheInterceptor(store: store, onOffline: (at) => offlineSince = at, onOnline: () => online++);
+    addTearDown(cache.dispose);
+    dio = backend.dio()..interceptors.add(cache);
   });
 
-  Future<void> settle() => Future<void>.delayed(Duration.zero);
+  /// The answers written to the device, as when the app leaves the screen
+  Future<void> settle() => cache.flush();
 
   test('serves the last answer when the server cannot be reached', () async {
     backend.get('/api/v2/traffic', [
@@ -40,6 +43,48 @@ void main() {
     ]);
     expect(cached.extra['offlineAt'], isA<DateTime>());
     expect(offlineSince, isNotNull);
+  });
+
+  test('answers wait in memory, written together when the app leaves the screen; served meanwhile', () async {
+    backend.get('/api/v2/traffic', [1]);
+    backend.get('/api/v2/nearby/departures', [2]);
+    for (var refresh = 0; refresh < 5; refresh++) {
+      await dio.get<Object>('/api/v2/traffic');
+      await dio.get<Object>('/api/v2/nearby/departures');
+    }
+    await Future<void>.delayed(Duration.zero);
+    expect(store.values, isEmpty);
+
+    // Offline before anything was written: the answer in memory
+    backend.down = true;
+    expect((await dio.get<Object>('/api/v2/traffic')).data, [1]);
+    backend.down = false;
+
+    await cache.flush();
+    expect(store.values.keys, unorderedEquals(['http_cache:/api/v2/traffic?', 'http_cache:/api/v2/nearby/departures?', 'http_cache_index']));
+    // The latest answered first in the index
+    expect(await store.readJson('http_cache_index'), ['http_cache:/api/v2/nearby/departures?', 'http_cache:/api/v2/traffic?']);
+  });
+
+  test('written after a while at the latest, without leaving the screen', () async {
+    cache = OfflineCacheInterceptor(store: store, onOffline: (_) {}, onOnline: () {}, flushAfter: const Duration(milliseconds: 20));
+    addTearDown(cache.dispose);
+    dio = backend.dio()..interceptors.add(cache);
+    backend.get('/api/v2/traffic', [1]);
+    await dio.get<Object>('/api/v2/traffic');
+    expect(store.values, isEmpty);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(store.values.keys, contains('http_cache:/api/v2/traffic?'));
+  });
+
+  test('answers not written yet are forgotten at sign-out too', () async {
+    backend.get('/api/v2/me/favorites', []);
+    await dio.get<Object>('/api/v2/me/favorites');
+    await cache.clearAll();
+    await cache.flush();
+    expect(store.values, isEmpty);
+    backend.down = true;
+    await expectLater(dio.get<Object>('/api/v2/me/favorites'), throwsA(isA<DioException>()));
   });
 
   test('keeps each query apart', () async {
@@ -88,7 +133,7 @@ void main() {
     await settle();
     expect(store.values.keys.where((key) => key.startsWith('http_cache')), hasLength(3));
 
-    await OfflineCacheInterceptor.clear(store);
+    await cache.clearAll();
 
     expect(store.values, isEmpty);
   });
@@ -109,13 +154,15 @@ void main() {
   test('indexes answers that come together, so that sign-out forgets them all', () async {
     // The device's store answers later, as the platform does
     store = _SlowStore();
-    dio = backend.dio()..interceptors.add(OfflineCacheInterceptor(store: store, onOffline: (_) {}, onOnline: () {}));
+    cache = OfflineCacheInterceptor(store: store, onOffline: (_) {}, onOnline: () {});
+    addTearDown(cache.dispose);
+    dio = backend.dio()..interceptors.add(cache);
     backend.on('GET', '/api/v2/lines/*', (request) => FakeResponse({'id': request.uri.pathSegments.last}));
     await Future.wait([for (var i = 0; i < 3; i++) dio.get<Object>('/api/v2/lines/C$i')]);
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await cache.flush();
     expect(store.values.keys.where((key) => key.startsWith('http_cache:')), hasLength(3));
 
-    await OfflineCacheInterceptor.clear(store);
+    await cache.clearAll();
 
     expect(store.values, isEmpty);
   });

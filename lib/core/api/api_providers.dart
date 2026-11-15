@@ -5,7 +5,6 @@ import '../../features/auth/auth_controller.dart';
 import '../auth/token_store.dart';
 import '../config.dart';
 import '../offline/offline_cache.dart';
-import '../storage/local_store.dart';
 import 'auth_api.dart';
 import 'auth_interceptor.dart';
 import 'mobility_api.dart';
@@ -30,11 +29,7 @@ final apiDioProvider = Provider<Dio>((ref) {
     dio: dio,
     onSessionLost: () => ref.read(authControllerProvider.notifier).onSessionLost(),
   ));
-  dio.interceptors.add(OfflineCacheInterceptor(
-    store: ref.watch(localStoreProvider),
-    onOffline: (at) => ref.read(offlineProvider.notifier).offline(at),
-    onOnline: () => ref.read(offlineProvider.notifier).online(),
-  ));
+  dio.interceptors.add(ref.watch(offlineCacheProvider));
   return dio;
 });
 
