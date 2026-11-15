@@ -25,6 +25,7 @@ import '../features/stops/timetable_screen.dart';
 import '../features/traffic/traffic_screen.dart';
 import '../l10n/l10n.dart';
 import 'routes.dart';
+import '../features/home_widget/android_widgets.dart';
 import 'shell.dart';
 
 /// Where the app opens: the home page, or what a home screen widget asked for (`main.dart`)
@@ -36,10 +37,27 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authControllerProvider, (_, status) => authListenable.value = status);
   ref.onDispose(authListenable.dispose);
 
-  final router = GoRouter(
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: ref.read(initialLocationProvider),
     refreshListenable: authListenable,
+    // Not one of the app's pages. Android hands the router every link the app is opened with: a launcher shortcut
+    // (`guillaumedamiens://go?…`) or a place from another app (`geo:…`) opens what it asks for over the home page,
+    // which going back finds; anything else (a mistyped address on the web) the home page
+    onException: (context, state, router) {
+      final asked = widgetLaunchLocation(state.uri);
+      router.go(Routes.home);
+      if (asked != null) {
+        router.push(asked);
+      }
+    },
     redirect: (context, state) {
+      // A launcher shortcut (`launchLink`): its page over the home page, which going back finds, instead of alone
+      if (state.uri.queryParameters[launchParameter] == '1') {
+        final asked = withoutLaunch(state.uri);
+        Future.microtask(() => router.push(asked));
+        return Routes.home;
+      }
       final status = authListenable.value;
       final location = state.matchedLocation;
       final onAuthPage = location == Routes.login;
@@ -86,6 +104,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => SearchScreen(
               pickTitle: state.uri.queryParameters['pick'],
               allowCurrentLocation: state.uri.queryParameters['here'] != '0',
+              initialQuery: state.uri.queryParameters['q'],
             ),
           ),
           _route(

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Home screen widget -->
+    <string name="shortcut_traffic">Traffic</string>
     <string name="widget_label">Next departures</string>
     <string name="app_widget_description">Real-time next departures of the stop of your choice</string>
     <string name="widget_refresh">Refresh</string>

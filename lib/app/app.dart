@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/favorites/place_shortcuts.dart';
 import '../core/config.dart';
 import '../core/location/location_providers.dart';
 import '../features/home_widget/home_widget_sync.dart';
@@ -47,6 +48,7 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
   @override
   Widget build(BuildContext context) {
     _lifecycle;
+    ref.watch(placeShortcutsSyncProvider);
     final locale = ref.watch(localeProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => context.l10n.appTitle,

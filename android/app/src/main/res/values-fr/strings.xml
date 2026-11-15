@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="shortcut_traffic">Info trafic</string>
     <string name="widget_label">Prochains départs</string>
     <string name="app_widget_description">Prochains départs en temps réel de l\'arrêt de votre choix</string>
     <string name="widget_refresh">Actualiser</string>
