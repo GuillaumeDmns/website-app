@@ -256,7 +256,12 @@ class _PlaceShortcut extends ConsumerWidget {
       case 'edit':
         await chooseFavoritePlace(context, ref, kind);
       case 'delete':
-        await runFavoriteAction(context, () => ref.read(favoritesProvider.notifier).remove(favorite!));
+        final messenger = ScaffoldMessenger.of(context);
+        final favorites = ref.read(favoritesProvider.notifier);
+        await _runFavoriteAction(messenger, () async {
+          await favorites.remove(favorite!);
+          showUndoSnackBar(messenger, currentL10n.favoriteRemoved, () => _runFavoriteAction(messenger, () => favorites.restore(favorite!)));
+        });
     }
   }
 

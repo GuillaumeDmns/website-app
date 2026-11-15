@@ -119,6 +119,9 @@ class FavoritesController extends AsyncNotifier<List<Favorite>> {
     await _cache(next);
   }
 
+  /// Puts back a favorite just removed (the server gives it a new id)
+  Future<void> restore(Favorite favorite) => _save(favorite);
+
   /// Home, work or another saved place
   Future<void> savePlace(FavoriteKind kind, JourneyPlace place) {
     assert(kind == FavoriteKind.home || kind == FavoriteKind.work || kind == FavoriteKind.place);

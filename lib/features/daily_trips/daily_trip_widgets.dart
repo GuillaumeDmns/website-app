@@ -311,8 +311,7 @@ class _DailyTripCardState extends ConsumerState<DailyTripCard> {
 
   Future<void> _remove() async {
     final messenger = ScaffoldMessenger.of(context);
-    await ref.read(dailyTripsProvider.notifier).remove(widget.trip);
-    messenger.showSnackBar(SnackBar(content: Text(currentL10n.dailyTripRemoved)));
+    await removeDailyTrip(ref.read(dailyTripsProvider.notifier), widget.trip, messenger);
   }
 
   @override
@@ -544,8 +543,7 @@ class SaveDailyTripButton extends ConsumerWidget {
           await trips.save(journey, request ?? const JourneyRequest());
           messenger.showSnackBar(SnackBar(content: Text(currentL10n.dailyTripSaved)));
         } else {
-          await trips.remove(saved);
-          messenger.showSnackBar(SnackBar(content: Text(currentL10n.dailyTripRemoved)));
+          await removeDailyTrip(trips, saved, messenger);
         }
       },
     );
@@ -579,4 +577,11 @@ class LastRideTag extends ConsumerWidget {
       color: context.colors.warning,
     );
   }
+}
+
+/// Removes [trip] and tells so, with "Annuler" putting it back where it was
+Future<void> removeDailyTrip(DailyTrips trips, DailyTrip trip, ScaffoldMessengerState messenger) async {
+  final at = trips.indexOf(trip);
+  await trips.remove(trip);
+  showUndoSnackBar(messenger, currentL10n.dailyTripRemoved, () => trips.restore(trip, at < 0 ? 0 : at));
 }

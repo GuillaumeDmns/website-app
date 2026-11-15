@@ -40,6 +40,21 @@ void main() {
       expect(container.read(favoritesProvider).value!.single.kind, FavoriteKind.line);
     });
 
+    test('puts back a favorite just removed', () async {
+      final container = testContainer(backend, store: store);
+      await sessionOf(container);
+      final favorites = container.read(favoritesProvider.notifier);
+      await container.read(favoritesProvider.future);
+      await favorites.toggleStop(chatelet);
+      final removed = favorites.stopFavorite(chatelet.id)!;
+
+      await favorites.remove(removed);
+      expect(favorites.stopFavorite(chatelet.id), isNull);
+      await favorites.restore(removed);
+      expect(favorites.stopFavorite(chatelet.id)!.stop, chatelet);
+      expect((await store.readJson('favorites') as List), hasLength(1));
+    });
+
     test('replaces home and keeps other places', () async {
       final container = testContainer(backend, store: store);
       await sessionOf(container);

@@ -218,7 +218,14 @@ class _Suggestions extends ConsumerWidget {
               children: [
                 Expanded(child: Text(context.l10n.recent, style: theme.textTheme.titleSmall)),
                 TextButton(
-                  onPressed: () => ref.read(recentSearchesProvider.notifier).clear(),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final searches = ref.read(recentSearchesProvider.notifier);
+                    // All of them, not only the ones this page lists
+                    final forgotten = ref.read(recentSearchesProvider).value ?? const <RecentSearch>[];
+                    await searches.clear();
+                    showUndoSnackBar(messenger, currentL10n.recentCleared, () => searches.restore(forgotten));
+                  },
                   child: Text(context.l10n.clear),
                 ),
               ],

@@ -149,6 +149,9 @@
   "favoritePlaceAdd": "Ajouter un lieu favori",
   "editAddress": "Modifier l'adresse",
   "delete": "Supprimer",
+  "undo": "Annuler",
+  "favoriteRemoved": "Favori supprimé",
+  "recentCleared": "Recherches récentes effacées",
   "addPlace": "Ajouter {title}",
   "@addPlace": {
     "placeholders": {

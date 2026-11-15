@@ -118,8 +118,15 @@ void main() {
     expect(read.lines, '${metro1.id},${rerA.id}');
     expect(read.journey.sections.first.from?.name, address.name);
 
-    await trips.remove(trips.find(trip)!);
+    final removed = trips.find(trip)!;
+    await trips.remove(removed);
     expect(container.read(dailyTripsProvider).value, isEmpty);
+
+    // Put back, once
+    await trips.restore(removed, 0);
+    await trips.restore(removed, 0);
+    expect(container.read(dailyTripsProvider).value, [removed]);
+    expect(await store.readJson(DailyTrips.key), hasLength(1));
   });
 }
 
