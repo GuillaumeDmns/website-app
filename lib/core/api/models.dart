@@ -874,6 +874,23 @@ abstract class BikeStation with _$BikeStation {
   factory BikeStation.fromJson(Map<String, dynamic> json) => _$BikeStationFromJson(json);
 }
 
+/// What the backend tells the apps at start-up (`/api/v2/app-config`): a published app can't be taken back
+@freezed
+abstract class RemoteConfig with _$RemoteConfig {
+  const factory RemoteConfig({
+    /// Oldest supported version per platform (`android`, `web`…), `X.Y.Z`
+    @Default({}) Map<String, String> minVersions,
+
+    /// Features switched off (`vehicles`…)
+    @Default([]) List<String> disabledFeatures,
+
+    /// Message for the home page per language (`fr`, `en`)
+    @Default({}) Map<String, String> notice,
+  }) = _RemoteConfig;
+
+  factory RemoteConfig.fromJson(Map<String, dynamic> json) => _$RemoteConfigFromJson(json);
+}
+
 /// The signed-in user's account (`/api/v2/me`)
 @freezed
 abstract class Account with _$Account {

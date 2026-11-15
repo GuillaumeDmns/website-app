@@ -3,9 +3,11 @@ package com.guillaumedamiens.app
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -98,6 +100,20 @@ class MainActivity: FlutterFragmentActivity() {
                         putExtra(Intent.EXTRA_TEXT, call.argument<String>("text"))
                     }
                     startActivity(Intent.createChooser(send, call.argument<String>("title")))
+                    result.success(null)
+                }
+                "openStore" -> {
+                    // The app's page in the store (a required update), its web page without a store app
+                    val page = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
+                    try {
+                        startActivity(page)
+                    } catch (e: ActivityNotFoundException) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
+                        } catch (e: ActivityNotFoundException) {
+                            // No browser either
+                        }
+                    }
                     result.success(null)
                 }
                 "keepScreenOn" -> {

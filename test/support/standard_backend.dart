@@ -80,6 +80,8 @@ FakeBackend standardBackend() {
     serviceTowards('Nation', direction: 0, at: StopRef(id: chatelet.id, name: chatelet.name, lat: chatelet.lat, lon: chatelet.lon)),
     serviceTowards('Châtelet', direction: 1, lastIn: 300),
   ]).toJson());
+  // Nothing required, nothing switched off, no message
+  backend.get('/api/v2/app-config', const RemoteConfig().toJson());
   backend.get('/api/v2/traffic', [
     LineTraffic(line: metro1, severity: DisruptionSeverity.blocking, titles: [metroStopped.title!]).toJson(),
     const LineTraffic(line: rerA).toJson(),
