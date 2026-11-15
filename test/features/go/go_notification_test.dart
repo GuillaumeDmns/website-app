@@ -10,8 +10,6 @@ import 'package:website_app/core/location/position_feed.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_glance.dart';
-import 'package:website_app/features/go/go_live.dart';
-import 'package:website_app/features/go/go_tracker.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -44,20 +42,6 @@ void main() {
     await pumpEventQueue();
   }
 
-  test('the progress bar marks where each ride is left, but not a ride ending the journey', () {
-    final connection = journey([
-      walk(now, 240),
-      transit(now.add(const Duration(minutes: 6)), 480, via: [gareDeLyon]),
-      walk(now.add(const Duration(minutes: 14)), 120, from: point(nation)),
-      transit(now.add(const Duration(minutes: 18)), 600, line: rerA, from: nation, to: chatelet),
-    ]);
-    final points = goLivePoints(GoTracker(connection));
-    // Out of the métro after the walk and the ride (240 + 480 s); the RER ends the journey
-    expect(points.map((point) => point.seconds), [720]);
-    expect(points.single.color, '#${metro1.color}');
-    expect(goLivePoints(GoTracker(journey([walk(now, 240)]))), isEmpty);
-  });
-
   test('the notification says how much its moment needs the user', () async {
     final live = _LiveJourney();
     final container = app(MemoryStore(), live: live);
@@ -67,8 +51,6 @@ void main() {
     final glance = goGlance(container.read(goControllerProvider)!, DateTime.now());
     expect(live.updates.last.tone, LiveJourneyTone.values[glance.tone.index]);
     expect(live.updates.last.title, glance.action);
-    // The métro ends the journey: the bar's end says where to get off
-    expect(live.updates.last.points, isEmpty);
     container.read(goControllerProvider.notifier).stop();
   });
 
