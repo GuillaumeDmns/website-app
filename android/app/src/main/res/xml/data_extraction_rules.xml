@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What leaves the device with its user (Android 12+). Nothing to the cloud. To a new phone, set up from this one:
+     only the app's own small documents (LocalStore: the DataStore file of shared_preferences), so that someone using
+     the app without account keeps their favorites, daily trips and preferences. Never the tokens (the secure storage's
+     preferences: their keys stay in this device's Keystore anyway), nor the home screen widgets' data (their ids
+     belong to this launcher). An account's copies arriving without its session are dropped at the first start
+     (AuthController). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="datastore/" />
+    </device-transfer>
+</data-extraction-rules>
