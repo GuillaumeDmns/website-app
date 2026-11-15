@@ -8,6 +8,7 @@ import 'package:website_app/core/location/location_providers.dart';
 import 'package:website_app/core/location/position_feed.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/platform/live_journey.dart';
+import 'package:website_app/core/utils/refresh.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_state.dart';
 import 'package:website_app/features/go/go_tracker.dart';
@@ -45,6 +46,25 @@ void main() {
     expect(goLocationNeed(at(GoPhase.onBoard, step: 1), shown: false), const LocationNeed(Duration(seconds: 3)));
     expect(goLocationNeed(at(GoPhase.arrived, step: 3), shown: true), isNull);
     expect(goLocationNeed(null, shown: true), isNull);
+  });
+
+  test('the departures followed go on with the screen off while a journey is followed, not after', () async {
+    final container = testContainer(standardBackend(), overrides: [
+      positionFeedProvider.overrideWithValue(PositionFeed(open: (_) => const Stream.empty())),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      userLocationProvider.overrideWith((ref) => Stream.value(const LatLng(48.8584, 2.3470))),
+    ]);
+    container.listen(goControllerProvider, (_, _) {});
+    final controller = container.read(goControllerProvider.notifier);
+    expect(container.read(followedOffScreenProvider), isFalse);
+
+    controller.start(plan, const JourneyRequest());
+    await pumpEventQueue();
+    expect(container.read(followedOffScreenProvider), isTrue);
+
+    controller.stop();
+    await pumpEventQueue();
+    expect(container.read(followedOffScreenProvider), isFalse);
   });
 
   test('a speed counts for what its accuracy leaves of it: a phone lying indoors is still', () {
