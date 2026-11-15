@@ -266,7 +266,9 @@ void main() {
     ];
     List<String?> shown() => [for (final pin in tester.widgetList<PinView>(find.byType(PinView))) pin.pin.label];
 
-    container.read(mapOverlaysProvider.notifier).set('/', const MapOverlay(pins: pins, follow: MapFollow.overhead(user)));
+    container
+        .read(mapOverlaysProvider.notifier)
+        .set('/', const MapOverlay(pins: pins, follow: MapFollow(position: user, bearing: 0, zoom: 14, overhead: true)));
     await animate(tester);
     expect(camera(tester).zoom, lessThan(MapPin.closeUpZoom));
     expect(shown(), ['Châtelet']);

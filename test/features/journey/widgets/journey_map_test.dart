@@ -44,7 +44,7 @@ void main() {
     expect(ridePath.color, const Color(0xFFFFCD00));
   });
 
-  test("a station's ways in and out: navy signs close up, the ones taken green and named on top of them", () {
+  test("a station's ways in and out: navy pictograms close up, the ones taken green and named on top of them", () {
     useLocale(const Locale('fr'));
     const way = StationEntrance(id: 'way', code: '3', name: 'r. Auber', lat: 48.8735, lon: 2.3278);
     const other = StationEntrance(id: 'other', code: '4', name: 'r. de Caumartin', lat: 48.8733, lon: 2.3290);
@@ -60,8 +60,8 @@ void main() {
     expect(pins.every((pin) => pin.closeUp), isTrue);
     expect(pins.last.color, AppTheme.brand);
     expect(pins.first.color, stationAccessColor);
-    // Their looks: the same number the same image, a door without one
-    expect([for (final pin in pins) pin.image], ['access-4', 'access-door', 'access-taken-3-r. Auber']);
+    // Their looks: the same number the same image, the way out's pictogram alone without one
+    expect([for (final pin in pins) pin.image], ['access-out-4', 'access-out-', 'access-out-3-taken-r. Auber']);
 
     // GO getting out of that station: its ways whatever the zoom
     expect(stationAccessPins(const [havre], shown: 'IDFM:71337').any((pin) => pin.closeUp), isFalse);
@@ -77,7 +77,7 @@ void main() {
       }),
     ));
 
-    expect(overlay.pins.first.image, 'access-1');
+    expect(overlay.pins.first.image, 'access-in-1');
     expect(overlay.pins.where((pin) => pin.closeUp), hasLength(1));
   });
 }

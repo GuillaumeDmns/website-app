@@ -29,7 +29,7 @@ class MapPin {
   }) : assert(child == null || image != null, 'A pin drawn by a child names its image');
 
   /// Where [closeUp] pins start showing: a few streets on the screen, a station's ways in and out apart
-  static const closeUpZoom = 16.0;
+  static const closeUpZoom = 15.0;
 
   final LatLng point;
   final Color color;

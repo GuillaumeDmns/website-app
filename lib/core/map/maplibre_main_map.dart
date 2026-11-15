@@ -19,7 +19,7 @@ import 'maplibre_overlay.dart';
 /// The web map is created at the window's size and resized by the browser after the frame that shows it
 const _webResizeDelay = Duration(milliseconds: 50);
 
-/// The map with MapLibre (native SDK on Android and iOS, maplibre-gl-js on the web): OpenFreeMap's vector tiles drawn
+/// The map with MapLibre (MapLibre Native's C API on Android and iOS, maplibre-gl-js on the web): OpenFreeMap's vector tiles drawn
 /// by the GPU. What a page shows on it, and the user dot, are layers of the map ([MapLibreOverlay]): they move with it.
 /// The part hidden by the [panel] is the camera's padding: changing it without animation keeps what is in the middle of
 /// the part left above (MapLibre's camera center is that of its padded area). See [MainMap].
@@ -135,27 +135,19 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     _animating(const Duration(milliseconds: 500), padding);
     if (overlay.fit.length == 1) {
       unawaited(controller.animateCamera(
-        center: _geo(overlay.fit.single),
-        zoom: 16,
-        bearing: 0,
-        pitch: 0,
-        padding: padding,
-        nativeDuration: const Duration(milliseconds: 500),
+        CameraUpdate.position(center: _geo(overlay.fit.single), zoom: 16, bearing: 0, pitch: 0, padding: padding),
+        animation: const CameraAnimation.ease(duration: Duration(milliseconds: 500)),
       ));
       return;
     }
-    unawaited(controller.fitBounds(
-      bounds: _bounds(overlay.fit),
-      bearing: 0,
-      pitch: 0,
-      padding: padding,
-      nativeDuration: const Duration(milliseconds: 500),
-      webMaxZoom: 17,
+    unawaited(controller.animateCamera(
+      CameraUpdate.bounds(_bounds(overlay.fit), bearing: 0, pitch: 0, padding: padding, maxZoom: 17),
+      animation: const CameraAnimation.ease(duration: Duration(milliseconds: 500)),
     ));
   }
 
   /// The points' bounds, at least about 300 m wide so that close points aren't zoomed in too much
-  static LngLatBounds _bounds(List<LatLng> points) {
+  static GeoBox _bounds(List<LatLng> points) {
     var south = points.first.latitude, north = south, west = points.first.longitude, east = west;
     for (final point in points) {
       south = point.latitude < south ? point.latitude : south;
@@ -174,7 +166,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       west = middle - minLon / 2;
       east = middle + minLon / 2;
     }
-    return LngLatBounds(longitudeWest: west, longitudeEast: east, latitudeSouth: south, latitudeNorth: north);
+    return GeoBox(west: west, south: south, east: east, north: north);
   }
 
   /// The user low in the visible part (above the panel), the way ahead up: the camera's padding puts its center at
@@ -209,12 +201,14 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     final padding = followPadding(_restingPanel, _height, overhead: view.overhead);
     _animating(duration, padding);
     unawaited(controller.animateCamera(
-      center: _geo(view.position),
-      zoom: view.zoom,
-      bearing: view.bearing,
-      pitch: view.pitch,
-      padding: padding,
-      nativeDuration: duration,
+      CameraUpdate.position(
+        center: _geo(view.position),
+        zoom: view.zoom,
+        bearing: view.bearing,
+        pitch: view.pitch,
+        padding: padding,
+      ),
+      animation: const CameraAnimation.ease(duration: duration),
     ));
   }
 
@@ -240,13 +234,13 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     final shown = camera.glideTo(target, last == null ? 1 / 60 : math.min(0.1, now.difference(last).inMicroseconds / 1e6));
     _camera = shown;
     _cameraPadding = _followPadding;
-    unawaited(controller.moveCamera(
+    unawaited(controller.moveCamera(CameraUpdate.position(
       center: _geo(shown.position),
       zoom: shown.zoom,
       bearing: shown.bearing,
       pitch: shown.pitch,
       padding: _followPadding,
-    ));
+    )));
     if (shown != target) {
       _glide = Timer(shown.glideStepTo(target), _glideStep);
     }
@@ -333,7 +327,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       return;
     }
     _cameraPadding = padding;
-    unawaited(controller.moveCamera(center: center, zoom: camera?.zoom, bearing: camera?.bearing, padding: padding));
+    unawaited(controller.moveCamera(
+      CameraUpdate.position(center: center, zoom: camera?.zoom, bearing: camera?.bearing, padding: padding),
+    ));
   }
 
   /// Frames (or follows) the overlay again, even if it is the one framed last
@@ -358,7 +354,10 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
       const duration = Duration(milliseconds: 500);
       final padding = framePadding(_restingPanel, _height);
       _animating(duration, padding);
-      unawaited(_controller?.animateCamera(bearing: 0, pitch: 0, padding: padding, nativeDuration: duration));
+      unawaited(_controller?.animateCamera(
+        CameraUpdate.position(bearing: 0, pitch: 0, padding: padding),
+        animation: const CameraAnimation.ease(duration: duration),
+      ));
     }
   }
 
@@ -374,42 +373,38 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     }
   }
 
-  void _onEvent(MapEvent event) {
-    switch (event) {
-      case MapEventStyleLoaded(:final style):
-        for (final id in hiddenStyleLayers) {
-          // A style without one of them (another version of it) is fine as it is
-          unawaited(style.removeLayer(id).catchError((Object e) => debugPrint('Map layer $id not removed: $e')));
-        }
-        // The overlay's layers on this style (the map may be created again)
-        _layers?.dispose();
-        _layers = MapLibreOverlay(style, theme: Theme.of(context), pixelRatio: View.of(context).devicePixelRatio);
-        _showLayers();
-        if (_ready) {
-          _reframe();
-        }
-        // What the map shows from the start, should its camera never move
-        _publishView();
-      case MapEventMoveCamera(:final camera):
-        _layers?.zoomed(camera.zoom);
-      case MapEventClick(:final screenPoint):
-        final controller = _controller;
-        if (controller != null) {
-          _layers?.tappedPin(controller, screenPoint)?.onTap?.call();
-        }
-      case MapEventStartMoveCamera(reason: CameraChangeReason.apiGesture):
-        // Moving the map by hand stops following until "Recentrer"
-        if (_following != null && !_followPaused) {
-          setState(() => _followPaused = true);
-        }
-      case MapEventCameraIdle():
-        _publishView();
-      case MapEventLongClick(:final point) || MapEventSecondaryClick(:final point):
-        widget.onLongPress?.call(context, LatLng(point.lat, point.lon));
-      default:
-        break;
+  void _onStyleLoaded(StyleController style) {
+    for (final id in hiddenStyleLayers) {
+      // A style without one of them (another version of it) is fine as it is
+      unawaited(style.layers.remove(id).catchError((Object e) => debugPrint('Map layer $id not removed: $e')));
+    }
+    // The overlay's layers on this style (the map may be created again)
+    _layers?.dispose();
+    _layers = MapLibreOverlay(style, theme: Theme.of(context), pixelRatio: View.of(context).devicePixelRatio);
+    _showLayers();
+    if (_ready) {
+      _reframe();
+    }
+    // What the map shows from the start, should its camera never move
+    _publishView();
+  }
+
+  Future<void> _onClick(MapEventClick event) async {
+    final controller = _controller;
+    final layers = _layers;
+    if (controller != null && layers != null) {
+      (await layers.tappedPin(controller, event.screenPoint))?.onTap?.call();
     }
   }
+
+  void _onCameraMoveStart(MapEventCameraMoveStart event) {
+    // Moving the map by hand stops following until "Recentrer"
+    if (event.reason == CameraChangeReason.gesture && _following != null && !_followPaused) {
+      setState(() => _followPaused = true);
+    }
+  }
+
+  void _onLongPress(Geographic point) => widget.onLongPress?.call(context, LatLng(point.lat, point.lon));
 
   /// Once the camera rests: where it is, and what it shows (the stops there; MapLibre's world is 512 px wide at
   /// zoom 0)
@@ -456,7 +451,10 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           const duration = Duration(milliseconds: 500);
           final padding = framePadding(_restingPanel, _height);
           _animating(duration, padding);
-          unawaited(_controller?.animateCamera(center: _geo(position), zoom: 16, padding: padding, nativeDuration: duration));
+          unawaited(_controller?.animateCamera(
+            CameraUpdate.position(center: _geo(position), zoom: 16, padding: padding),
+            animation: const CameraAnimation.ease(duration: duration),
+          ));
         }
       }
     });
@@ -478,15 +476,20 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   Widget _map(BuildContext context, LatLng? user, MapOverlay overlay) {
     return MapLibreMap(
       options: MapOptions(
-        initStyle: baseMapStyleUrl,
-        initCenter: _geo(user ?? parisCenter),
-        initZoom: user != null ? 16 : 13,
+        style: const MapStyle.url(baseMapStyleUrl),
+        initCamera: CameraUpdate.position(center: _geo(user ?? parisCenter), zoom: user != null ? 16 : 13),
         minZoom: 8,
         maxZoom: 19,
         // Turned by GO on foot only
-        gestures: const MapGestures.all(rotate: false, pitch: false),
+        movements: const MapMovements(rotate: false, pitch: false),
       ),
-      onEvent: _onEvent,
+      onStyleLoaded: _onStyleLoaded,
+      onCameraMove: (event) => _layers?.zoomed(event.camera.zoom),
+      onCameraMoveStart: _onCameraMoveStart,
+      onCameraMoveEnd: (_) => _publishView(),
+      onClick: (event) => unawaited(_onClick(event)),
+      onLongClick: (event) => _onLongPress(event.point),
+      onSecondaryClick: (event) => _onLongPress(event.point),
       children: [
         // The controller of the map actually shown: the map can be created again (the page laid out again), and the
         // overlay is then framed on the new one
@@ -495,7 +498,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
           if (controller != null && controller != _controller) {
             _controller = controller;
             _ready = true;
-            // On the web, once the browser has given the map its size (web/index.html), after this frame
+            // On the web, once the browser has given the map its size, after this frame
             WidgetsBinding.instance.addPostFrameCallback((_) => Timer(kIsWeb ? _webResizeDelay : Duration.zero, () {
                   if (mounted) {
                     _reframe();
@@ -510,7 +513,7 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
             allowInteraction: true,
             markers: [
               for (final pin in overlay.pins)
-                if (pin.label != null && pin.shownAt(MapCamera.maybeOf(context)?.zoom ?? 0))
+                if (pin.label != null && pin.shownAt(CameraPosition.maybeOf(context)?.zoom ?? 0))
                   Marker(
                     point: _geo(pin.point),
                     size: PinView.boxOf(pin),

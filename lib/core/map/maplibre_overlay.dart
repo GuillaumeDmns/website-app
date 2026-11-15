@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:maplibre/maplibre.dart';
@@ -19,15 +18,13 @@ import 'map_pins.dart';
 /// pins turned with the map (a vehicle's pointer), the
 /// upright pins, the user's heading lying on the map, the user dot.
 class MapLibreOverlay {
-  MapLibreOverlay(this._style, {required this.theme, required double pixelRatio})
-      : _pixelRatio = pixelRatio,
-        _iconSize = overlayIconSize(pixelRatio) {
+  MapLibreOverlay(this._style, {required this.theme, required this.pixelRatio}) {
     _run(() async {
       for (final source in [accuracySource, pinsSource, userSource]) {
-        await _style.addSource(GeoJsonSource(id: source, data: _empty));
+        await _style.sources.add(GeoJsonSource.data(id: source, data: const GeoJsonData.text(_empty)));
       }
-      for (final layer in overlayStyleLayers(iconSize: _iconSize)) {
-        await _style.addLayer(layer);
+      for (final layer in overlayStyleLayers()) {
+        await _style.layers.add(layer);
       }
     });
   }
@@ -49,8 +46,8 @@ class MapLibreOverlay {
   static const _empty = '{"type":"FeatureCollection","features":[]}';
 
   final StyleController _style;
-  final double _pixelRatio;
-  final double _iconSize;
+  /// The screen's density, the images' (made at it for sharpness)
+  final double pixelRatio;
   /// What the pins are drawn with (their colors, a dot's surface ring)
   ThemeData theme;
   bool _disposed = false;
@@ -89,15 +86,21 @@ class MapLibreOverlay {
     _run(() async {
       for (final old in gone) {
         for (var index = 0; index < old.layers; index++) {
-          await _style.removeLayer('${old.id}-$index');
+          await _style.layers.remove('${old.id}-$index');
         }
-        await _style.removeSource(old.id);
+        await _style.sources.remove(old.id);
       }
       for (final next in added) {
-        await _style.addSource(GeoJsonSource(id: next.id, data: pathGeoJson(next.path)));
+        await _style.sources.add(GeoJsonSource.data(id: next.id, data: GeoJsonData.text(pathGeoJson(next.path))));
         for (final (index, layer) in next.layers.indexed) {
-          await _style.addLayer(
-            LineStyleLayer(id: '${next.id}-$index', sourceId: next.id, layout: layer.getLayout(), paint: layer.getPaint()),
+          await _style.layers.add(
+            StyleLayer.fromJson({
+              'id': '${next.id}-$index',
+              'type': 'line',
+              'source': next.id,
+              'layout': layer.layout,
+              'paint': layer.paint,
+            }),
             belowLayerId: accuracyLayer,
           );
         }
@@ -132,8 +135,9 @@ class MapLibreOverlay {
               child: SizedBox.fromSize(size: size, child: Center(child: build())),
             ),
           ),
+          // Made at the screen's density, shown at their size (the map is told their pixel ratio)
           logicalSize: size,
-          imageSize: size * _pixelRatio,
+          imageSize: size * pixelRatio,
         );
         _images.add(id);
       } catch (e) {
@@ -199,22 +203,27 @@ class MapLibreOverlay {
       return;
     }
     _pinsShown = data;
-    _run(() => _style.updateGeoJsonSource(id: pinsSource, data: data));
+    _run(() => _style.sources.updateGeoJsonData(pinsSource, GeoJsonData.text(data)));
   }
 
   /// The pin under [screenPoint] that can be tapped, the one drawn on top
-  MapPin? tappedPin(MapController controller, Offset screenPoint) {
+  Future<MapPin?> tappedPin(MapController controller, Offset screenPoint) async {
+    final pins = _pins;
+    final features = await controller.queryRenderedFeatures(
+      QueryGeometry.point(screenPoint),
+      layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer],
+    );
     MapPin? tapped;
     var top = -1;
-    for (final feature in controller.featuresAtPoint(screenPoint, layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer])) {
+    for (final feature in features) {
       final index = switch (feature.properties['pin']) {
         final num value => value.toInt(),
         final String value => int.tryParse(value),
         _ => null,
       };
-      if (index != null && index > top && index < _pins.length && _pins[index].onTap != null) {
+      if (index != null && index > top && index < pins.length && pins[index].onTap != null) {
         top = index;
-        tapped = _pins[index];
+        tapped = pins[index];
       }
     }
     return tapped;
@@ -267,22 +276,17 @@ class MapLibreOverlay {
     );
     if (user != _userShown) {
       _userShown = user;
-      _run(() => _style.updateGeoJsonSource(id: userSource, data: user));
+      _run(() => _style.sources.updateGeoJsonData(userSource, GeoJsonData.text(user)));
     }
     final position = _user;
     final shown = position != null && AccuracyCircle.radiusFor(_accuracy, position.latitude, _zoom, tileSize: 512) != null;
     final circle = accuracyGeoJson(shown ? position : null, _accuracy);
     if (circle != _accuracyShown) {
       _accuracyShown = circle;
-      _run(() => _style.updateGeoJsonSource(id: accuracySource, data: circle));
+      _run(() => _style.sources.updateGeoJsonData(accuracySource, GeoJsonData.text(circle)));
     }
   }
 }
-
-/// The size images are drawn at on the map. They are drawn at the screen's [pixelRatio] for sharpness: the web map is
-/// told so, Android's takes them for images of logical pixels scaled up again (and iOS's for points), so they are
-/// drawn smaller by as much there
-double overlayIconSize(double pixelRatio, {bool web = kIsWeb}) => web ? 1 : 1 / pixelRatio;
 
 /// The name of [pin]'s look: its own, else its dot's
 String pinImageName(MapPin pin, Color outline) =>
@@ -367,11 +371,11 @@ Map<String, Object> _point(LatLng point) => {'type': 'Point', 'coordinates': _co
 
 List<double> _coordinates(LatLng point) => [point.longitude, point.latitude];
 
-/// The overlay's layers from the bottom, images drawn at [iconSize] ([overlayIconSize])
-List<StyleLayer> overlayStyleLayers({required double iconSize}) {
+/// The overlay's layers from the bottom, as the map's style describes them. Images are made at the screen's density
+/// and the map is told so: shown at their size.
+List<StyleLayer> overlayStyleLayers() {
   Map<String, Object> symbols({required bool turned, bool flat = false}) => {
         'icon-image': ['get', 'image'],
-        'icon-size': iconSize,
         'icon-anchor': ['coalesce', ['get', 'anchor'], 'center'],
         'icon-rotate': ['get', 'rotate'],
         'icon-rotation-alignment': turned ? 'map' : 'viewport',
@@ -381,11 +385,21 @@ List<StyleLayer> overlayStyleLayers({required double iconSize}) {
         'icon-ignore-placement': true,
         'symbol-z-order': 'source',
       };
+  StyleLayer pins(String id, String source, List<Object> filter, Map<String, Object> layout, {double? minZoom}) =>
+      StyleLayer.fromJson({
+        'id': id,
+        'type': 'symbol',
+        'source': source,
+        'minzoom': ?minZoom,
+        'filter': filter,
+        'layout': layout,
+      });
   return [
-    CircleStyleLayer(
-      id: MapLibreOverlay.accuracyLayer,
-      sourceId: MapLibreOverlay.accuracySource,
-      paint: {
+    StyleLayer.fromJson({
+      'id': MapLibreOverlay.accuracyLayer,
+      'type': 'circle',
+      'source': MapLibreOverlay.accuracySource,
+      'paint': {
         // Doubled at each zoom level, from its radius at zoom 0
         'circle-radius': [
           'interpolate',
@@ -396,79 +410,61 @@ List<StyleLayer> overlayStyleLayers({required double iconSize}) {
           24,
           ['*', ['get', 'r0'], 16777216],
         ],
-        'circle-color': _css(AccuracyCircle.fill),
-        'circle-stroke-color': _css(AccuracyCircle.border),
+        'circle-color': styleColor(AccuracyCircle.fill),
+        'circle-stroke-color': styleColor(AccuracyCircle.border),
         'circle-stroke-width': 1,
         // Lying on the map, flattened when it is tilted
         'circle-pitch-alignment': 'map',
         'circle-pitch-scale': 'map',
       },
-    ),
+    }),
     // A station's ways in and out, close up only: under the other pins
-    SymbolStyleLayer(
-      id: MapLibreOverlay.closeUpPinsLayer,
-      sourceId: MapLibreOverlay.pinsSource,
+    pins(
+      MapLibreOverlay.closeUpPinsLayer,
+      MapLibreOverlay.pinsSource,
+      const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], true]],
+      symbols(turned: false),
       minZoom: MapPin.closeUpZoom,
-      filter: const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], true]],
-      layout: symbols(turned: false),
     ),
-    SymbolStyleLayer(
-      id: MapLibreOverlay.turnedPinsLayer,
-      sourceId: MapLibreOverlay.pinsSource,
-      filter: const ['==', ['get', 'turned'], true],
-      layout: symbols(turned: true),
+    pins(MapLibreOverlay.turnedPinsLayer, MapLibreOverlay.pinsSource, const ['==', ['get', 'turned'], true],
+        symbols(turned: true)),
+    pins(
+      MapLibreOverlay.pinsLayer,
+      MapLibreOverlay.pinsSource,
+      const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], false]],
+      symbols(turned: false),
     ),
-    SymbolStyleLayer(
-      id: MapLibreOverlay.pinsLayer,
-      sourceId: MapLibreOverlay.pinsSource,
-      filter: const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], false]],
-      layout: symbols(turned: false),
-    ),
-    SymbolStyleLayer(
-      id: MapLibreOverlay.headingLayer,
-      sourceId: MapLibreOverlay.userSource,
-      filter: const ['==', ['get', 'kind'], 'heading'],
-      layout: symbols(turned: true, flat: true),
-    ),
-    SymbolStyleLayer(
-      id: MapLibreOverlay.userLayer,
-      sourceId: MapLibreOverlay.userSource,
-      filter: const ['==', ['get', 'kind'], 'dot'],
-      layout: symbols(turned: false),
-    ),
+    pins(MapLibreOverlay.headingLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'heading'],
+        symbols(turned: true, flat: true)),
+    pins(MapLibreOverlay.userLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'dot'],
+        symbols(turned: false)),
   ];
 }
 
 /// A color as the map's style reads it, transparency included
-String _css(Color color) =>
+String styleColor(Color color) =>
     'rgba(${(color.r * 255).round()}, ${(color.g * 255).round()}, ${(color.b * 255).round()}, ${color.a.toStringAsFixed(3)})';
 
 /// Light edge of the paths: the map stays light in dark mode too
 const _casing = Colors.white;
 
+/// A style layer of a path: how its line is laid out and painted
+typedef PathLayer = ({Map<String, Object> layout, Map<String, Object> paint});
+
 /// The style layers of [path] on the MapLibre map: a solid path on a light edge as faded as it, a walk as round dots
 /// on the map itself like Citymapper's (a light band under them hid the map)
-List<Layer> mapLibrePathLayers(MapPath path) {
-  final lines = [
-    if (path.points.length >= 2)
-      Feature(geometry: LineString.from([for (final point in path.points) Geographic(lon: point.longitude, lat: point.latitude)])),
-  ];
+List<PathLayer> mapLibrePathLayers(MapPath path) {
   if (path.dotted) {
-    return [DotsLayer(polylines: lines, color: path.color, width: path.width.round())];
+    // Dashes of no length, their round ends drawn: round dots as wide as the line, one every two widths
+    return [
+      (
+        layout: const {'line-cap': 'round', 'line-join': 'round'},
+        paint: {'line-color': styleColor(path.color), 'line-width': path.width.round(), 'line-dasharray': const [0, 2]},
+      ),
+    ];
   }
   return [
-    PolylineLayer(polylines: lines, color: _casing.withValues(alpha: path.color.a), width: (path.width + 3).round()),
-    PolylineLayer(polylines: lines, color: path.color, width: path.width.round()),
+    (layout: const {}, paint: {'line-color': styleColor(_casing.withValues(alpha: path.color.a)), 'line-width': (path.width + 3).round()}),
+    (layout: const {}, paint: {'line-color': styleColor(path.color), 'line-width': path.width.round()}),
   ];
-}
-
-/// A line of round dots as wide as the line, one every two widths: dashes of no length, their round ends drawn
-class DotsLayer extends PolylineLayer {
-  const DotsLayer({required super.polylines, required super.color, required super.width});
-
-  @override
-  Map<String, Object> getLayout() => const {'line-cap': 'round', 'line-join': 'round'};
-
-  @override
-  Map<String, Object> getPaint() => {...super.getPaint(), 'line-dasharray': const [0, 2]};
 }
