@@ -3,6 +3,7 @@ package com.guillaumedamiens.app
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -61,6 +62,12 @@ class NextDepartures : HomeWidgetProvider() {
 
         /** When the app last fetched the widgets' departures (ms since the epoch, written by the app) */
         private const val FETCHED_AT = "widgets_fetched_at"
+
+        /** When the picker's preview was last drawn from a widget's own departures */
+        private const val PREVIEW_AT = "widgets_preview_at"
+
+        /** The system only takes a few previews an hour: one is enough */
+        private const val PREVIEW_EVERY_MS = 60 * 60_000L
 
         /** When the widget last asked for them, so that a failure doesn't ask again at every redraw */
         private const val ASKED_AT = "widgets_asked_at"
@@ -182,6 +189,16 @@ class NextDepartures : HomeWidgetProvider() {
         super.onDisabled(context)
         context.getSystemService(AlarmManager::class.java).cancel(redrawIntent(context))
         WidgetRefreshWorker.cancel(context)
+        // The picker shows the made-up stop again, not one the user no longer has
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            try {
+                AppWidgetManager.getInstance(context)
+                    .removeWidgetPreview(ComponentName(context, NextDepartures::class.java), AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN)
+            } catch (e: Exception) {
+                // Nothing to remove
+            }
+            HomeWidgetPlugin.getData(context).edit { remove(PREVIEW_AT) }
+        }
     }
 
     private fun render(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences, now: Long) {
@@ -268,6 +285,35 @@ class NextDepartures : HomeWidgetProvider() {
             }
         }
 
+    /**
+     * In the launcher's widget picker, the widget as it looks with the user's own stop instead of the made-up one of
+     * `next_departures_preview.xml` (Android 15, generated previews): the first widget that has departures, its times as
+     * clock times (the picker doesn't redraw them), at most once an hour. Nothing before Android 15, nor without a
+     * widget placed yet: the layout's preview stays.
+     */
+    private fun updatePreview(context: Context, widgetData: SharedPreferences, configured: List<Int>, now: Long) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return
+        }
+        val last = widgetData.getString(PREVIEW_AT, null)?.toLongOrNull() ?: 0
+        if (now - last < PREVIEW_EVERY_MS) {
+            return
+        }
+        val widgetId = configured.firstOrNull { upcoming(parse(widgetData.getString(key(it, "rows"), null)), now).isNotEmpty() } ?: return
+        val rows = upcoming(parse(widgetData.getString(key(widgetId, "rows"), null)), now)
+        val stopName = widgetData.getString(key(widgetId, "stop_name"), null).orEmpty()
+        val preview = list(context, widgetData, widgetId, 0, stopName, rows, "", now, timeLeft = false)
+        try {
+            val set = AppWidgetManager.getInstance(context).setWidgetPreview(
+                ComponentName(context, NextDepartures::class.java), AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN, preview)
+            if (set) {
+                widgetData.edit { putString(PREVIEW_AT, now.toString()) }
+            }
+        } catch (e: Exception) {
+            // A launcher or a system that refuses it: the layout's preview stays
+        }
+    }
+
     /** Opens the app at [uri] (its stop, or the choice of its stop) */
     private fun open(context: Context, uri: String): PendingIntent =
         HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, uri.toUri())
@@ -280,6 +326,7 @@ class NextDepartures : HomeWidgetProvider() {
             return
         }
         WidgetRefreshWorker.schedule(context)
+        updatePreview(context, widgetData, configured, now)
         scheduleRedraw(context, configured.flatMap { parse(widgetData.getString(key(it, "rows"), null)) }, now)
 
         val fetchedAt = widgetData.getString(FETCHED_AT, null)?.toLongOrNull() ?: 0
