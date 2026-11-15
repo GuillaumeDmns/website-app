@@ -13,8 +13,10 @@ import '../../core/api/models.dart';
 import '../../core/config.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
+import '../../core/platform/go_system.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/size_reporter.dart';
+import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../journey/station_accesses.dart';
 import '../journey/widgets/journey_map.dart';
@@ -141,6 +143,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
             child: Column(
               children: [
                 if (isWideLayout(context)) GoPanelHeader(state: state),
+                const GoSystemNotice(),
                 if (AppConfig.isDev) const GoGpsStats(),
                 _Dots(count: cards.length, shown: _shown, live: current, onTap: _show),
               ],
@@ -427,7 +430,42 @@ class _CalloutArrow extends CustomPainter {
   bool shouldRepaint(_CalloutArrow oldDelegate) => oldDelegate.color != color;
 }
 
-/// A station's other ways out on the map: a small dark square
+/// What the system holds back from GO (the precise position, the notifications, the Live Update), said where the
+/// journey is followed, one tap from where it is granted; nothing when all is there
+class GoSystemNotice extends ConsumerWidget {
+  const GoSystemNotice({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final issue = ref.watch(goSystemIssueProvider).value;
+    if (issue == null) {
+      return const SizedBox.shrink();
+    }
+    final l10n = context.l10n;
+    final (icon, text) = switch (issue) {
+      GoSystemIssue.approximateLocation => (Icons.location_searching, l10n.goApproximateLocation),
+      GoSystemIssue.notificationsOff => (Icons.notifications_off_outlined, l10n.goNotificationsOff),
+      GoSystemIssue.liveUpdatesOff => (Icons.notifications_paused_outlined, l10n.goLiveUpdatesOff),
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: AppCard(
+        padding: const EdgeInsets.all(12),
+        onTap: () async {
+          await ref.read(goSystemChecksProvider).fix(issue);
+          ref.invalidate(goSystemIssueProvider);
+        },
+        child: Row(
+          children: [
+            Expanded(child: NoticeLine(icon: icon, text: text)),
+            Icon(Icons.chevron_right, size: 20, color: context.colors.muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// How the fixes come (development builds): is the device's GPS giving one a second?
 class GoGpsStats extends ConsumerWidget {
   const GoGpsStats({super.key});

@@ -99,6 +99,7 @@ object LiveJourneyNotification {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(context))
+            .setDeleteIntent(dismissed(context))
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setRequestPromotedOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -148,6 +149,7 @@ object LiveJourneyNotification {
     }
 
     fun cancelJourney(context: Context) {
+        dismissedByUser = false
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.cancel(NOTIFICATION_ID)
         manager.cancel(ALERT_ID)
@@ -198,6 +200,21 @@ object LiveJourneyNotification {
         canvas.drawText(name, size / 2f, size / 2f - (text.descent() + text.ascent()) / 2, text)
         return bitmap
     }
+
+    /**
+     * Swiped away by the user (ongoing notifications can be since Android 14): GO goes on, but its notification isn't
+     * posted again until the app is back on screen ([GoDismissReceiver]). A notification the user dismissed and that
+     * comes back within seconds is what makes them turn the app's notifications off.
+     */
+    @Volatile
+    var dismissedByUser = false
+
+    private fun dismissed(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        2,
+        Intent(context, GoDismissReceiver::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     /** "Terminer": GO stops without opening the app ([GoStopReceiver]) */
     private fun finishJourney(context: Context): PendingIntent = PendingIntent.getBroadcast(

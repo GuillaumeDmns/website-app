@@ -10,11 +10,13 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.LocationRequest
@@ -69,8 +71,11 @@ class MainActivity: FlutterFragmentActivity() {
                         GoService.start(this, notification)
                     } else {
                         GoService.latest = notification
-                        getSystemService(NotificationManager::class.java)
-                            .notify(LiveJourneyNotification.NOTIFICATION_ID, notification)
+                        // Swiped away: not back before the app is (onResume)
+                        if (!LiveJourneyNotification.dismissedByUser) {
+                            getSystemService(NotificationManager::class.java)
+                                .notify(LiveJourneyNotification.NOTIFICATION_ID, notification)
+                        }
                     }
                     result.success(null)
                 }
@@ -90,6 +95,32 @@ class MainActivity: FlutterFragmentActivity() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+                    }
+                    result.success(null)
+                }
+                "notificationStatus" -> {
+                    // "off": no notification at all; "liveOff": allowed, but not as a Live Update (Android 16, a
+                    // setting per app); "ok"
+                    val manager = getSystemService(NotificationManager::class.java)
+                    result.success(when {
+                        !NotificationManagerCompat.from(this).areNotificationsEnabled() -> "off"
+                        Build.VERSION.SDK_INT >= 36 && !manager.canPostPromotedNotifications() -> "liveOff"
+                        else -> "ok"
+                    })
+                }
+                "openNotificationSettings" -> {
+                    val live = call.argument<Boolean>("live") == true && Build.VERSION.SDK_INT >= 36
+                    val settings = Intent(if (live) Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS else Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    try {
+                        startActivity(settings)
+                    } catch (e: Exception) {
+                        // No such page on this device: the app's notification settings
+                        try {
+                            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+                        } catch (e: Exception) {
+                            // Nothing to open
+                        }
                     }
                     result.success(null)
                 }
@@ -137,6 +168,17 @@ class MainActivity: FlutterFragmentActivity() {
         super.onCreate(savedInstanceState)
         // Opened from a home screen widget: its stop
         WidgetBridge.launched(intent)
+    }
+
+    /** Back on screen: GO's notification, if the user had swiped it away, is posted again with the journey's progress */
+    override fun onResume() {
+        super.onResume()
+        if (LiveJourneyNotification.dismissedByUser) {
+            LiveJourneyNotification.dismissedByUser = false
+            GoService.latest?.let {
+                getSystemService(NotificationManager::class.java).notify(LiveJourneyNotification.NOTIFICATION_ID, it)
+            }
+        }
     }
 
     /** A widget tapped while the app's task is there (singleTop): its stop, once the Dart side takes it */

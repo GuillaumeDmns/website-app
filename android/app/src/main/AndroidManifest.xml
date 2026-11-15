@@ -45,6 +45,10 @@
         <receiver
             android:name=".GoStopReceiver"
             android:exported="false" />
+        <!-- GO mode: its notification swiped away, not posted again while the app is off screen -->
+        <receiver
+            android:name=".GoDismissReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".NextDepartures"
