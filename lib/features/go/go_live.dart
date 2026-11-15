@@ -59,7 +59,28 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
           color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : '#9E9E9E',
         ),
     ],
+    points: goLivePoints(tracker),
+    tone: switch (glance.tone) {
+      GoTone.ok => LiveJourneyTone.fine,
+      GoTone.warn => LiveJourneyTone.caution,
+      GoTone.urgent => LiveJourneyTone.danger,
+    },
   );
+}
+
+/// Where each ride is left along the progress bar (seconds from the start, as its segments count them): the
+/// connections and the last stop, what the traveller waits for. Not a ride ending the journey: the bar's end says it.
+List<LiveJourneyPoint> goLivePoints(GoTracker tracker) {
+  final points = <LiveJourneyPoint>[];
+  var seconds = 0;
+  for (final (index, step) in tracker.steps.indexed) {
+    // As the notification counts a segment: a second at least
+    seconds += step.section.duration < 1 ? 1 : step.section.duration;
+    if (step.isRide && index < tracker.steps.length - 1) {
+      points.add(LiveJourneyPoint(seconds: seconds, color: '#${step.section.line?.color ?? '9E9E9E'}'));
+    }
+  }
+  return points;
 }
 
 /// The notification's icon of the step in progress

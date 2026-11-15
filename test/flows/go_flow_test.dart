@@ -19,6 +19,7 @@ import 'package:website_app/features/go/widgets/go_ride_card.dart';
 import 'package:website_app/features/go/widgets/go_top_bar.dart';
 import 'package:website_app/features/journey/widgets/ride_departures.dart';
 import 'package:website_app/features/journey/journey_request.dart';
+import 'package:website_app/core/platform/go_system.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/fake_backend.dart';
@@ -101,6 +102,23 @@ void main() {
     expect(overlay.pins.map((pin) => pin.label), contains('${currentL10n.goTurnLeft} · Rue des Halles'));
     expect(overlay.follow, isNotNull);
 
+    await closeApp(tester);
+  });
+
+  testWidgets('what the system holds back from GO is said on its page, one tap from its settings', (tester) async {
+    final checks = _SystemChecks(GoSystemIssue.approximateLocation);
+    await pumpApp(tester, standardBackend(), overrides: [
+      goControllerProvider.overrideWith(() => _FollowedJourney(followed(const GoProgress(step: 0, phase: GoPhase.moving)))),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      goSystemChecksProvider.overrideWithValue(checks),
+    ]);
+    await tapOn(tester, find.text(currentL10n.go).first);
+    expect(find.text(currentL10n.goApproximateLocation), findsOneWidget);
+
+    // Granted in the system's prompt: nothing more to say
+    await tapOn(tester, find.text(currentL10n.goApproximateLocation));
+    expect(checks.fixed, [GoSystemIssue.approximateLocation]);
+    expect(find.text(currentL10n.goApproximateLocation), findsNothing);
     await closeApp(tester);
   });
 
@@ -512,6 +530,23 @@ void main() {
     expect(await shown(1), closeTo(0.25, 0.03));
     expect(await shown(3), closeTo(0.75, 0.03));
   });
+}
+
+/// The system's answers: [issue] until it is fixed
+class _SystemChecks extends GoSystemChecks {
+  _SystemChecks(this._issue);
+
+  GoSystemIssue? _issue;
+  final fixed = <GoSystemIssue>[];
+
+  @override
+  Future<GoSystemIssue?> issue() async => _issue;
+
+  @override
+  Future<void> fix(GoSystemIssue issue) async {
+    fixed.add(issue);
+    _issue = null;
+  }
 }
 
 /// No notification nor screen kept on in the tests
