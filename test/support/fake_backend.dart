@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -32,8 +33,14 @@ class FakeBackend implements HttpClientAdapter {
   /// Every request received, in order
   final requests = <RequestOptions>[];
 
+  /// The requests the app gave up before their answer
+  final cancelled = <RequestOptions>[];
+
   /// The server can't be reached at all (network down)
   bool down = false;
+
+  /// While set, the answers wait for it to complete (a slow network)
+  Completer<void>? held;
 
   /// What `METHOD path` answers from now on ([path] without query, `*` matches one path segment)
   void on(String method, String path, FakeHandler handler) => _routes['$method $path'] = handler;
@@ -59,6 +66,8 @@ class FakeBackend implements HttpClientAdapter {
     // As sent: a retried request reuses its options
     requests.add(options.copyWith(headers: {...options.headers}));
     final path = _path(options);
+    unawaited(cancelFuture?.then((_) => cancelled.add(options)));
+    await held?.future;
     if (down) {
       throw DioException.connectionError(requestOptions: options, reason: 'Fake backend down');
     }

@@ -24,7 +24,7 @@ NearbyKey nearbyKey(LatLng position) {
 /// Departures around a position, refreshed every 30 s while shown
 final nearbyDeparturesProvider = FutureProvider.autoDispose.family<List<StopDepartures>, NearbyKey>((ref, key) async {
   ref.refreshEvery(const Duration(seconds: 30));
-  return ref.watch(mobilityApiProvider).nearbyDepartures(key.lat, key.lon);
+  return ref.mobilityApi.nearbyDepartures(key.lat, key.lon);
 });
 
 /// Kind of departures shown around: all, rail (metro, RER, trains), buses (and Noctiliens), trams, Vélib

@@ -39,3 +39,14 @@ final apiDioProvider = Provider<Dio>((ref) {
 });
 
 final mobilityApiProvider = Provider<MobilityApi>((ref) => MobilityApi(ref.watch(apiDioProvider)));
+
+extension CancellableApi on Ref {
+  /// The API for what this provider reads itself: its requests still on their way are given up when it is disposed
+  /// or built again (the page left, the text typed further, the map moved), instead of going on to the end for
+  /// nobody, on the device's network and the backend's quotas
+  MobilityApi get mobilityApi {
+    final cancelToken = CancelToken();
+    onDispose(cancelToken.cancel);
+    return watch(mobilityApiProvider).cancelledWith(cancelToken);
+  }
+}

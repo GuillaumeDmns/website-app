@@ -24,7 +24,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
     return '${position.latitude},${position.longitude}';
   }
 
-  return ref.watch(mobilityApiProvider).journeys(
+  return ref.mobilityApi.journeys(
         from: await resolve(request.from!),
         to: await resolve(request.to!),
         datetime: request.datetime,
@@ -42,7 +42,7 @@ final journeyPlanProvider = FutureProvider.autoDispose.family<JourneyPlan, Journ
 /// shown for a period are outdated, see [currentRides]: the journey detail under GO's page keeps them alive, paused.
 final rideOptionsProvider = FutureProvider.autoDispose.family<List<Ride>, RideKey>((ref, key) async {
   ref.refreshEvery(rideRefreshPeriod(key.after, DateTime.now()), reloadWhenHidden: true, whileFollowed: true);
-  return ref.watch(mobilityApiProvider).lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
+  return ref.mobilityApi.lineRides(key.lineId, from: key.from, to: key.to, after: key.after, limit: 8);
 });
 
 /// The departures to show from what [rideOptionsProvider] holds: none while those not shown for a period are asked

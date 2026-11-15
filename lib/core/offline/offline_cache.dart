@@ -82,8 +82,8 @@ class OfflineCacheInterceptor extends Interceptor {
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
-    // No answer at all: network down or server unreachable
-    if (err.response == null && _cacheable(err.requestOptions)) {
+    // No answer at all: network down or server unreachable (not a request given up by the app itself)
+    if (err.response == null && err.type != DioExceptionType.cancel && _cacheable(err.requestOptions)) {
       final cached = await store.readJson(_key(err.requestOptions));
       if (cached is Map<String, dynamic> && cached['data'] != null) {
         final at = DateTime.tryParse(cached['at'] as String? ?? '') ?? DateTime.now();

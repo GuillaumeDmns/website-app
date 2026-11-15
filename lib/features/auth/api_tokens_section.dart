@@ -8,7 +8,7 @@ import '../../core/utils/time_format.dart';
 import '../../core/widgets/async_view.dart';
 import '../../l10n/l10n.dart';
 
-final apiTokensProvider = FutureProvider.autoDispose<List<ApiToken>>((ref) => ref.watch(mobilityApiProvider).apiTokens());
+final apiTokensProvider = FutureProvider.autoDispose<List<ApiToken>>((ref) => ref.mobilityApi.apiTokens());
 
 /// Personal API tokens of an admin (account page): what Bruno and scripts use since sign-in goes through Google.
 /// A token's value is shown once, at its creation.

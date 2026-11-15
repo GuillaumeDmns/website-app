@@ -24,7 +24,7 @@ import 'vehicle_sheet.dart';
 import 'widgets/line_stop_tile.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
-  (ref, lineId) => ref.watch(mobilityApiProvider).line(lineId),
+  (ref, lineId) => ref.mobilityApi.line(lineId),
 );
 
 class LineScreen extends ConsumerStatefulWidget {

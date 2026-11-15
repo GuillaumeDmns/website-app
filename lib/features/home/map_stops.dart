@@ -38,7 +38,7 @@ final mapStopsProvider = FutureProvider.autoDispose<List<StopAreaSummary>>((ref)
   if (query == null) {
     return const [];
   }
-  return ref.watch(mobilityApiProvider).nearby(query.lat, query.lon, radius: query.radius, limit: mapStopsLimit);
+  return ref.mobilityApi.nearby(query.lat, query.lon, radius: query.radius, limit: mapStopsLimit);
 });
 
 /// The stop of [departures] for its marker: with the lines of its departures when it comes without its own

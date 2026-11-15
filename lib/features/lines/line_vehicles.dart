@@ -23,7 +23,7 @@ final lineVehiclesProvider = FutureProvider.autoDispose.family<({List<Vehicle> v
     return (vehicles: const <Vehicle>[], fetchedAt: DateTime.now());
   }
   ref.refreshEvery(const Duration(seconds: 60));
-  final vehicles = await ref.watch(mobilityApiProvider).lineVehicles(lineId);
+  final vehicles = await ref.mobilityApi.lineVehicles(lineId);
   return (vehicles: vehicles, fetchedAt: DateTime.now());
 });
 
