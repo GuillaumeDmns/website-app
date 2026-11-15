@@ -59,9 +59,16 @@ void main() {
     await sessionOf(container);
     await container.read(recentSearchesProvider.future);
 
+    final before = container.read(recentSearchesProvider).value!;
     await container.read(recentSearchesProvider.notifier).clear();
 
     expect(container.read(recentSearchesProvider).value, isEmpty);
     expect(store.values, isEmpty);
+
+    // Put back, under what was chosen since, once each
+    await container.read(recentSearchesProvider.notifier).add(RecentSearch.line(rerA));
+    await container.read(recentSearchesProvider.notifier).restore([...before, RecentSearch.line(rerA)]);
+    expect(container.read(recentSearchesProvider).value!.map((item) => item.line?.id), [rerA.id, metro1.id]);
+    expect(await store.readJson('recent_searches'), hasLength(2));
   });
 }

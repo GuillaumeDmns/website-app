@@ -115,6 +115,19 @@ class DailyTrips extends AsyncNotifier<List<DailyTrip>> {
 
   Future<void> remove(DailyTrip trip) => _write([...?state.value?.where((other) => other.id != trip.id)]);
 
+  /// Where [trip] is among the saved ones, -1 when it isn't
+  int indexOf(DailyTrip trip) => state.value?.indexWhere((other) => other.id == trip.id) ?? -1;
+
+  /// Puts back a trip just removed, where it was ([at]: its place then), unless it is back already
+  Future<void> restore(DailyTrip trip, int at) async {
+    final trips = [...?state.value];
+    if (trips.any((other) => other.id == trip.id)) {
+      return;
+    }
+    trips.insert(at.clamp(0, trips.length), trip);
+    await _write(trips.reversed.take(max).toList().reversed.toList());
+  }
+
   Future<void> _write(List<DailyTrip> trips) async {
     state = AsyncData(trips);
     await ref.read(localStoreProvider).writeJson(key, trips.map((trip) => trip.toJson()).toList());

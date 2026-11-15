@@ -67,6 +67,10 @@ void main() {
     await tapOn(tester, find.byTooltip(currentL10n.dailyTripRemove));
     expect(find.text(currentL10n.dailyTripRemoved), findsOneWidget);
     expect(store.values[DailyTrips.key], '[]');
+    // A slip of the finger: one tap puts it back
+    await tapOn(tester, find.text(currentL10n.undo));
+    expect(store.values[DailyTrips.key], isNot('[]'));
+    expect(find.byTooltip(currentL10n.dailyTripRemove), findsOneWidget);
 
     await closeApp(tester);
   });

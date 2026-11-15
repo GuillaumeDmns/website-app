@@ -66,6 +66,14 @@ class RecentSearches extends AsyncNotifier<List<RecentSearch>> {
     state = const AsyncData([]);
     await ref.read(localStoreProvider).remove(_key);
   }
+
+  /// Puts back what [clear] forgot, under what was chosen since
+  Future<void> restore(List<RecentSearch> searches) async {
+    final since = state.value ?? const <RecentSearch>[];
+    final next = [...since, ...searches.where((item) => since.every((other) => other.key != item.key))].take(_max).toList();
+    state = AsyncData(next);
+    await ref.read(localStoreProvider).writeJson(_key, next.map((item) => item.toJson()).toList());
+  }
 }
 
 final recentSearchesProvider = AsyncNotifierProvider<RecentSearches, List<RecentSearch>>(RecentSearches.new);

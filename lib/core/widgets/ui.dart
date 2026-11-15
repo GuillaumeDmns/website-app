@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../l10n/l10n.dart';
 
 /// Title of a section of a page, with an optional action on the right ("Tout voir")
 class SectionTitle extends StatelessWidget {
@@ -170,4 +171,15 @@ class NoticeLine extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Says that something was deleted, with "Annuler" to put it back: a deletion is one tap, a slip of the finger must
+/// cost one tap too
+void showUndoSnackBar(ScaffoldMessengerState messenger, String text, Future<void> Function() undo) {
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(text),
+      action: SnackBarAction(label: currentL10n.undo, onPressed: undo),
+    ));
 }
