@@ -27,11 +27,13 @@
         </intent>
     </queries>
 
-    <!-- No backup of the app's data (favorites, recent searches, guest token) to the user's cloud or another device:
-         the account brings them back -->
+    <!-- No backup of the app's data to the user's cloud. To a new phone set up from this one (Android 12+), only what
+         res/xml/data_extraction_rules.xml lets through: the favorites and preferences kept on the device, never the
+         tokens -->
     <application
         android:name="${applicationName}"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name">
         <!-- GO mode: keeps the journey followed with the screen off (started from the app, while in use) -->

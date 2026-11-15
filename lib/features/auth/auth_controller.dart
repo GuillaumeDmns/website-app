@@ -27,12 +27,25 @@ class AuthController extends Notifier<AuthStatus> {
     } catch (_) {
       // Unreadable storage (e.g. keyring locked): carry on as a guest
     }
+    final store = ref.read(localStoreProvider);
+    if (tokenStore.signedIn) {
+      // Also for the sessions started before the mark existed
+      await store.writeJson(_accountDataKey, true);
+    } else if (await store.readJson(_accountDataKey) == true) {
+      // An account's copies without its session: brought by the transfer to a new phone, which leaves the tokens
+      // behind. They are the account's, not a guest's (its favorites have the server's ids): signing in brings them back
+      await _clearUserData();
+    }
     state = tokenStore.signedIn ? AuthStatus.signedIn : AuthStatus.guest;
   }
+
+  /// Says that what the device keeps belongs to an account (true while signed in)
+  static const _accountDataKey = 'account_data';
 
   /// The account's copies on the device (favorites, recent searches…) must not stay once it is gone
   Future<void> _clearUserData() async {
     final store = ref.read(localStoreProvider);
+    await store.remove(_accountDataKey);
     await store.remove('favorites');
     await store.remove('recent_searches');
     await store.remove('go_session');
@@ -57,6 +70,7 @@ class AuthController extends Notifier<AuthStatus> {
   Future<void> _signedIn(AuthTokens tokens) async {
     await OfflineCacheInterceptor.clear(ref.read(localStoreProvider));
     await ref.read(tokenStoreProvider).save(tokens);
+    await ref.read(localStoreProvider).writeJson(_accountDataKey, true);
     state = AuthStatus.signedIn;
   }
 

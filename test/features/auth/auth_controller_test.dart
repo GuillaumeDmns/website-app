@@ -21,6 +21,22 @@ void main() {
     expect(await sessionOf(testContainer(backend, refreshToken: 'stored')), AuthStatus.signedIn);
   });
 
+  test("an account's copies arriving without its session (a new phone) are dropped; a guest's stay", () async {
+    final account = MemoryStore({'account_data': true, 'favorites': [], 'daily_trips': [], 'locale': 'fr'});
+    expect(await sessionOf(testContainer(backend, store: account)), AuthStatus.guest);
+    expect(account.values.keys, ['locale']);
+
+    final guest = MemoryStore({'favorites': [], 'daily_trips': [], 'locale': 'fr'});
+    expect(await sessionOf(testContainer(backend, store: guest)), AuthStatus.guest);
+    expect(guest.values.keys, ['favorites', 'daily_trips', 'locale']);
+  });
+
+  test('what the device keeps is marked as an account\'s while signed in', () async {
+    final store = MemoryStore();
+    expect(await sessionOf(testContainer(backend, store: store, refreshToken: 'stored')), AuthStatus.signedIn);
+    expect(store.values.keys, contains('account_data'));
+  });
+
   test('signs in with Google, keeping what the guest saved', () async {
     final store = MemoryStore({'favorites': [], 'recent_searches': [], 'http_cache_index': ['http_cache:/api/v2/traffic?'], 'http_cache:/api/v2/traffic?': {}});
     final container = testContainer(backend, store: store);
