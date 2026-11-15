@@ -81,6 +81,41 @@ void main() {
     expect(widgetLaunchLocation(null), isNull);
   });
 
+  test('a launcher shortcut carries a location of the app, marked to open over the home page', () {
+    expect(launchLink('/traffic'), 'guillaumedamiens://app/traffic?launch=1');
+    final link = Uri.parse(launchLink('/journey?from=here&to=48.850000%2C2.350000&toName=Maison'));
+    expect(link.path, '/journey');
+    expect(link.queryParameters, {'from': 'here', 'to': '48.850000,2.350000', 'toName': 'Maison', 'launch': '1'});
+    // As Android gives it to the router: its path and query
+    expect(withoutLaunch(Uri.parse('/traffic?launch=1')), '/traffic');
+    expect(Uri.parse(withoutLaunch(Uri.parse('/journey?from=here&to=48.850000%2C2.350000&toName=Maison&launch=1'))).queryParameters,
+        {'from': 'here', 'to': '48.850000,2.350000', 'toName': 'Maison'});
+    expect(widgetLaunchLocation(Uri.parse('guillaumedamiens://traffic')), isNull);
+  });
+
+  test('a place handed over by another app opens the journeys to it, or the search of its text', () {
+    Map<String, String> journeyTo(String geo) {
+      final location = Uri.parse(widgetLaunchLocation(Uri.parse(geo))!);
+      expect(location.path, '/journey');
+      return location.queryParameters;
+    }
+
+    expect(journeyTo('geo:48.8606,2.3376'), {'from': 'here', 'to': '48.860600,2.337600', 'toName': currentL10n.pointOnMap});
+    expect(journeyTo('geo:48.8606,2.3376?z=17'), containsPair('to', '48.860600,2.337600'));
+    expect(journeyTo('geo:48.8606,2.3376?q=Mus%C3%A9e+du+Louvre'), containsPair('toName', 'Musée du Louvre'));
+    expect(journeyTo('geo:48.8606,2.3376;u=35'), containsPair('to', '48.860600,2.337600'));
+    // Android's own forms: the position, and its name, in the query
+    expect(journeyTo('geo:0,0?q=48.8606,2.3376(Louvre)'), {'from': 'here', 'to': '48.860600,2.337600', 'toName': 'Louvre'});
+    expect(journeyTo('geo:0,0?q=48.8606,2.3376'), containsPair('toName', currentL10n.pointOnMap));
+
+    final search = Uri.parse(widgetLaunchLocation(Uri.parse('geo:0,0?q=10+rue+de+Rivoli%2C+Paris'))!);
+    expect(search.path, '/search');
+    expect(search.queryParameters, {'q': '10 rue de Rivoli, Paris'});
+    expect(widgetLaunchLocation(Uri.parse('geo:0,0')), isNull);
+    expect(widgetLaunchLocation(Uri.parse('geo:0,0?q=')), isNull);
+    expect(widgetLaunchLocation(Uri.parse('geo:912,2')), isNull);
+  });
+
   test('each widget gets the departures of its own stop, fetched once per stop', () async {
     final widgets = FakeHomeWidget(widgetIds: [3, 4, 5], data: {
       'w3_stop_id': chatelet.id,

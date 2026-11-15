@@ -31,7 +31,10 @@ final _searchResultsProvider = FutureProvider.autoDispose.family<SearchResult, S
 
 /// Unified search. With [pickTitle] it chooses a journey start or end and pops a [JourneyPlace].
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key, this.pickTitle, this.allowCurrentLocation = true});
+  const SearchScreen({super.key, this.pickTitle, this.allowCurrentLocation = true, this.initialQuery});
+
+  /// Searched at once (a text handed over by another app)
+  final String? initialQuery;
 
   final String? pickTitle;
 
@@ -45,9 +48,9 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  final _controller = TextEditingController();
+  late final _controller = TextEditingController(text: widget.initialQuery?.trim());
   Timer? _debounce;
-  String _query = '';
+  late String _query = widget.initialQuery?.trim() ?? '';
 
   @override
   void dispose() {

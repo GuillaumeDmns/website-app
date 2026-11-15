@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/app/router.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/map_place/map_place_sheet.dart';
@@ -116,6 +118,57 @@ void main() {
     expect(find.textContaining('Métro 1 : trafic interrompu'), findsWidgets);
     // Bus lines are folded
     expect(find.textContaining('ligne de bus perturbée'), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a place handed over by another app opens the journeys to it over the home page', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+    final router = ProviderScope.containerOf(tester.element(find.byType(MaterialApp))).read(routerProvider);
+
+    // As Android gives the router the link the app is opened with
+    await router.routeInformationProvider.didPushRouteInformation(RouteInformation(uri: Uri.parse('geo:48.8606,2.3376?q=Louvre')));
+    await settle(tester);
+
+    expect(find.text('Page Not Found'), findsNothing);
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters, containsPair('to', '48.8606,2.3376'));
+    expect(find.text('Louvre'), findsWidgets);
+    // Back: the home page
+    router.pop();
+    await settle(tester);
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
+
+    // A launcher shortcut, as Android gives its link to the router (path and query): the traffic, over the home page too
+    await router.routeInformationProvider.didPushRouteInformation(RouteInformation(uri: Uri.parse('/traffic?launch=1')));
+    await settle(tester);
+    expect(find.byType(TrafficScreen), findsOneWidget);
+    router.pop();
+    await settle(tester);
+    expect(find.byType(TrafficScreen), findsNothing);
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
+    await router.routeInformationProvider.didPushRouteInformation(
+        RouteInformation(uri: Uri.parse('/journey?from=here&to=48.850000%2C2.350000&toName=Maison&launch=1')));
+    await settle(tester);
+    expect(backend.requestsTo('/api/v2/journeys').last.queryParameters, containsPair('to', '48.85,2.35'));
+    router.pop();
+    await settle(tester);
+
+    // A link the app knows nothing of: the home page, not an error
+    await router.routeInformationProvider.didPushRouteInformation(RouteInformation(uri: Uri.parse('geo:0,0')));
+    await settle(tester);
+    expect(find.text('Page Not Found'), findsNothing);
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
+  testWidgets('a text handed over by another app is searched at once', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend, overrides: [initialLocationProvider.overrideWithValue('/search?q=Nation')]);
+
+    expect(find.widgetWithText(TextField, 'Nation'), findsOneWidget);
+    expect(backend.requestsTo('/api/v2/search').single.queryParameters, containsPair('q', 'Nation'));
 
     await closeApp(tester);
   });

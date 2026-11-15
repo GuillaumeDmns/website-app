@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
+import '../../app/routes.dart';
 import '../../core/api/mobility_api.dart';
 import '../../core/api/models.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
+import '../journey/journey_request.dart';
 
 /// Android's home screen widgets (`NextDepartures.kt`): each one shows the next departures of the stop its user chose
 /// for it (`WidgetSetupScreen`), all its lines or the ones kept. What a widget reads is kept per widget id, as strings,
@@ -170,16 +172,86 @@ Future<void> failAndroidWidgets() async {
   }
 }
 
-/// What the app opens from a widget (`guillaumedamiens://stop?id=IDFM:71264`: its stop; `guillaumedamiens://widget?
-/// id=12`: choosing its stop), as a location of the app; null for anything else
+/// What the app opens when the system starts it with [uri], as a location of the app; null for anything else:
+/// - a home screen widget (`guillaumedamiens://stop?id=IDFM:71264`: its stop; `guillaumedamiens://widget?id=12`:
+///   choosing its stop);
+/// - a place another app hands over (`geo:48.8606,2.3376?q=Louvre`, an address of the calendar or the contacts, "open
+///   with" of a maps app): the journeys to it from here, or the search of its text when it has no position.
 String? widgetLaunchLocation(Uri? uri) {
-  final id = uri?.queryParameters['id'];
-  if (uri == null || id == null || id.isEmpty) {
+  if (uri == null) {
     return null;
   }
+  if (uri.scheme == 'geo') {
+    return _geoLocation(uri);
+  }
+  final id = uri.queryParameters['id'];
   return switch (uri.host) {
-    'stop' => '/stops/${Uri.encodeComponent(id)}',
-    'widget' when int.tryParse(id) != null => '/widget/$id',
+    'stop' when id != null && id.isNotEmpty => '/stops/${Uri.encodeComponent(id)}',
+    'widget' when id != null && int.tryParse(id) != null => '/widget/$id',
     _ => null,
   };
+}
+
+/// Marks a link of the app opened from the launcher (a shortcut): see [launchLink]
+const launchParameter = 'launch';
+
+/// The link a launcher shortcut opens for [location], a location of the app (`/traffic`, `/journey?…`):
+/// `guillaumedamiens://app/traffic?launch=1`. Android gives Flutter's router the path and the query of the link an
+/// activity is started with, not its scheme nor its host: the location itself then, marked so that the router opens it
+/// over the home page ([withoutLaunch]).
+String launchLink(String location) {
+  final uri = Uri.parse(location);
+  return Uri(scheme: 'guillaumedamiens', host: 'app', path: uri.path, queryParameters: {...uri.queryParameters, launchParameter: '1'})
+      .toString();
+}
+
+/// The location of the app a [launchLink] stands for, as the router gets it
+String withoutLaunch(Uri uri) {
+  final query = {...uri.queryParameters}..remove(launchParameter);
+  return Uri(path: uri.path.isEmpty ? '/' : uri.path, queryParameters: query.isEmpty ? null : query).toString();
+}
+
+/// The journeys to [place] from here
+String journeyTo(JourneyPlace place) => Routes.journey(JourneyRequest(from: const JourneyPlace.currentLocation(), to: place));
+
+final _geoPoint = RegExp(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)');
+final _geoLabel = RegExp(r'\(([^)]*)\)\s*$');
+
+/// `geo:lat,lon`, `geo:lat,lon?q=name`, `geo:0,0?q=lat,lon(name)` or `geo:0,0?q=an address` (RFC 5870 and Android's
+/// own forms)
+String? _geoLocation(Uri uri) {
+  // geo: is not hierarchical: everything after the scheme, without Dart's own reading of it
+  // (the router gives `geo:/48.86,2.33`)
+  final text = uri.toString().substring('geo:'.length).replaceFirst(RegExp('^/+'), '');
+  final mark = text.indexOf('?');
+  final coordinates = (mark < 0 ? text : text.substring(0, mark)).split(';').first;
+  String? query;
+  for (final part in mark < 0 ? const <String>[] : text.substring(mark + 1).split('&')) {
+    if (part.startsWith('q=')) {
+      try {
+        query = Uri.decodeQueryComponent(part.substring(2)).trim();
+      } catch (_) {
+        query = null;
+      }
+    }
+  }
+  (double, double)? point(String? value) {
+    final match = value == null ? null : _geoPoint.firstMatch(value);
+    final lat = double.tryParse(match?.group(1) ?? '');
+    final lon = double.tryParse(match?.group(2) ?? '');
+    // 0,0 stands for "no position, see the query"
+    return lat == null || lon == null || (lat == 0 && lon == 0) || lat.abs() > 90 || lon.abs() > 180 ? null : (lat, lon);
+  }
+
+  final inQuery = point(query);
+  final position = point(coordinates) ?? inQuery;
+  if (position != null) {
+    final label = query == null ? null : (_geoLabel.firstMatch(query)?.group(1)?.trim() ?? (inQuery == null ? query : null));
+    return journeyTo(JourneyPlace.point(
+      name: label == null || label.isEmpty ? currentL10n.pointOnMap : label,
+      lat: position.$1,
+      lon: position.$2,
+    ));
+  }
+  return query == null || query.isEmpty ? null : Uri(path: Routes.search, queryParameters: {'q': query}).toString();
 }

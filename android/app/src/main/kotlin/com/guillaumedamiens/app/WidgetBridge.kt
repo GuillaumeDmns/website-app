@@ -44,6 +44,10 @@ object WidgetBridge {
                     }
                     result.success(null)
                 }
+                "setPlaceShortcuts" -> {
+                    AppShortcuts.set(activity, call.argument<List<Map<String, String>>>("shortcuts") ?: emptyList())
+                    result.success(null)
+                }
                 // Only the app's own screen opens what a tap asked for, not the widget's setup
                 "takeLaunch" -> if (receivesLaunches) {
                     result.success(pending)
@@ -60,7 +64,11 @@ object WidgetBridge {
         launches = null
     }
 
-    /** [MainActivity] started or brought back by [intent]: a widget's tap is kept, and the Dart side told */
+    /**
+     * [MainActivity] started or brought back by [intent]: a widget's tap is kept, and the Dart side told. A launcher
+     * shortcut ([AppShortcuts]) or a place handed over by another app (`geo:`) is a plain link: Flutter gives it to
+     * the app's router itself.
+     */
     fun launched(intent: Intent?) {
         if (intent?.action != HomeWidgetLaunchIntent.HOME_WIDGET_LAUNCH_ACTION) {
             return

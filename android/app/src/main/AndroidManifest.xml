@@ -116,6 +116,21 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- A place handed over by another app (an address of the calendar or the contacts, "open with" of a maps
+                 app): the journeys to it -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
+            <!-- The launcher shortcuts' links (AppShortcuts: guillaumedamiens://app/<page of the app>): declared, since
+                 Android only delivers a link that matches a filter of the activity; not offered to web pages -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="guillaumedamiens" android:host="app" />
+            </intent-filter>
             <!-- Links to the web app: prod flavor only (src/prod/AndroidManifest.xml) -->
         </activity>
         <!--
