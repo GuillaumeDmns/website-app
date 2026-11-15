@@ -13,6 +13,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -75,6 +77,8 @@ object LiveJourneyNotification {
      * @param segments  one per step: `length` (seconds) and `color` (`#RRGGBB`)
      * @param progress  seconds done along the journey
      * @param line      the ride's line (`name`, `color`, `textColor` as `#RRGGBB`, `mode`), shown as a badge
+     * @param points    where each ride is left: `position` (seconds along the segments) and `color`
+     * @param tone      `fine`, `caution` or `danger`: what the title asks, colored by the system on Android 17
      */
     fun journey(
         context: Context,
@@ -86,11 +90,13 @@ object LiveJourneyNotification {
         longInfo: String,
         segments: List<Map<String, Any>>,
         line: Map<String, String>? = null,
+        points: List<Map<String, Any>> = emptyList(),
+        tone: String = "fine",
     ): Notification {
         val builder = NotificationCompat.Builder(context, JOURNEY_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_near_me)
             .setColor(brand(context))
-            .setContentTitle(title)
+            .setContentTitle(semantic(title, tone))
             .setContentText(status)
             // Before Android 8 (no channels): quiet, but on the lock screen
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -136,6 +142,15 @@ object LiveJourneyNotification {
                 style.addProgressSegment(segment)
                 total += maxOf(length, 1)
             }
+            // Where each ride is left, strictly inside the bar (its ends have their own marks)
+            points.forEach { data ->
+                val position = (data["position"] as? Int) ?: 0
+                if (position in 1 until total) {
+                    val point = NotificationCompat.ProgressStyle.Point(position)
+                    runCatching { point.setColor(((data["color"] as? String) ?: "").toColorInt()) }
+                    style.addProgressPoint(point)
+                }
+            }
             style.setProgressTrackerIcon(trackerIcon)
             style.setProgress(progress.coerceIn(0, maxOf(total, 1)))
             builder.setStyle(style)
@@ -146,6 +161,25 @@ object LiveJourneyNotification {
             builder.setSmallIcon(trackerIcon)
         }
         return builder.build()
+    }
+
+    /**
+     * [text] in the color the system gives to what needs attention or must be done now (Android 17's semantic colors:
+     * orange for caution, red for danger, readable in both themes and on the lock screen); as it is before, or when
+     * nothing special is asked
+     */
+    private fun semantic(text: String, tone: String): CharSequence {
+        if (Build.VERSION.SDK_INT < 37 || text.isEmpty()) {
+            return text
+        }
+        val style = when (tone) {
+            "caution" -> Notification.SEMANTIC_STYLE_CAUTION
+            "danger" -> Notification.SEMANTIC_STYLE_DANGER
+            else -> return text
+        }
+        return SpannableString(text).apply {
+            setSpan(Notification.createSemanticStyleAnnotation(style), 0, text.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+        }
     }
 
     fun cancelJourney(context: Context) {
