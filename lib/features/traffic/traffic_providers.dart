@@ -7,7 +7,7 @@ import '../../core/utils/refresh.dart';
 /// Traffic state of the main lines and of every disrupted line, refreshed every 2 min while shown
 final trafficProvider = FutureProvider.autoDispose<List<LineTraffic>>((ref) async {
   ref.refreshEvery(const Duration(minutes: 2));
-  return ref.watch(mobilityApiProvider).traffic();
+  return ref.mobilityApi.traffic();
 });
 
 /// Worst active disruption of each disrupted line; empty while loading or on error (the traffic is a bonus there)
@@ -20,19 +20,19 @@ final lineSeveritiesProvider = Provider.autoDispose<Map<String, DisruptionSeveri
 });
 
 final lineDisruptionsProvider = FutureProvider.autoDispose.family<List<Disruption>, String>(
-  (ref, lineId) => ref.watch(mobilityApiProvider).lineDisruptions(lineId),
+  (ref, lineId) => ref.mobilityApi.lineDisruptions(lineId),
 );
 
 final stopDisruptionsProvider = FutureProvider.autoDispose.family<List<Disruption>, String>(
-  (ref, stopAreaId) => ref.watch(mobilityApiProvider).stopDisruptions(stopAreaId),
+  (ref, stopAreaId) => ref.mobilityApi.stopDisruptions(stopAreaId),
 );
 
 /// Stop areas a line doesn't serve now (from its blocking disruptions), none when unknown
 final lineClosedStopsProvider = FutureProvider.autoDispose.family<Set<String>, String>(
-  (ref, lineId) async => (await ref.watch(mobilityApiProvider).lineClosedStops(lineId)).toSet(),
+  (ref, lineId) async => (await ref.mobilityApi.lineClosedStops(lineId)).toSet(),
 );
 
 /// Lines that don't stop at a stop area now
 final stopClosedLinesProvider = FutureProvider.autoDispose.family<Set<String>, String>(
-  (ref, stopAreaId) async => (await ref.watch(mobilityApiProvider).stopClosedLines(stopAreaId)).toSet(),
+  (ref, stopAreaId) async => (await ref.mobilityApi.stopClosedLines(stopAreaId)).toSet(),
 );

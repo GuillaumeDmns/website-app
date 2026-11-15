@@ -13,7 +13,7 @@ import '../journey/journey_request.dart';
 
 /// Address of a point of the map, null when there is none nearby
 final mapPlaceProvider = FutureProvider.autoDispose.family<PlaceResult?, LatLng>(
-  (ref, position) => ref.watch(mobilityApiProvider).reverse(position.latitude, position.longitude),
+  (ref, position) => ref.mobilityApi.reverse(position.latitude, position.longitude),
 );
 
 /// Long press on the map: the point's address, and going there, leaving from there or the departures around

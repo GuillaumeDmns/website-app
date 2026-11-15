@@ -8,8 +8,10 @@ enum _RenewResult { ok, unreachable }
 
 /// Adds the access token: the account's, renewed from the refresh token when it is about to expire or rejected, else
 /// the device's guest token, fetched when missing or rejected. A rejected refresh token ends the account's session
-/// (reported) and the request goes on as a guest. Queued: concurrent requests wait for a single renewal (the refresh
-/// token rotates on each use).
+/// (reported) and the request goes on as a guest. Concurrent requests wait for a single renewal ([_renew]): the refresh
+/// token rotates on each use, and the same one sent twice revokes every session of the account. The queue alone doesn't
+/// see to it: it moves on when the request it holds is given up (a page left while it waits for the renewal), and
+/// requests and rejected answers have a queue each.
 class AuthInterceptor extends QueuedInterceptor {
   AuthInterceptor({required this.tokenStore, required this.authApi, required this.dio, required this.onSessionLost});
 
@@ -58,8 +60,15 @@ class AuthInterceptor extends QueuedInterceptor {
     }
   }
 
-  /// [force]: renew the account's access token even if it looks valid (the server rejected it)
-  Future<_RenewResult> _renew({bool force = false}) async {
+  /// The renewal in progress, shared by whoever needs one meanwhile
+  Future<_RenewResult>? _renewal;
+
+  /// One renewal at a time, whatever asks for it: see the class. [force]: renew the account's access token even if it
+  /// looks valid (the server rejected it).
+  Future<_RenewResult> _renew({bool force = false}) =>
+      _renewal ??= _renewOnce(force: force).whenComplete(() => _renewal = null);
+
+  Future<_RenewResult> _renewOnce({required bool force}) async {
     // The latest tokens stored: the home screen widget may have renewed them in the background (a used refresh token
     // revokes the session)
     await tokenStore.load();

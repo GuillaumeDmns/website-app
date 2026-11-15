@@ -5,7 +5,6 @@ import '../../features/auth/auth_controller.dart';
 import '../auth/token_store.dart';
 import '../config.dart';
 import '../offline/offline_cache.dart';
-import '../storage/local_store.dart';
 import 'auth_api.dart';
 import 'auth_interceptor.dart';
 import 'mobility_api.dart';
@@ -30,12 +29,19 @@ final apiDioProvider = Provider<Dio>((ref) {
     dio: dio,
     onSessionLost: () => ref.read(authControllerProvider.notifier).onSessionLost(),
   ));
-  dio.interceptors.add(OfflineCacheInterceptor(
-    store: ref.watch(localStoreProvider),
-    onOffline: (at) => ref.read(offlineProvider.notifier).offline(at),
-    onOnline: () => ref.read(offlineProvider.notifier).online(),
-  ));
+  dio.interceptors.add(ref.watch(offlineCacheProvider));
   return dio;
 });
 
 final mobilityApiProvider = Provider<MobilityApi>((ref) => MobilityApi(ref.watch(apiDioProvider)));
+
+extension CancellableApi on Ref {
+  /// The API for what this provider reads itself: its requests still on their way are given up when it is disposed
+  /// or built again (the page left, the text typed further, the map moved), instead of going on to the end for
+  /// nobody, on the device's network and the backend's quotas
+  MobilityApi get mobilityApi {
+    final cancelToken = CancelToken();
+    onDispose(cancelToken.cancel);
+    return watch(mobilityApiProvider).cancelledWith(cancelToken);
+  }
+}

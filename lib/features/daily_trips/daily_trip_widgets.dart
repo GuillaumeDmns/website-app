@@ -33,7 +33,7 @@ typedef RideSpanKey = ({String lineId, String from, String to});
 /// shown: the service day changes at night
 final rideSpanProvider = FutureProvider.autoDispose.family<RideSpan, RideSpanKey>((ref, key) async {
   ref.refreshEvery(const Duration(minutes: 15));
-  return ref.watch(mobilityApiProvider).lineRideSpan(key.lineId, from: key.from, to: key.to);
+  return ref.mobilityApi.lineRideSpan(key.lineId, from: key.from, to: key.to);
 });
 
 /// Spans of the rides of a trip for [lastTripAlert], from a widget (watched)

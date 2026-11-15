@@ -20,7 +20,7 @@ typedef BikeKey = ({double lat, double lon, int radius, int limit});
 /// Vélib stations around a position, closest first, refreshed every minute while shown (the open data's pace)
 final nearbyBikesProvider = FutureProvider.autoDispose.family<List<BikeStation>, BikeKey>((ref, key) async {
   ref.refreshEvery(const Duration(seconds: 60));
-  return ref.watch(mobilityApiProvider).bikesNearby(key.lat, key.lon, radius: key.radius, limit: key.limit);
+  return ref.mobilityApi.bikesNearby(key.lat, key.lon, radius: key.radius, limit: key.limit);
 });
 
 /// Vélib green, as on the stations

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../platform/app_shown.dart';
 import '../storage/local_store.dart';
 
 /// When the app last fell back on cached data because the server could not be reached; null while online
@@ -32,7 +33,15 @@ final offlineProvider = NotifierProvider<OfflineController, DateTime?>(OfflineCo
 /// (vehicles, departures of a ride, Vélib, search, addresses of a point) are not kept: stale data there would mislead;
 /// nor the stops of the part of the map shown, a new answer at each move of the map.
 class OfflineCacheInterceptor extends Interceptor {
-  OfflineCacheInterceptor({required this.store, required this.onOffline, required this.onOnline});
+  OfflineCacheInterceptor({
+    required this.store,
+    required this.onOffline,
+    required this.onOnline,
+    this.flushAfter = const Duration(minutes: 5),
+  });
+
+  /// The answers wait in memory at most this long before they are written to the device
+  final Duration flushAfter;
 
   final LocalStore store;
   final void Function(DateTime dataAt) onOffline;
@@ -65,26 +74,63 @@ class OfflineCacheInterceptor extends Interceptor {
     await store.remove(_indexKey);
   }
 
-  /// Saves one at a time: each one rewrites the index, two at once would lose entries (never cleared then)
+  /// The answers not written to the device yet, the latest of each request, oldest first. The device's store writes
+  /// its whole file again at each change (Android's DataStore) and keeps it all in memory: writing each answer as it
+  /// came, with the index, rewrote it several times every 30 s on the home page. They are written together when the
+  /// app leaves the screen ([flush], `offlineCacheProvider`), and after [flushAfter] at the latest.
+  final _pending = <String, ({DateTime at, Object data})>{};
+  Timer? _flushTimer;
+
+  /// Writes one batch at a time: each one rewrites the index, two at once would lose entries (never cleared then)
   Future<void> _saving = Future.value();
+
+  /// Writes the answers waiting in memory to the device
+  Future<void> flush() {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    if (_pending.isEmpty) {
+      return _saving;
+    }
+    final entries = Map.of(_pending);
+    _pending.clear();
+    return _saving = _saving.then((_) => _save(entries));
+  }
+
+  /// Every answer kept, written or not (sign-in, sign-out: another account must not see them)
+  Future<void> clearAll() {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    _pending.clear();
+    return _saving = _saving.then((_) => clear(store));
+  }
+
+  /// The app closes: what waits is written, nothing is kept for later
+  void dispose() {
+    flush();
+  }
 
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     onOnline();
     final data = response.data;
     if (_cacheable(response.requestOptions) && response.statusCode == 200 && data != null) {
+      // The latest one last
       final key = _key(response.requestOptions);
-      // Once the answer is handed over: encoding a big one must not delay it
-      Timer.run(() => _saving = _saving.then((_) => _save(key, data)));
+      _pending.remove(key);
+      _pending[key] = (at: DateTime.now(), data: data);
+      _flushTimer ??= Timer(flushAfter, flush);
     }
     handler.next(response);
   }
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
-    // No answer at all: network down or server unreachable
-    if (err.response == null && _cacheable(err.requestOptions)) {
-      final cached = await store.readJson(_key(err.requestOptions));
+    // No answer at all: network down or server unreachable (not a request given up by the app itself)
+    if (err.response == null && err.type != DioExceptionType.cancel && _cacheable(err.requestOptions)) {
+      final waiting = _pending[_key(err.requestOptions)];
+      final cached = waiting != null
+          ? {'at': waiting.at.toIso8601String(), 'data': waiting.data}
+          : await store.readJson(_key(err.requestOptions));
       if (cached is Map<String, dynamic> && cached['data'] != null) {
         final at = DateTime.tryParse(cached['at'] as String? ?? '') ?? DateTime.now();
         onOffline(at);
@@ -100,17 +146,43 @@ class OfflineCacheInterceptor extends Interceptor {
     handler.next(err);
   }
 
-  Future<void> _save(String key, Object data) async {
-    final entry = jsonEncode({'at': DateTime.now().toIso8601String(), 'data': data});
-    if (entry.length > _maxLength) {
+  Future<void> _save(Map<String, ({DateTime at, Object data})> entries) async {
+    final written = <String>[];
+    for (final MapEntry(:key, :value) in entries.entries) {
+      final entry = jsonEncode({'at': value.at.toIso8601String(), 'data': value.data});
+      if (entry.length <= _maxLength) {
+        await store.writeEncoded(key, entry);
+        written.add(key);
+      }
+    }
+    if (written.isEmpty) {
       return;
     }
-    await store.writeEncoded(key, entry);
     final index = await store.readJson(_indexKey);
-    final keys = [key, ...(index is List ? index.map((item) => '$item').where((item) => item != key) : const <String>[])];
+    final keys = [
+      ...written.reversed,
+      ...(index is List ? index.map((item) => '$item').where((item) => !written.contains(item)) : const <String>[]),
+    ];
     for (final old in keys.skip(_maxEntries)) {
       await store.remove(old);
     }
     await store.writeJson(_indexKey, keys.take(_maxEntries).toList());
   }
 }
+
+/// The app's offline cache: its answers are written when the app leaves the screen (screen off, another app, a tab
+/// hidden), where a process may be stopped without notice
+final offlineCacheProvider = Provider<OfflineCacheInterceptor>((ref) {
+  final cache = OfflineCacheInterceptor(
+    store: ref.watch(localStoreProvider),
+    onOffline: (at) => ref.read(offlineProvider.notifier).offline(at),
+    onOnline: () => ref.read(offlineProvider.notifier).online(),
+  );
+  ref.listen(appShownProvider, (_, shown) {
+    if (!shown) {
+      cache.flush();
+    }
+  });
+  ref.onDispose(cache.dispose);
+  return cache;
+});

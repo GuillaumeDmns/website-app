@@ -26,7 +26,7 @@ import '../../app/theme.dart';
 final _searchResultsProvider = FutureProvider.autoDispose.family<SearchResult, String>((ref, query) {
   // Read once: the results don't change while the map moves
   final origin = ref.read(nearbyOriginProvider).position;
-  return ref.watch(mobilityApiProvider).search(query, lat: origin.latitude, lon: origin.longitude);
+  return ref.mobilityApi.search(query, lat: origin.latitude, lon: origin.longitude);
 });
 
 /// Unified search. With [pickTitle] it chooses a journey start or end and pops a [JourneyPlace].

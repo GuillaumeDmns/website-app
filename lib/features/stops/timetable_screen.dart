@@ -20,7 +20,7 @@ typedef TimetableKey = ({String stopAreaId, String lineId, DateTime date});
 /// Scheduled timetable of a line at a stop area for a service day (kept while the app runs: it changes twice a day)
 final timetableProvider = FutureProvider.autoDispose.family<Timetable, TimetableKey>((ref, key) {
   ref.keepAlive();
-  return ref.watch(mobilityApiProvider).timetable(key.stopAreaId, key.lineId, date: key.date);
+  return ref.mobilityApi.timetable(key.stopAreaId, key.lineId, date: key.date);
 });
 
 /// Scheduled timetable of a stop area, like a printed one: per line and direction, hours with their minutes. The line

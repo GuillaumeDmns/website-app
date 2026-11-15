@@ -20,13 +20,13 @@ import 'android_widgets.dart';
 /// The stops of a query, nothing else (the widget shows a stop's departures). Without the user's position: the widget's
 /// stop is the user's choice, and asking for the location here would open the system's prompt.
 final _stopResultsProvider = FutureProvider.autoDispose.family<List<PlaceResult>, String>((ref, query) async {
-  final result = await ref.watch(mobilityApiProvider).search(query);
+  final result = await ref.mobilityApi.search(query);
   return [for (final place in result.places) if (place.type == PlaceType.stopArea) place];
 });
 
 /// The departures of the stop chosen, for its lines
 final _stopDirectionsProvider = FutureProvider.autoDispose.family<StopDepartures, String>(
-  (ref, stopId) => ref.watch(mobilityApiProvider).stopDepartures(stopId, limit: 5),
+  (ref, stopId) => ref.mobilityApi.stopDepartures(stopId, limit: 5),
 );
 
 /// Whether the widget can say how long until a departure (it is drawn again every minute: Android's exact alarms)

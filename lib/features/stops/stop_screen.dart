@@ -26,7 +26,7 @@ import '../traffic/traffic_providers.dart';
 import 'widgets/stop_departures_card.dart';
 
 final stopAreaProvider = FutureProvider.autoDispose.family<StopAreaDetail, String>(
-  (ref, stopAreaId) => ref.watch(mobilityApiProvider).stopArea(stopAreaId),
+  (ref, stopAreaId) => ref.mobilityApi.stopArea(stopAreaId),
 );
 
 /// Departures of a stop area, refreshed every 30 s while shown
@@ -35,7 +35,7 @@ const stopDeparturesLimit = 5;
 
 final stopDeparturesProvider = FutureProvider.autoDispose.family<StopDepartures, String>((ref, stopAreaId) async {
   ref.refreshEvery(const Duration(seconds: 30));
-  return ref.watch(mobilityApiProvider).stopDepartures(stopAreaId, limit: stopDeparturesLimit);
+  return ref.mobilityApi.stopDepartures(stopAreaId, limit: stopDeparturesLimit);
 });
 
 class StopScreen extends ConsumerWidget {

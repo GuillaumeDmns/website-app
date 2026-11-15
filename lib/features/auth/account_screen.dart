@@ -12,7 +12,7 @@ import '../../l10n/l10n.dart';
 import 'api_tokens_section.dart';
 import 'auth_controller.dart';
 
-final accountProvider = FutureProvider.autoDispose<Account>((ref) => ref.watch(mobilityApiProvider).account());
+final accountProvider = FutureProvider.autoDispose<Account>((ref) => ref.mobilityApi.account());
 
 /// The signed-in user's account: who, export of what the server keeps, sign-out, deletion. Also the web page to
 /// delete an account that Google Play asks for (`/account`, signing in first).

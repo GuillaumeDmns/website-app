@@ -51,7 +51,7 @@ class AuthController extends Notifier<AuthStatus> {
     await store.remove('go_session');
     await store.remove('journey_preferences');
     await store.remove('daily_trips');
-    await OfflineCacheInterceptor.clear(store);
+    await ref.read(offlineCacheProvider).clearAll();
     await ref.read(accountPhotoProvider.notifier).set(null);
     await clearHomeWidget();
   }
@@ -68,7 +68,7 @@ class AuthController extends Notifier<AuthStatus> {
   Future<void> signInWithTokens(AuthTokens tokens) => _signedIn(tokens);
 
   Future<void> _signedIn(AuthTokens tokens) async {
-    await OfflineCacheInterceptor.clear(ref.read(localStoreProvider));
+    await ref.read(offlineCacheProvider).clearAll();
     await ref.read(tokenStoreProvider).save(tokens);
     await ref.read(localStoreProvider).writeJson(_accountDataKey, true);
     state = AuthStatus.signedIn;

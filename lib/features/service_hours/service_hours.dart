@@ -14,12 +14,12 @@ import '../../app/theme.dart';
 
 /// First and last departures of the lines of a stop area today, and their frequency (GTFS: no real-time call)
 final stopServiceHoursProvider = FutureProvider.autoDispose.family<StopServiceHours, String>(
-  (ref, stopAreaId) => ref.watch(mobilityApiProvider).stopServiceHours(stopAreaId),
+  (ref, stopAreaId) => ref.mobilityApi.stopServiceHours(stopAreaId),
 );
 
 /// First and last departures of each direction of a line today, and its frequency
 final lineServiceHoursProvider = FutureProvider.autoDispose.family<LineServiceHours, String>(
-  (ref, lineId) => ref.watch(mobilityApiProvider).lineServiceHours(lineId),
+  (ref, lineId) => ref.mobilityApi.lineServiceHours(lineId),
 );
 
 /// A last departure this close is announced

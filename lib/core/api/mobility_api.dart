@@ -7,9 +7,16 @@ import 'models.dart';
 
 /// Backend mobility endpoints (`/api/v2`).
 class MobilityApi {
-  MobilityApi(this._dio);
+  MobilityApi(this._dio, {this.cancelToken});
 
   final Dio _dio;
+
+  /// Gives up the reads still on their way once cancelled
+  final CancelToken? cancelToken;
+
+  /// The same API whose reads (GET) are given up when [cancelToken] is cancelled: those of a page left, of a text
+  /// typed further, of a part of the map moved away from. What changes something on the server always goes through.
+  MobilityApi cancelledWith(CancelToken cancelToken) => MobilityApi(_dio, cancelToken: cancelToken);
 
   Future<List<StopDepartures>> nearbyDepartures(double lat, double lon, {int radius = 500, int maxStops = 5, int limit = 3}) =>
       _getList('/api/v2/nearby/departures', StopDepartures.fromJson,
@@ -182,7 +189,7 @@ class MobilityApi {
 
   Future<T> _get<T>(String path, T Function(Map<String, dynamic>) fromJson, [Map<String, dynamic>? query]) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(path, queryParameters: query);
+      final response = await _dio.get<Map<String, dynamic>>(path, queryParameters: query, cancelToken: cancelToken);
       return fromJson(response.data!);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -191,7 +198,7 @@ class MobilityApi {
 
   Future<List<String>> _getStrings(String path) async {
     try {
-      final response = await _dio.get<List<dynamic>>(path);
+      final response = await _dio.get<List<dynamic>>(path, cancelToken: cancelToken);
       return response.data!.cast<String>();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -200,7 +207,7 @@ class MobilityApi {
 
   Future<List<T>> _getList<T>(String path, T Function(Map<String, dynamic>) fromJson, [Map<String, dynamic>? query]) async {
     try {
-      final response = await _dio.get<List<dynamic>>(path, queryParameters: query);
+      final response = await _dio.get<List<dynamic>>(path, queryParameters: query, cancelToken: cancelToken);
       return response.data!.map((item) => fromJson(item as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
