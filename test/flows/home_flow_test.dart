@@ -79,7 +79,7 @@ void main() {
 
   final work = Favorite(id: -1, kind: FavoriteKind.work, label: 'Bureau', lat: nation.lat, lon: nation.lon);
 
-  testWidgets('the work pill opens the next departure of the trip saved there, without a search', (tester) async {
+  testWidgets('the work pill searches from where the user is, not from where the trip saved there starts', (tester) async {
     final saved = DateTime.utc(2026, 10, 7, 7);
     final trip = DailyTrip.of(
       journey([walk(saved, 300), transit(saved.add(const Duration(minutes: 5)), 480)]),
@@ -95,10 +95,12 @@ void main() {
     final pill = find.descendant(of: find.byType(FavoriteShortcuts), matching: find.text(currentL10n.work));
     expect(pill, findsOneWidget);
 
-    // Its detail, without a search
+    // From here, not from Rue de Rivoli; the start can be changed
     await tapOn(tester, pill);
-    expect(find.widgetWithText(FilledButton, currentL10n.go), findsOneWidget);
-    expect(backend.requestsTo('/api/v2/journeys'), isEmpty);
+    final search = backend.requestsTo('/api/v2/journeys').single;
+    expect(search.queryParameters['from'], '${userPosition.latitude},${userPosition.longitude}');
+    expect(search.queryParameters['to'], '${work.lat},${work.lon}');
+    expect(find.text(currentL10n.myLocation), findsOneWidget);
 
     await closeApp(tester);
   });
