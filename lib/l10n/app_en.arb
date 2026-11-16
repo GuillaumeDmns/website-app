@@ -491,6 +491,7 @@
   "rideAlertsOf": "Ride alerts: {summary}",
   "atStop": "At {stop}",
   "widgetFailedAt": "Failed at {time}",
+  "trafficWidgetNoLine": "Star your lines in the app (on a line's page) to follow their service here",
   "widgetSetupTitle": "Which stop to show?",
   "widgetSetupHint": "Search for a stop",
   "widgetSetupFavorites": "Favorite stops",

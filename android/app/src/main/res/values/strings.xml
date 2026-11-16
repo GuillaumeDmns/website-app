@@ -13,6 +13,15 @@
     <!-- The following departure, small widget -->
     <string name="widget_then">then %1$s</string>
     <string name="widget_departures_of">Next departures at %1$s</string>
+    <!-- "Mes lignes" widget: the traffic of the favorite lines -->
+    <string name="traffic_widget_label">My lines</string>
+    <string name="traffic_widget_description">Service status of your favorite lines</string>
+    <string name="traffic_widget_title">My lines</string>
+    <string name="traffic_widget_normal">Normal service</string>
+    <string name="traffic_widget_disrupted">Disrupted</string>
+    <string name="traffic_widget_interrupted">Interrupted</string>
+    <string name="traffic_widget_loading">Loading…</string>
+    <string name="traffic_widget_open_app">Open the app to show your lines</string>
     <!-- GO -->
     <string name="journey_channel">Journey in progress</string>
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>

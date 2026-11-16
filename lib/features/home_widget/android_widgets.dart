@@ -174,7 +174,8 @@ Future<void> failAndroidWidgets() async {
 
 /// What the app opens when the system starts it with [uri], as a location of the app; null for anything else:
 /// - a home screen widget (`guillaumedamiens://stop?id=IDFM:71264`: its stop; `guillaumedamiens://widget?id=12`:
-///   choosing its stop);
+///   choosing its stop; the "Mes lignes" widget: `guillaumedamiens://line?id=C01371`, its line, and
+///   `guillaumedamiens://traffic`, the traffic page);
 /// - a place another app hands over (`geo:48.8606,2.3376?q=Louvre`, an address of the calendar or the contacts, "open
 ///   with" of a maps app): the journeys to it from here, or the search of its text when it has no position.
 String? widgetLaunchLocation(Uri? uri) {
@@ -188,6 +189,8 @@ String? widgetLaunchLocation(Uri? uri) {
   return switch (uri.host) {
     'stop' when id != null && id.isNotEmpty => '/stops/${Uri.encodeComponent(id)}',
     'widget' when id != null && int.tryParse(id) != null => '/widget/$id',
+    'line' when id != null && id.isNotEmpty => Routes.line(id),
+    'traffic' => Routes.traffic,
     _ => null,
   };
 }

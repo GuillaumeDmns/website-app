@@ -90,7 +90,8 @@ void main() {
     expect(withoutLaunch(Uri.parse('/traffic?launch=1')), '/traffic');
     expect(Uri.parse(withoutLaunch(Uri.parse('/journey?from=here&to=48.850000%2C2.350000&toName=Maison&launch=1'))).queryParameters,
         {'from': 'here', 'to': '48.850000,2.350000', 'toName': 'Maison'});
-    expect(widgetLaunchLocation(Uri.parse('guillaumedamiens://traffic')), isNull);
+    // The traffic page from a shortcut is a launch link, the plain link being the "Mes lignes" widget's
+    expect(widgetLaunchLocation(Uri.parse('guillaumedamiens://app/traffic?launch=1')), isNull);
   });
 
   test('a place handed over by another app opens the journeys to it, or the search of its text', () {

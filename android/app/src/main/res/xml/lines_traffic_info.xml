@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Mes lignes" (LinesTraffic): 4 x 2 cells at first, resizable down to 2 x 1. No setup: it shows the favorite lines
+     the app wrote. No periodic update of the system: WidgetRefreshWorker fetches the traffic while the screen is on. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/traffic_widget_description"
+    android:initialLayout="@layout/lines_traffic"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="60dp"
+    android:previewLayout="@layout/lines_traffic_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
