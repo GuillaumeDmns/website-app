@@ -18,6 +18,7 @@ import '../../core/storage/local_store.dart';
 import '../../core/utils/refresh.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
+import '../follow/departure_follow.dart';
 import '../journey/journey_providers.dart';
 import '../journey/journey_request.dart';
 import '../journey/journey_retime.dart';
@@ -141,8 +142,11 @@ class GoController extends Notifier<GoState?> {
       _askPositions();
     });
     ref.onDispose(_stopFeeds);
-    // "Terminer" in the notification
-    ref.read(liveJourneyProvider).onStop(stop);
+    // "Terminer" in the notification ("Arrêter" for a departure followed without a journey)
+    ref.read(liveJourneyProvider).onStop(() {
+      ref.read(departureFollowProvider.notifier).stop();
+      stop();
+    });
     _restore();
     return null;
   }
@@ -391,6 +395,8 @@ class GoController extends Notifier<GoState?> {
   }) {
     _closeTimer?.cancel();
     _closeTimer = null;
+    // One live notification: the journey's, not a departure followed from a stop
+    ref.read(departureFollowProvider.notifier).handOver();
     _walkSpeed = null;
     _vehicleSpeed.reset();
     _turnFelt = null;

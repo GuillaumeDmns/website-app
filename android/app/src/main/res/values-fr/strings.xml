@@ -14,6 +14,7 @@
     <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
     <string name="journey_preparing">Préparation du trajet…</string>
     <string name="journey_finish">Terminer</string>
+    <string name="departure_stop">Arrêter</string>
     <string name="journey_alerts_channel">Alertes de trajet</string>
     <string name="journey_alerts_channel_description">Descendre, changement de voie, véhicule raté : avec son et vibration quand l\'app n\'est pas à l\'écran</string>
     <string name="home_tile">Rentrer</string>

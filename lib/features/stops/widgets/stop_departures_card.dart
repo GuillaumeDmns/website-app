@@ -104,7 +104,7 @@ String? followingDepartures(List<Departure> departures, DateTime now, {Transport
 /// Line badge, the destination in clear, the next departure large on the right; the following ones under the
 /// destination (`puis 12 et 47 min`), with what there is to know about the first one: only scheduled, its platform
 class LineDeparturesRow extends StatelessWidget {
-  const LineDeparturesRow({super.key, required this.row, required this.now, this.realtimeAvailable = true, this.onTap});
+  const LineDeparturesRow({super.key, required this.row, required this.now, this.realtimeAvailable = true, this.onTap, this.onLongPress});
 
   final LineDepartures row;
   final DateTime now;
@@ -112,6 +112,9 @@ class LineDeparturesRow extends StatelessWidget {
   /// False when the whole stop only has scheduled times, already said above its rows
   final bool realtimeAvailable;
   final VoidCallback? onTap;
+
+  /// Long press: following its next departure
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +166,7 @@ class LineDeparturesRow extends StatelessWidget {
         ],
       ),
     );
-    return onTap == null ? content : InkWell(onTap: onTap, child: content);
+    return onTap == null && onLongPress == null ? content : InkWell(onTap: onTap, onLongPress: onLongPress, child: content);
   }
 }
 
@@ -188,13 +191,16 @@ List<({Departure departure, String destination})> trainBoard(List<LineDepartures
 /// A train of a station's board: its time and delay, mission code and destination, then the time until it leaves
 /// and its platform on the right
 class TrainDepartureRow extends StatelessWidget {
-  const TrainDepartureRow({super.key, required this.line, required this.departure, required this.destination, required this.now, this.onTap});
+  const TrainDepartureRow({super.key, required this.line, required this.departure, required this.destination, required this.now, this.onTap, this.onLongPress});
 
   final LineSummary line;
   final Departure departure;
   final String destination;
   final DateTime now;
   final VoidCallback? onTap;
+
+  /// Long press: following this departure
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +258,6 @@ class TrainDepartureRow extends StatelessWidget {
         ],
       ),
     );
-    return onTap == null ? content : InkWell(onTap: onTap, child: content);
+    return onTap == null && onLongPress == null ? content : InkWell(onTap: onTap, onLongPress: onLongPress, child: content);
   }
 }

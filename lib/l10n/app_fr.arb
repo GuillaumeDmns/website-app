@@ -1315,5 +1315,12 @@
   "@thenDepartures": {"placeholders": {"times": {"type": "String"}}},
   "and": "et",
   "dailyTripSaveCommute": "Enregistrer le trajet {from} → {to}",
-  "@dailyTripSaveCommute": {"placeholders": {"from": {"type": "String"}, "to": {"type": "String"}}}
+  "@dailyTripSaveCommute": {"placeholders": {"from": {"type": "String"}, "to": {"type": "String"}}},
+  "followDeparture": "Suivre ce départ",
+  "followDepartureHint": "Il reste dans vos notifications jusqu'à son départ, avec son retard et sa voie.",
+  "followStop": "Arrêter",
+  "followLeavesAt": "Départ {time}",
+  "@followLeavesAt": {"placeholders": {"time": {"type": "String"}}},
+  "followAt": "{stop} · départ {time}",
+  "@followAt": {"placeholders": {"stop": {"type": "String"}, "time": {"type": "String"}}}
 }

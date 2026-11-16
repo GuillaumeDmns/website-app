@@ -66,6 +66,48 @@ class LiveJourneyUpdate {
   final LiveJourneyLine? line;
 }
 
+/// A departure followed from a stop's page, without a journey ([LiveJourney.followDeparture])
+@immutable
+class LiveDeparture {
+  const LiveDeparture({
+    required this.title,
+    required this.status,
+    required this.departureAt,
+    required this.mode,
+    this.cancelled = false,
+    this.line,
+    this.tone = LiveJourneyTone.fine,
+  });
+
+  /// `RER A · Boissy-Saint-Léger`
+  final String title;
+
+  /// `Départ 08:42 · Châtelet · voie 2`
+  final String status;
+
+  /// When it leaves: the system counts down to it, and takes the notification away a minute later
+  final DateTime departureAt;
+
+  /// Icon: `metro`, `train`, `tram` or `bus`
+  final String mode;
+  final bool cancelled;
+  final LiveJourneyLine? line;
+  final LiveJourneyTone tone;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveDeparture &&
+      other.title == title &&
+      other.status == status &&
+      other.departureAt == departureAt &&
+      other.mode == mode &&
+      other.cancelled == cancelled &&
+      other.tone == tone;
+
+  @override
+  int get hashCode => Object.hash(title, status, departureAt, mode, cancelled, tone);
+}
+
 /// System side of GO mode: ongoing notification with the progress and what to do now, and keeping the journey
 /// followed with the screen off. Android: foreground service + Live Update. iOS: a Live Activity (lock screen and
 /// Dynamic Island, `ios/NextDepartures/GoLiveActivity.swift`), the position kept in the background by the `location`
@@ -76,6 +118,11 @@ abstract class LiveJourney {
   Future<void> prepare();
 
   Future<void> update(LiveJourneyUpdate update);
+
+  /// A departure followed without a journey, in place of GO's notification (Android): its line and destination, the
+  /// time left counted by the system itself (no service keeps the app running for it), "Arrêter" ([onStop]); taken
+  /// away by the system once it left. Nothing elsewhere.
+  Future<void> followDeparture(LiveDeparture departure);
 
   /// What must be done now while the app isn't on screen (get off, a platform changed, a vehicle missed): a
   /// notification that rings and vibrates (Android), over the ongoing one, gone after a while
@@ -126,6 +173,18 @@ class _NativeLiveJourney implements LiveJourney {
       });
 
   @override
+  Future<void> followDeparture(LiveDeparture departure) => _call('followDeparture', {
+        'title': departure.title,
+        'status': departure.status,
+        'departureAt': departure.departureAt.millisecondsSinceEpoch,
+        'currentMode': departure.mode,
+        'cancelled': departure.cancelled,
+        'tone': departure.tone.name,
+        if (departure.line case final line?)
+          'line': {'name': line.name, 'color': line.color, 'textColor': line.textColor, 'mode': line.mode},
+      });
+
+  @override
   Future<void> alert(String title, String? body) => _call('alertJourney', {'title': title, 'body': body});
 
   @override
@@ -160,6 +219,9 @@ class _NoLiveJourney implements LiveJourney {
   Future<void> alert(String title, String? body) async {}
 
   @override
+  Future<void> followDeparture(LiveDeparture departure) async {}
+
+  @override
   Future<void> prepare() async {}
 
   @override
@@ -182,6 +244,9 @@ class _NoLiveJourney implements LiveJourney {
 class _WebLiveJourney implements LiveJourney {
   @override
   Future<void> alert(String title, String? body) async {}
+
+  @override
+  Future<void> followDeparture(LiveDeparture departure) async {}
 
   @override
   Future<void> prepare() async {}

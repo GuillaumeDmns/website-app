@@ -552,6 +552,9 @@ class _SystemChecks extends GoSystemChecks {
 /// No notification nor screen kept on in the tests
 class _NoLiveJourney implements LiveJourney {
   @override
+  Future<void> followDeparture(LiveDeparture departure) async {}
+
+  @override
   Future<void> alert(String title, String? body) async {}
 
   @override

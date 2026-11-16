@@ -519,5 +519,10 @@
   "nowShort": "Now",
   "thenDepartures": "then {times}",
   "and": "and",
-  "dailyTripSaveCommute": "Save the {from} → {to} trip"
+  "dailyTripSaveCommute": "Save the {from} → {to} trip",
+  "followDeparture": "Follow this departure",
+  "followDepartureHint": "It stays in your notifications until it leaves, with its delay and platform.",
+  "followStop": "Stop",
+  "followLeavesAt": "Leaves {time}",
+  "followAt": "{stop} · leaves {time}"
 }

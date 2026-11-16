@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/router.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
+import 'package:website_app/features/follow/follow_widgets.dart';
 import 'package:website_app/features/map_place/map_place_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
 import 'package:website_app/features/traffic/traffic_screen.dart';
 
+import '../support/fake_live_journey.dart';
 import '../support/memory_store.dart';
 import '../support/standard_backend.dart';
 import '../support/test_app.dart';
@@ -19,6 +22,29 @@ void main() {
         of: find.byType(DraggableScrollableSheet),
         matching: find.byWidgetPredicate((widget) => widget is LineBadge && widget.line.id == lineId),
       );
+
+  testWidgets('a departure of a stop followed from a long press, until stopped', (tester) async {
+    final live = FakeLiveJourney();
+    await pumpApp(tester, standardBackend(), overrides: [liveJourneyProvider.overrideWithValue(live)]);
+    await tapOn(tester, find.text('Châtelet'));
+
+    // The RER's train of the board
+    await tester.longPress(find.text('UPAC'));
+    await settle(tester);
+    expect(find.text(currentL10n.followDepartureHint), findsOneWidget);
+    await tapOn(tester, find.text(currentL10n.followDeparture));
+
+    // In the system's notification, and over the map with "Arrêter"
+    expect(live.departures.single.title, 'RER A · Fontenay-sous-Bois');
+    expect(live.departures.single.status, contains('voie A'));
+    expect(find.byType(FollowBar), findsOneWidget);
+    expect(find.text(currentL10n.followStop), findsOneWidget);
+
+    await tapOn(tester, find.text(currentL10n.followStop));
+    expect(find.text(currentL10n.followStop), findsNothing);
+    expect(live.stops, greaterThan(0));
+    await closeApp(tester);
+  });
 
   testWidgets('from the nearby stop to its line, saved as a favorite', (tester) async {
     final backend = standardBackend();
