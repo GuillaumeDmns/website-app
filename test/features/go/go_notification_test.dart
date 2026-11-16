@@ -89,6 +89,9 @@ void main() {
 /// The notification of the tests: "Terminer" tapped on demand, or before the app started ([requested])
 class _LiveJourney implements LiveJourney {
   @override
+  Future<void> followDeparture(LiveDeparture departure) async {}
+
+  @override
   Future<void> alert(String title, String? body) async {}
 
   _LiveJourney({this.requested = false});

@@ -3,6 +3,7 @@ package com.guillaumedamiens.app
 import android.Manifest
 import android.app.Activity
 import android.app.LocaleManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -34,6 +35,9 @@ class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.guillaumedamiens.live_notification/bridge"
     private val NOTIFICATION_PERMISSION_REQUEST = 7541
 
+    /** The notification of a departure followed without a journey, posted again when the app is back on screen */
+    private var followed: Notification? = null
+
     private var locationSettingsResult: MethodChannel.Result? = null
 
     private val locationSettingsLauncher: ActivityResultLauncher<IntentSenderRequest> =
@@ -54,6 +58,7 @@ class MainActivity: FlutterFragmentActivity() {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "updateJourney" -> {
+                    followed = null
                     val notification = LiveJourneyNotification.journey(
                         this,
                         title = call.argument<String>("title") ?: getString(R.string.journey_channel),
@@ -82,12 +87,33 @@ class MainActivity: FlutterFragmentActivity() {
                     }
                     result.success(null)
                 }
+                "followDeparture" -> {
+                    val notification = LiveJourneyNotification.departure(
+                        this,
+                        title = call.argument<String>("title") ?: "",
+                        status = call.argument<String>("status") ?: "",
+                        departureAt = call.argument<Number>("departureAt")?.toLong() ?: System.currentTimeMillis(),
+                        currentMode = call.argument<String>("currentMode") ?: "bus",
+                        cancelled = call.argument<Boolean>("cancelled") == true,
+                        line = call.argument<Map<String, String>>("line"),
+                        tone = call.argument<String>("tone") ?: "fine",
+                    )
+                    // No service: the system counts the time left and takes the notification away by itself
+                    GoService.stop(this)
+                    followed = notification
+                    if (!LiveJourneyNotification.dismissedByUser) {
+                        getSystemService(NotificationManager::class.java)
+                            .notify(LiveJourneyNotification.NOTIFICATION_ID, notification)
+                    }
+                    result.success(null)
+                }
                 "alertJourney" -> {
                     LiveJourneyNotification.showAlert(this, call.argument<String>("title") ?: "", call.argument<String>("body"))
                     result.success(null)
                 }
                 "stopNotification" -> {
                     GoService.stop(this)
+                    followed = null
                     LiveJourneyNotification.cancelJourney(this)
                     result.success(null)
                 }
@@ -190,7 +216,7 @@ class MainActivity: FlutterFragmentActivity() {
         super.onResume()
         if (LiveJourneyNotification.dismissedByUser) {
             LiveJourneyNotification.dismissedByUser = false
-            GoService.latest?.let {
+            (GoService.latest ?: followed)?.let {
                 getSystemService(NotificationManager::class.java).notify(LiveJourneyNotification.NOTIFICATION_ID, it)
             }
         }

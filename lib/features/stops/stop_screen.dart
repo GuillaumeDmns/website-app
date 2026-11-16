@@ -17,6 +17,7 @@ import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
+import '../follow/follow_widgets.dart';
 import '../home/map_stops.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
@@ -208,7 +209,7 @@ class _StopContent extends ConsumerWidget {
                     value: departures,
                     loading: const SkeletonCards(count: 3, height: 52),
                     onRetry: () => ref.invalidate(stopDeparturesProvider(detail.id)),
-                    data: (departures) => _DepartureList(departures: departures, now: now),
+                    data: (departures) => _DepartureList(departures: departures, now: now, stop: detail),
                   ),
                 ),
                 StopServiceHoursSection(stopAreaId: detail.id),
@@ -275,14 +276,19 @@ class _StopDisruptions extends ConsumerWidget {
   }
 }
 
-class _DepartureList extends StatelessWidget {
-  const _DepartureList({required this.departures, required this.now});
+class _DepartureList extends ConsumerWidget {
+  const _DepartureList({required this.departures, required this.now, required this.stop});
 
   final StopDepartures departures;
   final DateTime now;
+  final StopAreaDetail stop;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // A long press on a departure offers to follow it
+    final summary = StopAreaSummary(id: stop.id, name: stop.name, lat: stop.lat, lon: stop.lon, lines: stop.lines);
+    VoidCallback? follow(LineDepartures row, String destination, Departure? departure) =>
+        followDepartureAction(context, ref, stop: summary, line: row.line, destination: destination, departure: departure);
     final rows = departures.lines.where((line) => line.departures.isNotEmpty).toList();
     final theme = Theme.of(context);
 
@@ -308,6 +314,7 @@ class _DepartureList extends StatelessWidget {
                 now: now,
                 realtimeAvailable: departures.realtimeAvailable,
                 onTap: () => context.push(Routes.line(row.line.id)),
+                onLongPress: follow(row, row.destination, row.departures.firstOrNull),
               ),
             (final LineDepartures row, (:final departure, :final destination)) => TrainDepartureRow(
                 line: row.line,
@@ -315,6 +322,7 @@ class _DepartureList extends StatelessWidget {
                 destination: destination,
                 now: now,
                 onTap: () => context.push(Routes.line(row.line.id)),
+                onLongPress: follow(row, destination, departure),
               ),
           },
         ],

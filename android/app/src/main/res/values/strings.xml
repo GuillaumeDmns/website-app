@@ -18,6 +18,7 @@
     <string name="journey_channel_description">Progress of the journey followed in GO mode</string>
     <string name="journey_preparing">Preparing the journey…</string>
     <string name="journey_finish">Finish</string>
+    <string name="departure_stop">Stop</string>
     <string name="journey_alerts_channel">Journey alerts</string>
     <string name="journey_alerts_channel_description">Getting off, platform change, vehicle missed: with sound and vibration while the app isn\'t on screen</string>
     <string name="home_tile">Go home</string>

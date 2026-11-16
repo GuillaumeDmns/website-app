@@ -35,6 +35,9 @@ object LiveJourneyNotification {
     /** An alert goes once its moment has passed */
     private const val ALERT_TIMEOUT_MS = 2 * 60_000L
 
+    /** A followed departure stays this long after it left */
+    private const val DEPARTURE_KEPT_MS = 60_000L
+
     /** The alerts' channels of earlier versions, removed from the system settings */
     private val OLD_CHANNEL_IDS = listOf("go_alerts", "go_alerts_prepare", "go_alerts_alight", "go_alerts_platform")
 
@@ -114,14 +117,7 @@ object LiveJourneyNotification {
         }
         line?.let { badge(context, it) }?.let(builder::setLargeIcon)
 
-        val trackerIcon = IconCompat.createWithResource(context, when (currentMode) {
-            "train" -> R.drawable.ic_train
-            "metro" -> R.drawable.ic_subway
-            "tram" -> R.drawable.ic_tram
-            "bus" -> R.drawable.ic_bus
-            "transfer" -> R.drawable.ic_transfer_within_a_station
-            else -> R.drawable.ic_walk
-        })
+        val trackerIcon = IconCompat.createWithResource(context, modeIcon(currentMode))
 
         if (Build.VERSION.SDK_INT >= 36) {
             if (chipText.isNotEmpty()) {
@@ -149,6 +145,55 @@ object LiveJourneyNotification {
             builder.setProgress(maxOf(total, 1), progress.coerceIn(0, maxOf(total, 1)), false)
             builder.setSmallIcon(trackerIcon)
         }
+        return builder.build()
+    }
+
+    private fun modeIcon(mode: String) = when (mode) {
+        "train" -> R.drawable.ic_train
+        "metro" -> R.drawable.ic_subway
+        "tram" -> R.drawable.ic_tram
+        "bus" -> R.drawable.ic_bus
+        "transfer" -> R.drawable.ic_transfer_within_a_station
+        else -> R.drawable.ic_walk
+    }
+
+    /**
+     * A departure followed from a stop's page, without a journey: its line and destination as the title, where it
+     * leaves from under it, the time left counted down by the system itself to [departureAt] (in the notification and,
+     * as a Live Update, in its chip: no service keeps the app running for it), "Arrêter"; the system takes it away a
+     * minute after the departure, whether the app still runs or not.
+     */
+    fun departure(
+        context: Context,
+        title: String,
+        status: String,
+        departureAt: Long,
+        currentMode: String,
+        cancelled: Boolean,
+        line: Map<String, String>? = null,
+        tone: String = "fine",
+    ): Notification {
+        val builder = NotificationCompat.Builder(context, JOURNEY_CHANNEL_ID)
+            .setSmallIcon(modeIcon(currentMode))
+            .setColor(brand(context))
+            .setContentTitle(semantic(title, tone))
+            .setContentText(status)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openApp(context))
+            .setDeleteIntent(dismissed(context))
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setRequestPromotedOngoing(true)
+            .setTimeoutAfter(maxOf(departureAt + DEPARTURE_KEPT_MS - System.currentTimeMillis(), 1_000L))
+            .addAction(0, context.getString(R.string.departure_stop), finishJourney(context))
+        if (cancelled) {
+            builder.setShowWhen(false)
+        } else {
+            builder.setWhen(departureAt).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
+        }
+        line?.let { badge(context, it) }?.let(builder::setLargeIcon)
         return builder.build()
     }
 
