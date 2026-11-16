@@ -104,16 +104,17 @@ final userLocationProvider = StreamProvider<LatLng?>((ref) async* {
 
     // The app's single feed (GO may ask it a fix a second): a new position every 25 m here, as without GO, or a fix
     // twice as sure as the one given (the circle around the user dot shrinks as the GPS settles, like Google Maps')
-    yield* feed.fixes.where((fix) {
+    // (read one by one: an error of the feed, location refused or turned off, must end here as no position; passed on
+    // by a `yield*`, it would fail the provider, which Riverpod then starts again by itself, asking the device again)
+    await for (final fix in feed.fixes) {
       final position = LatLng(fix.latitude, fix.longitude);
-      final moved = shown == null || metersBetween(shown!, position) >= regularDistanceFilter;
+      final moved = shown == null || metersBetween(shown, position) >= regularDistanceFilter;
       final surer = fix.accuracy > 0 && fix.accuracy * 2 <= (shownAccuracy ?? 0);
       if (moved || surer) {
-        shown = position;
         sure(shownAccuracy = fix.accuracy);
+        yield shown = position;
       }
-      return moved || surer;
-    }).map((fix) => LatLng(fix.latitude, fix.longitude));
+    }
   } catch (e) {
     debugPrint('Location unavailable: $e');
     yield null;
