@@ -1279,6 +1279,7 @@
   "@atStop": {"placeholders": {"stop": {"type": "String"}}},
   "widgetFailedAt": "Échec à {time}",
   "@widgetFailedAt": {"placeholders": {"time": {"type": "String"}}},
+  "trafficWidgetNoLine": "Mettez vos lignes en favori dans l'app (étoile sur la page d'une ligne) pour suivre leur trafic ici",
   "widgetSetupTitle": "Quel arrêt afficher ?",
   "widgetSetupHint": "Rechercher un arrêt",
   "widgetSetupFavorites": "Arrêts favoris",

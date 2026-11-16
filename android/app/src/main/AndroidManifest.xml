@@ -78,6 +78,19 @@
                 android:resource="@xml/next_departures_info" />
         </receiver>
 
+        <receiver
+            android:name=".LinesTraffic"
+            android:exported="true"
+            android:label="@string/traffic_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lines_traffic_info" />
+        </receiver>
+
         <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
             android:exported="true">
             <intent-filter>

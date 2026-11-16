@@ -102,6 +102,7 @@ class HomeScreen extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
               sliver: SliverToBoxAdapter(child: TrafficSummaryCard()),
             ),
+            const SliverToBoxAdapter(child: TrafficWidgetSync()),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(

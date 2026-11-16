@@ -12,15 +12,20 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /**
- * Fetches the widgets' departures every 15 min (Android's shortest period), only while the screen is on: nobody sees
- * them otherwise, and the stop's departures count against the backend's PRIM quota. Scheduled while a widget has a
- * stop ([NextDepartures]).
+ * Fetches the widgets' data every 15 min (Android's shortest period), only while the screen is on: nobody sees them
+ * otherwise, and the stop's departures count against the backend's PRIM quota. Scheduled while a departures widget
+ * has a stop ([NextDepartures]) or a "Mes lignes" widget is placed ([LinesTraffic]), each fetched only when placed.
  */
 class WidgetRefreshWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
 
     override fun doWork(): Result {
         if (applicationContext.getSystemService(PowerManager::class.java).isInteractive) {
-            NextDepartures.requestRefresh(applicationContext)
+            if (NextDepartures.hasStops(applicationContext)) {
+                NextDepartures.requestRefresh(applicationContext)
+            }
+            if (LinesTraffic.ids(applicationContext).isNotEmpty()) {
+                LinesTraffic.requestRefresh(applicationContext)
+            }
         }
         return Result.success()
     }
@@ -28,14 +33,19 @@ class WidgetRefreshWorker(context: Context, parameters: WorkerParameters) : Work
     companion object {
         private const val NAME = "widget_refresh"
 
-        fun schedule(context: Context) {
+        /** Scheduled while a widget needs it, cancelled otherwise */
+        fun update(context: Context) {
+            if (NextDepartures.hasStops(context) || LinesTraffic.ids(context).isNotEmpty()) schedule(context) else cancel(context)
+        }
+
+        private fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<WidgetRefreshWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
-        fun cancel(context: Context) {
+        private fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(NAME)
         }
     }

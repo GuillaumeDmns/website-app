@@ -11,4 +11,5 @@
     <color name="widget_brand">#FF0A8F4E</color>
     <color name="widget_live">#FF0A8F4E</color>
     <color name="widget_late">#FFC2410C</color>
+    <color name="widget_cancelled">#FFD92D20</color>
 </resources>

@@ -10,6 +10,14 @@
     <string name="widget_minutes">%1$d min</string>
     <string name="widget_then">puis %1$s</string>
     <string name="widget_departures_of">Prochains départs à %1$s</string>
+    <string name="traffic_widget_label">Mes lignes</string>
+    <string name="traffic_widget_description">Info trafic de vos lignes favorites</string>
+    <string name="traffic_widget_title">Mes lignes</string>
+    <string name="traffic_widget_normal">Trafic normal</string>
+    <string name="traffic_widget_disrupted">Trafic perturbé</string>
+    <string name="traffic_widget_interrupted">Trafic interrompu</string>
+    <string name="traffic_widget_loading">Chargement…</string>
+    <string name="traffic_widget_open_app">Ouvrez l\'app pour afficher vos lignes</string>
     <string name="journey_channel">Trajet en cours</string>
     <string name="journey_channel_description">Progression du trajet suivi en mode GO</string>
     <string name="journey_preparing">Préparation du trajet…</string>

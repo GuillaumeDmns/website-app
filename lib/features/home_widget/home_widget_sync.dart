@@ -18,7 +18,9 @@ import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
 import '../favorites/favorites_controller.dart';
 import '../stops/stop_screen.dart';
+import '../traffic/traffic_providers.dart';
 import 'android_widgets.dart';
+import 'traffic_widget.dart';
 
 /// Where the home screen widget lives: Android's `NextDepartures.kt`, the WidgetKit extension of iOS and macOS
 /// (`ios/NextDepartures/`, also built for macOS). Android and iOS get their data through home_widget (iOS: the App
@@ -164,16 +166,22 @@ Future<Dio> widgetBackgroundDio(Dio dio, TokenStore tokens) async {
 
 /// Refresh button of the widget (Android; iOS 17, through home_widget's `BackgroundIntent`) and its periodic refresh
 /// (Android), run in a background isolate (the app may be closed): fetches the departures with the device's guest
-/// token ([widgetBackgroundDio])
+/// token ([widgetBackgroundDio]); `refreshtraffic`, the traffic of the "Mes lignes" widget (Android,
+/// `traffic_widget.dart`)
 @pragma('vm:entry-point')
 Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
-  if (uri?.host != 'refreshdepartures') {
+  final traffic = uri?.host == 'refreshtraffic';
+  if (uri?.host != 'refreshdepartures' && !traffic) {
     return;
   }
   // Another isolate: the app's language and App Group are given again
   await loadLocale();
   await _useAppGroup();
   final android = widgetHost == WidgetHost.android;
+  // The "Mes lignes" widget (Android): its own button and refresh
+  if (traffic && !android) {
+    return;
+  }
   final stopId = android ? null : await HomeWidget.getWidgetData<String>('stop_id');
   if (!android && stopId == null) {
     await _write({'departures_list': currentL10n.widgetOpenApp});
@@ -187,14 +195,18 @@ Future<void> homeWidgetBackgroundCallback(Uri? uri) async {
         ..options.headers.addAll(AppConfig.clientHeaders),
       tokens,
     );
-    if (android) {
+    if (traffic) {
+      await refreshTrafficWidget(MobilityApi(dio));
+    } else if (android) {
       await refreshAndroidWidgets(MobilityApi(dio));
     } else {
       await pushDeparturesToWidget(await MobilityApi(dio).stopDepartures(stopId!, limit: 3));
     }
   } catch (e) {
     debugPrint('Home widget refresh failed: $e');
-    if (android) {
+    if (traffic) {
+      await failTrafficWidget();
+    } else if (android) {
       // No token, no network: the widgets say so, with the departures they had
       await failAndroidWidgets();
     } else {
@@ -321,6 +333,30 @@ class HomeWidgetSync extends ConsumerWidget {
         _lastPush = now;
         Future.microtask(() => pushDeparturesToWidget(departures));
       }
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+/// Invisible, on the home page (Android): keeps the "Mes lignes" widget on the favorite lines and the traffic the home
+/// page already shows (`trafficProvider`, also watched by its traffic sections: no request of its own)
+class TrafficWidgetSync extends ConsumerWidget {
+  const TrafficWidgetSync({super.key});
+
+  static List<Favorite>? _lastFavorites;
+  static List<LineTraffic>? _lastTraffic;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (widgetHost != WidgetHost.android) {
+      return const SizedBox.shrink();
+    }
+    final favorites = ref.watch(favoritesProvider).value;
+    final traffic = ref.watch(trafficProvider).value;
+    if (favorites != null && (!identical(favorites, _lastFavorites) || !identical(traffic, _lastTraffic))) {
+      _lastFavorites = favorites;
+      _lastTraffic = traffic;
+      Future.microtask(() => syncTrafficWidget(favorites, traffic));
     }
     return const SizedBox.shrink();
   }

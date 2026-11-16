@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// home_widget's native side (Android) in memory: the widgets on the home screen and what the app writes for them
 class FakeHomeWidget {
-  FakeHomeWidget({this.widgetIds = const [], Map<String, String>? data}) : data = {...?data} {
+  FakeHomeWidget({this.widgetIds = const [], this.trafficWidgetIds = const [], Map<String, String>? data}) : data = {...?data} {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(_channel, _handle);
     addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(_channel, null));
   }
@@ -12,6 +12,9 @@ class FakeHomeWidget {
 
   /// Ids of the `NextDepartures` widgets placed
   final List<int> widgetIds;
+
+  /// Ids of the "Mes lignes" widgets placed (`LinesTraffic`)
+  final List<int> trafficWidgetIds;
 
   /// The widgets' data, as `NextDepartures.kt` reads it
   final Map<String, String> data;
@@ -39,6 +42,8 @@ class FakeHomeWidget {
         return [
           for (final id in widgetIds)
             {'widgetId': id, 'androidClassName': 'com.guillaumedamiens.app.NextDepartures', 'label': 'Prochains départs'},
+          for (final id in trafficWidgetIds)
+            {'widgetId': id, 'androidClassName': 'com.guillaumedamiens.app.LinesTraffic', 'label': 'Mes lignes'},
         ];
       case 'finishHomeWidgetConfigure':
         configureFinished = true;

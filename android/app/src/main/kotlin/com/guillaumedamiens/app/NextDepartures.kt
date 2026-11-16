@@ -77,6 +77,12 @@ class NextDepartures : HomeWidgetProvider() {
         private fun ids(context: Context): IntArray =
             AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, NextDepartures::class.java))
 
+        /** Whether a departures widget has its stop */
+        fun hasStops(context: Context): Boolean {
+            val data = HomeWidgetPlugin.getData(context)
+            return ids(context).any { data.contains(key(it, "stop_id")) }
+        }
+
         /** Whether the widget can be drawn every minute on time (exact alarms), so as to show the time left */
         fun canShowTimeLeft(context: Context): Boolean =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -188,7 +194,7 @@ class NextDepartures : HomeWidgetProvider() {
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         context.getSystemService(AlarmManager::class.java).cancel(redrawIntent(context))
-        WidgetRefreshWorker.cancel(context)
+        WidgetRefreshWorker.update(context)
         // The picker shows the made-up stop again, not one the user no longer has
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             try {
@@ -321,11 +327,10 @@ class NextDepartures : HomeWidgetProvider() {
     /** After drawing: the next redraw, the periodic fetch, and new departures once the screen is back on if stale */
     private fun afterRender(context: Context, widgetData: SharedPreferences, now: Long) {
         val configured = ids(context).filter { widgetData.contains(key(it, "stop_id")) }
+        WidgetRefreshWorker.update(context)
         if (configured.isEmpty()) {
-            WidgetRefreshWorker.cancel(context)
             return
         }
-        WidgetRefreshWorker.schedule(context)
         updatePreview(context, widgetData, configured, now)
         scheduleRedraw(context, configured.flatMap { parse(widgetData.getString(key(it, "rows"), null)) }, now)
 
