@@ -21,13 +21,25 @@ class MobilityApp extends ConsumerStatefulWidget {
 }
 
 class _MobilityAppState extends ConsumerState<MobilityApp> with WidgetsBindingObserver {
+  /// The position had been given up (location off, permission refused, no fix) when the app last left the screen
+  bool _leftWithoutPosition = false;
+
   // Back from the system settings (location turned on, permission granted): look for the position again, where a page
-  // uses it (not the widget's setup, which never asks for it)
-  late final _lifecycle = AppLifecycleListener(onResume: () {
-    if (ref.read(userLocationProvider.exists) && ref.read(userLocationProvider).value == null) {
-      ref.invalidate(userLocationProvider);
-    }
-  });
+  // uses it (not the widget's setup, which never asks for it). Only when the app was left after the position was given
+  // up: a window the system shows while the position is looked for (the permission, Google's location accuracy) takes
+  // the app off screen too, and closing it must not ask again, or a refusal brings the window back without end
+  late final _lifecycle = AppLifecycleListener(
+    onInactive: () {
+      final position = ref.read(userLocationProvider.exists) ? ref.read(userLocationProvider) : null;
+      _leftWithoutPosition = position != null && !position.isLoading && position.hasValue && position.value == null;
+    },
+    onResume: () {
+      if (_leftWithoutPosition) {
+        _leftWithoutPosition = false;
+        ref.invalidate(userLocationProvider);
+      }
+    },
+  );
 
   /// A home screen widget tapped while the app runs: its stop, or its setup
   StreamSubscription<String>? _widgetClicks;

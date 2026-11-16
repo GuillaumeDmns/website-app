@@ -43,6 +43,7 @@ Future<MemoryStore> pumpApp(
   String? refreshToken,
   bool onboardingDone = true,
   LatLng? position = userPosition,
+  Stream<LatLng?> Function()? positions,
   Locale locale = const Locale('fr'),
   bool languageKeptBySystem = false,
   Size size = const Size(412, 915),
@@ -62,7 +63,8 @@ Future<MemoryStore> pumpApp(
       localStoreProvider.overrideWithValue(deviceStore),
       onboardingDoneProvider.overrideWith(() => _TestOnboarding(onboardingDone)),
       localeProvider.overrideWith(() => LocaleController(locale, languageKeptBySystem)),
-      userLocationProvider.overrideWith((ref) => Stream.value(position)),
+      // [positions]: each search of the position, as the device answers it
+      userLocationProvider.overrideWith((ref) => positions?.call() ?? Stream.value(position)),
       // No compass: GO's map keeps the way's direction
       deviceHeadingProvider.overrideWith((ref) => const Stream.empty()),
       mapTilesEnabledProvider.overrideWithValue(false),
