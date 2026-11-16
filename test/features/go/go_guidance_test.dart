@@ -217,6 +217,27 @@ void main() {
     expect(journeyFraction(state(const GoProgress(step: 3, phase: GoPhase.arrived))), 1);
   });
 
+  test('on board, the journey done moves between two stops too (a direct train has none for long)', () {
+    const onBoard = GoProgress(step: 1, phase: GoPhase.onBoard);
+    // Left Châtelet at 8:06, Gare de Lyon at 8:10: halfway at 8:08
+    expect(journeySecondsDone(tracker, onBoard, now: at(8)), closeTo(240 + 120, 1));
+    expect(journeySecondsDone(tracker, onBoard, now: at(6)), closeTo(240, 1));
+    // A minute late: a minute behind
+    expect(journeySecondsDone(tracker, onBoard.copyWith(shift: const Duration(minutes: 1)), now: at(8)), closeTo(240 + 60, 1));
+  });
+
+  test('on the last walk, the arrival follows the pace of the user', () {
+    const lastWalk = GoProgress(step: 2, phase: GoPhase.moving);
+    final meters = tracker.steps[2].line.length;
+    // Faster than planned: earlier; standing a while: later
+    final fast = goEta(state(lastWalk, walkSpeed: 2), at(14));
+    expect(fast, at(14).add(Duration(seconds: (meters / 2).round())));
+    expect(fast.isBefore(goEta(state(lastWalk), at(14))), isTrue);
+    expect(goEta(state(lastWalk, walkSpeed: 2), at(20)).isAfter(plan.arrival), isTrue);
+    // With a ride still to take, its times say when
+    expect(goEta(state(tracker.initial(), walkSpeed: 2), at(1)), plan.arrival);
+  });
+
   test('alerts are felt apart', () {
     expect(const GoAlert(id: 'prepare-1', title: '').kind, 'prepare');
     expect(const GoAlert(id: 'alight-1', title: '', urgent: true).kind, 'alight');

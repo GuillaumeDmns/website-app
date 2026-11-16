@@ -368,6 +368,39 @@ void main() {
     expect(tracker.dismissIssue(progress).issue, isNull);
   });
 
+  test('out of a train, the platform far from where the walk is drawn from is not off the way', () {
+    // Off the metro at Nation, the walk goes east; the user is still 250 m west of where it starts, for minutes
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+    const platform = LatLng(48.8484, 2.3925);
+    var (progress, alerts) = tracker.update(lastWalk, input(at(14), position: platform));
+    (progress, alerts) = tracker.update(progress, input(at(16), position: platform));
+    expect(progress.issue, isNull);
+    expect(alerts, isEmpty);
+
+    // Leaving the other way, further than a station is long: off the way after a minute
+    const away = LatLng(48.8484, 2.3875);
+    (progress, alerts) = tracker.update(progress, input(at(17), position: away));
+    (progress, alerts) = tracker.update(progress, input(at(18, 5), position: away));
+    expect(progress.issue, GoIssue.offRoute);
+  });
+
+  test('once on the walk, leaving it is off the way even close to its start; a rough fix is not', () {
+    final lastWalk = tracker.jumpTo(tracker.initial(), 2);
+    final onPath = tracker.steps[2].line.pointAt(20);
+    const beside = LatLng(48.8504, 2.3959);
+    var (progress, _) = tracker.update(lastWalk, input(at(14), position: onPath));
+    expect(progress.joined, isTrue);
+
+    // 220 m beside it by a fix that may be 95 m off: not sure enough
+    (progress, _) = tracker.update(progress, input(at(15), position: beside, accuracy: 95));
+    (progress, _) = tracker.update(progress, input(at(16, 5), position: beside, accuracy: 95));
+    expect(progress.issue, isNull);
+
+    (progress, _) = tracker.update(progress, input(at(17), position: beside));
+    (progress, _) = tracker.update(progress, input(at(18, 5), position: beside));
+    expect(progress.issue, GoIssue.offRoute);
+  });
+
   test('arrives near the destination', () {
     final lastWalk = tracker.jumpTo(tracker.initial(), 2);
 

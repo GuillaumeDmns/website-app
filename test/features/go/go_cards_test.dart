@@ -38,6 +38,17 @@ void main() {
     ]);
   });
 
+  test('the map shows the ways in and out of the stations of the move shown or in progress only', () {
+    final cards = goCards(metro);
+    // On board, looking at the ride: none
+    expect(goStationsShown(metro, cards[2], const GoProgress(step: 1, phase: GoPhase.onBoard)), isEmpty);
+    // Walking to Châtelet, then out of Nation
+    expect(goStationsShown(metro, cards[0], metro.initial()), {chatelet.id});
+    expect(goStationsShown(metro, cards[4], const GoProgress(step: 2, phase: GoPhase.moving)), {nation.id});
+    // Waiting, looking at the way out to come
+    expect(goStationsShown(metro, cards[3], const GoProgress(step: 1, phase: GoPhase.waiting)), {nation.id});
+  });
+
   test('a transfer is walked in the departures card of the ride after it; a bus stop has no way out to find', () {
     final transfer = JourneySection(
       kind: SectionKind.transfer,

@@ -241,6 +241,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     final shownStep = shown.step < tracker.steps.length ? tracker.steps[shown.step] : null;
     final onBoardOrMoving = progress.phase == GoPhase.moving || progress.phase == GoPhase.onBoard;
     final exit = shown.kind == GoCardKind.exit ? stations.exits[shown.step] : null;
+    final stationsShown = goStationsShown(tracker, shown, progress);
     final overlay = journeyOverlay(
       context,
       state.journey,
@@ -249,7 +250,11 @@ class _GoScreenState extends ConsumerState<GoScreen> {
       // them on board (the dot left behind in a tunnel, the faded part running ahead of it)
       currentAlong: onBoardOrMoving ? progress.along : 0,
       fitSection: shownStep?.sectionIndex,
-      stations: journeyStationAccesses(state.journey, watchStationEntrances(ref, state.journey)),
+      // The ways in and out of the stations of the move shown or in progress only
+      stations: [
+        for (final station in journeyStationAccesses(state.journey, watchStationEntrances(ref, state.journey)))
+          if (stationsShown.contains(station.stopAreaId)) station,
+      ],
       // Getting out of a station: its ways out whatever the zoom
       stationShown: exit == null ? null : tracker.steps[shown.step - 1].section.to?.stopAreaId,
     );

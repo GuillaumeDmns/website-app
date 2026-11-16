@@ -132,6 +132,7 @@ class GoProgress {
     this.arrivedAt,
     this.preciseAlong,
     this.preciseAt,
+    this.joined = false,
   });
 
   /// Index in [GoTracker.steps]
@@ -162,6 +163,10 @@ class GoProgress {
   final Set<String> fired;
   final DateTime? arrivedAt;
 
+  /// Moving: the user was seen on the step's path (a move starts off it out of a train: on its platform, hundreds of
+  /// meters from where the walk is drawn from)
+  final bool joined;
+
   GoProgress copyWith({
     int? step,
     GoPhase? phase,
@@ -175,6 +180,7 @@ class GoProgress {
     DateTime? arrivedAt,
     double? Function()? preciseAlong,
     DateTime? Function()? preciseAt,
+    bool? joined,
   }) =>
       GoProgress(
         step: step ?? this.step,
@@ -189,6 +195,7 @@ class GoProgress {
         arrivedAt: arrivedAt ?? this.arrivedAt,
         preciseAlong: preciseAlong != null ? preciseAlong() : this.preciseAlong,
         preciseAt: preciseAt != null ? preciseAt() : this.preciseAt,
+        joined: joined ?? this.joined,
       );
 
   Map<String, dynamic> toJson() => {
@@ -320,10 +327,17 @@ class GoTracker {
   DateTime expectedDeparture(GoStep ride, GoProgress progress, Departure? vehicle) =>
       vehicle?.time ?? plannedDeparture(ride, progress);
 
-  /// Estimated arrival at the destination; [vehicle]: real-time departure of the current ride's vehicle
-  DateTime eta(GoProgress progress, Departure? vehicle, {DateTime? now}) {
+  /// Estimated arrival at the destination; [vehicle]: real-time departure of the current ride's vehicle. With no ride
+  /// left to take, the moves alone say when: [secondsToGo] on the one in progress (at the user's pace) from [now],
+  /// then the ones after it as planned.
+  DateTime eta(GoProgress progress, Departure? vehicle, {DateTime? now, double? secondsToGo}) {
     if (progress.arrivedAt != null) {
       return progress.arrivedAt!;
+    }
+    if (now != null && secondsToGo != null && progress.phase == GoPhase.moving && progress.step < steps.length &&
+        steps.skip(progress.step).every((step) => !step.isRide)) {
+      final after = steps.skip(progress.step + 1).fold(0, (seconds, step) => seconds + step.section.duration);
+      return now.add(Duration(seconds: secondsToGo.round() + after));
     }
     var delay = progress.shift;
     final step = stepOf(progress);
@@ -525,8 +539,15 @@ class GoTracker {
       if (projection != null) {
         current = current.copyWith(along: math.max(current.along, projection.along));
 
-        // Away from the path for more than a minute
-        if (projection.distance > 150) {
+        // Away from the path for more than a minute, as far as the fix is sure of it (indoors, a fix may be 100 m off);
+        // not where the move starts before the path was joined: out of a train, the platform is hundreds of meters
+        // from where the walk is drawn from, and a big station takes minutes to leave
+        final away = projection.distance - (input.accuracy ?? 0);
+        final leaving = !current.joined && step.line.points.isNotEmpty && metersBetween(fix, step.line.points.first) <= _leavingMeters;
+        if (projection.distance < 80) {
+          current = current.copyWith(joined: true);
+        }
+        if (away > 150 && !leaving) {
           final since = current.offRouteSince ?? input.now;
           current = current.copyWith(offRouteSince: () => since);
           if (input.now.difference(since) >= const Duration(minutes: 1) && current.issue == null &&
@@ -646,6 +667,10 @@ class GoTracker {
     }
     return current;
   }
+
+  /// A move's path not joined yet, the user this close to where it starts is still leaving the place (a station and its
+  /// platforms), not off the way
+  static const _leavingMeters = 400.0;
 
   /// The destination is reached by a fix this close to it, or to the end of the walk to it (an address may be a point
   /// inside a building that the walk stops in front of)…

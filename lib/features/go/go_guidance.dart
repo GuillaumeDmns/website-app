@@ -245,9 +245,23 @@ double metersToGo(GoState state) {
   return math.max(state.tracker.metersLeft(state.progress), end == null || position == null ? 0.0 : metersBetween(position, end));
 }
 
+/// When the user arrives, as GO's header and notification say it: on the last moves (no ride left to take) at their
+/// pace, as the walk's card counts its minutes; else as the rides say ([GoTracker.eta])
+DateTime goEta(GoState state, DateTime now) {
+  final step = state.tracker.stepOf(state.progress);
+  return state.tracker.eta(
+    state.progress,
+    state.currentVehicle,
+    now: now,
+    secondsToGo: step == null || step.isRide ? null : metersToGo(state) / movePace(state, step),
+  );
+}
+
 /// Seconds of the journey done, by the planned durations of its steps: the steps before the current one, and the
-/// share of the current one done (along its path on foot, by its stops on board)
-double journeySecondsDone(GoTracker tracker, GoProgress progress) {
+/// share of the current one done: along its path on foot; on board, the time of its stops up to where the vehicle is
+/// at [now], between the stop left and the next one too ([GoTracker.betweenStops]: a direct train has no stop for
+/// half an hour), at the stop left without [now]
+double journeySecondsDone(GoTracker tracker, GoProgress progress, {DateTime? now}) {
   var done = 0.0;
   for (final (index, step) in tracker.steps.indexed) {
     final duration = step.section.duration;
@@ -256,13 +270,34 @@ double journeySecondsDone(GoTracker tracker, GoProgress progress) {
     } else if (index == progress.step) {
       final fraction = switch (progress.phase) {
         GoPhase.moving => step.line.length == 0 ? 0.0 : progress.along / step.line.length,
-        GoPhase.onBoard => step.section.stops.length < 2 ? 0.5 : progress.stopIndex / (step.section.stops.length - 1),
+        GoPhase.onBoard => _rideShare(tracker, step, progress, now),
         _ => 0.0,
       };
       done += duration * fraction.clamp(0.0, 1.0);
     }
   }
   return done;
+}
+
+/// Share of the ride [step] in progress done, by its stops' times
+double _rideShare(GoTracker tracker, GoStep step, GoProgress progress, DateTime? now) {
+  final last = step.section.stops.length - 1;
+  if (last < 1) {
+    // Without its stops, the clock alone
+    final total = step.section.duration;
+    return now == null || total <= 0 ? 0.5 : now.difference(step.section.departure.add(progress.shift)).inSeconds / total;
+  }
+  if (progress.stopIndex >= last) {
+    return 1;
+  }
+  final total = step.stopTime(last).difference(step.stopTime(0)).inSeconds;
+  if (total <= 0) {
+    return progress.stopIndex / last;
+  }
+  final left = step.stopTime(progress.stopIndex);
+  final between = now == null ? 0.0 : tracker.betweenStops(progress, now) ?? 0.0;
+  final at = left.add(step.stopTime(progress.stopIndex + 1).difference(left) * between);
+  return at.difference(step.stopTime(0)).inSeconds / total;
 }
 
 /// Share of the journey done (0 to 1), by the planned durations of its steps
