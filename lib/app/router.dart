@@ -52,13 +52,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
     },
     redirect: (context, state) {
-      // A launcher shortcut (`launchLink`): its page over the home page, which going back finds, instead of alone
-      if (state.uri.queryParameters[launchParameter] == '1') {
+      final status = authListenable.value;
+      // A launcher shortcut or the quick settings tile (`launchLink`): its page over the home page, which going back
+      // finds, instead of alone. Once the app is there: started by the link, it first waits for the session on the
+      // splash page (or shows the welcome pages), which keep the link in `from` and come back to it; pushed before,
+      // the page would be gone with them
+      if (state.uri.queryParameters[launchParameter] == '1' && status != AuthStatus.unknown && ref.read(onboardingDoneProvider)) {
         final asked = withoutLaunch(state.uri);
         Future.microtask(() => router.push(asked));
         return Routes.home;
       }
-      final status = authListenable.value;
       final location = state.matchedLocation;
       final onAuthPage = location == Routes.login;
 
