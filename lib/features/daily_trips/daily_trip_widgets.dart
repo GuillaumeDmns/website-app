@@ -101,28 +101,9 @@ DailyTrip? tripTo(List<DailyTrip> trips, Favorite place) {
   return null;
 }
 
-/// The next departure of the saved trip to [place] (see [tripTo]), retimed on its lines' departures (no search); null
-/// without such a trip, or when the user is there already
-JourneyOption? nextTripTo(WidgetRef ref, Favorite place, DateTime now) {
-  final trip = tripTo(ref.watch(dailyTripsProvider).value ?? const [], place);
-  final user = ref.watch(userLocationProvider).value;
-  if (trip == null ||
-      (user != null && place.lat != null && metersBetween(user, LatLng(place.lat!, place.lon!)) < 300)) {
-    return null;
-  }
-  return upcomingTrips(trip.journey, lookup: watchRides(ref, now), now: now).firstOrNull;
-}
-
-/// Goes to [place]: the detail of the next departure of the trip saved there (no search), else a search from here
+/// Goes to [place]: a search from where the user is, whatever trip is saved to it (that one starts from another saved
+/// place, not from here, and has its own card on the home page); the start is changed on the search page
 void goToPlace(BuildContext context, WidgetRef ref, Favorite place) {
-  final now = ref.read(nowProvider).value ?? DateTime.now();
-  final trip = tripTo(ref.read(dailyTripsProvider).value ?? const [], place);
-  final next = trip == null ? null : nextTripTo(ref, place, now);
-  if (trip != null && next != null) {
-    ref.read(selectedJourneyProvider.notifier).select(next, trip.request);
-    context.push(Routes.journeyDetailOf(trip.request, next));
-    return;
-  }
   context.push(Routes.journey(ref.read(journeyPreferencesProvider).apply(JourneyRequest(
         from: const JourneyPlace.currentLocation(),
         to: favoritePlace(place),
