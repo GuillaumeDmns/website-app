@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages of the app (lib/l10n, values/ and values-fr/): Android 13+ lists them on the app's own language page
+     of the system settings, and keeps the choice (MainActivity "appLanguage", lib/l10n/l10n.dart) -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="fr" />
+    <locale android:name="en" />
+</locale-config>

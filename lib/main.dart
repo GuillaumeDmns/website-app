@@ -34,7 +34,7 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks(['Inter'], await rootBundle.loadString('assets/google_fonts/OFL.txt'));
   });
   GoogleFonts.inter();
-  final (_, onboardingDone, locale, _, widgetLocation) = await (
+  final (_, onboardingDone, language, _, widgetLocation) = await (
     GoogleFonts.pendingFonts().timeout(const Duration(seconds: 3), onTimeout: () => const []),
     loadOnboardingDone(),
     loadLocale(),
@@ -45,7 +45,7 @@ Future<void> main() async {
   runApp(ProviderScope(
     overrides: [
       onboardingDoneProvider.overrideWith(() => OnboardingController(onboardingDone)),
-      localeProvider.overrideWith(() => LocaleController(locale)),
+      localeProvider.overrideWith(() => LocaleController(language.chosen, language.keptBySystem)),
       // Opened by a home screen widget: its stop, or the choice of its stop
       if (widgetLocation != null) initialLocationProvider.overrideWithValue(widgetLocation),
     ],

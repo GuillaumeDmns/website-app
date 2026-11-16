@@ -2,6 +2,7 @@ package com.guillaumedamiens.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.LocaleManager
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -10,6 +11,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.LocaleList
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.result.ActivityResultLauncher
@@ -147,6 +149,18 @@ class MainActivity: FlutterFragmentActivity() {
                         }
                     }
                     result.success(null)
+                }
+                "appLanguage" -> {
+                    // Android 13+: the system keeps the app's language (its page in the settings lists those of
+                    // res/xml/locales_config.xml), and the choice made in the app is given to it. True when it does
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        call.argument<String>("language")?.let {
+                            getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(it)
+                        }
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
                 }
                 "keepScreenOn" -> {
                     // GO mode option: the screen stays on while the journey is followed

@@ -44,6 +44,7 @@ Future<MemoryStore> pumpApp(
   bool onboardingDone = true,
   LatLng? position = userPosition,
   Locale locale = const Locale('fr'),
+  bool languageKeptBySystem = false,
   Size size = const Size(412, 915),
   Future<String?> Function()? googleAccountChooser = _testGoogleAccount,
   BrowserSignIn? googleBrowserSignIn,
@@ -60,7 +61,7 @@ Future<MemoryStore> pumpApp(
       dioFactoryProvider.overrideWithValue(backend.dio),
       localStoreProvider.overrideWithValue(deviceStore),
       onboardingDoneProvider.overrideWith(() => _TestOnboarding(onboardingDone)),
-      localeProvider.overrideWith(() => LocaleController(locale)),
+      localeProvider.overrideWith(() => LocaleController(locale, languageKeptBySystem)),
       userLocationProvider.overrideWith((ref) => Stream.value(position)),
       // No compass: GO's map keeps the way's direction
       deviceHeadingProvider.overrideWith((ref) => const Stream.empty()),
