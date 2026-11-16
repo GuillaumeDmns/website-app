@@ -20,4 +20,6 @@
     <string name="journey_finish">Finish</string>
     <string name="journey_alerts_channel">Journey alerts</string>
     <string name="journey_alerts_channel_description">Getting off, platform change, vehicle missed: with sound and vibration while the app isn\'t on screen</string>
+    <string name="home_tile">Go home</string>
+    <string name="home_tile_no_home">Home not saved yet</string>
 </resources>

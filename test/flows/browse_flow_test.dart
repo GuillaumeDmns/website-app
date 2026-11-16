@@ -8,6 +8,7 @@ import 'package:website_app/features/map_place/map_place_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
 import 'package:website_app/features/traffic/traffic_screen.dart';
 
+import '../support/memory_store.dart';
 import '../support/standard_backend.dart';
 import '../support/test_app.dart';
 
@@ -187,6 +188,24 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('started by a launcher shortcut or the quick settings tile, the app opens its page over the home page',
+      (tester) async {
+    // The link the app is started with (not one it gets while running): the session isn't read yet, as on a device,
+    // whose storage takes a moment
+    await pumpApp(tester, standardBackend(),
+        store: _SlowStore(), overrides: [initialLocationProvider.overrideWithValue('/traffic?launch=1')]);
+
+    expect(find.byType(TrafficScreen), findsOneWidget);
+
+    final router = ProviderScope.containerOf(tester.element(find.byType(TrafficScreen))).read(routerProvider);
+    router.pop();
+    await settle(tester);
+    expect(find.byType(TrafficScreen), findsNothing);
+    expect(find.text(currentL10n.homeSearchHint), findsOneWidget);
+
+    await closeApp(tester);
+  });
+
   testWidgets('the app speaks English when asked', (tester) async {
     final backend = standardBackend();
     await pumpApp(tester, backend);
@@ -237,4 +256,13 @@ void main() {
 
     await closeApp(tester);
   });
+}
+
+/// A device's storage: its answers take a moment
+class _SlowStore extends MemoryStore {
+  @override
+  Future<Object?> readJson(String key) async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return super.readJson(key);
+  }
 }
