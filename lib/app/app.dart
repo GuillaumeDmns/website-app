@@ -20,7 +20,7 @@ class MobilityApp extends ConsumerStatefulWidget {
   ConsumerState<MobilityApp> createState() => _MobilityAppState();
 }
 
-class _MobilityAppState extends ConsumerState<MobilityApp> {
+class _MobilityAppState extends ConsumerState<MobilityApp> with WidgetsBindingObserver {
   // Back from the system settings (location turned on, permission granted): look for the position again, where a page
   // uses it (not the widget's setup, which never asks for it)
   late final _lifecycle = AppLifecycleListener(onResume: () {
@@ -35,11 +35,17 @@ class _MobilityAppState extends ConsumerState<MobilityApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _widgetClicks = ref.read(widgetClicksProvider).listen((location) => ref.read(routerProvider).push(location));
   }
 
+  /// The system's language changed, or the app's own on its page of the system settings (Android 13+)
+  @override
+  void didChangeLocales(List<Locale>? locales) => ref.read(localeProvider.notifier).systemChanged();
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _widgetClicks?.cancel();
     _lifecycle.dispose();
     super.dispose();
