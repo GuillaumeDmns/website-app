@@ -9,6 +9,7 @@ import '../../../app/theme.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../l10n/l10n.dart';
 import '../go_controller.dart';
+import '../go_guidance.dart';
 import '../go_state.dart';
 import '../go_tracker.dart';
 
@@ -140,7 +141,7 @@ class _TimeLeft extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = context.colors;
     final arrived = state.progress.phase == GoPhase.arrived;
-    final eta = state.tracker.eta(state.progress, state.currentVehicle);
+    final eta = goEta(state, DateTime.now());
     final late = eta.difference(state.journey.arrival).inMinutes;
     final left = math.max(0, (eta.difference(DateTime.now()).inSeconds / 60).ceil());
     final figure = theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600, height: 1.1, fontFeatures: const [FontFeature.tabularFigures()]);

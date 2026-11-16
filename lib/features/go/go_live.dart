@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/utils/time_format.dart';
@@ -15,6 +16,7 @@ import 'go_tracker.dart';
 /// platform, the line of the ride as a badge, the progress along the steps and the arrival. Not for an arrived
 /// journey: the notification is gone then.
 LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
+  final brand = '#${(AppTheme.brand.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
   final glance = goGlance(state, now);
   final tracker = state.tracker;
   final progress = state.progress;
@@ -39,10 +41,10 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
   return LiveJourneyUpdate(
     title: glance.action,
     status: status,
-    progress: journeySecondsDone(tracker, progress).round(),
+    progress: journeySecondsDone(tracker, progress, now: now).round(),
     mode: _liveMode(step?.section),
     chip: chip,
-    info: currentL10n.goArrival(formatClock(tracker.eta(progress, state.currentVehicle))),
+    info: currentL10n.goArrival(formatClock(goEta(state, now))),
     line: switch (step?.section.line) {
       final line? when step!.isRide && (line.name ?? '').isNotEmpty => LiveJourneyLine(
           name: line.name!,
@@ -56,7 +58,8 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
       for (final goStep in tracker.steps)
         LiveJourneySegment(
           seconds: goStep.section.duration,
-          color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : '#9E9E9E',
+          // A move in the app's green: grey, its part done looked like one still to do
+          color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : brand,
         ),
     ],
     tone: switch (glance.tone) {

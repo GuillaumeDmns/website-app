@@ -91,3 +91,26 @@ int goCurrentCard(List<GoCard> cards, GoProgress progress, {double? exitAlong}) 
   };
   return index < 0 ? 0 : index;
 }
+
+/// The stations whose ways in and out the map shows with the card [shown] at [progress]: the ones the move shown, or
+/// the one in progress, gets out of or walks into. None on board or waiting: the stations of the rest of the journey
+/// are not where the user is, and their signs came up at each station the camera passed.
+Set<String> goStationsShown(GoTracker tracker, GoCard shown, GoProgress progress) {
+  final steps = tracker.steps;
+  Iterable<String> around(int step) sync* {
+    if (step < 0 || step >= steps.length || steps[step].isRide) {
+      return;
+    }
+    if (step > 0 && steps[step - 1].isRide) {
+      yield* [?steps[step - 1].section.to?.stopAreaId];
+    }
+    if (step + 1 < steps.length && steps[step + 1].isRide) {
+      yield* [?steps[step + 1].section.from?.stopAreaId];
+    }
+  }
+
+  return {
+    if (shown.kind == GoCardKind.walk || shown.kind == GoCardKind.exit) ...around(shown.step),
+    if (progress.phase == GoPhase.moving) ...around(progress.step),
+  };
+}
