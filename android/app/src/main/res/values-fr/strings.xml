@@ -16,4 +16,6 @@
     <string name="journey_finish">Terminer</string>
     <string name="journey_alerts_channel">Alertes de trajet</string>
     <string name="journey_alerts_channel_description">Descendre, changement de voie, véhicule raté : avec son et vibration quand l\'app n\'est pas à l\'écran</string>
+    <string name="home_tile">Rentrer</string>
+    <string name="home_tile_no_home">Maison à enregistrer</string>
 </resources>

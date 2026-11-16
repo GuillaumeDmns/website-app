@@ -15,9 +15,19 @@ import androidx.core.net.toUri
  * app's id differs per flavor, which a shortcuts XML can't follow.
  */
 object AppShortcuts {
+    private const val PREFERENCES = "app_shortcuts"
+    private const val HOME_LINK = "home_link"
+
+    /** The link of the journeys to the saved home ([HomeTileService]), null without one */
+    fun homeLink(context: Context): String? =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(HOME_LINK, null)
 
     /** @param places `id`, `label` and `uri` of each saved place, in order */
     fun set(context: Context, places: List<Map<String, String>>) {
+        // Kept for the quick settings tile, which opens it while the app doesn't run
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit()
+            .apply { places.firstOrNull { it["id"] == "home" }?.get("uri")?.let { putString(HOME_LINK, it) } ?: remove(HOME_LINK) }
+            .apply()
         val shortcuts = places.mapNotNull { place ->
             val id = place["id"] ?: return@mapNotNull null
             val label = place["label"]?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
