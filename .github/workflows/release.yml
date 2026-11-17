@@ -3,7 +3,7 @@ name: Release
 # apps and publishes them as assets of the tag's GitHub release, next to the web app's archive (deploy-web.yml):
 #   android-<tag>.apk        signed with the release key (secrets below); not published without them
 #   linux-x64-<tag>.tar.gz, windows-x64-<tag>.zip
-# and sends the Android App Bundle to the Play Console's internal testing track (secret PLAY_SERVICE_ACCOUNT_JSON).
+# and sends the Android App Bundle to the Play Console's closed testing track "alpha" (secret PLAY_SERVICE_ACCOUNT_JSON).
 # Release notes for users, in French: the message of the annotated tag (tool/release-notes.sh).
 # Nothing for iOS and macOS: without the Apple Developer Program their builds can't be signed for others.
 # A pull request that changes this file runs it dry: the same builds, kept 7 days as artifacts of the run instead
@@ -145,9 +145,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/whatsnew"
           tool/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/whatsnew/whatsnew-fr-FR"
           cat "$RUNNER_TEMP/whatsnew/whatsnew-fr-FR"
-      # Internal testing track, rolled out at once to its testers. A version code goes to Google Play only once:
-      # re-running this job on a tag already sent fails here, after the GitHub release is done.
-      - name: Google Play (internal testing)
+      # Closed testing track "alpha" (the Play Console's default closed track), sent for Google's review, then rolled out
+      # to its testers. A version code goes to Google Play only once: re-running this job on a tag already sent fails
+      # here, after the GitHub release is done.
+      - name: Google Play (closed testing)
         if: steps.play.outputs.upload == 'true'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
@@ -155,7 +156,7 @@ jobs:
           packageName: com.guillaumedamiens.app
           releaseFiles: build/app/outputs/bundle/prodRelease/app-prod-release.aab
           releaseName: ${{ needs.check.outputs.label }}
-          track: internal
+          tracks: alpha
           status: completed
           whatsNewDirectory: ${{ runner.temp }}/whatsnew
           # No mappingFile: the bundle already carries R8's mapping (BUNDLE-METADATA), which Play reads
