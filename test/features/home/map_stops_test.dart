@@ -163,6 +163,24 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets("a big station's marker holds its count of two digits (Châtelet: +27)", (tester) async {
+      final lines = [
+        rerA,
+        metro1,
+        tram3,
+        for (var number = 20; number < 47; number++)
+          LineSummary(id: 'C0$number', name: '$number', mode: TransportMode.bus, color: 'FFC000', textColor: '000000'),
+      ];
+      final marker = (await pins(tester, [chatelet.copyWith(lines: lines)])).single;
+      final child = marker.child! as StopMarker;
+      expect(child.more, 27);
+      await tester.pumpWidget(MaterialApp(
+        home: Center(child: SizedBox.fromSize(size: marker.childSize, child: Center(child: child))),
+      ));
+      expect(find.text('+27'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a kind of departures chosen: the stops with such lines, those lines only', (tester) async {
       final busStop = nation.copyWith(lines: [bus38]);
       final result = await pins(tester, [chatelet, gareDeLyon, busStop], shows: (mode) => mode == TransportMode.bus);

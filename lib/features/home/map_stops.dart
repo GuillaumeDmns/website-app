@@ -171,7 +171,8 @@ class StopMarker extends StatelessWidget {
     };
     final badges = lines.fold(0.0, (sum, line) => sum + width(line)) + (lines.length - 1) * 3;
     // Room for the red mark over the last badge's corner
-    return Size(badges + (more > 0 ? 22 : 0) + 12, _badge + 6 + _pointer + 4);
+    // `+2`, `+27` (Châtelet): 9 px a digit
+    return Size(badges + (more > 0 ? 13 + 9 * '$more'.length : 0) + 12, _badge + 6 + _pointer + 4);
   }
 
   @override
