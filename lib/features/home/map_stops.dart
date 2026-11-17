@@ -16,8 +16,9 @@ import '../traffic/disruption_widgets.dart';
 /// would cover the map.
 const mapStopsMetersPerPixel = 6.6;
 
-/// Stops asked for the map at most: the closest ones to its center (the backend's limit)
-const mapStopsLimit = 50;
+/// Stops asked for the map at most: the closest ones to its center (the backend's limit), about 2 km around in Paris, as
+/// far as the dots show ([PinZoom.stopDot])
+const mapStopsLimit = 200;
 
 /// The stops to ask for a [MapView]: around its center rounded to about 100 m (small moves of the map ask nothing
 /// new), as far as its corners; null when the map shows too much for them, or isn't known yet
