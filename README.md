@@ -64,6 +64,16 @@ gh secret set ANDROID_KEYSTORE_PASSWORD      # puis ANDROID_KEY_ALIAS et ANDROID
 gh secret set PLAY_SERVICE_ACCOUNT_JSON < <la clé JSON>
 ```
 
+### Publier une version
+
+Un tag annoté sur `master` à jour : son message est la note de version que lisent les utilisateurs (« Nouveautés » fr-FR de Google Play, haut de la release GitHub), donc en français et sans jargon, 500 caractères au plus (`tool/release-notes.sh`, qui fait échouer la release au-delà). Un tag sans message donne « Corrections et améliorations. ».
+
+```bash
+git tag -a v0.17.0 -m "• Raccourcis Domicile et Travail en appui long sur l'icône
+• Notifications de trajet plus claires"
+git push origin v0.17.0
+```
+
 
 ## Builds de production
 

@@ -4,6 +4,7 @@ name: Release
 #   android-<tag>.apk        signed with the release key (secrets below); not published without them
 #   linux-x64-<tag>.tar.gz, windows-x64-<tag>.zip
 # and sends the Android App Bundle to the Play Console's internal testing track (secret PLAY_SERVICE_ACCOUNT_JSON).
+# Release notes for users, in French: the message of the annotated tag (tool/release-notes.sh).
 # Nothing for iOS and macOS: without the Apple Developer Program their builds can't be signed for others.
 # A pull request that changes this file runs it dry: the same builds, kept 7 days as artifacts of the run instead
 # (the only way to check the Windows packaging without that machine). README: "Installer une release".
@@ -54,10 +55,13 @@ jobs:
             echo "Tag $GITHUB_REF_NAME: tag vX.Y.Z (minor and patch up to 99) the commit to release (version found: $name)" >&2
             exit 1
           fi
+          # The tag's message, users' release notes (tool/release-notes.sh); checkout may leave it lightweight
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          notes=$(tool/release-notes.sh "$GITHUB_REF_NAME")
           # deploy-web.yml creates it too, whichever comes first
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
-              --notes "Installation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release" ||
+              --notes "$(printf '%s\n\nInstallation: %s' "$notes" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release")" ||
             gh release view "$GITHUB_REF_NAME" >/dev/null
           echo "publish=true" >> "$GITHUB_OUTPUT"
           echo "label=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
@@ -136,6 +140,11 @@ jobs:
           else
             echo "upload=true" >> "$GITHUB_OUTPUT"
           fi
+          # "What's new" in French, from the tag's message (tool/release-notes.sh)
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          mkdir -p "$RUNNER_TEMP/whatsnew"
+          tool/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/whatsnew/whatsnew-fr-FR"
+          cat "$RUNNER_TEMP/whatsnew/whatsnew-fr-FR"
       # Internal testing track, rolled out at once to its testers. A version code goes to Google Play only once:
       # re-running this job on a tag already sent fails here, after the GitHub release is done.
       - name: Google Play (internal testing)
@@ -148,6 +157,7 @@ jobs:
           releaseName: ${{ needs.check.outputs.label }}
           track: internal
           status: completed
+          whatsNewDirectory: ${{ runner.temp }}/whatsnew
           # No mappingFile: the bundle already carries R8's mapping (BUNDLE-METADATA), which Play reads
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: needs.check.outputs.publish != 'true'
