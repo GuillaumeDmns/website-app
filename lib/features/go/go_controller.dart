@@ -775,9 +775,14 @@ class GoController extends Notifier<GoState?> {
         seen.add(ride);
       }
     }
-    // The planned vehicle: same scheduled time (a few minutes of tolerance)
+    // The planned vehicle: same scheduled time (a few minutes of tolerance); among departures of the same minute, the
+    // one arriving when the ride does, as the departures card picks it (its mission is the card's header)
     final ride = of.tracker.steps[of.step];
-    final vehicle = plannedRide(rides, of.tracker.plannedDeparture(ride, latest.progress))?.departure;
+    final vehicle = plannedRide(
+      rides,
+      of.tracker.plannedDeparture(ride, latest.progress),
+      arrival: ride.section.arrival.add(latest.progress.shift),
+    )?.departure;
     state = latest.copyWith(
       vehicle: () => vehicle,
       vehicleStep: () => of.step,

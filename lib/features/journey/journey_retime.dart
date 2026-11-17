@@ -189,10 +189,34 @@ Ride? _choose(JourneySection section, List<Ride>? list, Ride? choice, DateTime e
   }
   final catchable = earliest.subtract(_tolerance);
   final planned = plannedRide(list, section.departure, arrival: section.arrival);
-  if (planned != null && !planned.departure.cancelled && !planned.departure.time.isBefore(catchable)) {
-    return planned;
+  final taken = planned != null && !planned.departure.cancelled && !planned.departure.time.isBefore(catchable)
+      ? planned
+      : list.where((ride) => !ride.departure.cancelled && !ride.departure.time.isBefore(catchable)).firstOrNull;
+  return taken == null ? null : _firstToArrive(list, taken);
+}
+
+/// Among the departures leaving the same minute as [taken] (two trains of the line at the same time, a direct one and
+/// a stopping one), the one arriving first: it costs no more waiting. A later one arriving sooner is left to the
+/// traveller to choose.
+Ride _firstToArrive(List<Ride> list, Ride taken) {
+  DateTime minute(DateTime time) {
+    final utc = time.toUtc();
+    return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, utc.minute);
   }
-  return list.where((ride) => !ride.departure.cancelled && !ride.departure.time.isBefore(catchable)).firstOrNull;
+
+  final leaving = minute(taken.departure.time);
+  var best = taken;
+  for (final ride in list) {
+    final arrival = ride.arrivalAt;
+    final bestArrival = best.arrivalAt;
+    if (!ride.departure.cancelled &&
+        minute(ride.departure.time) == leaving &&
+        arrival != null &&
+        (bestArrival == null || arrival.isBefore(bestArrival))) {
+      best = ride;
+    }
+  }
+  return best;
 }
 
 Duration _arrivalGap(Ride ride, DateTime? arrival) =>
