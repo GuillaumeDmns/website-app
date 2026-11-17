@@ -30,8 +30,11 @@ void main() {
       final close = mapStopsQuery(mapViewOf(paris, 16, phone, tileSize: 512));
       expect(close, (lat: 48.858, lon: 2.347, radius: 500));
       expect(mapStopsQuery(mapViewOf(paris, 15, phone, tileSize: 512)), isNotNull);
-      // A whole part of the town: the markers would cover the map
-      expect(mapStopsQuery(mapViewOf(paris, 14, phone, tileSize: 512)), isNull);
+      // A part of the town: their dots, from the zoom they show at
+      expect(mapStopsQuery(mapViewOf(paris, PinZoom.stopDotZoom, phone, tileSize: 512)), isNotNull);
+      // The whole town: the dots would cover the map
+      expect(mapStopsQuery(mapViewOf(paris, PinZoom.stopDotZoom - 0.2, phone, tileSize: 512)), isNull);
+      expect(mapStopsQuery(mapViewOf(paris, 11, phone, tileSize: 512)), isNull);
       // Not drawn yet
       expect(mapStopsQuery(null), isNull);
     });
@@ -63,8 +66,64 @@ void main() {
           return const SizedBox();
         }),
       ));
-      return result;
+      // The markers with their lines; their dots from afar apart
+      return [for (final pin in result) if (pin.zoom == PinZoom.stopLines) pin];
     }
+
+    testWidgets('progressively as the map zooms in: nothing from afar, a dot, then the marker with its lines',
+        (tester) async {
+      late List<MapPin> result;
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(builder: (context) {
+          result = stopPins(context, [chatelet, gareDeLyon]);
+          return const SizedBox();
+        }),
+      ));
+      // Each stop its dot, then its marker
+      expect([for (final pin in result) (pin.label, pin.zoom)], [
+        ('Châtelet', PinZoom.stopDot),
+        ('Châtelet', PinZoom.stopLines),
+        ('Gare de Lyon', PinZoom.stopDot),
+        ('Gare de Lyon', PinZoom.stopLines),
+      ]);
+      List<String?> shownAt(double zoom) => [for (final pin in result) if (pin.shownAt(zoom)) pin.child.runtimeType.toString()];
+      // The whole town: nothing, the stops of a closer view left behind gone too
+      expect(shownAt(11), isEmpty);
+      expect(shownAt(12.9), isEmpty);
+      // A part of the town: dots
+      expect(shownAt(13), ['StopDot', 'StopDot']);
+      expect(shownAt(13.9), ['StopDot', 'StopDot']);
+      // A neighbourhood: the markers with their lines instead
+      expect(shownAt(14), ['StopMarker', 'StopMarker']);
+      expect(shownAt(18), ['StopMarker', 'StopMarker']);
+      // One image for every dot, tapped to open its stop, named for screen readers
+      final dot = result.first;
+      expect(dot.image, result[2].image);
+      expect(dot.onTap, isNotNull);
+      expect(dot.childSize, StopDot.box);
+    });
+
+    testWidgets("on a stop's page, its own marker at every zoom, the others' as anywhere else", (tester) async {
+      late List<MapPin> result;
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(builder: (context) {
+          result = stopPins(context, [chatelet, gareDeLyon], opened: gareDeLyon.id);
+          return const SizedBox();
+        }),
+      ));
+      expect([for (final pin in result) (pin.label, pin.zoom)], [
+        ('Châtelet', PinZoom.stopDot),
+        ('Châtelet', PinZoom.stopLines),
+        ('Gare de Lyon', PinZoom.any),
+      ]);
+      expect(result.last.onTap, isNull);
+    });
+
+    testWidgets('a stop drawn in its box from afar: a small dot', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: Center(child: SizedBox(width: 20, height: 20, child: StopDot()))));
+      expect(tester.getSize(find.byType(Container)), const Size.square(StopDot.size));
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('one marker per stop with its lines, standing on it, named for screen readers', (tester) async {
       final result = await pins(tester, [chatelet, gareDeLyon]);

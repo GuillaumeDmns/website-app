@@ -11,9 +11,10 @@ import '../../core/map/map_view.dart';
 import '../../core/widgets/line_badge.dart';
 import '../traffic/disruption_widgets.dart';
 
-/// From how close the map shows the stops of the part it shows, in meters per logical pixel: a neighbourhood on the
-/// screen (MapLibre's zoom 15 around Paris). Further out they would cover the map.
-const mapStopsMetersPerPixel = 1.65;
+/// From how close the map shows the stops of the part it shows, in meters per logical pixel: a part of the town on the
+/// screen, where they show as dots ([PinZoom.stopDotZoom], MapLibre's zoom 13 around Paris, 6.3 m). Further out they
+/// would cover the map.
+const mapStopsMetersPerPixel = 6.6;
 
 /// Stops asked for the map at most: the closest ones to its center (the backend's limit)
 const mapStopsLimit = 50;
@@ -31,7 +32,7 @@ const mapStopsLimit = 50;
 }
 
 /// The stop areas of the part of the map shown, with their lines, once it is close enough ([mapStopsMetersPerPixel]);
-/// none further out. From the GTFS only (`/api/v2/nearby`): no real-time quota. While the stops of a new view are
+/// none further out (and the map hides those it has as soon as it zooms out: [PinZoom]). From the GTFS only (`/api/v2/nearby`): no real-time quota. While the stops of a new view are
 /// fetched, the previous ones stay (the provider keeps its last value): the markers don't blink as the map moves.
 final mapStopsProvider = FutureProvider.autoDispose<List<StopAreaSummary>>((ref) async {
   final query = ref.watch(mapViewProvider.select(mapStopsQuery));
@@ -68,10 +69,12 @@ List<LineSummary> markerLines(Iterable<LineSummary> lines) {
     });
 }
 
-/// One marker per stop of [stops] on the map, with its lines among [shows] (every line by default; a stop without any
-/// of them is left out): a tap opens the stop. A stop given twice has one marker; the last ones are drawn on top.
-/// [severities] marks the interrupted lines. On the page of the stop [opened], its own marker opens nothing and the
-/// others take its place (going back leaves the stops, not through each one looked at).
+/// The pins of [stops] on the map, its lines among [shows] (every line by default; a stop without any of them is left
+/// out), a tap opening the stop: progressively, as the map zooms in ([PinZoom]), nothing from far out, a dot
+/// ([StopDot]) from a part of the town on the screen, its marker with its lines from a neighbourhood. A stop given
+/// twice has one dot and one marker; the last ones are drawn on top. [severities] marks the interrupted lines. On the
+/// page of the stop [opened], its own marker shows at every zoom and opens nothing, the others take its place (going
+/// back leaves the stops, not through each one looked at).
 List<MapPin> stopPins(
   BuildContext context,
   Iterable<StopAreaSummary> stops, {
@@ -80,7 +83,8 @@ List<MapPin> stopPins(
   String? opened,
 }) {
   final scheme = Theme.of(context).colorScheme;
-  final pins = <String, MapPin>{};
+  // Per stop, its dot then its marker
+  final pins = <String, List<MapPin>>{};
   for (final stop in stops) {
     final lines = markerLines(stop.lines.where((line) => shows == null || shows(line.mode)));
     if (lines.isEmpty && (shows != null || stop.lines.isNotEmpty)) {
@@ -92,27 +96,49 @@ List<MapPin> stopPins(
         : () => opened == null ? context.push(Routes.stop(stop.id)) : context.pushReplacement(Routes.stop(stop.id));
     // Drawn again last: on top
     pins.remove(stop.id);
+    final isOpened = stop.id == opened;
+    // From afar, a dot (the opened stop keeps its marker at every zoom)
+    final dot = isOpened
+        ? null
+        : MapPin(
+            point: point,
+            color: StopMarker.box,
+            label: stop.name,
+            onTap: open,
+            zoom: PinZoom.stopDot,
+            childSize: StopDot.box,
+            image: 'stop-dot',
+            child: const StopDot(),
+          );
+    final zoom = isOpened ? PinZoom.any : PinZoom.stopLines;
     if (lines.isEmpty) {
       // Its lines unknown: a plain dot
-      pins[stop.id] = MapPin(point: point, color: scheme.primary, icon: Icons.directions_transit, size: 22, label: stop.name, onTap: open);
+      pins[stop.id] = [
+        ?dot,
+        MapPin(point: point, color: scheme.primary, icon: Icons.directions_transit, size: 22, label: stop.name, onTap: open, zoom: zoom),
+      ];
       continue;
     }
     final shown = lines.take(StopMarker.maxLines).toList();
     final more = lines.length - shown.length;
     final interrupted = {for (final line in shown) if (severities[line.id] == DisruptionSeverity.blocking) line.id};
-    pins[stop.id] = MapPin(
-      point: point,
-      color: scheme.primary,
-      label: stop.name,
-      onTap: open,
-      above: true,
-      childSize: StopMarker.sizeOf(shown, more),
-      // The same look for the same lines, whatever the stop
-      image: 'stop-${shown.map((line) => '${line.mode.name}:${line.name}:${line.color}${interrupted.contains(line.id) ? '!' : ''}').join(',')}+$more',
-      child: StopMarker(lines: shown, more: more, interrupted: interrupted),
-    );
+    pins[stop.id] = [
+      ?dot,
+      MapPin(
+        point: point,
+        color: scheme.primary,
+        label: stop.name,
+        onTap: open,
+        above: true,
+        zoom: zoom,
+        childSize: StopMarker.sizeOf(shown, more),
+        // The same look for the same lines, whatever the stop
+        image: 'stop-${shown.map((line) => '${line.mode.name}:${line.name}:${line.color}${interrupted.contains(line.id) ? '!' : ''}').join(',')}+$more',
+        child: StopMarker(lines: shown, more: more, interrupted: interrupted),
+      ),
+    ];
   }
-  return pins.values.toList();
+  return pins.values.expand((stop) => stop).toList();
 }
 
 /// A stop on the map: its lines' badges in a dark box pointing at it, `+2` for those it has no room for, a red mark
@@ -133,7 +159,8 @@ class StopMarker extends StatelessWidget {
 
   static const _badge = 18.0;
   static const _pointer = 6.0;
-  static const _box = Color(0xFF101215);
+  /// Dark in both themes: the map stays light
+  static const box = Color(0xFF101215);
 
   /// The box a marker of [lines] is drawn in, its point at the bottom center
   static Size sizeOf(List<LineSummary> lines, int more) {
@@ -156,7 +183,7 @@ class StopMarker extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: _box,
+            color: box,
             borderRadius: BorderRadius.circular(8),
             boxShadow: const [BoxShadow(color: Color(0x59000000), blurRadius: 3, offset: Offset(0, 1))],
           ),
@@ -188,6 +215,32 @@ class StopMarker extends StatelessWidget {
   }
 }
 
+/// A stop seen from afar, before its lines show ([PinZoom.stopDot]): a small dot as dark as its marker's box, ringed
+/// in white to stand out on the map's streets, in the middle of a box wider than it, to tap it
+class StopDot extends StatelessWidget {
+  const StopDot({super.key});
+
+  /// The dot's diameter, its white ring included
+  static const size = 9.0;
+
+  /// The box it is drawn in: room around the dot to tap it
+  static const box = Size.square(20);
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: StopMarker.box,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
+            boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 2)],
+          ),
+        ),
+      );
+}
+
 /// The marker's point, under its box
 class _PointerPainter extends CustomPainter {
   @override
@@ -197,7 +250,7 @@ class _PointerPainter extends CustomPainter {
       ..lineTo(size.width, 0)
       ..lineTo(size.width / 2, size.height)
       ..close();
-    canvas.drawPath(path, Paint()..color = StopMarker._box);
+    canvas.drawPath(path, Paint()..color = StopMarker.box);
   }
 
   @override

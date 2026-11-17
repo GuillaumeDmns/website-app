@@ -345,33 +345,42 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
               ),
             ]);
           }),
-        // Rebuilt as the camera moves: pins shown close up only come and go with the zoom
+        // Rebuilt as the camera moves: pins shown at some zooms only come and go with it
         Builder(builder: (context) {
-          final zoom = MapCamera.of(context).zoom;
-          // Those shown close up only under the others, as on MapLibre
-          final pins = [...overlay.pins.where((pin) => pin.closeUp), ...overlay.pins.where((pin) => !pin.closeUp)];
+          // MapLibre's zoom, its world twice as wide as flutter_map's
+          final zoom = MapCamera.of(context).zoom - 1;
+          // In MapLibre's order: those shown close up only, the stops' dots, the other pins, the stops' lines
+          int layer(MapPin pin) => pin.closeUp
+              ? 0
+              : switch (pin.zoom) {
+                  PinZoom.stopDot => 1,
+                  PinZoom.any => 2,
+                  PinZoom.stopLines => 3,
+                };
+          final shown = [for (final pin in overlay.pins) if (pin.shownAt(zoom)) pin];
+          // Each layer in the overlay's order
+          final pins = [for (final index in const [0, 1, 2, 3]) ...shown.where((pin) => layer(pin) == index)];
           return MarkerLayer(
             // Upright when the map turns (GO on foot)
             rotate: true,
             markers: [
               for (final pin in pins)
-                if (pin.shownAt(zoom))
-                  Marker(
-                    point: pin.point,
-                    width: PinView.boxOf(pin).width,
-                    height: PinView.boxOf(pin).height,
-                    alignment: pin.above ? Alignment.topCenter : Alignment.center,
-                    child: switch (pin.rotation) {
-                      null => PinView(pin: pin, outline: scheme.surface),
-                      // Turned from north, with the map: its rotation plus the map's (the layer keeps markers upright)
-                      final rotation => Builder(
-                          builder: (context) => Transform.rotate(
-                            angle: (rotation + MapCamera.of(context).rotation) * math.pi / 180,
-                            child: PinView(pin: pin, outline: scheme.surface),
-                          ),
+                Marker(
+                  point: pin.point,
+                  width: PinView.boxOf(pin).width,
+                  height: PinView.boxOf(pin).height,
+                  alignment: pin.above ? Alignment.topCenter : Alignment.center,
+                  child: switch (pin.rotation) {
+                    null => PinView(pin: pin, outline: scheme.surface),
+                    // Turned from north, with the map: its rotation plus the map's (the layer keeps markers upright)
+                    final rotation => Builder(
+                        builder: (context) => Transform.rotate(
+                          angle: (rotation + MapCamera.of(context).rotation) * math.pi / 180,
+                          child: PinView(pin: pin, outline: scheme.surface),
                         ),
-                    },
-                  ),
+                      ),
+                  },
+                ),
               if (user != null)
                 Marker(
                   point: user,

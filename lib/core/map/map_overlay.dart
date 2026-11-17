@@ -26,6 +26,7 @@ class MapPin {
     this.above = false,
     this.rotation,
     this.closeUp = false,
+    this.zoom = PinZoom.any,
   }) : assert(child == null || image != null, 'A pin drawn by a child names its image');
 
   /// Where [closeUp] pins start showing: a few streets on the screen, a station's ways in and out apart
@@ -57,8 +58,41 @@ class MapPin {
   /// station, and say nothing yet)
   final bool closeUp;
 
-  /// Shown at [zoom]
-  bool shownAt(double zoom) => !closeUp || zoom >= closeUpZoom;
+  /// The zooms it shows at: a stop's dot from afar, its lines closer ([PinZoom])
+  final PinZoom zoom;
+
+  /// Shown at [zoom], MapLibre's (its world 512 px wide at zoom 0; flutter_map's is one more)
+  bool shownAt(double zoom) => (!closeUp || zoom >= closeUpZoom) && this.zoom.shows(zoom);
+}
+
+/// The zooms a pin shows at (MapLibre's): a stop is nothing on the map from far out (the stops would cover it), a
+/// dot from a part of the town on the screen, its marker with its lines from a neighbourhood. The map hides and shows
+/// them itself as it zooms (layers with their zooms on MapLibre): nothing waits for the camera to rest.
+enum PinZoom {
+  /// Whatever the zoom
+  any(),
+
+  /// A stop seen from afar: a dot, from [stopDotZoom] until [stopLinesZoom]
+  stopDot(min: stopDotZoom, max: stopLinesZoom),
+
+  /// A stop seen close: its marker with its lines, from [stopLinesZoom]
+  stopLines(min: stopLinesZoom);
+
+  const PinZoom({this.min, this.max});
+
+  /// From where stops show as dots: a part of the town on the screen
+  static const stopDotZoom = 13.0;
+
+  /// From where stops show their lines: a neighbourhood on the screen (two or three metro stations)
+  static const stopLinesZoom = 14.0;
+
+  /// Shown from this zoom on
+  final double? min;
+
+  /// Shown until this zoom
+  final double? max;
+
+  bool shows(double zoom) => (min == null || zoom >= min!) && (max == null || zoom < max!);
 }
 
 /// Line drawn on the shared map
