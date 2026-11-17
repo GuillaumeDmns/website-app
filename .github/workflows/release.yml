@@ -3,6 +3,7 @@ name: Release
 # apps and publishes them as assets of the tag's GitHub release, next to the web app's archive (deploy-web.yml):
 #   android-<tag>.apk        signed with the release key (secrets below); not published without them
 #   linux-x64-<tag>.tar.gz, windows-x64-<tag>.zip
+# and sends the Android App Bundle to the Play Console's internal testing track (secret PLAY_SERVICE_ACCOUNT_JSON).
 # Nothing for iOS and macOS: without the Apple Developer Program their builds can't be signed for others.
 # A pull request that changes this file runs it dry: the same builds, kept 7 days as artifacts of the run instead
 # (the only way to check the Windows packaging without that machine). README: "Installer une release".
@@ -118,6 +119,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "$FILE" --clobber
+      # The Play Store takes App Bundles only; built in the dry run too, so a pull request checks it builds
+      - name: Android App Bundle (prod)
+        run: tool/build.sh appbundle --flavor prod
+      # Secret PLAY_SERVICE_ACCOUNT_JSON: the JSON key of a Google Cloud service account invited in the Play Console
+      # with release rights on testing tracks only (README). Production stays a manual promotion in the console.
+      - name: Google Play key
+        id: play
+        if: needs.check.outputs.publish == 'true' && steps.key.outputs.signed == 'true'
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_JSON" ]; then
+            echo "::warning::No Google Play key (secret PLAY_SERVICE_ACCOUNT_JSON): the bundle is not sent to the Play Console"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Internal testing track, rolled out at once to its testers. A version code goes to Google Play only once:
+      # re-running this job on a tag already sent fails here, after the GitHub release is done.
+      - name: Google Play (internal testing)
+        if: steps.play.outputs.upload == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.guillaumedamiens.app
+          releaseFiles: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          releaseName: ${{ needs.check.outputs.label }}
+          track: internal
+          status: completed
+          # No mappingFile: the bundle already carries R8's mapping (BUNDLE-METADATA), which Play reads
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: needs.check.outputs.publish != 'true'
         with:
