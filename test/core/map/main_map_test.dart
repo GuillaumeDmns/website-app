@@ -284,6 +284,36 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("the stops as the camera zooms, without waiting for it to rest: their lines, their dots, then nothing",
+      (tester) async {
+    final container = await pumpMap(tester);
+    const pins = [
+      MapPin(point: user, color: Colors.black, label: 'dot', zoom: PinZoom.stopDot, image: 'stop-dot', child: SizedBox.square(dimension: 9)),
+      MapPin(point: user, color: Colors.black, label: 'lines', zoom: PinZoom.stopLines, image: 'stop-1', child: SizedBox.square(dimension: 20)),
+      MapPin(point: user, color: Colors.green, label: 'always'),
+    ];
+    List<String?> shown() => [for (final pin in tester.widgetList<PinView>(find.byType(PinView))) pin.pin.label];
+    // flutter_map counts its zooms one more than MapLibre, whose zooms the pins say
+    Future<void> zoomTo(double zoom) async {
+      container
+          .read(mapOverlaysProvider.notifier)
+          .set('/', MapOverlay(pins: pins, follow: MapFollow(position: user, bearing: 0, zoom: zoom + 1, overhead: true)));
+      await animate(tester);
+      expect(camera(tester).zoom, zoom + 1);
+    }
+
+    await zoomTo(16);
+    // The other pins under the stops' lines, over their dots
+    expect(shown(), ['always', 'lines']);
+    await zoomTo(PinZoom.stopLinesZoom - 0.5);
+    expect(shown(), ['dot', 'always']);
+    // Zoomed out a long way after close up: the stops gone, not piled up on one point
+    await zoomTo(PinZoom.stopDotZoom - 2);
+    expect(shown(), ['always']);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a vehicle followed from overhead: north up, in the middle of what is left above the panel', (tester) async {
     final container = await pumpMap(tester);
 

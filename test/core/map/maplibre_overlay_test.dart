@@ -41,13 +41,14 @@ void main() {
       const MapPin(point: at, color: Color(0xFF1F2933), rotation: 90, image: 'vehicle-pointer', child: SizedBox()),
       const MapPin(point: at, color: Color(0xFF0A8F4E), image: 'not-drawn-yet', child: SizedBox()),
       const MapPin(point: at, color: Color(0xFF233A7E), closeUp: true, image: 'access-3', child: SizedBox()),
+      const MapPin(point: at, color: Color(0xFF101215), zoom: PinZoom.stopDot, image: 'stop-dot', child: SizedBox()),
     ];
     final data = jsonDecode(pinsGeoJson(pins, image: (pin) => pinImageName(pin, Colors.white), ready: (id) => id != 'not-drawn-yet'))
         as Map<String, Object?>;
     final features = [for (final feature in data['features']! as List) (feature as Map)['properties'] as Map];
 
     // Not there yet: left out until its image is on the map; the others keep their place in the list
-    expect([for (final feature in features) feature['pin']], [0, 1, 2, 4]);
+    expect([for (final feature in features) feature['pin']], [0, 1, 2, 4, 5]);
     expect(features[0]['image'], startsWith('dot-'));
     expect(features[0]['anchor'], 'center');
     // A callout by its bottom, its arrow's tip on the place
@@ -58,6 +59,9 @@ void main() {
     // A station's way in or out, for the layer shown close up only
     expect(features[3]['closeUp'], isTrue);
     expect(features[0]['closeUp'], isFalse);
+    // For the layer of the zooms it shows at
+    expect(features[0]['zoom'], 'any');
+    expect(features[4]['zoom'], 'stopDot');
     expect((data['features']! as List).first, containsPair('geometry', {'type': 'Point', 'coordinates': [2.3470, 48.8584]}));
   });
 
@@ -84,15 +88,18 @@ void main() {
     expect((jsonDecode(accuracyGeoJson(at, null)) as Map)['features'], isEmpty);
   });
 
-  test("the overlay's layers from the bottom: the circle, the close-up pins, the turned pins, the pins, the heading, the dot",
-      () {
+  test(
+      "the overlay's layers from the bottom: the circle, the close-up pins, the turned pins, the stops' dots, the pins, "
+      "the stops' lines, the heading, the dot", () {
     final layers = overlayStyleLayers();
     Map<String, Object?> layout(StyleLayer layer) => layer.toJson()['layout']! as Map<String, Object?>;
     expect([for (final layer in layers) layer.id], [
       MapLibreOverlay.accuracyLayer,
       MapLibreOverlay.closeUpPinsLayer,
       MapLibreOverlay.turnedPinsLayer,
+      MapLibreOverlay.stopDotsLayer,
       MapLibreOverlay.pinsLayer,
+      MapLibreOverlay.stopLinesLayer,
       MapLibreOverlay.headingLayer,
       MapLibreOverlay.userLayer,
     ]);
@@ -100,16 +107,25 @@ void main() {
     final closeUp = layers[1] as SymbolStyleLayer;
     expect(closeUp.minZoom, MapPin.closeUpZoom);
     expect(closeUp.filter.toString(), contains('closeUp'));
-    expect((layers[3] as SymbolStyleLayer).minZoom, 0);
-    expect(layers[3].filter.toString(), contains('closeUp'));
+    expect((layers[4] as SymbolStyleLayer).minZoom, 0);
+    expect(layers[4].filter.toString(), contains('closeUp'));
+    // The stops, by the map itself as it zooms: their dots from a part of the town until their lines show, nothing
+    // further out
+    final dots = layers[3] as SymbolStyleLayer;
+    expect((dots.minZoom, dots.maxZoom), (PinZoom.stopDotZoom, PinZoom.stopLinesZoom));
+    expect(dots.filter.toString(), contains('stopDot'));
+    final lines = layers[5] as SymbolStyleLayer;
+    expect((lines.minZoom, lines.maxZoom), (PinZoom.stopLinesZoom, 24));
+    expect(lines.filter.toString(), contains('stopLines'));
+    expect(layers[4].filter.toString(), contains('any'));
     expect(layers[2], isA<SymbolStyleLayer>());
     expect(layout(layers[2]), containsPair('icon-rotation-alignment', 'map'));
-    expect(layout(layers[3]), containsPair('icon-rotation-alignment', 'viewport'));
+    expect(layout(layers[4]), containsPair('icon-rotation-alignment', 'viewport'));
     // Images made at the screen's density and the map told so: shown at their size, no icon-size
-    expect(layout(layers[3]).containsKey('icon-size'), isFalse);
-    expect(layout(layers[3]), containsPair('icon-allow-overlap', true));
+    expect(layout(layers[4]).containsKey('icon-size'), isFalse);
+    expect(layout(layers[4]), containsPair('icon-allow-overlap', true));
     // The heading lies on the map; the circle too
-    expect(layout(layers[4]), containsPair('icon-pitch-alignment', 'map'));
+    expect(layout(layers[6]), containsPair('icon-pitch-alignment', 'map'));
     expect(layers[0].toJson()['paint'], containsPair('circle-pitch-alignment', 'map'));
   });
 }

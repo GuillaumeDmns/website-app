@@ -15,8 +15,8 @@ import 'map_pins.dart';
 /// look is drawn once from its widget into an image the map draws (`MapPin.image`).
 ///
 /// From the bottom: the paths, the circle of accuracy, the pins shown close up only (a station's ways in and out), the
-/// pins turned with the map (a vehicle's pointer), the
-/// upright pins, the user's heading lying on the map, the user dot.
+/// pins turned with the map (a vehicle's pointer), the stops' dots from afar, the upright pins, the stops' markers with
+/// their lines, the user's heading lying on the map, the user dot.
 class MapLibreOverlay {
   MapLibreOverlay(this._style, {required this.theme, required this.pixelRatio}) {
     _run(() async {
@@ -36,7 +36,9 @@ class MapLibreOverlay {
   static const accuracyLayer = 'overlay-accuracy';
   static const closeUpPinsLayer = 'overlay-pins-close-up';
   static const turnedPinsLayer = 'overlay-pins-turned';
+  static const stopDotsLayer = 'overlay-pins-stop-dots';
   static const pinsLayer = 'overlay-pins';
+  static const stopLinesLayer = 'overlay-pins-stop-lines';
   static const headingLayer = 'overlay-user-heading';
   static const userLayer = 'overlay-user';
 
@@ -211,7 +213,7 @@ class MapLibreOverlay {
     final pins = _pins;
     final features = await controller.queryRenderedFeatures(
       QueryGeometry.point(screenPoint),
-      layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer],
+      layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer, stopDotsLayer, stopLinesLayer],
     );
     MapPin? tapped;
     var top = -1;
@@ -310,6 +312,7 @@ String pinsGeoJson(List<MapPin> pins, {required String Function(MapPin pin) imag
                 'rotate': pin.rotation ?? 0,
                 'turned': pin.rotation != null,
                 'closeUp': pin.closeUp,
+                'zoom': pin.zoom.name,
               },
             },
       ],
@@ -385,15 +388,31 @@ List<StyleLayer> overlayStyleLayers() {
         'icon-ignore-placement': true,
         'symbol-z-order': 'source',
       };
-  StyleLayer pins(String id, String source, List<Object> filter, Map<String, Object> layout, {double? minZoom}) =>
+  StyleLayer pins(String id, String source, List<Object> filter, Map<String, Object> layout,
+          {double? minZoom, double? maxZoom}) =>
       StyleLayer.fromJson({
         'id': id,
         'type': 'symbol',
         'source': source,
         'minzoom': ?minZoom,
+        'maxzoom': ?maxZoom,
         'filter': filter,
         'layout': layout,
       });
+  // The upright pins shown at the zooms of [zoom], close up only or not ([MapPin.closeUp])
+  StyleLayer upright(String id, PinZoom zoom, {bool closeUp = false}) => pins(
+        id,
+        MapLibreOverlay.pinsSource,
+        [
+          'all',
+          ['==', ['get', 'turned'], false],
+          ['==', ['get', 'closeUp'], closeUp],
+          ['==', ['get', 'zoom'], zoom.name],
+        ],
+        symbols(turned: false),
+        minZoom: closeUp ? MapPin.closeUpZoom : zoom.min,
+        maxZoom: zoom.max,
+      );
   return [
     StyleLayer.fromJson({
       'id': MapLibreOverlay.accuracyLayer,
@@ -419,21 +438,14 @@ List<StyleLayer> overlayStyleLayers() {
       },
     }),
     // A station's ways in and out, close up only: under the other pins
-    pins(
-      MapLibreOverlay.closeUpPinsLayer,
-      MapLibreOverlay.pinsSource,
-      const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], true]],
-      symbols(turned: false),
-      minZoom: MapPin.closeUpZoom,
-    ),
+    upright(MapLibreOverlay.closeUpPinsLayer, PinZoom.any, closeUp: true),
     pins(MapLibreOverlay.turnedPinsLayer, MapLibreOverlay.pinsSource, const ['==', ['get', 'turned'], true],
         symbols(turned: true)),
-    pins(
-      MapLibreOverlay.pinsLayer,
-      MapLibreOverlay.pinsSource,
-      const ['all', ['==', ['get', 'turned'], false], ['==', ['get', 'closeUp'], false]],
-      symbols(turned: false),
-    ),
+    // The stops: dots from afar under the other pins, their lines closer over them; nothing further out. The map
+    // shows each layer at its zooms as it zooms, the stops of a view left behind gone at once.
+    upright(MapLibreOverlay.stopDotsLayer, PinZoom.stopDot),
+    upright(MapLibreOverlay.pinsLayer, PinZoom.any),
+    upright(MapLibreOverlay.stopLinesLayer, PinZoom.stopLines),
     pins(MapLibreOverlay.headingLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'heading'],
         symbols(turned: true, flat: true)),
     pins(MapLibreOverlay.userLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'dot'],
