@@ -91,9 +91,41 @@ void main() {
 
     controller.stop();
   });
+
+  _sameMinuteTests();
 }
 
 /// No notification nor screen kept on in the tests
+void _sameMinuteTests() {
+  test('two trains leaving the same minute: the one chosen is the vehicle followed, its mission the header\'s', () async {
+    final now = DateTime.now().toUtc();
+    final leaves = now.add(const Duration(minutes: 5));
+    Ride train(String mission, int minutes) => ride(leaves, ride: Duration(minutes: minutes))
+        .copyWith(departure: departure(leaves, mission: mission));
+    // Planned on the stopping one (10 min); a direct one leaves the same minute and arrives 4 min sooner
+    final plan = journey([transit(leaves, 600, line: rerA)]);
+    final backend = standardBackend();
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([train('NOPE', 10).toJson(), train('SEBU', 6).toJson()]));
+    final container = testContainer(backend, overrides: [
+      positionFeedProvider.overrideWithValue(PositionFeed(open: (_) => const Stream.empty())),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      userLocationProvider.overrideWith((ref) => Stream.value(LatLng(chatelet.lat, chatelet.lon))),
+    ]);
+    container.listen(goControllerProvider, (_, _) {});
+    final controller = container.read(goControllerProvider.notifier);
+
+    controller.start(plan, const JourneyRequest());
+    await pumpEventQueue();
+    expect(container.read(goControllerProvider)!.vehicle?.mission, 'NOPE');
+
+    await controller.choose(0, train('SEBU', 6));
+    await pumpEventQueue();
+    expect(container.read(goControllerProvider)!.vehicle?.mission, 'SEBU');
+
+    controller.stop();
+  });
+}
+
 class _NoLiveJourney implements LiveJourney {
   @override
   Future<void> followDeparture(LiveDeparture departure) async {}

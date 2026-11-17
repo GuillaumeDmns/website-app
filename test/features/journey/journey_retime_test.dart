@@ -60,6 +60,21 @@ void main() {
     expect(retimed.sections[1].arrival, at(20));
   });
 
+  test('two departures of the same minute: the one arriving first is taken, not one leaving later even if sooner there',
+      () {
+    // Planned on the 8:10 arriving at 8:20; another one leaves 8:10 too and arrives at 8:16, a third at 8:12 for 8:15
+    final stopping = ride(at(10), ride: const Duration(minutes: 10));
+    final direct = ride(at(10).add(const Duration(seconds: 20)), aimed: at(10), ride: const Duration(minutes: 6));
+    final later = ride(at(12), ride: const Duration(minutes: 3));
+    final onStopping = journey([walk(at(0), 300), transit(at(10), 600)]);
+
+    final retimed = retimeJourney(onStopping, lookup: lookupOf({'C01371': [stopping, direct, later]}), now: now).journey;
+    expect(retimed.sections[1].arrival, direct.arrivalAt);
+    // Chosen, the stopping one stays
+    final chosen = retimeJourney(onStopping, lookup: lookupOf({'C01371': [stopping, direct, later]}), now: now, choices: {1: stopping});
+    expect(chosen.journey.sections[1].arrival, at(20));
+  });
+
   test('keeps the plan when its departures are unknown', () {
     final retimed = retimeJourney(planned, lookup: (_) => null, now: now);
 
