@@ -58,10 +58,13 @@ jobs:
         run: |
           name="web-${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
           tar -C build/web -czf "$name.tar.gz" .
+          # The tag's message, users' release notes (tool/release-notes.sh); checkout may leave it lightweight
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          notes=$(tool/release-notes.sh "$GITHUB_REF_NAME")
           # release.yml creates it too, whichever comes first
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
-              --notes "Installation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release" ||
+              --notes "$(printf '%s\n\nInstallation: %s' "$notes" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installer-une-release")" ||
             gh release view "$GITHUB_REF_NAME" >/dev/null
           gh release upload "$GITHUB_REF_NAME" "$name.tar.gz" --clobber
           echo "name=$name" >> "$GITHUB_OUTPUT"

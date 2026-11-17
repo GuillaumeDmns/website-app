@@ -54,6 +54,26 @@ base64 -w0 <le keystore> | gh secret set ANDROID_KEYSTORE_BASE64
 gh secret set ANDROID_KEYSTORE_PASSWORD      # puis ANDROID_KEY_ALIAS et ANDROID_KEY_PASSWORD : la valeur est demandée
 ```
 
+- Tag `v*` encore : l'App Bundle de prod (signé avec la même clé, la clé d'importation de Play App Signing) part sur la piste de **test interne** de la Play Console, déployé tout de suite à ses testeurs. Le passage en production reste un clic dans la console (*Tests internes → Promouvoir la release*). Le `versionCode` vient du tag (`tool/version.sh`) : un nouveau tag donne toujours une version plus haute, et relancer le job sur un tag déjà envoyé échoue à cette étape (Google Play refuse un `versionCode` déjà reçu). Sans le secret `PLAY_SERVICE_ACCOUNT_JSON`, rien n'est envoyé (avertissement dans le run). Mise en place, une fois :
+  1. L'app existe dans la Play Console avec une première version importée à la main (l'API ne sait pas faire la toute première).
+  2. Google Cloud : activer la *Google Play Android Developer API*, créer un compte de service (sans rôle IAM), puis une clé JSON.
+  3. Play Console, *Utilisateurs et autorisations → Inviter un utilisateur* : l'adresse du compte de service, limitée à l'app Nav', avec seulement *Publier des versions sur les canaux de test* (pas la production).
+  4. Le secret du dépôt, puis supprimer le fichier JSON de la machine :
+
+```bash
+gh secret set PLAY_SERVICE_ACCOUNT_JSON < <la clé JSON>
+```
+
+### Publier une version
+
+Un tag annoté sur `master` à jour : son message est la note de version que lisent les utilisateurs (« Nouveautés » fr-FR de Google Play, haut de la release GitHub), donc en français et sans jargon, 500 caractères au plus (`tool/release-notes.sh`, qui fait échouer la release au-delà). Un tag sans message donne « Corrections et améliorations. ».
+
+```bash
+git tag -a v0.17.0 -m "• Raccourcis Domicile et Travail en appui long sur l'icône
+• Notifications de trajet plus claires"
+git push origin v0.17.0
+```
+
 
 ## Builds de production
 
