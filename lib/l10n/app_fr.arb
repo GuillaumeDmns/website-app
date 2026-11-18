@@ -1299,6 +1299,7 @@
   "@walkFor": {"placeholders": {"duration": {"type": "String"}}},
   "waitAfterMove": "{duration}\u00a0d'attente",
   "@waitAfterMove": {"placeholders": {"duration": {"type": "String"}}},
+  "rideDirectAlone": "Direct",
   "rideDirect": "direct",
   "transfersShort": "{count, plural, =1{1 corresp.} other{{count} corresp.}}",
   "@transfersShort": {"placeholders": {"count": {"type": "int"}}},

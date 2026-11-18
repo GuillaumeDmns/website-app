@@ -298,7 +298,10 @@ class _RideTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
+                              // With the departures listed, each row has its own ride time: missions differ
+                              plan != null
+                                  ? context.l10n.stopsCount(intermediate.length)
+                                  : '${context.l10n.stopsCount(intermediate.length)} · ${formatDuration(section.duration)}',
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                             ),
                           ),
@@ -311,7 +314,7 @@ class _RideTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '${formatDuration(section.duration)} · ${context.l10n.rideDirect}',
+                      plan != null ? context.l10n.rideDirectAlone : '${formatDuration(section.duration)} · ${context.l10n.rideDirect}',
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ),

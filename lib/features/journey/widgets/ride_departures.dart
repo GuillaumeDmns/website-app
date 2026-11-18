@@ -10,8 +10,9 @@ import '../../../app/theme.dart';
 
 /// Next departures for a ride, like Citymapper: one row per departure with its times at both stops, mission code,
 /// destination and platform. The [selected] one is raised and scrolled into view when it changes. [compact] (the
-/// journey detail, read before leaving) says each thing once: no ride time per row (the same on each, said under the
-/// list), no clock time on the right repeating the row's, the destinations only when they differ.
+/// journey detail, read before leaving) says each thing once: no clock time on the right repeating the row's, the
+/// destinations only when they differ. Each row keeps its own ride time: missions of a line don't take the same time
+/// (a direct train, a stopping one).
 class RideDepartureList extends StatefulWidget {
   const RideDepartureList({
     super.key,
@@ -264,7 +265,7 @@ class _RideRow extends StatelessWidget {
                           '${ride.arrivalSource == ArrivalSource.typical ? '~' : ''}${formatClock(arrival)}',
                           style: TextStyle(color: muted, fontSize: 15, fontFeatures: figures),
                         ),
-                        if (minutes != null && minutes > 0 && !largeText && !compact)
+                        if (minutes != null && minutes > 0 && !largeText)
                           Padding(
                             padding: const EdgeInsets.only(left: 6),
                             child: Text(

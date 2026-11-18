@@ -62,15 +62,16 @@ void main() {
   });
 
   group('compact, in the journey detail', () {
-    testWidgets('each thing once: no ride time per row, no destination every row has', (tester) async {
-      final rides = [for (final minutes in [10, 19, 30]) ride(inMinutes(minutes))];
+    testWidgets('each thing once: no destination every row has; each row its own ride time, missions differ', (tester) async {
+      final rides = [for (final minutes in [10, 19]) ride(inMinutes(minutes)), ride(inMinutes(30), ride: const Duration(minutes: 5))];
       await pump(tester, RideDepartureList(rides: rides, now: now, selected: rides.first, compact: true, onSelect: (_) {}));
 
-      // The times at both stops, the time left: the direction is said above the list, the ride time under it
+      // The times at both stops, the ride time, the time left: the direction is said above the list
       expect(find.text(formatClock(rides.first.departure.time)), findsOneWidget);
       expect(find.text(formatClock(rides.first.arrivalAt!)), findsOneWidget);
       expect(find.text('Nation'), findsNothing);
-      expect(find.text(currentL10n.minutesShort(8)), findsNothing);
+      expect(find.text(currentL10n.minutesShort(8).replaceAll(' ', '\u00a0')), findsNWidgets(2));
+      expect(find.text(currentL10n.minutesShort(5).replaceAll(' ', '\u00a0')), findsOneWidget);
       expect(find.byType(DepartureTime), findsNWidgets(3));
     });
 
