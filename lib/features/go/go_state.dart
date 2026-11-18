@@ -30,6 +30,7 @@ class GoState {
     this.retained,
     this.recalculateAt,
     this.alightAlertsOff = const {},
+    this.locationOff = false,
   });
 
   final GoTracker tracker;
@@ -83,6 +84,9 @@ class GoState {
   /// Rides (steps) whose getting-off alerts the user turned off ("Alerter quand descendre"): nothing felt for them
   final Set<int> alightAlertsOff;
 
+  /// The device's location is turned off: the schedule leads until it is back
+  final bool locationOff;
+
   JourneyOption get journey => tracker.journey;
 
   /// Vehicle of the current ride (null when the next ride is not the current step)
@@ -106,6 +110,7 @@ class GoState {
     ({int step, Duration later, bool cancelled})? Function()? retained,
     DateTime? Function()? recalculateAt,
     Set<int>? alightAlertsOff,
+    bool? locationOff,
   }) =>
       GoState(
         tracker: tracker ?? this.tracker,
@@ -128,6 +133,7 @@ class GoState {
         retained: retained != null ? retained() : this.retained,
         recalculateAt: recalculateAt != null ? recalculateAt() : this.recalculateAt,
         alightAlertsOff: alightAlertsOff ?? this.alightAlertsOff,
+        locationOff: locationOff ?? this.locationOff,
       );
 }
 

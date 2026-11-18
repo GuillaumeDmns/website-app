@@ -506,6 +506,129 @@ void main() {
     expect(GoProgress.fromJson(const {}).phase, GoPhase.moving);
   });
 
+  group('the GPS first', () {
+    // Walk to Châtelet, RER A from there (its head of platform in this sample, as in a terminus) at 8:06 to Nation
+    // through Gare de Lyon (8 min), walk 3 min
+    final rerPlan = journey([
+      walk(at(0), 240),
+      transit(at(6), 480, line: rerA, via: [gareDeLyon]),
+      walk(at(14), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+    ]);
+    final rer = GoTracker(rerPlan);
+    final ride = rer.steps[1];
+    LatLng along(double meters) => ride.line.pointAt(meters);
+    final waiting = rer.jumpTo(rer.initial(), 1);
+    // The planned train, six minutes late, standing at the platform
+    final late = departure(at(12), aimed: at(6)).copyWith(atStop: true);
+
+    test('seated early in a train standing at the platform, 420 m from the stop\'s point: waiting, then on board when it '
+        'leaves, six minutes late, never on another train', () {
+      var (progress, alerts) = rer.update(waiting, input(at(4), position: along(420), vehicle: late, vehicleStep: 1, realtime: true));
+      expect(progress.phase, GoPhase.waiting);
+      expect(progress.preciseAlong, closeTo(420, 1));
+
+      // Another train left on time meanwhile: still there, neither on board nor missed
+      for (final minute in [6, 7, 9, 11]) {
+        (progress, alerts) = rer.update(progress, input(at(minute), position: along(420), vehicle: late, vehicleStep: 1, realtime: true));
+        expect(progress.phase, GoPhase.waiting, reason: '8:0$minute');
+        expect(progress.issue, isNull);
+      }
+
+      // It leaves at 8:12: on board, 20 s after the train moved 240 m from where the user sat
+      (progress, alerts) = rer.update(progress, input(at(12, 20), position: along(660), speed: 12, vehicle: late, vehicleStep: 1));
+      expect(progress.phase, GoPhase.onBoard);
+      expect(progress.byClock, isFalse);
+      expect(progress.departedAt, at(12));
+      expect(progress.shift, const Duration(minutes: 6));
+
+      // Its own times on: Gare de Lyon at 8:16, not 8:10; never off before Nation
+      final lyon = ride.stopAlongs[1];
+      (progress, alerts) = rer.update(progress, input(at(15), position: along(lyon - 800), speed: 15));
+      expect(progress.stopIndex, 0);
+      (progress, alerts) = rer.update(progress, input(at(16, 40), position: along(lyon + 100), speed: 12));
+      expect(progress.stopIndex, 1);
+      expect(progress.phase, GoPhase.onBoard);
+      // The network's positions only a little while: the GPS seen within the minute still leads, not the clock
+      (progress, alerts) = rer.update(progress, input(at(17, 20), position: along(lyon + 400), accuracy: 60));
+      expect(progress.phase, GoPhase.onBoard);
+      expect(alerts.where((alert) => alert.id.startsWith('alight')), isEmpty);
+    });
+
+    test('a train stopped at a signal well down the line, the user still in it: on board', () {
+      final (progress, _) = rer.update(waiting, input(at(7), position: along(ride.platformZone.to + 300)));
+      expect(progress.phase, GoPhase.onBoard);
+    });
+
+    test('a train the real time says is still at the platform is not missed, however late', () {
+      final (stillThere, _) = rer.update(waiting, input(at(9), position: along(100), vehicle: late.copyWith(time: at(6)), vehicleStep: 1, realtime: true));
+      expect(stillThere.issue, isNull);
+      expect(stillThere.phase, GoPhase.waiting);
+
+      final (gone, alerts) = rer.update(waiting, input(at(9), position: along(100), vehicle: departure(at(6)), vehicleStep: 1, realtime: true));
+      expect(gone.issue, GoIssue.missed);
+      expect(alerts.map((alert) => alert.id), ['missed-1']);
+    });
+
+    test('on board, the GPS a minute far from the line: off the way (the wrong train, off too early)', () {
+      final onBoard = rer.next(waiting);
+      const away = LatLng(48.8700, 2.3000);
+      var (progress, alerts) = rer.update(onBoard, input(at(8), position: away));
+      expect(progress.issue, isNull);
+      (progress, alerts) = rer.update(progress, input(at(9, 5), position: away));
+      expect(progress.issue, GoIssue.offRoute);
+      expect(alerts.map((alert) => alert.id), ['offroute-1']);
+
+      // Back on it: nothing to do
+      (progress, alerts) = rer.update(progress, input(at(9, 10), position: along(ride.stopAlongs[1] - 200), speed: 12));
+      expect(progress.issue, isNull);
+    });
+
+    test('got off by the clock, the GPS back on the line well before the stop: back on board, "get off" to come again', () {
+      final onBoard = rer.next(waiting);
+      // Underground all along: off at 8:14 by the clock
+      var (progress, alerts) = rer.update(onBoard, GoInput(now: at(14, 1)));
+      expect(progress.step, 2);
+      expect(progress.byClock, isTrue);
+      expect(alerts.map((alert) => alert.id), contains('alight-1'));
+
+      // The train was late: the GPS sees it 1 km before Nation, moving
+      (progress, alerts) = rer.update(progress, input(at(14, 30), position: along(ride.stopAlongs[2] - 1000), speed: 14));
+      expect(progress.step, 1);
+      expect(progress.phase, GoPhase.onBoard);
+      expect(progress.stopIndex, 1);
+      expect(progress.fired, isNot(contains('alight-1')));
+
+      // Then it gets there
+      (progress, alerts) = rer.update(progress, input(at(15, 40), position: along(ride.stopAlongs[2] - 20), speed: 3));
+      expect(alerts.map((alert) => alert.id), ['alight-1']);
+      expect(progress.step, 2);
+      expect(progress.byClock, isFalse);
+
+      // Off by the GPS: walking along the line out of the station is no ride
+      final (walking, _) = rer.update(progress, input(at(16, 30), position: along(ride.stopAlongs[2] - 600)));
+      expect(walking.step, 2);
+    });
+
+    test('above ground, the precise fixes measure the delay: the clock in a tunnel goes on from it', () {
+      final onBoard = rer.next(waiting);
+      final lyon = ride.stopAlongs[1];
+      // A minute and a half late on its way to Gare de Lyon (planned there at 8:10), fixes every 5 s
+      var progress = onBoard;
+      for (var second = 0; second <= 60; second += 5) {
+        final time = at(8, 30).add(Duration(seconds: second));
+        final scheduledAlong = lyon * (time.difference(at(6, 90)).inSeconds / 240);
+        (progress, _) = rer.update(progress, input(time, position: along(scheduledAlong), speed: 10));
+      }
+      expect(progress.shift.inSeconds, closeTo(90, 10));
+
+      // Into a tunnel: Gare de Lyon left by the clock at 8:11:50, not 8:10:20
+      (progress, _) = rer.update(progress, GoInput(now: at(10, 40)));
+      expect(progress.stopIndex, 0);
+      (progress, _) = rer.update(progress, GoInput(now: at(11, 55)));
+      expect(progress.stopIndex, 1);
+    });
+  });
+
   group('platform', () {
     // Walk to Châtelet, RER A at 8:06 to Nation
     final rerPlan = journey([walk(at(0), 240), transit(at(6), 480, line: rerA)]);

@@ -33,11 +33,34 @@ class LocationNeed {
 /// followed, and back after. Closed while nobody listens, and while the app is not on screen unless GO needs it (its
 /// foreground service keeps the journey followed with the screen off).
 class PositionFeed {
-  PositionFeed({Stream<Position> Function(LocationSettings settings)? open}) : _open = open ?? _geolocator;
+  PositionFeed({Stream<Position> Function(LocationSettings settings)? open, Stream<bool> Function()? serviceEnabled})
+      : _open = open ?? _geolocator,
+        // The device's status goes with the device's fixes: fixes of the tests' have none unless given
+        _serviceEnabled = serviceEnabled ?? (open == null ? _geolocatorService : () => const Stream.empty());
 
   static Stream<Position> _geolocator(LocationSettings settings) => Geolocator.getPositionStream(locationSettings: settings);
 
+  /// The device's location turned on or off (Android, iOS, macOS); nothing elsewhere
+  static Stream<bool> _geolocatorService() {
+    if (kIsWeb || !(defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS)) {
+      return const Stream.empty();
+    }
+    return Geolocator.getServiceStatusStream().map((status) => status == ServiceStatus.enabled);
+  }
+
   final Stream<Position> Function(LocationSettings settings) _open;
+  final Stream<bool> Function() _serviceEnabled;
+
+  /// The device's location turned on (true) or off (false), as it changes
+  Stream<bool> get serviceEnabled => _serviceEnabled();
+
+  /// The device's stream opened again with the same settings: Android's ends when the location is turned off, and
+  /// gives nothing once it is back until asked again
+  void reopen() {
+    _opened = null;
+    _update();
+  }
   late final _fixes = StreamController<Position>.broadcast(onListen: _update, onCancel: _update);
   StreamSubscription<Position>? _subscription;
 

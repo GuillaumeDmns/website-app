@@ -9,6 +9,8 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../app/routes.dart';
 import '../../app/shell.dart';
 import '../../app/theme.dart';
+import '../../core/storage/local_store.dart';
+import '../../core/platform/share.dart';
 import '../../core/api/models.dart';
 import '../../core/config.dart';
 import '../../core/location/location_providers.dart';
@@ -21,6 +23,7 @@ import '../../l10n/l10n.dart';
 import '../journey/station_accesses.dart';
 import '../journey/widgets/journey_map.dart';
 import '../stops/stop_screen.dart';
+import 'go_trace.dart';
 import 'go_cards.dart';
 import 'go_controller.dart';
 import 'go_guidance.dart';
@@ -144,7 +147,7 @@ class _GoScreenState extends ConsumerState<GoScreen> {
               children: [
                 if (isWideLayout(context)) GoPanelHeader(state: state),
                 const GoSystemNotice(),
-                if (AppConfig.isDev) const GoGpsStats(),
+                if (AppConfig.isDev || AppConfig.isBeta) const GoGpsStats(),
                 _Dots(count: cards.length, shown: _shown, live: current, onTap: _show),
               ],
             ),
@@ -490,8 +493,26 @@ class GoGpsStats extends ConsumerWidget {
             DateTime.now().difference(stats.at).inSeconds,
           );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.muted)),
+      padding: const EdgeInsets.fromLTRB(16, 0, 4, 0),
+      child: Row(
+        children: [
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.muted))),
+          // The sessions' traces, to play a journey GO got wrong again in the tests
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 18,
+            tooltip: context.l10n.goExportTrace,
+            icon: const Icon(Icons.ios_share),
+            onPressed: () async {
+              await ref.read(goTraceProvider)?.flush();
+              final text = await GoTrace.export(ref.read(localStoreProvider));
+              if (context.mounted) {
+                await exportText(context, title: context.l10n.goExportTrace, fileName: 'go-traces.json', text: text);
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

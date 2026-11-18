@@ -176,7 +176,7 @@ class GoDeparturesCard extends ConsumerWidget {
           ),
         ),
         if (!done) RideDisruptions(lineId: line?.id, max: 1, top: 0),
-        if (live && tracker.followsSchedule(progress, now)) const GoNoGpsLine(),
+        if (live && (state.locationOff || tracker.followsSchedule(progress, now))) GoNoGpsLine(locationOff: state.locationOff),
       ],
     );
   }
