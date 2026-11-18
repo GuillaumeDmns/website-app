@@ -282,7 +282,8 @@ class _GoScreenState extends ConsumerState<GoScreen> {
     }
     if (isLive && progress.phase == GoPhase.moving) {
       final turn = _turnPin(state);
-      return MapOverlay(pins: [...overlay.pins, ?turn], paths: overlay.paths, fit: overlay.fit).withFollow(goFollow(state, progress.step));
+      return MapOverlay(pins: [...overlay.pins, ?turn], paths: overlay.paths, fit: overlay.fit).withFollow(goFollow(state, progress.step,
+          startAlong: startsWithExit(tracker, progress.step) ? stations.exits[progress.step]?.along ?? leaveStationMeters : 0));
     }
     // Another ride's departures: its stop, close up
     final start = shownStep?.start;

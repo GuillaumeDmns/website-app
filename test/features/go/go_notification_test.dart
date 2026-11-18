@@ -10,6 +10,7 @@ import 'package:website_app/core/location/position_feed.dart';
 import 'package:website_app/core/platform/live_journey.dart';
 import 'package:website_app/features/go/go_controller.dart';
 import 'package:website_app/features/go/go_glance.dart';
+import 'package:website_app/features/go/go_live.dart';
 import 'package:website_app/features/journey/journey_request.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -51,8 +52,8 @@ void main() {
     final glance = goGlance(container.read(goControllerProvider)!, DateTime.now());
     expect(live.updates.last.tone, LiveJourneyTone.values[glance.tone.index]);
     expect(live.updates.last.title, glance.action);
-    // The walk in the app's green, the metro in its line's color
-    expect(live.updates.last.segments.map((segment) => segment.color), ['#0A8F4E', '#${metro1.color}']);
+    // The walk in dark grey, the metro in its line's color
+    expect(live.updates.last.segments.map((segment) => segment.color), [walkSegmentColor, '#${metro1.color}']);
     container.read(goControllerProvider.notifier).stop();
   });
 

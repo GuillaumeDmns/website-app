@@ -118,6 +118,27 @@ void main() {
       expect(goFollow(on(moveBy(SectionKind.bike)), 0)!.pitch, MapFollow.firstPersonPitch);
     });
 
+    test('after a ride, not before the user is where the walk starts: its path joined, out of the station', () {
+      final afterRide = GoTracker(journey([transit(at(0), 300), walk(at(5), 600, from: point(nation))]));
+      final walkAfter = afterRide.steps[1].line;
+      GoState out(GoProgress progress) => GoState(
+            tracker: afterRide,
+            request: const JourneyRequest(),
+            progress: progress,
+            startedAt: at(0),
+            plannedArrival: at(15),
+            position: walkAfter.pointAt(5),
+          );
+      final arrived = afterRide.jumpTo(afterRide.initial(), 1);
+      // The ride just over, still on the platform or in the corridors: the map isn't followed close up
+      expect(goFollow(out(arrived), 1, startAlong: 60), isNull);
+      expect(goFollow(out(arrived.copyWith(joined: true, along: 20)), 1, startAlong: 60), isNull);
+      // Out of the station, on the walk's path
+      expect(goFollow(out(arrived.copyWith(joined: true, along: 70)), 1, startAlong: 60)!.pitch, MapFollow.firstPersonPitch);
+      // A bus or a tram has no station to get out of: once its path is joined
+      expect(goFollow(out(arrived.copyWith(joined: true)), 1), isNotNull);
+    });
+
     test('a vehicle is two fast fixes in a row; back on foot after fifteen slow ones', () {
       final speeds = GoVehicleSpeed();
       // A run for the bus, a noisy fix: still on foot

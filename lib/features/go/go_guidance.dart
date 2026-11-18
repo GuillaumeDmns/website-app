@@ -312,12 +312,18 @@ double journeyFraction(GoState state) {
 
 /// On foot or by bike, the map follows the user with the way ahead up, like Citymapper: a view from above makes
 /// little sense when walking. Where the device has a compass, the map turns with it instead (the phone in the hand
-/// turns, the map turns). Only for the move in progress, when it is the step shown.
-MapFollow? goFollow(GoState state, int shownStep) {
+/// turns, the map turns). Only for the move in progress, when it is the step shown. After a ride, only once the user
+/// is where the move starts: its path joined and [startAlong] meters along it (out of the station): followed close up
+/// as the ride ends, on the platform or in the station's corridors, the way out of the building can't be seen.
+MapFollow? goFollow(GoState state, int shownStep, {double startAlong = 0}) {
   final progress = state.progress;
   final position = state.position;
   final step = state.tracker.stepOf(progress);
   if (position == null || step == null || step.isRide || progress.phase != GoPhase.moving || shownStep != progress.step) {
+    return null;
+  }
+  final afterRide = progress.step > 0 && state.tracker.steps[progress.step - 1].isRide;
+  if (afterRide && (!progress.joined || progress.along < startAlong)) {
     return null;
   }
   // First person on foot and by bike, tilted to see the way ahead; overhead in a car, or in whatever goes faster than

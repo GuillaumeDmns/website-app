@@ -84,7 +84,8 @@ FakeBackend standardBackend() {
   backend.get('/api/v2/app-config', const RemoteConfig().toJson());
   backend.get('/api/v2/traffic', [
     LineTraffic(line: metro1, severity: DisruptionSeverity.blocking, titles: [metroStopped.title!]).toJson(),
-    const LineTraffic(line: rerA).toJson(),
+    // A station in works, nothing else
+    const LineTraffic(line: rerA, works: true).toJson(),
     const LineTraffic(line: bus38, severity: DisruptionSeverity.disrupted, titles: ['Bus 38 : manifestation']).toJson(),
   ]);
   backend.on('GET', '/api/v2/search', (request) => FakeResponse(SearchResult(

@@ -155,11 +155,11 @@ class _ModeGrid extends StatelessWidget {
                 Tooltip(
                   message: context.l10n.lineSeverity(
                     line.line.label,
-                    severityLabel(line.severity).toLowerCase(),
+                    (line.works ? context.l10n.severityWorks : severityLabel(line.severity)).toLowerCase(),
                   ),
                   child: InkWell(
                     onTap: () => context.push(Routes.line(line.line.id)),
-                    child: WithSeverity(severity: line.severity, child: LineBadge(line.line, size: 32)),
+                    child: WithSeverity(severity: line.severity, works: line.works, child: LineBadge(line.line, size: 32)),
                   ),
                 ),
             ],

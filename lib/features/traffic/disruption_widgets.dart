@@ -58,24 +58,92 @@ class SeverityDot extends StatelessWidget {
   }
 }
 
-/// Line badge (or any child) with a severity dot on its top right corner when disrupted
+/// Works sign drawn on a corner of a line badge, like the network's screens: a white traffic cone on orange
+class WorksSign extends StatelessWidget {
+  const WorksSign({super.key, this.size = 14});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final colors = context.colors;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: colors.warning,
+        shape: BoxShape.circle,
+        border: Border.all(color: scheme.surface, width: 1.5),
+      ),
+      child: CustomPaint(painter: _ConePainter(colors.warning)),
+    );
+  }
+}
+
+/// A traffic cone in white, its band in [band], within a box of side 1 scaled to the size
+class _ConePainter extends CustomPainter {
+  const _ConePainter(this.band);
+
+  final Color band;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide;
+    canvas.translate((size.width - s) / 2, (size.height - s) / 2);
+    canvas.scale(s);
+    final white = Paint()..color = Colors.white;
+    // Body, then its base
+    canvas.drawPath(
+      Path()
+        ..moveTo(0.44, 0.2)
+        ..lineTo(0.56, 0.2)
+        ..lineTo(0.7, 0.72)
+        ..lineTo(0.3, 0.72)
+        ..close(),
+      white,
+    );
+    canvas.drawRRect(RRect.fromLTRBR(0.22, 0.7, 0.78, 0.8, const Radius.circular(0.03)), white);
+    // The band across it
+    canvas.drawPath(
+      Path()
+        ..moveTo(0.4, 0.38)
+        ..lineTo(0.6, 0.38)
+        ..lineTo(0.63, 0.5)
+        ..lineTo(0.37, 0.5)
+        ..close(),
+      Paint()..color = band,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ConePainter oldDelegate) => oldDelegate.band != band;
+}
+
+/// Line badge (or any child) with a severity dot on its top right corner when disrupted, or the works sign when its
+/// trouble is [works]
 class WithSeverity extends StatelessWidget {
-  const WithSeverity({super.key, required this.severity, required this.child, this.dotSize = 14});
+  const WithSeverity({super.key, required this.severity, required this.child, this.dotSize = 14, this.works = false});
 
   final DisruptionSeverity? severity;
   final Widget child;
   final double dotSize;
+  final bool works;
 
   @override
   Widget build(BuildContext context) {
-    if (severity == null) {
+    if (severity == null && !works) {
       return child;
     }
     return Stack(
       clipBehavior: Clip.none,
       children: [
         child,
-        Positioned(top: -dotSize / 3, right: -dotSize / 3, child: SeverityDot(severity: severity!, size: dotSize)),
+        Positioned(
+          top: -dotSize / 3,
+          right: -dotSize / 3,
+          child: works ? WorksSign(size: dotSize) : SeverityDot(severity: severity!, size: dotSize),
+        ),
       ],
     );
   }
