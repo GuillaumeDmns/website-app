@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/api/models.dart';
+import '../../../core/location/location_providers.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../l10n/l10n.dart';
@@ -229,21 +230,64 @@ class GoContextLine extends StatelessWidget {
   }
 }
 
-/// GO follows the schedule for want of GPS: said once, small
-class GoNoGpsLine extends StatelessWidget {
-  const GoNoGpsLine({super.key});
+/// GO follows the schedule for want of GPS: said once, small; the location turned off, with the way to turn it on
+class GoNoGpsLine extends ConsumerWidget {
+  const GoNoGpsLine({super.key, this.locationOff = false});
+
+  final bool locationOff;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context, WidgetRef ref) => Row(
         children: [
           Icon(Icons.gps_off, size: 16, color: context.colors.muted),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(context.l10n.goNoGps, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+            child: Text(locationOff ? context.l10n.goLocationOff : context.l10n.goNoGps,
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
           ),
+          if (locationOff)
+            TextButton(
+              onPressed: () => fixLocationIssue(ref, LocationIssue.serviceDisabled),
+              child: Text(context.l10n.goTurnLocationOn),
+            ),
         ],
       );
 }
+
+/// Off the way: recalculate now, or ignore it
+class GoOffRouteActions extends ConsumerWidget {
+  const GoOffRouteActions({super.key, required this.state});
+
+  final GoState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(goControllerProvider.notifier);
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            icon: state.recalculating
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.refresh, size: 20),
+            label: Text(context.l10n.recalculate),
+            onPressed: state.recalculating ? null : controller.recalculate,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+            onPressed: controller.dismissIssue,
+            child: Text(context.l10n.dismiss),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 
 /// "Je suis ici" on a card that is not the one going on: GO got it wrong, it goes on from there
 class GoHereButton extends ConsumerWidget {

@@ -73,6 +73,8 @@ class GoRideCard extends ConsumerWidget {
             children: [
               header,
               if (!live && !done) ...[const SizedBox(height: 12), GoHereButton(card: card)],
+              if (live && onBoard && progress.issue == GoIssue.offRoute) ...[const SizedBox(height: 12), GoOffRouteActions(state: state)],
+              if (live && onBoard && state.locationOff) ...[const SizedBox(height: 12), GoNoGpsLine(locationOff: state.locationOff)],
               if (onBoard && late >= 1) ...[
                 const SizedBox(height: 12),
                 GoContextLine(icon: Icons.schedule, text: context.l10n.goMinutesLate(late), color: context.colors.warning),

@@ -15,6 +15,7 @@ import '../../core/map/map_overlay.dart';
 import '../../core/platform/app_shown.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/storage/local_store.dart';
+import '../../core/utils/geo.dart';
 import '../../core/utils/refresh.dart';
 import '../../l10n/l10n.dart';
 import '../auth/auth_controller.dart';
@@ -25,10 +26,11 @@ import '../journey/journey_retime.dart';
 import 'go_cards.dart';
 import 'go_guidance.dart';
 import 'go_live.dart';
-import 'go_ride_guess.dart';
 import 'go_smoother.dart';
 import 'go_state.dart';
+import 'go_trace.dart';
 import 'go_tracker.dart';
+import 'go_vehicle_match.dart';
 
 const _storageKey = 'go_session';
 
@@ -49,11 +51,24 @@ double? sureSpeed(Position fix) => fix.speed < 0 ? null : math.max(0, fix.speed 
 
 /// When the position of [fix] was first given, [previous] being the fix before it, whose position was first given at
 /// [since]: the same position given again with a new time (the system's last one, underground) is no fresher, and no
-/// sign that the user is still there
-DateTime positionSince(Position fix, Position? previous, DateTime? since) => previous != null && since != null &&
-        previous.latitude == fix.latitude && previous.longitude == fix.longitude
-    ? since
-    : fix.timestamp;
+/// sign that the user is still there. With [rough] (waiting, on board), neither is a rough position within the
+/// accuracies of the one before (a cell tower, the GPS stuck at a station while the metro takes the user five stations
+/// away): only a rough one that moved says something.
+DateTime positionSince(Position fix, Position? previous, DateTime? since, {bool rough = false}) {
+  if (previous == null || since == null) {
+    return fix.timestamp;
+  }
+  if (previous.latitude == fix.latitude && previous.longitude == fix.longitude) {
+    return since;
+  }
+  final stuck = rough && fix.accuracy > _preciseAccuracy && previous.accuracy > _preciseAccuracy &&
+      metersBetween(LatLng(fix.latitude, fix.longitude), LatLng(previous.latitude, previous.longitude)) <=
+          math.max(fix.accuracy, previous.accuracy);
+  return stuck ? since : fix.timestamp;
+}
+
+/// A fix this precise is the GPS's (see [GoTracker])
+const _preciseAccuracy = 30.0;
 
 /// Whether [alert] is felt (sound, vibration): not when muted, nor a getting-off alert of a ride whose alerts the user
 /// turned off ("Alerter quand descendre")
@@ -69,8 +84,13 @@ bool goAlertFelt(GoState state, GoAlert alert) {
 /// moment needs, [goLocationNeed]), a 5 s clock and the real-time departures of the next ride (`rideOptionsProvider`,
 /// every 30 s, shared with the cards showing them), gives the alerts, and keeps the session on the device so that it
 /// survives a restart. On board, the journey follows the vehicle guessed among the departures seen at the stop
-/// ([RideGuess]).
+/// ([VehicleMatch]), from waiting for it on.
 class GoController extends Notifier<GoState?> {
+  DateTime _now() => ref.read(goClockProvider)();
+
+  /// What the session received and made of it (development builds)
+  GoTrace? get _trace => ref.read(goTraceProvider);
+
   PositionFeed? _feed;
   StreamSubscription<Position>? _positions;
   Timer? _tick;
@@ -116,10 +136,32 @@ class GoController extends Notifier<GoState?> {
   final _seen = <int, List<Ride>>{};
   GoTracker? _seenFor;
 
-  /// On board, which of them the user is on, and the journey being moved to it
-  RideGuess? _guess;
-  DateTime? _guessedFixAt;
+  /// From waiting for a ride to its alighting stop, which of them the user is on, and the journey being moved to it
+  VehicleMatch? _match;
+  DateTime? _matchedFixAt;
   bool _following = false;
+
+  /// Since when the GPS sees the user still at the platform (or in the vehicle standing there)
+  DateTime? _stillSince;
+
+  /// The device's location turned on and off
+  StreamSubscription<bool>? _service;
+
+  /// The location back (turned on again, a session taken up after a restart): from when fixes are new, the rough one
+  /// waiting for a second one to agree with it, and the next fix to place anywhere on the journey ([GoInput.relocate])
+  DateTime? _reacquireFrom;
+  Position? _reacquireRough;
+  Position? _beforeOff;
+  bool _relocateNext = false;
+
+  /// When the last precise fix came: after minutes without one (a long tunnel), the next may be anywhere
+  DateTime? _lastPreciseAt;
+  static const _longWithoutPrecise = Duration(minutes: 3);
+
+  /// After boarding, the ride's departures followed a few minutes more (see [_watchBoarded]), and which ones
+  ProviderSubscription<AsyncValue<List<Ride>>>? _boarded;
+  ({RideKey key, GoTracker tracker, int step})? _boardKey;
+  static const _boardedWatch = Duration(minutes: 5);
 
   /// Off the way: the recalculation on its own, after a countdown the user can beat or cancel
   Timer? _recalculateTimer;
@@ -138,6 +180,9 @@ class GoController extends Notifier<GoState?> {
     _shown = ref.read(appShownProvider);
     ref.listen(appShownProvider, (_, shown) {
       _shown = shown;
+      if (!shown) {
+        unawaited(_trace?.flush());
+      }
       _smoothen();
       _askPositions();
     });
@@ -158,6 +203,9 @@ class GoController extends Notifier<GoState?> {
   }
 
   void stop() {
+    if (state != null) {
+      _trace?.stop(_now());
+    }
     _closeTimer?.cancel();
     _closeTimer = null;
     _stopFeeds();
@@ -238,6 +286,7 @@ class GoController extends Notifier<GoState?> {
       position: latest.position,
       retained: retained ? (step: step, later: tracker.eta(chosen, null).difference(previousEta), cancelled: cancelled) : null,
       alightAlertsOff: latest.alightAlertsOff,
+      locationOff: latest.locationOff,
     );
     _save();
     // The departures followed go on with the screen off
@@ -251,7 +300,7 @@ class GoController extends Notifier<GoState?> {
   Future<JourneyOption> _retimedWith(GoState current, int step, Ride ride) async {
     final sectionIndex = current.tracker.steps[step].sectionIndex;
     final api = ref.read(mobilityApiProvider);
-    final now = DateTime.now();
+    final now = _now();
     final known = <RideKey, List<Ride>>{};
     var retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
     for (var round = 0; round < 6; round++) {
@@ -271,27 +320,51 @@ class GoController extends Notifier<GoState?> {
     return retimed.journey;
   }
 
-  /// On board, the vehicle taken is guessed among the departures seen at the stop ([RideGuess]: the one that left when
-  /// the user did, then checked at each station on the way): the journey follows it, without a word to the user
-  void _guessRide(GoState state) {
+  /// The vehicle the user is on, among the departures seen at the stop ([VehicleMatch]), from waiting for it to the
+  /// alighting stop: the journey follows it, without a word to the user
+  void _matchVehicle(GoState state) {
     final progress = state.progress;
-    if (progress.phase != GoPhase.onBoard) {
-      _guess = null;
+    final ride = state.tracker.stepOf(progress);
+    if (ride == null || !ride.isRide || (progress.phase != GoPhase.waiting && progress.phase != GoPhase.onBoard)) {
+      _match = null;
+      _stillSince = null;
       return;
     }
-    var guess = _guess;
-    if (guess == null || guess.step != progress.step) {
-      final ride = state.tracker.steps[progress.step];
+    final now = _now();
+    var match = _match;
+    if (match == null || match.step != progress.step) {
+      match = _match = VehicleMatch(progress.step, ride);
+      _stillSince = null;
       final seen = _seenFor == state.tracker ? _seen[progress.step] : null;
-      guess = _guess = RideGuess.start(progress.step, ride, seen ?? const [], departed: ride.section.departure.add(progress.shift));
+      if (seen != null) {
+        match.seen(seen, now);
+      }
     }
     final fix = _lastFix;
-    // A new position only: the same one given again tells nothing of a station (stopped there or not)
-    if (fix != null && fix.timestamp != _guessedFixAt && fix.timestamp == _fixSince) {
-      _guessedFixAt = fix.timestamp;
-      guess.observe(fix.timestamp, LatLng(fix.latitude, fix.longitude), speed: sureSpeed(fix), accuracy: fix.accuracy);
+    final since = _fixSince;
+    final fresh = fix != null && since != null && now.difference(since) <= const Duration(seconds: 30);
+    if (progress.phase == GoPhase.waiting) {
+      // Still at the platform, or seated in the vehicle standing there, by the GPS: not on any departure gone since
+      final speed = fix == null ? null : sureSpeed(fix);
+      final still = fresh && fix.accuracy <= _preciseAccuracy && (speed == null || speed < 1) &&
+          ride.alongInPlatformZone(LatLng(fix.latitude, fix.longitude), fix.accuracy) != null;
+      if (!still) {
+        _stillSince = null;
+      } else if (now.difference(_stillSince ??= now) >= const Duration(seconds: 30)) {
+        match.stillAtPlatform(now);
+      }
+      return;
     }
-    final better = guess.better;
+    _stillSince = null;
+    if (!match.hasDeparted) {
+      match.departed(progress.departedAt ?? ride.section.departure.add(progress.shift));
+    }
+    // A new position only: the same one given again tells nothing of a station (stopped there or not)
+    if (fix != null && fix.timestamp != _matchedFixAt && fix.timestamp == since) {
+      _matchedFixAt = fix.timestamp;
+      match.observe(fix.timestamp, LatLng(fix.latitude, fix.longitude), speed: sureSpeed(fix), accuracy: fix.accuracy);
+    }
+    final better = match.better;
     if (better != null && !_following) {
       _following = true;
       unawaited(_followRide(progress.step, better).whenComplete(() => _following = false));
@@ -311,10 +384,20 @@ class GoController extends Notifier<GoState?> {
     if (latest == null || latest.tracker != current.tracker || latest.progress.step != step || latest.progress.phase != GoPhase.onBoard) {
       return;
     }
-    final departed = latest.tracker.steps[step].section.departure.add(latest.progress.shift);
+    final departed = latest.progress.departedAt ?? latest.tracker.steps[step].section.departure.add(latest.progress.shift);
     final tracker = GoTracker(journey);
     state = latest.copyWith(tracker: tracker, progress: tracker.onAnotherVehicle(latest.progress, departed));
-    _guess?.follow(ride);
+    _match
+      ?..ride = tracker.steps[step]
+      ..follow(ride);
+    _trace?.follow(step, ride, _now());
+    // The departures seen are the same ones, for the same ride of the journey moved to that vehicle
+    if (_seenFor == latest.tracker) {
+      _seenFor = tracker;
+    }
+    if (_boardKey?.tracker == latest.tracker) {
+      _boardKey = (key: _boardKey!.key, tracker: tracker, step: _boardKey!.step);
+    }
     _save();
     _watchDepartures();
     _update();
@@ -407,14 +490,15 @@ class GoController extends Notifier<GoState?> {
       // The GPS gets its usual time for a first fix before the clock leads (GoTracker.followsSchedule): a session taken
       // up again after a restart (the last fix isn't kept with it), or started from a journey looked at for a while,
       // never skips a step by the schedule while that fix comes
-      progress: (progress ?? tracker.initial()).copyWith(lastFixAt: DateTime.now()),
-      startedAt: startedAt ?? DateTime.now(),
+      progress: (progress ?? tracker.initial()).copyWith(lastFixAt: _now()),
+      startedAt: startedAt ?? _now(),
       plannedArrival: plannedArrival ?? journey.arrival,
       muted: muted,
       keepAwake: keepAwake,
       alightAlertsOff: alightAlertsOff,
     );
     ref.read(liveJourneyProvider).keepScreenOn(keepAwake);
+    _trace?.start(journey, _now());
     _save();
     _startFeeds();
   }
@@ -448,19 +532,100 @@ class GoController extends Notifier<GoState?> {
     _stopFeeds();
     final feed = ref.read(positionFeedProvider);
     _feed = feed;
-    _positions = feed.fixes.listen(_onFix, onError: (Object e) => debugPrint('GO positions unavailable: $e'));
+    _positions = feed.fixes.listen(_onFix, onError: (Object e) {
+      debugPrint('GO positions unavailable: $e');
+      if (e is LocationServiceDisabledException) {
+        _onService(false);
+      }
+    });
+    _service = feed.serviceEnabled.listen(_onService, onError: (Object e) => debugPrint('GO location status unavailable: $e'));
     _askPositions();
     unawaited(_seed());
     _tick = Timer.periodic(const Duration(seconds: 5), (_) => _update());
-    _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) => _watchDepartures());
+    _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _watchDepartures();
+      _watchBoarded();
+    });
     _watchDepartures();
     _update();
   }
 
+  /// The device's location turned off: the schedule leads, the card says so with a way to turn it on; back on, the
+  /// device's stream is opened again and the next good fix may be anywhere on the journey
+  void _onService(bool enabled) {
+    final current = state;
+    if (current == null || current.locationOff == !enabled) {
+      return;
+    }
+    if (enabled) {
+      _reacquire();
+      _feed?.reopen();
+    } else {
+      _beforeOff = _lastFix ?? _beforeOff;
+      // Its last fix says nothing of where the user goes now
+      _lastFix = null;
+      _fixSince = null;
+    }
+    _trace?.service(enabled, _now());
+    state = current.copyWith(locationOff: !enabled);
+    _update();
+  }
+
+  /// The location back: fixes from now on only, a precise one or two rough ones agreeing, then placed anywhere on the
+  /// journey
+  void _reacquire() {
+    _reacquireFrom = _now();
+    _reacquireRough = null;
+  }
+
+  /// [position] is good enough to place the user again after the location came back (see [_reacquire])
+  bool _reacquired(Position position) {
+    final from = _reacquireFrom;
+    if (from == null) {
+      return true;
+    }
+    final last = _beforeOff;
+    final givenAgain = last != null && last.latitude == position.latitude && last.longitude == position.longitude;
+    if (position.timestamp.isBefore(from.subtract(const Duration(seconds: 2))) || givenAgain) {
+      return false;
+    }
+    if (position.accuracy > _preciseAccuracy) {
+      final first = _reacquireRough;
+      final agree = first != null && (first.latitude != position.latitude || first.longitude != position.longitude) &&
+          metersBetween(LatLng(first.latitude, first.longitude), LatLng(position.latitude, position.longitude)) <=
+              math.max(first.accuracy, position.accuracy);
+      if (!agree) {
+        _reacquireRough = position;
+        return false;
+      }
+    }
+    _reacquireFrom = null;
+    _reacquireRough = null;
+    _beforeOff = null;
+    _relocateNext = true;
+    return true;
+  }
+
   void _onFix(Position position) {
-    _fixSince = positionSince(position, _lastFix, _fixSince);
+    _trace?.fix(position, _now());
+    if (state?.locationOff == true) {
+      // Fixes again: the location is back (its status may come later, or never on this platform)
+      _onService(true);
+    }
+    if (!_reacquired(position)) {
+      return;
+    }
+    if (position.accuracy <= _preciseAccuracy) {
+      final last = _lastPreciseAt;
+      if (last != null && position.timestamp.difference(last) > _longWithoutPrecise) {
+        _relocateNext = true;
+      }
+      _lastPreciseAt = position.timestamp;
+    }
+    final phase = state?.progress.phase;
+    _fixSince = positionSince(position, _lastFix, _fixSince, rough: phase == GoPhase.waiting || phase == GoPhase.onBoard);
     _lastFix = position;
-    final now = DateTime.now();
+    final now = _now();
     ref.read(goFixStatsProvider.notifier).record(now, position.accuracy);
     final current = state;
     final step = current?.tracker.stepOf(current.progress);
@@ -497,7 +662,7 @@ class GoController extends Notifier<GoState?> {
     if (_lastFix != null || _positions == null) {
       return;
     }
-    if (known != null && DateTime.now().difference(known.timestamp) < const Duration(minutes: 1)) {
+    if (known != null && _now().difference(known.timestamp) < const Duration(minutes: 1)) {
       _onFix(known);
       return;
     }
@@ -506,7 +671,7 @@ class GoController extends Notifier<GoState?> {
       _onFix(Position(
         latitude: position.latitude,
         longitude: position.longitude,
-        timestamp: DateTime.now(),
+        timestamp: _now(),
         // The app's regular positions: within 25 m
         accuracy: 25,
         altitude: 0,
@@ -524,11 +689,11 @@ class GoController extends Notifier<GoState?> {
 
   /// Shows the smoothed position, redrawn while it moves and the app is on screen (nothing drawn screen off)
   void _smoothen() {
-    final position = _smoother.at(DateTime.now());
+    final position = _smoother.at(_now());
     if (position != null) {
       ref.read(preciseUserPositionProvider.notifier).set(position, accuracy: _lastFix?.accuracy);
     }
-    if (_smoothTimer != null || !_shown || !_smoother.moving(DateTime.now())) {
+    if (_smoothTimer != null || !_shown || !_smoother.moving(_now())) {
       return;
     }
     _smoothTimer = Timer(_smoother.redrawInterval, () {
@@ -569,7 +734,17 @@ class GoController extends Notifier<GoState?> {
     _rides = null;
     _seen.clear();
     _seenFor = null;
-    _guess = null;
+    _match = null;
+    _stillSince = null;
+    _boarded?.close();
+    _boarded = null;
+    _boardKey = null;
+    _service?.cancel();
+    _service = null;
+    _reacquireFrom = null;
+    _reacquireRough = null;
+    _relocateNext = false;
+    _lastPreciseAt = null;
     _recalculateTimer?.cancel();
     _recalculateTimer = null;
   }
@@ -582,7 +757,7 @@ class GoController extends Notifier<GoState?> {
     final fix = _lastFix;
     final position = fix == null ? null : LatLng(fix.latitude, fix.longitude);
     final input = GoInput(
-      now: DateTime.now(),
+      now: _now(),
       position: position,
       accuracy: fix?.accuracy,
       speed: fix == null ? null : sureSpeed(fix),
@@ -590,7 +765,11 @@ class GoController extends Notifier<GoState?> {
       vehicle: current.vehicle,
       vehicleStep: current.vehicleStep,
       realtimeDepartures: current.realtimeDepartures,
+      relocate: _relocateNext && fix != null,
     );
+    if (fix != null) {
+      _relocateNext = false;
+    }
     final (progress, alerts) = current.tracker.update(current.progress, input);
 
     final changed = progress.step != current.progress.step ||
@@ -614,7 +793,7 @@ class GoController extends Notifier<GoState?> {
     if (progress.issue == GoIssue.offRoute && current.progress.issue != GoIssue.offRoute && !current.recalculating) {
       _recalculateTimer?.cancel();
       _recalculateTimer = Timer(_recalculateAfter, recalculate);
-      next = next.copyWith(recalculateAt: () => DateTime.now().add(_recalculateAfter));
+      next = next.copyWith(recalculateAt: () => _now().add(_recalculateAfter));
     } else if (progress.issue != GoIssue.offRoute && current.recalculateAt != null) {
       _recalculateTimer?.cancel();
       _recalculateTimer = null;
@@ -624,7 +803,7 @@ class GoController extends Notifier<GoState?> {
     // notification of its own while the app isn't on screen
     if (alerts.isNotEmpty) {
       final alert = alerts.last;
-      next = next.copyWith(alert: alert, alertAt: DateTime.now());
+      next = next.copyWith(alert: alert, alertAt: _now());
       if (goAlertFelt(current, alert)) {
         feelGoAlert(alert);
         if (!_shown && goAlertRings(alert)) {
@@ -633,10 +812,11 @@ class GoController extends Notifier<GoState?> {
       }
     }
     state = next;
+    _trace?.progress(progress, input.now);
     _askPositions();
     _publishLive(next);
     _feelTurn(next);
-    _guessRide(next);
+    _matchVehicle(next);
 
     if (changed) {
       _save();
@@ -644,6 +824,7 @@ class GoController extends Notifier<GoState?> {
       if (progress.step != current.progress.step || progress.phase != current.progress.phase) {
         _watchDepartures();
       }
+      _watchBoarded();
     }
     _replaceMissed(next);
     if (progress.phase == GoPhase.arrived) {
@@ -670,7 +851,7 @@ class GoController extends Notifier<GoState?> {
         rides == null || _departuresOf?.step != state.progress.step || _departuresOf?.tracker != state.tracker) {
       return;
     }
-    final now = DateTime.now();
+    final now = _now();
     final planned = state.tracker.expectedDeparture(step, state.progress, state.currentVehicle);
     final ride = replacementRide(rides, issue!, planned, now);
     if (ride == null) {
@@ -685,7 +866,7 @@ class GoController extends Notifier<GoState?> {
     if (state.progress.phase == GoPhase.arrived) {
       return;
     }
-    final update = goLiveUpdate(state, DateTime.now());
+    final update = goLiveUpdate(state, _now());
     final key = '${update.title}|${update.status}|${update.chip}|${update.info}|${state.progress.step}';
     if (key == _lastLive && (update.progress - _lastLiveProgress).abs() < 15) {
       return;
@@ -726,7 +907,7 @@ class GoController extends Notifier<GoState?> {
     final steps = current.tracker.steps;
     final index = [for (var i = start; i < steps.length; i++) i].where((i) => steps[i].isRide).firstOrNull;
     final ride = index == null ? null : steps[index];
-    final now = DateTime.now();
+    final now = _now();
     final earliest = ride == null || index == progress.step
         ? now
         : earliestBoarding(current.journey, ride.sectionIndex, now).add(progress.shift);
@@ -739,6 +920,9 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     final of = (key: key, tracker: current.tracker, step: index);
+    if (index == progress.step && progress.phase == GoPhase.waiting) {
+      _boardKey = of;
+    }
     if (of == _departuresOf) {
       return;
     }
@@ -762,19 +946,7 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     _rides = rides;
-    if (_seenFor != of.tracker) {
-      _seen.clear();
-      _seenFor = of.tracker;
-    }
-    final seen = _seen.putIfAbsent(of.step, () => []);
-    for (final ride in rides) {
-      final known = seen.indexWhere((other) => sameDeparture(other, ride));
-      if (known >= 0) {
-        seen[known] = ride;
-      } else {
-        seen.add(ride);
-      }
-    }
+    _remember(of, rides, latest);
     // The planned vehicle: same scheduled time (a few minutes of tolerance); among departures of the same minute, the
     // one arriving when the ride does, as the departures card picks it (its mission is the card's header)
     final ride = of.tracker.steps[of.step];
@@ -788,6 +960,58 @@ class GoController extends Notifier<GoState?> {
       vehicleStep: () => of.step,
       realtimeDepartures: rides.any((ride) => ride.departure.realtime),
     );
+  }
+
+  /// The departures [rides] received for the ride of [of], the departed ones kept: those the user may be on
+  void _remember(({RideKey key, GoTracker tracker, int step}) of, List<Ride> rides, GoState latest) {
+    _trace?.rides(of.step, rides, _now());
+    if (_seenFor != of.tracker) {
+      _seen.clear();
+      _seenFor = of.tracker;
+    }
+    final seen = _seen.putIfAbsent(of.step, () => []);
+    for (final ride in rides) {
+      final known = seen.indexWhere((other) => sameDeparture(other, ride));
+      if (known >= 0) {
+        seen[known] = ride;
+      } else {
+        seen.add(ride);
+      }
+    }
+    final match = _match;
+    if (match != null && match.step == of.step) {
+      final progress = latest.progress;
+      final ride = of.tracker.steps[of.step];
+      // Down the line already: a vehicle still at the stop is not the user's
+      final gone = progress.step == of.step && progress.phase == GoPhase.onBoard && progress.along > ride.platformZone.to;
+      match.seen(rides, _now(), userGone: gone);
+    }
+  }
+
+  /// After boarding, the departures of the ride taken a few minutes more (no request of their own: the ones waited for):
+  /// the real time of the vehicles that left about then (a late one still at the platform) says which one the user is on
+  void _watchBoarded() {
+    final current = state;
+    final progress = current?.progress;
+    final departed = progress?.departedAt;
+    final of = _boardKey;
+    final keep = current != null && progress!.phase == GoPhase.onBoard && of != null && of.step == progress.step &&
+        of.tracker == current.tracker && departed != null && _now().difference(departed) < _boardedWatch;
+    if (!keep) {
+      _boarded?.close();
+      _boarded = null;
+      if (progress?.phase != GoPhase.waiting) {
+        _boardKey = null;
+      }
+      return;
+    }
+    _boarded ??= ref.listen(rideOptionsProvider(of.key), (_, departures) {
+      final rides = departures.value;
+      final latest = state;
+      if (rides != null && latest != null) {
+        _remember(of, rides, latest);
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -824,7 +1048,7 @@ class GoController extends Notifier<GoState?> {
       final journey = JourneyOption.fromJson(json['journey'] as Map<String, dynamic>);
       final progress = GoProgress.fromJson(json['progress'] as Map<String, dynamic>);
       final end = (progress.arrivedAt ?? journey.arrival.add(progress.shift)).add(const Duration(minutes: 30));
-      if (DateTime.now().isAfter(end)) {
+      if (_now().isAfter(end)) {
         await store.remove(_storageKey);
         return;
       }
@@ -838,6 +1062,8 @@ class GoController extends Notifier<GoState?> {
         startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
         alightAlertsOff: {...?(json['alightOff'] as List?)?.cast<int>()},
       );
+      // Wherever the user got while the app was gone
+      _relocateNext = true;
     } catch (e) {
       debugPrint('GO session unreadable: $e');
       await store.remove(_storageKey);
@@ -846,3 +1072,6 @@ class GoController extends Notifier<GoState?> {
 }
 
 final goControllerProvider = NotifierProvider<GoController, GoState?>(GoController.new);
+
+/// GO's clock: the device's, a simulated one in the tests and when a trace is played again
+final goClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

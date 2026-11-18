@@ -9,6 +9,7 @@ import 'package:website_app/app/app.dart';
 import 'package:website_app/core/api/api_providers.dart';
 import 'package:website_app/core/location/device_heading.dart';
 import 'package:website_app/core/location/location_providers.dart';
+import 'package:website_app/core/location/position_feed.dart';
 import 'package:website_app/core/map/main_map.dart';
 import 'package:website_app/core/storage/local_store.dart';
 import 'package:website_app/features/auth/google/browser_sign_in.dart';
@@ -73,6 +74,8 @@ Future<MemoryStore> pumpApp(
       googleBrowserSignInProvider.overrideWithValue(googleBrowserSignIn),
       // No home_widget native side
       widgetClicksProvider.overrideWithValue(const Stream.empty()),
+      // The device's fixes, but no status of its location service (a platform stream the tests have no side for)
+      positionFeedProvider.overrideWithValue(PositionFeed(serviceEnabled: () => const Stream.empty())),
       ...overrides,
     ],
     child: const MobilityApp(),

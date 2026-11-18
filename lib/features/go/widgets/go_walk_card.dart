@@ -10,7 +10,6 @@ import '../../../core/widgets/size_reporter.dart';
 import '../../../l10n/l10n.dart';
 import '../../journey/journey_labels.dart';
 import '../go_cards.dart';
-import '../go_controller.dart';
 import '../go_glance.dart';
 import '../go_guidance.dart';
 import '../go_state.dart';
@@ -79,7 +78,7 @@ class GoWalkCard extends ConsumerWidget {
     final head = [
       header,
       if (!live && !done) GoHereButton(card: card, along: outAlong),
-      if (live && progress.issue == GoIssue.offRoute) _OffRouteActions(state: state),
+      if (live && progress.issue == GoIssue.offRoute) GoOffRouteActions(state: state),
       if (live && moving) ?_marginLine(context, ref, now),
       ?turns.firstOrNull,
     ];
@@ -96,7 +95,7 @@ class GoWalkCard extends ConsumerWidget {
         ),
         ...turns.skip(1),
         if (entrance case final entrance?) GoStationAccess(entrance: entrance, exit: false),
-        if (live && tracker.followsSchedule(progress, now)) const GoNoGpsLine(),
+        if (live && (state.locationOff || tracker.followsSchedule(progress, now))) GoNoGpsLine(locationOff: state.locationOff),
       ],
     );
   }
@@ -154,39 +153,6 @@ class GoWalkCard extends ConsumerWidget {
 }
 
 /// Off the way: the recalculation coming on its own (its countdown in the header), done now or ignored
-class _OffRouteActions extends ConsumerWidget {
-  const _OffRouteActions({required this.state});
-
-  final GoState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.read(goControllerProvider.notifier);
-    return Row(
-      children: [
-        Expanded(
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-            icon: state.recalculating
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.refresh, size: 20),
-            label: Text(context.l10n.recalculate),
-            onPressed: state.recalculating ? null : controller.recalculate,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-            onPressed: controller.dismissIssue,
-            child: Text(context.l10n.dismiss),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// One instruction of a move, like Citymapper's: its arrow in a square, `Dans 35 m` over what to do, the time it takes
 class _TurnRow extends StatelessWidget {
   const _TurnRow({required this.walk, required this.meters, required this.pace, required this.next});

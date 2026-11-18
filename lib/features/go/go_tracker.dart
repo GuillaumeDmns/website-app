@@ -61,6 +61,57 @@ class GoStep {
 
   static const _aheadMeters = 30.0;
 
+  /// Ride: meters along it where its vehicle may stand at the boarding stop with the user in it: from a little before the
+  /// stop's point to a vehicle's length after it, since the stop's point may be at the head of the platform (a terminus'
+  /// always is) and the user anywhere in a 450 m double train. Someone standing still there is waiting, on the platform
+  /// or already seated: never seen leaving.
+  ({double from, double to}) get platformZone {
+    final at = stopAlongs.isEmpty ? 0.0 : stopAlongs.first;
+    return (from: at - 150, to: at + platformLength);
+  }
+
+  double get platformLength => switch (section.line?.mode) {
+        TransportMode.rer || TransportMode.transilien || TransportMode.ter => 450,
+        TransportMode.metro => 150,
+        TransportMode.tram => 80,
+        _ => 40,
+      };
+
+  /// Ride: the fastest its vehicle goes (m/s), to bound how far the clock may take the user from where the GPS last saw
+  /// them
+  double get topSpeed => switch (section.line?.mode) {
+        TransportMode.rer || TransportMode.transilien || TransportMode.ter => 40,
+        TransportMode.metro => 22,
+        _ => 15,
+      };
+
+  /// Ride: where [fix] is on the boarding stop's platform zone (meters along), null when elsewhere
+  double? alongInPlatformZone(LatLng fix, double accuracy) {
+    final projection = line.project(fix);
+    final zone = platformZone;
+    if (projection == null || projection.distance > 100 + accuracy || projection.along < zone.from || projection.along > zone.to) {
+      return null;
+    }
+    return projection.along;
+  }
+
+  /// Ride: index of the stop whose point is closest to [fix] within [meters], null when none is
+  int? stopNear(LatLng fix, double meters) {
+    int? closest;
+    var best = meters;
+    for (final (index, stop) in section.stops.indexed) {
+      final distance = metersBetween(fix, LatLng(stop.lat, stop.lon));
+      if (distance <= best) {
+        best = distance;
+        closest = index;
+      }
+    }
+    return closest;
+  }
+
+  /// Ride: scheduled time at [along] meters along it
+  DateTime scheduledAt(double along) => stopTime(0).add(scheduledTo(along));
+
   /// Ride: scheduled time from its first stop to [along] meters along it, between the times of the stops around
   Duration scheduledTo(double along) {
     if (stopAlongs.length < 2) {
@@ -133,6 +184,11 @@ class GoProgress {
     this.preciseAlong,
     this.preciseAt,
     this.joined = false,
+    this.stopFloor = 0,
+    this.departedAt,
+    this.byClock = false,
+    this.hintStop = 0,
+    this.pendingHintStop,
   });
 
   /// Index in [GoTracker.steps]
@@ -167,6 +223,22 @@ class GoProgress {
   /// meters from where the walk is drawn from)
   final bool joined;
 
+  /// On board: the last stop the GPS saw the vehicle leave (or the user said they were past): the clock never takes the
+  /// user back before it
+  final int stopFloor;
+
+  /// When the vehicle the user is on left the boarding stop (seen leaving, or assumed then), null before boarding
+  final DateTime? departedAt;
+
+  /// The current step (or phase) was reached by the clock or an assumption, not seen by the GPS nor said by the user:
+  /// a precise fix may still put the user back where they really are (still on board the ride before, say)
+  final bool byClock;
+
+  /// On board underground: the last stop a rough position was taken as a sign of being at ([stopFloor]'s like for
+  /// hints), and a stop further back than the clock waiting for a second hint to confirm it
+  final int hintStop;
+  final int? pendingHintStop;
+
   GoProgress copyWith({
     int? step,
     GoPhase? phase,
@@ -181,6 +253,11 @@ class GoProgress {
     double? Function()? preciseAlong,
     DateTime? Function()? preciseAt,
     bool? joined,
+    int? stopFloor,
+    DateTime? Function()? departedAt,
+    bool? byClock,
+    int? hintStop,
+    int? Function()? pendingHintStop,
   }) =>
       GoProgress(
         step: step ?? this.step,
@@ -196,6 +273,11 @@ class GoProgress {
         preciseAlong: preciseAlong != null ? preciseAlong() : this.preciseAlong,
         preciseAt: preciseAt != null ? preciseAt() : this.preciseAt,
         joined: joined ?? this.joined,
+        stopFloor: stopFloor ?? this.stopFloor,
+        departedAt: departedAt != null ? departedAt() : this.departedAt,
+        byClock: byClock ?? this.byClock,
+        hintStop: hintStop ?? this.hintStop,
+        pendingHintStop: pendingHintStop != null ? pendingHintStop() : this.pendingHintStop,
       );
 
   Map<String, dynamic> toJson() => {
@@ -207,6 +289,9 @@ class GoProgress {
         'issue': issue?.name,
         'fired': fired.toList(),
         if (arrivedAt != null) 'arrivedAt': arrivedAt!.toIso8601String(),
+        'stopFloor': stopFloor,
+        if (departedAt != null) 'departedAt': departedAt!.toIso8601String(),
+        'byClock': byClock,
       };
 
   factory GoProgress.fromJson(Map<String, dynamic> json) => GoProgress(
@@ -218,6 +303,10 @@ class GoProgress {
         issue: GoIssue.values.asNameMap()[json['issue']],
         fired: {...?(json['fired'] as List?)?.cast<String>()},
         arrivedAt: DateTime.tryParse(json['arrivedAt'] as String? ?? ''),
+        stopFloor: json['stopFloor'] as int? ?? 0,
+        departedAt: DateTime.tryParse(json['departedAt'] as String? ?? ''),
+        // Taken up after a restart: wherever the user is now, the GPS says it
+        byClock: json['byClock'] as bool? ?? true,
       );
 }
 
@@ -232,6 +321,7 @@ class GoInput {
     this.vehicle,
     this.vehicleStep,
     this.realtimeDepartures = false,
+    this.relocate = false,
   });
 
   final DateTime now;
@@ -250,6 +340,10 @@ class GoInput {
 
   /// The departures of the ride [vehicleStep] come with real time (see [GoState.realtimeDepartures])
   final bool realtimeDepartures;
+
+  /// The position may be anywhere on the journey, not only where the progress was: the first fix after the location was
+  /// turned off, a restart, or minutes without a precise one (see [GoTracker.update])
+  final bool relocate;
 
   Departure? vehicleOf(int step) => vehicleStep == step ? vehicle : null;
 }
@@ -437,15 +531,17 @@ class GoTracker {
     if (ride == null || progress.phase != GoPhase.onBoard) {
       return progress;
     }
-    var index = 0;
-    for (var k = 0; k < ride.stopAlongs.length - 1; k++) {
-      if (ride.stopAlongs[k] + _leftStopMeters <= progress.along) {
-        index = k;
-      }
-    }
+    final index = _stopLeft(ride, progress.along);
+    final preciseAlong = progress.preciseAlong;
     final gap = departed.difference(ride.section.departure);
     final shift = gap.abs() <= const Duration(minutes: 1) ? Duration.zero : Duration(seconds: gap.inSeconds.clamp(-1800, 3600));
-    return progress.copyWith(stopIndex: index, shift: shift);
+    return progress.copyWith(
+      stopIndex: index,
+      stopFloor: preciseAlong == null ? 0 : _stopLeft(ride, preciseAlong),
+      shift: shift,
+      hintStop: 0,
+      pendingHintStop: () => null,
+    );
   }
 
   GoProgress dismissIssue(GoProgress progress) => progress.copyWith(issue: () => null, offRouteSince: () => null);
@@ -456,6 +552,15 @@ class GoTracker {
     final alerts = <GoAlert>[];
     final fix = _usableFix(input);
     var current = fix != null ? progress.copyWith(lastFixAt: input.fixAt ?? input.now) : progress;
+
+    // Where the user really is, when the progress was only guessed: still on board the ride the clock got them off, or
+    // anywhere on the journey once the location is back
+    if (fix != null && current.phase != GoPhase.arrived) {
+      final precise = (input.accuracy ?? 0) <= _preciseAccuracy;
+      current = (precise ? _backOnBoard(current, input, fix) : null) ??
+          (input.relocate ? _relocate(current, input, fix, alerts) : null) ??
+          current;
+    }
 
     // Several steps can end at once (e.g. back from the background)
     for (var guard = 0; guard <= steps.length; guard++) {
@@ -592,7 +697,7 @@ class GoTracker {
       done = !input.now.isBefore(step.section.arrival.add(current.shift));
     }
 
-    return done ? _advance(current, input.now) : current;
+    return done ? _advance(current, input.now, byClock: fix == null) : current;
   }
 
   GoProgress _wait(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
@@ -633,23 +738,32 @@ class GoTracker {
 
     // Seen riding: on board, of the vehicle seen leaving then
     final speed = input.speed ?? 0;
+    final precise = fix != null && (input.accuracy ?? 0) <= _preciseAccuracy;
     if (fix != null) {
       final riding = _riding(ride, fix, speed);
       if (riding != null) {
-        final left = _leftAt(ride, input.now, riding.along, speed);
-        return _board(current, input.now, _departureTaken(departure, input.now, riding.along, left));
+        final left = _leftAt(ride, input.now, riding.along, speed, seat: current.preciseAlong);
+        return _board(current, input.now, _departureTaken(departure, input.now, riding.along, left), byClock: !precise);
       }
     }
 
+    // Standing on the platform, or seated in the vehicle waiting there (a train is 450 m long, the stop's point at its
+    // head in a terminus): where, to date the vehicle's leaving once it moves
+    final seat = precise ? ride.alongInPlatformZone(fix, input.accuracy ?? 0) : null;
+    if (seat != null) {
+      current = current.copyWith(preciseAlong: () => seat, preciseAt: () => input.fixAt ?? input.now);
+    }
+
     // Still at the stop by a precise fix only
-    final precise = fix != null && (input.accuracy ?? 0) <= _preciseAccuracy;
     if (untilDeparture <= const Duration(seconds: -90) && fix != null && precise) {
       final start = ride.start;
-      final stillAtStop = start != null && metersBetween(fix, start) < 150 && speed < 2;
+      final stillAtStop = (seat != null || start != null && metersBetween(fix, start) < 150) && speed < 2;
       if (stillAtStop) {
-        // A vehicle only scheduled is often a few minutes late: given up later than one the real time saw leave
+        // A vehicle only scheduled is often a few minutes late: given up later than one the real time saw leave; one the
+        // real time says is at the stop has not left
         final realtime = vehicle?.realtime ?? (input.vehicleStep == current.step && input.realtimeDepartures);
-        final missed = untilDeparture <= (realtime ? const Duration(seconds: -90) : -_scheduledLateness);
+        final missed = vehicle?.atStop != true &&
+            untilDeparture <= (realtime ? const Duration(seconds: -90) : -_scheduledLateness);
         if (missed && current.issue == null && !current.fired.contains('missed-${current.step}')) {
           current = current.copyWith(issue: () => GoIssue.missed);
           alerts.add(GoAlert(id: 'missed-${current.step}', title: currentL10n.alertMissed(lineLabel),
@@ -657,13 +771,13 @@ class GoTracker {
         }
         return current;
       }
-      return _board(current, input.now, departure);
+      return _board(current, input.now, departure, byClock: true);
     }
 
     // No position, or only rough ones (underground station): assume the user boarded
     final unseen = fix == null ? _noFixFor(current, input.now) : !precise;
     if (untilDeparture <= const Duration(seconds: -60) && unseen && current.issue == null) {
-      return _board(current, input.now, departure);
+      return _board(current, input.now, departure, byClock: true);
     }
     return current;
   }
@@ -697,28 +811,42 @@ class GoTracker {
   }
 
   /// Seen on board [ride] at [fix]: moving fast along its line, or [far] along it from the stop whatever the speed
-  /// (the network's positions have none, back from a tunnel), not where the line passes by the stop again
+  /// (the network's positions have none, back from a tunnel), beyond where its vehicle may stand at the stop
+  /// ([GoStep.platformZone]: someone seated in a train waiting at the platform is not on their way), not where the line
+  /// passes by the stop again
   static PolylineProjection? _riding(GoStep ride, LatLng fix, double speed, {bool far = true}) {
     final projection = ride.line.project(fix);
     if (projection == null) {
       return null;
     }
-    if (speed >= 4 && projection.distance < 60 && projection.along > 80) {
+    if (speed >= _movingSpeed && projection.distance < 60 && projection.along > 80) {
       return projection;
     }
     final start = ride.start;
     final awayFromStop = start == null || metersBetween(fix, start) > 150;
-    return far && awayFromStop && projection.distance < 100 && projection.along >= _farAlong ? projection : null;
+    final beyond = math.max(_farAlong, ride.platformZone.to + _beyondZoneMeters);
+    return far && awayFromStop && projection.distance < 100 && projection.along >= beyond ? projection : null;
   }
 
-  /// Nobody waits this far down the line from their stop: seen there, the user is on board
+  /// Nobody waits this far down the line from their stop: seen there, the user is on board…
   static const _farAlong = 400.0;
 
+  /// …nor this far beyond where its vehicle stands at the stop
+  static const _beyondZoneMeters = 200.0;
+
+  /// A vehicle moving: its passengers' GPS says at least this (m/s), sure of it ([sureSpeed])
+  static const _movingSpeed = 4.0;
+
   /// When the vehicle the user is on left the stop, seen [along] meters from it at [now]: at [speed] near the stop (the
-  /// first fixes on board), else on the ride's times (the stops on the way slow it)
-  static DateTime _leftAt(GoStep ride, DateTime now, double along, double speed) => speed >= 4 && along <= 500
-      ? now.subtract(Duration(milliseconds: (along / speed * 1000).round()))
-      : now.subtract(ride.scheduledTo(along));
+  /// first fixes on board) from where the user was seen in it at the platform ([seat]), else on the ride's times (the
+  /// stops on the way slow it)
+  static DateTime _leftAt(GoStep ride, DateTime now, double along, double speed, {double? seat}) {
+    final from = seat ?? (ride.stopAlongs.isEmpty ? 0.0 : ride.stopAlongs.first);
+    final run = math.max(0.0, along - from);
+    return speed >= _movingSpeed && run <= 500
+        ? now.subtract(Duration(milliseconds: (run / speed * 1000).round()))
+        : now.subtract(ride.scheduledTo(along));
+  }
 
   /// Waiting for a vehicle only scheduled, how late it may still come before it is given up for missed
   static const _scheduledLateness = Duration(minutes: 3);
@@ -734,7 +862,7 @@ class GoTracker {
     return anotherVehicle ? left : expected;
   }
 
-  GoProgress _board(GoProgress progress, DateTime? now, DateTime? departure) {
+  GoProgress _board(GoProgress progress, DateTime? now, DateTime? departure, {bool byClock = false}) {
     final ride = stepOf(progress);
     if (ride == null) {
       return progress;
@@ -754,6 +882,11 @@ class GoTracker {
       issue: () => null,
       preciseAlong: () => null,
       preciseAt: () => null,
+      stopFloor: 0,
+      departedAt: () => departure ?? now,
+      byClock: byClock,
+      hintStop: 0,
+      pendingHintStop: () => null,
     );
   }
 
@@ -778,63 +911,323 @@ class GoTracker {
 
   /// On board. [GoProgress.stopIndex] is the last stop the vehicle has left, so that "next stop" is only said once
   /// it is really the next one: not while the vehicle pulls in to the one before.
+  ///
+  /// The GPS leads whenever it is precise: a precise fix on the ride's path says which stops were left and when the
+  /// alighting stop is reached, and nothing else does while one came in the last minute. Its times measure how late the
+  /// vehicle is ([GoProgress.shift], see [_recalibrated]), so that the clock taking over in a tunnel goes on from where
+  /// the GPS last saw the vehicle. Without one (underground, the network's positions only), the clock leads: the stop
+  /// times shifted by that delay, never further than the vehicle can have gone since the GPS last saw it ([_reach]),
+  /// set right by a rough position near a station ([_hint]).
   GoProgress _ride(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
     final ride = steps[progress.step];
     final stops = ride.section.stops;
     // Without the served stops, only the end and the arrival time say where the vehicle is
     final withStops = stops.length >= 2;
     final last = math.max(0, stops.length - 1);
-    final shiftedArrival = (withStops ? ride.stopTime(last) : ride.section.arrival).add(progress.shift);
+    final now = input.now;
+    final accuracy = input.accuracy ?? 0;
+    final at = input.fixAt ?? now;
+    final precise = fix != null && accuracy <= _preciseAccuracy;
     var current = progress;
-    var index = current.stopIndex;
-    var arrived = false;
+    var gpsArrived = false;
+    int? gpsIndex;
 
-    if (fix != null) {
-      final projection = ride.line.project(fix, minAlong: math.max(0, current.along - 50));
-      if (projection != null && projection.distance < 200) {
-        current = current.copyWith(along: math.max(current.along, projection.along));
-        for (var k = index; k < last; k++) {
-          if (ride.stopAlongs[k] + _leftStopMeters <= current.along) {
-            index = k;
-          }
+    if (fix != null && precise) {
+      final projection = ride.line.project(fix, minAlong: math.max(0, (current.preciseAlong ?? 0) - 100));
+      if (projection != null && projection.distance < _onPathMeters) {
+        final along = projection.along;
+        // Two precise fixes on board at least: how late the vehicle is where it is (the first one may be the one that
+        // saw the user board)
+        if (current.preciseAt != null && current.preciseAt!.isBefore(at)) {
+          current = current.copyWith(shift: _recalibrated(ride, current, along, at, input.speed ?? 0));
         }
-        arrived = withStops && ride.stopAlongs[last] <= current.along + _arrivingMeters;
-      }
-      // The GPS's: where the user is between the stops (see betweenStops)
-      if (projection != null && projection.distance < _onPathMeters && (input.accuracy ?? 0) <= _preciseAccuracy) {
-        final seen = math.max(current.preciseAlong ?? 0, projection.along);
-        current = current.copyWith(preciseAlong: () => seen, preciseAt: () => input.fixAt ?? input.now);
+        gpsIndex = _stopLeft(ride, along);
+        gpsArrived = withStops && ride.stopAlongs[last] <= along + _arrivingMeters;
+        final issue = current.issue == GoIssue.offRoute ? null : current.issue;
+        current = current.copyWith(
+          along: math.max(current.along, along),
+          preciseAlong: () => math.max(progress.preciseAlong ?? 0, along),
+          preciseAt: () => at,
+          stopFloor: math.max(current.stopFloor, gpsIndex),
+          offRouteSince: () => null,
+          issue: () => issue,
+        );
+      } else if (projection == null || projection.distance - accuracy > _offLineMeters) {
+        // Far from the line by a fix sure of it: not on this vehicle (the wrong train, off too early)
+        current = _offLine(current, now, alerts);
       }
       final end = ride.end;
-      arrived = arrived || end != null && metersBetween(fix, end) < 60;
+      gpsArrived = gpsArrived || end != null && metersBetween(fix, end) < 60;
     }
-    // Underground: stop times, shifted by the real departure; with only rough positions too, which may stay at a
-    // station the vehicle has left (the further of the two)
-    if (fix == null ? _noFixFor(current, input.now) : (input.accuracy ?? 0) > _preciseAccuracy) {
-      for (var k = index; k < last; k++) {
-        if (!input.now.isBefore(ride.stopTime(k).add(current.shift + _dwell))) {
-          index = k;
+
+    final recentPrecise = current.preciseAt != null && !now.isAfter(current.preciseAt!.add(_noFixDelay));
+    // Underground: a rough position near a station, now and then, says about where the vehicle is
+    final position = input.position;
+    if (!recentPrecise && !precise && position != null && accuracy <= _hintAccuracy && now.difference(at) <= _fixValidity) {
+      current = _hint(ride, current, position, accuracy, at);
+    }
+
+    final shiftedArrival = (withStops ? ride.stopTime(last) : ride.section.arrival).add(current.shift);
+    var index = current.stopIndex;
+    var arrived = gpsArrived;
+    if (recentPrecise) {
+      if (gpsIndex != null) {
+        index = math.max(current.stopFloor, gpsIndex);
+      }
+    } else {
+      // The clock, the vehicle's delay measured, as far as it can have gone; never before a stop the GPS saw left
+      final reach = _reach(ride, current, now);
+      var clockIndex = 0;
+      for (var k = 1; k < last; k++) {
+        if (!now.isBefore(ride.stopTime(k).add(current.shift + _dwell)) && ride.stopAlongs[k] <= reach) {
+          clockIndex = k;
         }
       }
-      arrived = arrived || !input.now.isBefore(shiftedArrival);
+      index = math.max(current.stopFloor, clockIndex);
+      final behind = fix != null && !precise && _roughlyBehind(ride, fix, accuracy);
+      arrived = arrived || !now.isBefore(shiftedArrival) && (!withStops || ride.stopAlongs[last] <= reach) && !behind;
     }
-    current = current.copyWith(stopIndex: math.max(current.stopIndex, index));
+    current = current.copyWith(stopIndex: index);
 
     final alightName = ride.section.to?.name ?? '';
     final left = withStops ? last - current.stopIndex : 1;
-    final untilArrival = shiftedArrival.difference(input.now);
+    final untilArrival = shiftedArrival.difference(now);
     // Get ready once the stop before has been left and the arrival is near (without the stops: two minutes before it)
     if (!arrived && (withStops ? left == 1 && untilArrival <= prepareAhead : untilArrival <= const Duration(minutes: 2))) {
       alerts.add(GoAlert(id: 'prepare-${current.step}', title: currentL10n.alertPrepare, body: currentL10n.goNextStop(alightName)));
     }
     if (arrived) {
       alerts.add(GoAlert(id: 'alight-${current.step}', title: currentL10n.alertGetOffNow, body: alightName, urgent: true));
-      return _advance(current.copyWith(stopIndex: last), input.now);
+      return _advance(current.copyWith(stopIndex: last), now, byClock: !gpsArrived);
     }
     return current;
   }
 
-  GoProgress _advance(GoProgress progress, DateTime? now) {
+  /// Off the line this far (m), the fix's accuracy taken off, the user is not on the ride's vehicle
+  static const _offLineMeters = 300.0;
+
+  /// Rough positions this sure of themselves (m) may still say near which station a vehicle underground is
+  static const _hintAccuracy = 300.0;
+
+  /// …within this of it, the accuracy added
+  static const _hintMeters = 150.0;
+
+  /// A vehicle said near a station is there within this of the clock's time for it
+  static const _hintSlack = Duration(seconds: 60);
+
+  /// The delay measured by a precise fix moves the clock by at most this (fixes a few seconds apart smooth it)
+  static const _maxRecalibration = Duration(seconds: 30);
+
+  /// Back on board the ride the clock got the user off: on its line this far before where they get off, or moving
+  static const _backOnBoardMeters = 500.0;
+
+  /// The last stop left at [along] meters along [ride]
+  static int _stopLeft(GoStep ride, double along) {
+    var index = 0;
+    for (var k = 0; k < ride.stopAlongs.length - 1; k++) {
+      if (ride.stopAlongs[k] + _leftStopMeters <= along) {
+        index = k;
+      }
+    }
+    return index;
+  }
+
+  /// The delay of the vehicle the user is on, measured by a precise fix [along] meters along [ride] at [at]: moving, the
+  /// time it is there less the schedule's; standing (at a station, a signal), at least that, since it hasn't left yet.
+  /// By [_maxRecalibration] at most per fix.
+  static Duration _recalibrated(GoStep ride, GoProgress progress, double along, DateTime at, double speed) {
+    final shift = progress.shift;
+    var target = at.difference(ride.scheduledAt(along));
+    if (speed < _movingSpeed) {
+      final atStation = ride.stopAlongs.any((stop) => (stop - along).abs() <= 100);
+      final late = target - (atStation ? _dwell : Duration.zero);
+      target = late > shift ? late : shift;
+    }
+    var change = target - shift;
+    if (change > _maxRecalibration) {
+      change = _maxRecalibration;
+    } else if (change < -_maxRecalibration) {
+      change = -_maxRecalibration;
+    }
+    return Duration(seconds: (shift + change).inSeconds.clamp(-1800, 3600));
+  }
+
+  /// How far along [ride] the vehicle can be at [now]: where the GPS last saw it, plus its top speed since
+  static double _reach(GoStep ride, GoProgress progress, DateTime now) {
+    final along = progress.preciseAlong;
+    final at = progress.preciseAt;
+    if (along == null || at == null) {
+      return double.infinity;
+    }
+    return along + ride.topSpeed * math.max(0, now.difference(at).inMilliseconds) / 1000;
+  }
+
+  /// A rough position on [ride]'s line well before where the user gets off: not there yet, whatever the clock says
+  static bool _roughlyBehind(GoStep ride, LatLng fix, double accuracy) {
+    if (ride.stopAlongs.length < 2) {
+      return false;
+    }
+    final projection = ride.line.project(fix);
+    return projection != null && projection.distance < 200 && ride.stopAlongs.last - projection.along > accuracy + 500;
+  }
+
+  /// The last stop of [ride] the clock says the vehicle has reached at [at]
+  static int _clockStop(GoStep ride, GoProgress progress, DateTime at) {
+    var stop = 0;
+    for (var k = 1; k < ride.section.stops.length; k++) {
+      if (!at.isBefore(ride.stopTime(k).add(progress.shift))) {
+        stop = k;
+      }
+    }
+    return stop;
+  }
+
+  /// Underground, a rough [position] near a station of [ride] at [at]: the vehicle is about there, the clock set right
+  /// to it. Each station once, never one behind the last taken (a position the system keeps giving while the metro takes
+  /// the user stations away); one more than two stations behind the clock only when a second one further on confirms it
+  /// (the vehicle really late), none further than one ahead.
+  static GoProgress _hint(GoStep ride, GoProgress progress, LatLng position, double accuracy, DateTime at) {
+    final k = ride.stopNear(position, accuracy + _hintMeters);
+    if (k == null || k == 0 || k <= progress.hintStop) {
+      return progress;
+    }
+    final clock = _clockStop(ride, progress, at);
+    if (k > clock + 1) {
+      return progress;
+    }
+    if (k < clock - 2) {
+      final pending = progress.pendingHintStop;
+      if (pending == null || pending >= k) {
+        return progress.copyWith(pendingHintStop: () => k);
+      }
+    }
+    final arrives = ride.stopTime(k).add(progress.shift);
+    final from = arrives.subtract(_hintSlack);
+    final to = arrives.add(_dwell + _hintSlack);
+    // Out of the clock's time there: the vehicle at the station then, standing halfway through its stop
+    final shift = at.isBefore(from) || at.isAfter(to) ? at.difference(ride.stopTime(k).add(_dwell ~/ 2)) : progress.shift;
+    return progress.copyWith(
+      shift: Duration(seconds: shift.inSeconds.clamp(-1800, 3600)),
+      hintStop: k,
+      pendingHintStop: () => null,
+    );
+  }
+
+  /// On board, a precise fix far from the ride's line for a minute: off the way
+  GoProgress _offLine(GoProgress progress, DateTime now, List<GoAlert> alerts) {
+    final since = progress.offRouteSince ?? now;
+    var current = progress.copyWith(offRouteSince: () => since);
+    if (now.difference(since) >= const Duration(minutes: 1) && current.issue == null &&
+        !current.fired.contains('offroute-${current.step}')) {
+      current = current.copyWith(issue: () => GoIssue.offRoute);
+      alerts.add(GoAlert(id: 'offroute-${current.step}', title: currentL10n.goOffRoute, body: currentL10n.alertOffRouteBody));
+    }
+    return current;
+  }
+
+  /// Off a ride by the clock (underground, the GPS lost), a precise fix still on its line before where the user gets off,
+  /// moving with the vehicle or well before that stop: back on board, where the GPS says, its "get off" to come again
+  GoProgress? _backOnBoard(GoProgress progress, GoInput input, LatLng fix) {
+    final previous = progress.step - 1;
+    if (!progress.byClock || progress.joined || progress.phase == GoPhase.onBoard || previous < 0 ||
+        previous >= steps.length || !steps[previous].isRide) {
+      return null;
+    }
+    final ride = steps[previous];
+    final projection = ride.line.project(fix);
+    if (ride.stopAlongs.length < 2 || projection == null || projection.distance > 50) {
+      return null;
+    }
+    final before = ride.stopAlongs.last - projection.along;
+    final moving = (input.speed ?? 0) >= _movingSpeed;
+    if (!(before > _backOnBoardMeters || moving && before > _arrivingMeters)) {
+      return null;
+    }
+    final index = _stopLeft(ride, projection.along);
+    return GoProgress(
+      step: previous,
+      phase: GoPhase.onBoard,
+      along: projection.along,
+      preciseAlong: projection.along,
+      preciseAt: input.fixAt ?? input.now,
+      stopIndex: index,
+      stopFloor: index,
+      shift: progress.shift,
+      lastFixAt: progress.lastFixAt,
+      fired: {...progress.fired}..remove('alight-$previous'),
+    );
+  }
+
+  /// The step the clock says is going on at [now]: the last one whose (shifted) departure is past
+  int _clockStep(GoProgress progress, DateTime now) {
+    var clock = 0;
+    for (var s = 0; s < steps.length; s++) {
+      if (!now.isBefore(steps[s].section.departure.add(progress.shift))) {
+        clock = s;
+      }
+    }
+    return clock;
+  }
+
+  /// The location back (turned on again, a restart, a long tunnel): [fix] is wherever the user got meanwhile, not
+  /// necessarily on the step in progress. On a step further on, of all the journey's that pass by it the one closest to
+  /// where the clock is; one back when the step in progress was only reached by the clock. Null when the user is still
+  /// on the step in progress; off the way when nowhere near the journey.
+  GoProgress? _relocate(GoProgress progress, GoInput input, LatLng fix, List<GoAlert> alerts) {
+    final accuracy = input.accuracy ?? 0;
+    final reach = _onPathMeters + accuracy;
+    final current = stepOf(progress);
+    final here = current?.line.project(fix);
+    if (here != null && here.distance <= reach) {
+      return null;
+    }
+    final lowest = progress.byClock ? math.max(0, progress.step - 1) : progress.step;
+    final clock = _clockStep(progress, input.now);
+    (int, PolylineProjection)? best;
+    var closest = here?.distance ?? double.infinity;
+    for (var s = lowest; s < steps.length; s++) {
+      final projection = steps[s].line.project(fix);
+      if (projection == null) {
+        continue;
+      }
+      closest = math.min(closest, projection.distance);
+      if (s == progress.step || projection.distance > reach) {
+        continue;
+      }
+      if (best == null || (s - clock).abs() < (best.$1 - clock).abs()) {
+        best = (s, projection);
+      }
+    }
+    if (best == null) {
+      if (closest - accuracy > _offLineMeters && progress.issue == null && !progress.fired.contains('offroute-${progress.step}')) {
+        alerts.add(GoAlert(id: 'offroute-${progress.step}', title: currentL10n.goOffRoute, body: currentL10n.alertOffRouteBody));
+        return progress.copyWith(issue: () => GoIssue.offRoute, offRouteSince: () => input.now);
+      }
+      return null;
+    }
+    final (step, projection) = best;
+    final target = steps[step];
+    final base = GoProgress(step: step, phase: _phaseOf(step), shift: progress.shift, lastFixAt: progress.lastFixAt, fired: progress.fired);
+    if (!target.isRide) {
+      return base.copyWith(along: projection.along, joined: projection.distance < 80);
+    }
+    final precise = accuracy <= _preciseAccuracy;
+    final moving = (input.speed ?? 0) >= _movingSpeed;
+    if (!moving && projection.along <= target.platformZone.to + _beyondZoneMeters) {
+      return base;
+    }
+    final index = _stopLeft(target, projection.along);
+    return base.copyWith(
+      phase: GoPhase.onBoard,
+      along: projection.along,
+      preciseAlong: precise ? () => projection.along : null,
+      preciseAt: precise ? () => input.fixAt ?? input.now : null,
+      stopIndex: index,
+      stopFloor: precise ? index : 0,
+    );
+  }
+
+  GoProgress _advance(GoProgress progress, DateTime? now, {bool byClock = false}) {
     final next = progress.step + 1;
     if (next >= steps.length) {
       return _arrive(progress, now ?? DateTime.now());
@@ -845,6 +1238,7 @@ class GoTracker {
       shift: progress.shift,
       lastFixAt: progress.lastFixAt,
       fired: progress.fired,
+      byClock: byClock,
     );
   }
 

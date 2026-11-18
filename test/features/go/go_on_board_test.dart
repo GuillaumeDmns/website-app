@@ -92,6 +92,87 @@ void main() {
     controller.stop();
   });
 
+  test('seated early in a late train at a terminus, far down the platform: GO waits with it, never follows the one '
+      'leaving on time meanwhile, nor gets the user off at that one\'s arrival', () async {
+    final base = DateTime.now().toUtc();
+    DateTime at(int minutes, [int seconds = 0]) => base.add(Duration(minutes: minutes, seconds: seconds));
+    var time = at(4);
+    Ride train(String number, DateTime aimed, DateTime departs, {bool atStop = false}) =>
+        ride(departs, aimed: aimed, trainNumber: number).copyWith(
+          departure: departure(departs, aimed: aimed, trainNumber: number).copyWith(atStop: atStop ? true : null),
+          stops: [
+            for (final (index, stop) in [chatelet, gareDeLyon, nation].indexed)
+              JourneyStop(name: stop.name, lat: stop.lat, lon: stop.lon, time: aimed.add(Duration(minutes: 4 * index))),
+          ],
+        );
+    // The train planned at 8:06 leaves at 8:12, standing at the platform meanwhile; another one leaves on time at 8:07
+    final plan = journey([transit(at(6), 480, line: rerA, via: [gareDeLyon])]);
+    final backend = standardBackend();
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
+          train('A', at(6), at(12), atStop: true).toJson(),
+          train('B', at(7), at(7)).toJson(),
+        ]));
+    final fixes = StreamController<Position>.broadcast();
+    addTearDown(fixes.close);
+    final container = testContainer(backend, overrides: [
+      positionFeedProvider.overrideWithValue(PositionFeed(open: (_) => fixes.stream)),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      userLocationProvider.overrideWith((ref) => Stream.value(LatLng(chatelet.lat, chatelet.lon))),
+      goClockProvider.overrideWithValue(() => time),
+    ]);
+    container.listen(goControllerProvider, (_, _) {});
+    final controller = container.read(goControllerProvider.notifier);
+    controller.start(plan, const JourneyRequest());
+    await pumpEventQueue();
+    final step = container.read(goControllerProvider)!.tracker.steps.single;
+    Position fix(double along, {double speed = 0}) {
+      final point = step.line.pointAt(along);
+      return Position(latitude: point.latitude, longitude: point.longitude, timestamp: time, accuracy: 8, altitude: 0,
+          altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: speed, speedAccuracy: 0.5);
+    }
+
+    // Seated 420 m from the stop's point from 8:04 to 8:12
+    while (time.isBefore(at(12))) {
+      fixes.add(fix(420));
+      await pumpEventQueue();
+      final state = container.read(goControllerProvider)!;
+      expect(state.progress.phase, GoPhase.waiting, reason: '$time');
+      expect(state.progress.issue, isNull, reason: '$time');
+      time = time.add(const Duration(seconds: 20));
+    }
+
+    // It leaves at 8:12
+    for (var along = 430.0; along < 1100; along += 36) {
+      fixes.add(fix(along, speed: 12));
+      await pumpEventQueue();
+      time = time.add(const Duration(seconds: 3));
+    }
+    var state = container.read(goControllerProvider)!;
+    expect(state.progress.phase, GoPhase.onBoard);
+    // Six minutes late at the start, a little less once the GPS saw it run faster than its schedule
+    expect(state.progress.shift.inSeconds, inInclusiveRange(290, 360));
+    expect(state.journey.rides.single.departure, at(6));
+
+    // Into a tunnel: the GPS gives its last position again. Past the arrival of the one that left at 8:07 (8:15), still
+    // on board; off about 8:19
+    final last = fix(1100, speed: 12);
+    while (time.isBefore(at(18, 30))) {
+      time = time.add(const Duration(seconds: 30));
+      fixes.add(Position(latitude: last.latitude, longitude: last.longitude, timestamp: time, accuracy: 8, altitude: 0,
+          altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: 12, speedAccuracy: 0.5));
+      await pumpEventQueue();
+      state = container.read(goControllerProvider)!;
+      expect(state.progress.phase, GoPhase.onBoard, reason: '$time');
+    }
+    time = at(20, 30);
+    fixes.add(Position(latitude: last.latitude, longitude: last.longitude, timestamp: time, accuracy: 8, altitude: 0,
+        altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: 12, speedAccuracy: 0.5));
+    await pumpEventQueue();
+    expect(container.read(goControllerProvider)!.progress.phase, GoPhase.arrived);
+
+    controller.stop();
+  });
+
   _sameMinuteTests();
 }
 
