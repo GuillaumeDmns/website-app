@@ -649,6 +649,9 @@ abstract class LineTraffic with _$LineTraffic {
 
     /// Titles of the active disruptions, worst first
     @Default([]) List<String> titles,
+
+    /// Works going on now on the line or at its stops, nothing else worse than an information: a works sign on its badge
+    @Default(false) bool works,
   }) = _LineTraffic;
 
   factory LineTraffic.fromJson(Map<String, dynamic> json) => _$LineTrafficFromJson(json);

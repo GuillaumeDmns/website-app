@@ -170,6 +170,7 @@
   "trafficAllNormal": "Good service on metros, RER, trains and trams",
   "disruptedBusLines": "{count, plural, =1{1 disrupted bus line} other{{count} disrupted bus lines}}",
   "linesWithInformation": "{count, plural, =1{1 line with information} other{{count} lines with information}}",
+  "severityWorks": "Works",
   "lineSeverity": "{line}: {severity}",
   "trafficMainNormal": "Good service on the main lines",
   "disruptedLines": "{count, plural, =1{1 disrupted line} other{{count} disrupted lines}}",

@@ -445,6 +445,7 @@
       }
     }
   },
+  "severityWorks": "Travaux",
   "lineSeverity": "{line} : {severity}",
   "@lineSeverity": {
     "placeholders": {

@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 
-import '../../app/theme.dart';
 import '../../core/api/models.dart';
 import '../../core/platform/live_journey.dart';
 import '../../core/utils/time_format.dart';
@@ -16,7 +15,6 @@ import 'go_tracker.dart';
 /// platform, the line of the ride as a badge, the progress along the steps and the arrival. Not for an arrived
 /// journey: the notification is gone then.
 LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
-  final brand = '#${(AppTheme.brand.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
   final glance = goGlance(state, now);
   final tracker = state.tracker;
   final progress = state.progress;
@@ -58,8 +56,9 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
       for (final goStep in tracker.steps)
         LiveJourneySegment(
           seconds: goStep.section.duration,
-          // A move in the app's green: grey, its part done looked like one still to do
-          color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : brand,
+          // A move in a dark grey (green read as a line of its own): the system fades the part still to do, and the
+          // light grey of before looked the same faded or not
+          color: goStep.isRide && goStep.section.line?.color != null ? '#${goStep.section.line!.color}' : walkSegmentColor,
         ),
     ],
     tone: switch (glance.tone) {
@@ -69,6 +68,9 @@ LiveJourneyUpdate goLiveUpdate(GoState state, DateTime now) {
     },
   );
 }
+
+/// A move's segment in the notification's progress
+const walkSegmentColor = '#5F6368';
 
 /// The notification's icon of the step in progress
 String _liveMode(JourneySection? section) => switch (section?.kind) {

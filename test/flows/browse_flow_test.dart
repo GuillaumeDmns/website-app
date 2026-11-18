@@ -8,6 +8,7 @@ import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/follow/follow_widgets.dart';
 import 'package:website_app/features/map_place/map_place_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
+import 'package:website_app/features/traffic/disruption_widgets.dart';
 import 'package:website_app/features/traffic/traffic_screen.dart';
 
 import '../support/fake_live_journey.dart';
@@ -145,6 +146,11 @@ void main() {
     expect(find.textContaining('Métro 1 : trafic interrompu'), findsWidgets);
     // Bus lines are folded
     expect(find.textContaining('ligne de bus perturbée'), findsOneWidget);
+    // The RER A in works: the works sign on its badge, not a severity dot, and said so to a screen reader
+    await scrollTo(tester, find.byType(WorksSign));
+    expect(find.byType(WorksSign), findsOneWidget);
+    expect(find.ancestor(of: find.byType(WorksSign), matching: find.byWidgetPredicate(
+        (widget) => widget is Tooltip && (widget.message ?? '').endsWith('travaux'))), findsOneWidget);
 
     await closeApp(tester);
   });
