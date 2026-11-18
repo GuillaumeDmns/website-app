@@ -509,6 +509,7 @@
   "widgetTimeLeftBody": "\"4 min\" rather than the clock time for departures within the hour: let the app update the widget every minute (Alarms and reminders).",
   "walkFor": "{duration} on foot",
   "waitAfterMove": "{duration}\u00a0wait",
+  "rideDirectAlone": "Direct",
   "rideDirect": "direct",
   "transfersShort": "{count, plural, =1{1 transfer} other{{count} transfers}}",
   "avoidModes": "Avoid",
