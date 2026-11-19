@@ -744,18 +744,18 @@ packages:
     dependency: "direct main"
     description:
       name: maplibre
-      sha256: fa420f214208ac09eb08298f26244cfc186b34aa4dde92144c34ff607430173a
+      sha256: "3508feeacae9a4e01ac5b23d2750f93e14321d99fb30838404aa490f0ddd1079"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.0-pre.2"
+    version: "0.4.0"
   maplibre_native:
     dependency: transitive
     description:
       name: maplibre_native
-      sha256: be4be543b042bd16984569bf99aff22fc27297d9293223d757bb34b8de550513
+      sha256: "5178073f1a096032a7ab3e26a5504181c3a0ff80ec3ac7c5ebd47fbf7ceb776e"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.0-pre.2"
+    version: "0.4.0"
   maplibre_native_ffi:
     dependency: transitive
     description:
@@ -768,18 +768,18 @@ packages:
     dependency: transitive
     description:
       name: maplibre_platform_interface
-      sha256: "137c99188e968cc2c00031d9ae5ddc8662f965266d29926f1c4f8ee6ab3be3db"
+      sha256: fe306727e7f917d5ab2b3c6a7c87d17164ee0541aac87a39bce5c6fa25933bd7
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.0-pre.2"
+    version: "0.4.0"
   maplibre_web:
     dependency: transitive
     description:
       name: maplibre_web
-      sha256: e8ecd33caba9970978e43dfba873afcc37a282a6a5c5e14da74bb191bc934e73
+      sha256: "04abbd58fc397b3d04811edf63b60391edccc6cc01fa18b5d7674bf88b11e9d0"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.0-pre.2"
+    version: "0.4.0"
   matcher:
     dependency: transitive
     description:
