@@ -94,6 +94,7 @@ class GoController extends Notifier<GoState?> {
   PositionFeed? _feed;
   StreamSubscription<Position>? _positions;
   Timer? _tick;
+  static const _tickEvery = Duration(seconds: 5);
   Timer? _departuresTimer;
   Position? _lastFix;
 
@@ -541,7 +542,7 @@ class GoController extends Notifier<GoState?> {
     _service = feed.serviceEnabled.listen(_onService, onError: (Object e) => debugPrint('GO location status unavailable: $e'));
     _askPositions();
     unawaited(_seed());
-    _tick = Timer.periodic(const Duration(seconds: 5), (_) => _update());
+    _tick = Timer.periodic(_tickEvery, (_) => _update());
     _departuresTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _watchDepartures();
       _watchBoarded();
@@ -748,6 +749,10 @@ class GoController extends Notifier<GoState?> {
     _recalculateTimer?.cancel();
     _recalculateTimer = null;
   }
+
+  /// The 5 s clock's beat, for a trace played again on a simulated clock (`test/support/go_replay.dart`)
+  @visibleForTesting
+  void tick() => _update();
 
   void _update() {
     final current = state;

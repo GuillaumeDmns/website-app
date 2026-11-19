@@ -187,6 +187,8 @@ class GoProgress {
     this.stopFloor = 0,
     this.departedAt,
     this.byClock = false,
+    this.seenStep,
+    this.preciseFixAt,
     this.hintStop = 0,
     this.pendingHintStop,
   });
@@ -234,6 +236,14 @@ class GoProgress {
   /// a precise fix may still put the user back where they really are (still on board the ride before, say)
   final bool byClock;
 
+  /// With [byClock], the last step the GPS (or the user) put the user on before the clock took them further: a precise
+  /// fix back there takes them back to it. Null when unknown (taken up after a restart): one step back at most.
+  final int? seenStep;
+
+  /// When the last precise fix came (the GPS's, outdoors), wherever it put the user: the GPS working, they are not
+  /// underground
+  final DateTime? preciseFixAt;
+
   /// On board underground: the last stop a rough position was taken as a sign of being at ([stopFloor]'s like for
   /// hints), and a stop further back than the clock waiting for a second hint to confirm it
   final int hintStop;
@@ -256,6 +266,8 @@ class GoProgress {
     int? stopFloor,
     DateTime? Function()? departedAt,
     bool? byClock,
+    int? Function()? seenStep,
+    DateTime? preciseFixAt,
     int? hintStop,
     int? Function()? pendingHintStop,
   }) =>
@@ -276,6 +288,8 @@ class GoProgress {
         stopFloor: stopFloor ?? this.stopFloor,
         departedAt: departedAt != null ? departedAt() : this.departedAt,
         byClock: byClock ?? this.byClock,
+        seenStep: seenStep != null ? seenStep() : this.seenStep,
+        preciseFixAt: preciseFixAt ?? this.preciseFixAt,
         hintStop: hintStop ?? this.hintStop,
         pendingHintStop: pendingHintStop != null ? pendingHintStop() : this.pendingHintStop,
       );
@@ -552,6 +566,9 @@ class GoTracker {
     final alerts = <GoAlert>[];
     final fix = _usableFix(input);
     var current = fix != null ? progress.copyWith(lastFixAt: input.fixAt ?? input.now) : progress;
+    if (fix != null && (input.accuracy ?? 0) <= _preciseAccuracy) {
+      current = current.copyWith(preciseFixAt: input.fixAt ?? input.now);
+    }
 
     // Where the user really is, when the progress was only guessed: still on board the ride the clock got them off, or
     // anywhere on the journey once the location is back
@@ -559,6 +576,7 @@ class GoTracker {
       final precise = (input.accuracy ?? 0) <= _preciseAccuracy;
       current = (precise ? _backOnBoard(current, input, fix) : null) ??
           (input.relocate ? _relocate(current, input, fix, alerts) : null) ??
+          (precise ? _backToSeen(current, input, fix) : null) ??
           current;
     }
 
@@ -693,11 +711,45 @@ class GoTracker {
         }
       }
     } else if (_noFixFor(current, input.now)) {
-      // Underground or indoor: follow the schedule
-      done = !input.now.isBefore(step.section.arrival.add(current.shift));
+      // Underground or indoor: follow the schedule, as far as the user can have gone since the last fix
+      done = !input.now.isBefore(step.section.arrival.add(current.shift)) && _couldBeAtEnd(step, current, input.now);
     }
 
     return done ? _advance(current, input.now, byClock: fix == null) : current;
+  }
+
+  /// The fastest a move's user goes (m/s): a brisk walk, a fast ride; null for a car, which the clock alone follows
+  static double? _topPace(GoStep step) => switch (step.section.kind) {
+        SectionKind.walk || SectionKind.transfer => 2.0,
+        SectionKind.bike => 8.0,
+        _ => null,
+      };
+
+  /// Without a fix, the move [step] may have been done: from where the last one put the user along it, its end is
+  /// within reach at [_topPace] since. Indoors, the GPS gives way to positions hundreds of meters off for a minute or
+  /// two: the user still at home is not at the station by the clock. Only once the GPS saw the user on the move
+  /// ([GoProgress.joined]): before that (a session taken up after a restart, the GPS lost from the start), nothing
+  /// says where they are.
+  static bool _couldBeAtEnd(GoStep step, GoProgress progress, DateTime now) {
+    final pace = _topPace(step);
+    final since = progress.lastFixAt;
+    if (pace == null || since == null || !progress.joined) {
+      return true;
+    }
+    final left = math.max(0.0, step.line.length - progress.along);
+    return !now.isBefore(since.add(Duration(milliseconds: (left / pace * 1000).round())));
+  }
+
+  /// A precise fix off the path of [ride]: not on its vehicle, wherever it is on the way
+  static bool _offPath(GoStep ride, LatLng fix, double accuracy) {
+    final projection = ride.line.project(fix);
+    return projection == null || projection.distance > _onPathMeters + accuracy;
+  }
+
+  /// A precise fix came this recently: the GPS works, the user is not underground
+  static bool _recentlyPrecise(GoProgress progress, DateTime now) {
+    final at = progress.preciseFixAt;
+    return at != null && !now.isAfter(at.add(_noFixDelay));
   }
 
   GoProgress _wait(GoProgress progress, GoInput input, LatLng? fix, List<GoAlert> alerts) {
@@ -771,11 +823,16 @@ class GoTracker {
         }
         return current;
       }
+      // Neither at the stop nor on the way: elsewhere, not on the vehicle gone (at home; a later one may still be taken)
+      if (_offPath(ride, fix, input.accuracy ?? 0)) {
+        return current;
+      }
       return _board(current, input.now, departure, byClock: true);
     }
 
-    // No position, or only rough ones (underground station): assume the user boarded
-    final unseen = fix == null ? _noFixFor(current, input.now) : !precise;
+    // No position, or only rough ones (underground station): assume the user boarded; not while the GPS gave a precise
+    // fix a moment ago (indoors, the network's positions come between the GPS's)
+    final unseen = fix == null ? _noFixFor(current, input.now) : !precise && !_recentlyPrecise(current, input.now);
     if (untilDeparture <= const Duration(seconds: -60) && unseen && current.issue == null) {
       return _board(current, input.now, departure, byClock: true);
     }
@@ -885,6 +942,7 @@ class GoTracker {
       stopFloor: 0,
       departedAt: () => departure ?? now,
       byClock: byClock,
+      seenStep: () => byClock ? _seenBefore(progress) : null,
       hintStop: 0,
       pendingHintStop: () => null,
     );
@@ -1158,6 +1216,51 @@ class GoTracker {
     );
   }
 
+  /// Where a precise fix may be on [step] in [phase]: along a move's path, at a ride's stop (or riding it, seen moving),
+  /// anywhere near its line on board
+  bool _onStep(GoStep step, GoPhase phase, LatLng fix, double accuracy, double speed) {
+    final projection = step.line.project(fix);
+    final distance = projection?.distance ?? double.infinity;
+    return switch (phase) {
+      GoPhase.moving => distance <= _onPathMeters + accuracy,
+      GoPhase.waiting => step.alongInPlatformZone(fix, accuracy) != null || speed >= _movingSpeed && distance <= _onPathMeters + accuracy,
+      GoPhase.onBoard => distance - accuracy <= _offLineMeters,
+      GoPhase.arrived => true,
+    };
+  }
+
+  /// Taken further by the clock, a precise fix sure to be off the step in progress and back on a step the clock got the
+  /// user through since the GPS last saw them ([GoProgress.seenStep]): the user is there, never got further (indoors,
+  /// a minute of rough positions ended the walk; the user is still at home). On a move, where the fix is along it; at a
+  /// ride's stop, waiting for it. The latest such step; never back on board (see [_backOnBoard]).
+  GoProgress? _backToSeen(GoProgress progress, GoInput input, LatLng fix) {
+    if (!progress.byClock || progress.phase == GoPhase.arrived) {
+      return null;
+    }
+    final accuracy = input.accuracy ?? 0;
+    final current = stepOf(progress);
+    if (current == null || _onStep(current, progress.phase, fix, accuracy, input.speed ?? 0)) {
+      return null;
+    }
+    final seen = progress.seenStep ?? math.max(0, progress.step - 1);
+    for (var s = math.min(progress.step, steps.length) - 1; s >= seen; s--) {
+      final step = steps[s];
+      final base = GoProgress(step: s, phase: _phaseOf(s), shift: progress.shift, lastFixAt: progress.lastFixAt, fired: progress.fired);
+      if (step.isRide) {
+        final moving = (input.speed ?? 0) >= _movingSpeed;
+        if (!moving && step.alongInPlatformZone(fix, accuracy) != null) {
+          return base;
+        }
+        continue;
+      }
+      final projection = step.line.project(fix);
+      if (projection != null && projection.distance <= _onPathMeters + accuracy) {
+        return base.copyWith(along: projection.along, joined: projection.distance < 80);
+      }
+    }
+    return null;
+  }
+
   /// The step the clock says is going on at [now]: the last one whose (shifted) departure is past
   int _clockStep(GoProgress progress, DateTime now) {
     var clock = 0;
@@ -1239,8 +1342,12 @@ class GoTracker {
       lastFixAt: progress.lastFixAt,
       fired: progress.fired,
       byClock: byClock,
+      seenStep: byClock ? _seenBefore(progress) : null,
     );
   }
+
+  /// The step the GPS last saw the user on, [progress] being left by the clock
+  static int _seenBefore(GoProgress progress) => progress.byClock ? progress.seenStep ?? math.max(0, progress.step - 1) : progress.step;
 
   GoProgress _arrive(GoProgress progress, DateTime now) => GoProgress(
         step: steps.length,
