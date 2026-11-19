@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,5 +101,52 @@ void main() {
     expect(last.progress.phase, GoPhase.onBoard);
     expect(last.journey.rides.single.departure, at(6));
     expect(last.progress.shift.inMinutes, inInclusiveRange(4, 6));
+  });
+
+  test('played again on the clock: rough positions at home end no walk; the schedule leads between the events', () async {
+    final base = DateTime.now().toUtc();
+    DateTime at(int minutes, [int seconds = 0]) => base.add(Duration(minutes: minutes, seconds: seconds));
+    // Walk 4 min from home to Châtelet, metro at 8:06 to Nation (8 min), walk 3 min
+    final plan = journey([
+      walk(at(0), 240),
+      transit(at(6), 480, via: [gareDeLyon]),
+      walk(at(14), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+    ]);
+    Map<String, Object?> fix(DateTime time, {double accuracy = 8}) => {
+          't': time.toIso8601String(),
+          'kind': 'fix',
+          // A GPS standing still wanders by a few centimeters: each fix a new one (see positionSince)
+          'lat': address.lat + time.second % 7 * 1e-6,
+          'lon': address.lon,
+          'accuracy': accuracy,
+          'speed': 0.0,
+          'speedAccuracy': 0.5,
+          'timestamp': time.toIso8601String(),
+        };
+    Map<String, Object?> session(List<Map<String, Object?>> fixes) => {
+          'id': base.toIso8601String(),
+          'events': [
+            {'t': at(0).toIso8601String(), 'kind': 'start', 'journey': jsonDecode(jsonEncode(plan))},
+            ...fixes,
+          ],
+        };
+
+    // At home, the GPS precise until 8:03:20, then the Wi-Fi's positions 180 m off past the walk's time, then precise again
+    final indoors = await replayGoTrace(session([
+      for (var second = 0; second <= 200; second += 10) fix(at(0, second)),
+      for (var second = 205; second <= 330; second += 5) fix(at(0, second), accuracy: 180),
+      for (var second = 340; second <= 600; second += 10) fix(at(0, second)),
+    ]));
+    expect(indoors.map((replayed) => replayed.state.progress.step).toSet(), {0});
+
+    // The GPS lost at 8:03:20 (underground), one rough position at 8:15: the clock took the user on board meanwhile,
+    // at its beats between the two
+    final underground = await replayGoTrace(session([
+      for (var second = 0; second <= 200; second += 10) fix(at(0, second)),
+      fix(at(15), accuracy: 60),
+    ]));
+    final between = underground.where((replayed) => replayed.at.isAfter(at(8)) && replayed.at.isBefore(at(13)));
+    expect(between, isNotEmpty);
+    expect(between.every((replayed) => replayed.state.progress.step == 1 && replayed.state.progress.phase == GoPhase.onBoard), isTrue);
   });
 }

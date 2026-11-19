@@ -506,6 +506,88 @@ void main() {
     expect(GoProgress.fromJson(const {}).phase, GoPhase.moving);
   });
 
+  group('still at home, the GPS indoors', () {
+    // 10 Rue de Rivoli, where the walk starts, 540 m from Châtelet
+    final home = LatLng(address.lat, address.lon);
+    // The walk at a brisk 2 m/s: more than its 4 min
+    final walkable = Duration(seconds: (tracker.steps[0].line.length / 2).ceil());
+    // Seen at home at 8:00, when the walk starts
+    final (atHome, _) = tracker.update(tracker.initial(), input(at(0), position: home));
+
+    test('a minute of positions hundreds of meters off ends no walk the user can\'t have done since the GPS saw them', () {
+      expect(atHome.joined, isTrue);
+      expect(walkable, greaterThan(const Duration(minutes: 4, seconds: 10)));
+      // The network's positions, too rough to say anything: past the walk's time (8:04), the clock leads, as far as the
+      // user can have walked
+      var (progress, _) = tracker.update(atHome, input(at(4, 1), position: home, accuracy: 180));
+      expect(progress.step, 0);
+      final before = at(0).add(walkable).subtract(const Duration(seconds: 5));
+      (progress, _) = tracker.update(progress, input(before, position: home, accuracy: 180));
+      expect(progress.step, 0);
+      expect(tracker.followsSchedule(progress, before), isTrue);
+
+      // Walkable since the GPS saw them: they may be at the stop
+      (progress, _) = tracker.update(progress, input(at(0).add(walkable), position: home, accuracy: 180));
+      expect(progress.step, 1);
+      expect(progress.phase, GoPhase.waiting);
+      expect(progress.byClock, isTrue);
+    });
+
+    test('never seen on the walk (the GPS lost from the start), the schedule alone ends it', () {
+      final (progress, _) = tracker.update(tracker.initial(), GoInput(now: at(4, 1)));
+      expect(progress.step, 1);
+    });
+
+    test('waiting, a rough position between precise ones at home is not the user underground in the vehicle gone', () {
+      final waiting = tracker.jumpTo(tracker.initial(), 1);
+      // The metro left at 8:06; at home by the GPS, then by the Wi-Fi a moment later
+      var (progress, _) = tracker.update(waiting, input(at(7), position: home));
+      expect(progress.phase, GoPhase.waiting);
+      (progress, _) = tracker.update(progress, input(at(7, 10), position: home, accuracy: 78));
+      expect(progress.phase, GoPhase.waiting);
+      // Precise, at home well after it left: not on it either (a later one may be taken)
+      (progress, _) = tracker.update(progress, input(at(7, 40), position: home));
+      expect(progress.phase, GoPhase.waiting);
+      expect(progress.issue, isNull);
+
+      // Then nothing for a minute and more (underground): on board by the clock, as ever
+      (progress, _) = tracker.update(progress, GoInput(now: at(8, 50)));
+      expect(progress.phase, GoPhase.onBoard);
+      (progress, _) = tracker.update(waiting, input(at(9), position: home, accuracy: 78, fixAt: at(9)));
+      expect(progress.phase, GoPhase.onBoard);
+    });
+
+    test('taken by the clock to the stop, then on board, then off: the GPS at home takes the user back to the walk', () {
+      // No usable position since 8:00: at the stop, then on board, then off at Nation by the clock
+      var (progress, _) = tracker.update(atHome, GoInput(now: at(6)));
+      expect((progress.step, progress.phase, progress.byClock), (1, GoPhase.waiting, true));
+      (progress, _) = tracker.update(progress, GoInput(now: at(7, 1)));
+      expect(progress.phase, GoPhase.onBoard);
+      (progress, _) = tracker.update(progress, GoInput(now: at(14, 1)));
+      expect((progress.step, progress.phase), (2, GoPhase.moving));
+      expect(progress.seenStep, 0);
+
+      // A precise fix at home: still at the start of the walk, never left
+      (progress, _) = tracker.update(progress, input(at(14, 10), position: home));
+      expect((progress.step, progress.phase, progress.byClock), (0, GoPhase.moving, false));
+      expect(progress.along, lessThan(30));
+      // The walk is done by the GPS, or by the clock as far as the user can have gone since
+      (progress, _) = tracker.update(progress, GoInput(now: at(15, 30)));
+      expect(progress.step, 0);
+    });
+
+    test('seen at the stop, the clock taking them on from there: a fix back at home is off the way, not the walk', () {
+      final waiting = tracker.jumpTo(tracker.initial(), 1);
+      var (progress, _) = tracker.update(waiting, input(at(5, 30), position: position(chatelet)));
+      // Underground from there: on board by the clock
+      (progress, _) = tracker.update(progress, GoInput(now: at(7, 1)));
+      expect((progress.phase, progress.byClock, progress.seenStep), (GoPhase.onBoard, true, 1));
+
+      (progress, _) = tracker.update(progress, input(at(7, 30), position: home));
+      expect((progress.step, progress.phase), (1, GoPhase.onBoard));
+    });
+  });
+
   group('the GPS first', () {
     // Walk to Châtelet, RER A from there (its head of platform in this sample, as in a terminus) at 8:06 to Nation
     // through Gare de Lyon (8 min), walk 3 min

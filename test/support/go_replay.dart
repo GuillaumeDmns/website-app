@@ -18,12 +18,15 @@ import 'fake_live_journey.dart';
 import 'standard_backend.dart';
 import 'test_container.dart';
 
+/// The beat of GO's clock between a trace's events ([GoController.tick])
+const _beat = Duration(seconds: 5);
+
 /// A state of GO while a trace is played again, and when
 typedef GoReplayed = ({DateTime at, GoState state});
 
 /// Plays a session of GO's trace again ([GoTrace], exported from a development build): the journey, then the fixes,
 /// the departures and the location turned off and on at the times they came, through GO's own controller on a
-/// simulated clock. The departures asked are answered with the last ones the trace received for that line. Gives GO's
+/// simulated clock, beating every 5 s between them like the controller's. The departures asked are answered with the last ones the trace received for that line. Gives GO's
 /// state after each of them; the trace's own `progress` and `follow` events say what the app made of them then.
 Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session) async {
   final events = [for (final event in session['events'] as List) (event as Map).cast<String, Object?>()];
@@ -64,8 +67,25 @@ Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session) async {
   await pumpEventQueue();
 
   final states = <GoReplayed>[];
+  void record() {
+    final state = container.read(goControllerProvider);
+    if (state != null) {
+      states.add((at: time, state: state));
+    }
+  }
+
+  // The controller's 5 s clock beats between the events, from the start as in the app: what the schedule does without
+  // a fix
+  var beat = time.add(_beat);
   for (final event in events) {
-    time = DateTime.parse(event['t'] as String);
+    final next = DateTime.parse(event['t'] as String);
+    for (; beat.isBefore(next); beat = beat.add(_beat)) {
+      time = beat;
+      controller.tick();
+      await pumpEventQueue();
+      record();
+    }
+    time = next;
     switch (event['kind']) {
       case 'fix':
         fixes.add(Position(
@@ -92,10 +112,7 @@ Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session) async {
         continue;
     }
     await pumpEventQueue();
-    final state = container.read(goControllerProvider);
-    if (state != null) {
-      states.add((at: time, state: state));
-    }
+    record();
   }
   controller.stop();
   return states;
