@@ -1095,6 +1095,7 @@
   "accountDataHint": "Le serveur garde votre email, votre prénom et vos favoris (dont Maison et Travail).",
   "accountExport": "Exporter mes données",
   "exportCopied": "Données copiées dans le presse-papiers",
+  "exportFailed": "Impossible d'exporter les données",
   "accountDangerZone": "Suppression",
   "accountDelete": "Supprimer mon compte",
   "accountDeleteQuestion": "Supprimer votre compte ?",

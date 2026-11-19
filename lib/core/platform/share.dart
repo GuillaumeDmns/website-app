@@ -47,7 +47,8 @@ Future<void> shareLink(BuildContext context, {required String title, required St
 }
 
 /// Hands [text] to the user as a file: the browser's download on the web, the share sheet on Android, iOS and macOS (to
-/// save it or send it), else the clipboard
+/// save it or send it; Android shares the file [fileName], a text over 1 MB being refused by the system), else the
+/// clipboard
 Future<void> exportText(BuildContext context, {required String title, required String fileName, required String text}) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (kIsWeb && browser.download(fileName, text)) {
@@ -55,12 +56,18 @@ Future<void> exportText(BuildContext context, {required String title, required S
   }
   if (hasNativeBridge) {
     try {
-      await _channel.invokeMethod<void>('share', {'title': title, 'text': text});
+      await _channel.invokeMethod<void>('share', {'title': title, 'text': text, 'fileName': fileName});
       return;
     } catch (e) {
       debugPrint('Share failed: $e');
     }
   }
-  await Clipboard.setData(ClipboardData(text: text));
-  messenger?.showSnackBar(SnackBar(content: Text(currentL10n.exportCopied)));
+  try {
+    await Clipboard.setData(ClipboardData(text: text));
+    messenger?.showSnackBar(SnackBar(content: Text(currentL10n.exportCopied)));
+  } catch (e) {
+    // Too big for the clipboard too (Android refuses over 1 MB)
+    debugPrint('Copy failed: $e');
+    messenger?.showSnackBar(SnackBar(content: Text(currentL10n.exportFailed)));
+  }
 }

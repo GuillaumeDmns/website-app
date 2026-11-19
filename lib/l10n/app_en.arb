@@ -372,6 +372,7 @@
   "accountDataHint": "The server keeps your email, first name and favorites (Home and Work included).",
   "accountExport": "Export my data",
   "exportCopied": "Data copied to the clipboard",
+  "exportFailed": "The data could not be exported",
   "accountDangerZone": "Deletion",
   "accountDelete": "Delete my account",
   "accountDeleteQuestion": "Delete your account?",
