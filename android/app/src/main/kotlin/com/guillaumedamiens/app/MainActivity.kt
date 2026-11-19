@@ -6,6 +6,7 @@ import android.app.LocaleManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
@@ -21,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
@@ -28,6 +30,7 @@ import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.Priority
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import java.io.File
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
@@ -154,12 +157,28 @@ class MainActivity: FlutterFragmentActivity() {
                     result.success(null)
                 }
                 "share" -> {
+                    val title = call.argument<String>("title")
+                    val text = call.argument<String>("text") ?: ""
+                    val fileName = call.argument<String>("fileName")
                     val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, call.argument<String>("title"))
-                        putExtra(Intent.EXTRA_TEXT, call.argument<String>("text"))
+                        putExtra(Intent.EXTRA_SUBJECT, title)
+                        if (fileName == null) {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        } else {
+                            // An export, as a file: a text over 1 MB in the intent makes the system refuse it
+                            // (TransactionTooLargeException), and the clipboard as well
+                            val dir = File(cacheDir, "exports").apply { mkdirs() }
+                            val file = File(dir, File(fileName).name)
+                            file.writeText(text)
+                            val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.exports", file)
+                            type = if (fileName.endsWith(".json")) "application/json" else "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            clipData = ClipData.newRawUri(fileName, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
                     }
-                    startActivity(Intent.createChooser(send, call.argument<String>("title")))
+                    startActivity(Intent.createChooser(send, title))
                     result.success(null)
                 }
                 "openStore" -> {

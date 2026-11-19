@@ -37,6 +37,16 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config">
+        <!-- Exports shared as files (GO's traces, the account's data): the app's cache/exports, read by the app chosen -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.exports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/export_paths" />
+        </provider>
         <!-- GO mode: keeps the journey followed with the screen off (started from the app, while in use) -->
         <service
             android:name=".GoService"
