@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/theme.dart';
 import 'package:website_app/core/api/models.dart';
@@ -360,6 +361,48 @@ void main() {
     final datetime = DateTime.parse(backend.requestsTo('/api/v2/journeys').last.queryParameters['datetime'] as String).toLocal();
     // The test may run across a minute
     expect(datetime.minute, anyOf((opened.minute + 1) % 60, (opened.minute + 2) % 60));
+
+    await closeApp(tester);
+  });
+
+  testWidgets('when to leave: the wheels turn with a mouse too (desktop, web): drag, wheel, click', (tester) async {
+    final backend = standardBackend();
+    await pumpApp(tester, backend);
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+
+    await tapOn(tester, find.text(currentL10n.nowShort));
+    await tapOn(tester, find.text(currentL10n.timeLeaveAt));
+    final minutes = find.bySemanticsLabel(currentL10n.timeMinutes);
+    // The minute the sheet says, "Partir à 08:07 aujourd'hui"
+    int shown() {
+      final summary = find.textContaining(RegExp('^${currentL10n.timeLeaveAt} \\d\\d:\\d\\d')).evaluate().map((e) => (e.widget as Text).data!).single;
+      return int.parse(RegExp(r'\d\d:(\d\d)').firstMatch(summary)!.group(1)!);
+    }
+    final start = shown();
+
+    // Dragged with the mouse: one row up is the next minute
+    await tester.drag(minutes, const Offset(0, -40), kind: PointerDeviceKind.mouse);
+    await settle(tester);
+    expect(shown(), (start + 1) % 60);
+    // One notch of the wheel down: one minute more, whatever the notch's size (100 px in Chrome)
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(tester.getCenter(minutes)));
+    await tester.sendEventToBinding(mouse.scroll(const Offset(0, 100)));
+    await settle(tester);
+    expect(shown(), (start + 2) % 60);
+    // And back up
+    await tester.sendEventToBinding(mouse.scroll(const Offset(0, -100)));
+    await settle(tester);
+    expect(shown(), (start + 1) % 60);
+    // A click on a row: that one, here the one under the band
+    await tester.tapAt(tester.getCenter(minutes) + const Offset(0, 40), kind: PointerDeviceKind.mouse);
+    await settle(tester);
+    expect(shown(), (start + 2) % 60);
+    await tapOn(tester, find.text(currentL10n.apply));
+
+    final datetime = DateTime.parse(backend.requestsTo('/api/v2/journeys').last.queryParameters['datetime'] as String).toLocal();
+    expect(datetime.minute, (start + 2) % 60);
 
     await closeApp(tester);
   });

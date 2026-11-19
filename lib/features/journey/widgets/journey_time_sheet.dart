@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -32,6 +35,7 @@ class _TimeSheet extends StatefulWidget {
 
 class _TimeSheetState extends State<_TimeSheet> {
   static const _itemExtent = 40.0;
+  static const _diameterRatio = 1.6;
 
   late _When _when = widget.request.datetime == null
       ? _When.now
@@ -56,6 +60,41 @@ class _TimeSheetState extends State<_TimeSheet> {
     _minute = initial.minute;
     _hours = FixedExtentScrollController(initialItem: _hour);
     _minutes = FixedExtentScrollController(initialItem: _minute);
+  }
+
+  /// What a wheel was scrolled by since its last step (a trackpad sends many small moves)
+  final _scrolled = <FixedExtentScrollController, double>{};
+
+  /// One row per notch of a mouse wheel, whatever its size (100 px in Chrome: the wheel left alone moved two or
+  /// three rows), or per row's height scrolled on a trackpad
+  void _wheelStep(FixedExtentScrollController controller, PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || event.scrollDelta.dy == 0) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (event) {
+      final dy = (event as PointerScrollEvent).scrollDelta.dy;
+      final before = _scrolled[controller] ?? 0;
+      // Turned the other way: from there
+      final scrolled = (before.sign == dy.sign ? before : 0) + dy;
+      if (scrolled.abs() < _itemExtent && dy.abs() < _itemExtent) {
+        _scrolled[controller] = scrolled;
+        return;
+      }
+      _scrolled[controller] = 0;
+      controller.jumpToItem(controller.selectedItem + dy.sign.toInt());
+    });
+  }
+
+  /// The row under a click, [dy] from the wheel's top: the rows away from the band are drawn closer together on the
+  /// cylinder, at its radius × sin(their angle)
+  void _pickRow(FixedExtentScrollController controller, double dy) {
+    const height = _itemExtent * 5;
+    const radius = height * _diameterRatio / 2;
+    final angle = math.asin(((dy - height / 2) / radius).clamp(-1.0, 1.0));
+    final rows = (angle * radius / _itemExtent).round();
+    if (rows != 0) {
+      controller.animateToItem(controller.selectedItem + rows, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+    }
   }
 
   @override
@@ -146,18 +185,36 @@ class _TimeSheetState extends State<_TimeSheet> {
         width: 64,
         child: Semantics(
           label: semantics,
-          child: ListWheelScrollView.useDelegate(
-            controller: controller,
-            itemExtent: _itemExtent,
-            diameterRatio: 1.6,
-            overAndUnderCenterOpacity: 0.35,
-            physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (index) {
-              HapticFeedback.selectionClick();
-              onChanged(index);
-            },
-            childDelegate: ListWheelChildLoopingListDelegate(
-              children: [for (var i = 0; i < count; i++) Center(child: Text(label(i), style: style))],
+          // With a mouse too (desktop, web): Flutter drags scroll views with touch and trackpads only; a click picks
+          // the row clicked
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(dragDevices: PointerDeviceKind.values.toSet()),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTapUp: (details) => _pickRow(controller, details.localPosition.dy),
+                child: ListWheelScrollView.useDelegate(
+                  controller: controller,
+                  itemExtent: _itemExtent,
+                  diameterRatio: _diameterRatio,
+                  overAndUnderCenterOpacity: 0.35,
+                  physics: const FixedExtentScrollPhysics(),
+                  onSelectedItemChanged: (index) {
+                    HapticFeedback.selectionClick();
+                    onChanged(index);
+                  },
+                  childDelegate: ListWheelChildLoopingListDelegate(
+                    children: [
+                      for (var i = 0; i < count; i++)
+                        // Taken before the scroll view's own handling: one row per notch of a mouse wheel
+                        Listener(
+                          onPointerSignal: (event) => _wheelStep(controller, event),
+                          child: Center(child: Text(label(i), style: style)),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
