@@ -130,14 +130,13 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets('in the morning, going to work is offered in one tap', (tester) async {
+  testWidgets('in the morning without a daily trip, no "Aller au travail" chip: the Travail pill does it', (tester) async {
     final morning = DateTime.now().copyWith(hour: 8, minute: 0);
-    final backend = standardBackend();
-    await pumpApp(tester, backend,
+    await pumpApp(tester, standardBackend(),
         store: MemoryStore({'favorites': [work.toJson()]}), overrides: [nowProvider.overrideWith((ref) => Stream.value(morning))]);
 
-    await tapOn(tester, find.widgetWithText(ActionChip, currentL10n.homeSuggestWork));
-    expect(backend.requestsTo('/api/v2/journeys').single.queryParameters['to'], '${nation.lat},${nation.lon}');
+    expect(find.descendant(of: find.byType(FavoriteShortcuts), matching: find.text(currentL10n.work)), findsOneWidget);
+    expect(find.text(currentL10n.homeSuggestWork), findsNothing);
 
     await closeApp(tester);
   });

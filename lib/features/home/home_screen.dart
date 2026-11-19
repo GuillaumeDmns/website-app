@@ -75,7 +75,8 @@ class HomeScreen extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverToBoxAdapter(child: RemoteNotice()),
             ),
-            if (place != null)
+            // Only with a daily trip there: a chip searching the way there was what the place's pill does already
+            if (place != null && commute != null)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 sliver: SliverToBoxAdapter(child: _Suggestion(place: place, trip: commute)),
@@ -169,35 +170,22 @@ Favorite? suggestedPlace(WidgetRef ref, DateTime now) {
   return place;
 }
 
-/// What the user likely wants now, in one tap. With a daily trip there, one card: the suggestion and the trip become
-/// the same thing, with GO and what threatens the trip ([DailyTripCard]); else a chip searching the way there.
-class _Suggestion extends ConsumerWidget {
+/// What the user likely wants now, in one tap: the daily trip to the suggested place, the suggestion and the trip
+/// being the same thing, with GO and what threatens the trip ([DailyTripCard])
+class _Suggestion extends StatelessWidget {
   const _Suggestion({required this.place, required this.trip});
 
   final Favorite place;
-  final DailyTrip? trip;
+  final DailyTrip trip;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final home = place.kind == FavoriteKind.home;
     final icon = home ? Icons.home_rounded : Icons.work_rounded;
     final title = home ? context.l10n.homeSuggestHome : context.l10n.homeSuggestWork;
-    if (trip case final trip?) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: DailyTripCard(key: ValueKey('commute-${trip.id}-${place.kind}'), trip: trip, heading: (icon: icon, title: title)),
-      );
-    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: ActionChip(
-          avatar: Icon(icon, size: 18),
-          label: Text(title),
-          onPressed: () => goToPlace(context, ref, place),
-        ),
-      ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DailyTripCard(key: ValueKey('commute-${trip.id}-${place.kind}'), trip: trip, heading: (icon: icon, title: title)),
     );
   }
 }
