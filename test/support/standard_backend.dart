@@ -32,7 +32,7 @@ FakeBackend standardBackend() {
   backend.post('/api/token/refresh', {'jwt': 'access-token', 'refreshToken': 'next-refresh-token', 'expiresIn': 3600});
 
   backend.on('GET', '/api/v2/nearby/departures', (_) => FakeResponse([chateletDepartures().toJson()]));
-  backend.on('GET', '/api/v2/nearby', (_) => FakeResponse([chatelet.copyWith(distance: 40).toJson(), gareDeLyon.copyWith(distance: 2400).toJson()]));
+  backend.on('GET', '/api/v2/stops', (_) => FakeResponse([chatelet.toJson(), gareDeLyon.toJson()]));
   backend.on('GET', '/api/v2/stops/IDFM:70001/departures', (_) => FakeResponse(chateletDepartures().toJson()));
   backend.get('/api/v2/stops/IDFM:70001', const StopAreaDetail(
     id: 'IDFM:70001',

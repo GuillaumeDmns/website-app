@@ -26,8 +26,9 @@ final nearbyBikesProvider = FutureProvider.autoDispose.family<List<BikeStation>,
 /// Vélib green, as on the stations
 const velibColor = Color(0xFF4CAF50);
 
-/// Map pins of Vélib stations: the bikes available, faded when none can be taken
-List<MapPin> bikeStationPins(BuildContext context, List<BikeStation> stations) => [
+/// Map pins of Vélib stations: the bikes available, faded when none can be taken; at the zooms of [zoom] (those around,
+/// on the home map, close only: [PinZoom.close])
+List<MapPin> bikeStationPins(BuildContext context, List<BikeStation> stations, {PinZoom zoom = PinZoom.any}) => [
       for (final station in stations)
         MapPin(
           point: LatLng(station.lat, station.lon),
@@ -36,6 +37,7 @@ List<MapPin> bikeStationPins(BuildContext context, List<BikeStation> stations) =
           childSize: const Size(44, 24),
           onTap: () => showBikeStationSheet(context, station),
           image: 'bike-${station.renting && station.bikes > 0}-${station.bikes}',
+          zoom: zoom,
           child: _BikePin(station: station),
         ),
     ];

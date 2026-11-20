@@ -22,8 +22,10 @@ class MobilityApi {
       _getList('/api/v2/nearby/departures', StopDepartures.fromJson,
           {'lat': lat, 'lon': lon, 'radius': radius, 'maxStops': maxStops, 'limit': limit});
 
-  Future<List<StopAreaSummary>> nearby(double lat, double lon, {int radius = 500, int limit = 20}) =>
-      _getList('/api/v2/nearby', StopAreaSummary.fromJson, {'lat': lat, 'lon': lon, 'radius': radius, 'limit': limit});
+  /// Stop areas inside a box with their lines, the closest to its middle when it has more than [limit]: the map's
+  Future<List<StopAreaSummary>> stopsInBox(double minLat, double minLon, double maxLat, double maxLon, {int limit = 500}) =>
+      _getList('/api/v2/stops', StopAreaSummary.fromJson,
+          {'minLat': minLat, 'minLon': minLon, 'maxLat': maxLat, 'maxLon': maxLon, 'limit': limit});
 
   Future<StopAreaDetail> stopArea(String stopAreaId) =>
       _get('/api/v2/stops/${Uri.encodeComponent(stopAreaId)}', StopAreaDetail.fromJson);

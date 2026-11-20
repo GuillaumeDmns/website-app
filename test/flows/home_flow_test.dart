@@ -58,6 +58,13 @@ void main() {
     await tapOn(tester, find.text('Vélib'));
     expect(find.byType(NearbyDeparturesList), findsNothing);
     expect(find.text('Châtelet - Rivoli'), findsOneWidget);
+    // On the map, close only: further out they pile up
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    final bikePins = [
+      for (final pin in container.read(mapOverlaysProvider)[container.read(routerLocationProvider)]!.pins)
+        if (pin.label!.startsWith('Châtelet - Rivoli')) pin,
+    ];
+    expect([for (final pin in bikePins) pin.zoom], [PinZoom.close]);
 
     await tapOn(tester, find.text(currentL10n.filterAll));
     expect(badgeOf('C01371'), findsWidgets);
@@ -193,7 +200,7 @@ void main() {
   testWidgets("a stop opened keeps its marker with its lines, and the stops around theirs", (tester) async {
     final backend = standardBackend();
     const hotelDeVille = StopAreaSummary(id: 'IDFM:70010', name: 'Hôtel de Ville', lat: 48.8592, lon: 2.3486, lines: [bus38]);
-    backend.on('GET', '/api/v2/nearby', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
+    backend.on('GET', '/api/v2/stops', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
     backend.get('/api/v2/stops/IDFM:70010', StopAreaDetail(id: hotelDeVille.id, name: hotelDeVille.name, lat: hotelDeVille.lat, lon: hotelDeVille.lon, lines: const [bus38]).toJson());
     await pumpApp(tester, backend);
 
@@ -221,13 +228,16 @@ void main() {
     final backend = standardBackend();
     // A stop the map shows, further than the departures listed around
     const hotelDeVille = StopAreaSummary(id: 'IDFM:70010', name: 'Hôtel de Ville', lat: 48.8592, lon: 2.3486, lines: [bus38]);
-    backend.on('GET', '/api/v2/nearby', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
+    backend.on('GET', '/api/v2/stops', (_) => FakeResponse([chatelet.toJson(), hotelDeVille.toJson()]));
     await pumpApp(tester, backend);
 
-    // Asked around the middle of the map, as far as its corners, from the GTFS
-    final request = backend.requestsTo('/api/v2/nearby').last.queryParameters;
-    expect(request['lat'], closeTo(48.858, 0.005));
-    expect(request['radius'], inInclusiveRange(500, 2000));
+    // The box of the part of the map shown, from the GTFS
+    final request = backend.requestsTo('/api/v2/stops').last.queryParameters;
+    expect(request['minLat'] as double, lessThan(48.8584));
+    expect(request['maxLat'] as double, greaterThan(48.8584));
+    expect(request['minLon'] as double, lessThan(2.347));
+    expect(request['maxLon'] as double, greaterThan(2.347));
+    expect(request['limit'], mapStopsLimit);
     // One marker per stop with its lines: Châtelet once, though listed around too
     StopMarker marker(Element element) => element.widget as StopMarker;
     expect([for (final element in find.byType(StopMarker).evaluate()) marker(element).lines.length]..sort(), [1, 3]);

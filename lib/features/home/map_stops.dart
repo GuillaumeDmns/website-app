@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,31 +18,54 @@ import '../traffic/disruption_widgets.dart';
 /// would cover the map.
 const mapStopsMetersPerPixel = 6.6;
 
-/// Stops asked for the map at most: the closest ones to its center (the backend's limit), about 2 km around in Paris, as
-/// far as the dots show ([PinZoom.stopDot])
-const mapStopsLimit = 200;
+/// Stops asked for the map at most (the backend's limit): those closest to the middle of the part shown when it has
+/// more, about 950 in the middle of Paris on a 1920 px wide window at [mapStopsMetersPerPixel]
+const mapStopsLimit = 1500;
 
-/// The stops to ask for a [MapView]: around its center rounded to about 100 m (small moves of the map ask nothing
-/// new), as far as its corners; null when the map shows too much for them, or isn't known yet
-({double lat, double lon, int radius})? mapStopsQuery(MapView? view) {
+/// How much more than the part of the map shown its stops are asked for, on each side (a fraction of its width and
+/// height): a small move shows stops already there
+const mapStopsMargin = 0.1;
+
+/// The farthest the box of stops goes from its middle, meters: very wide screens (the backend refuses a box over
+/// half a degree)
+const _maxHalfSide = 15000.0;
+
+/// The stops to ask for a [MapView]: the box of the part of the map the user sees (above the panel), [mapStopsMargin]
+/// wider on each side. Its middle is rounded to about 100 m and its sides to the next 100 m (100 m more for the
+/// rounded middle): small moves of the map ask nothing new. Null when the map shows too much for them, or isn't known
+/// yet.
+({double minLat, double minLon, double maxLat, double maxLon})? mapStopsQuery(MapView? view) {
   if (view == null || view.metersPerPixel > mapStopsMetersPerPixel) {
     return null;
   }
-  double round(double value) => (value * 1000).roundToDouble() / 1000;
-  // To the next 100 m, and 100 m more for the rounded center; the backend looks at most 2 km around
-  final radius = ((view.radius / 100).ceil() + 1) * 100;
-  return (lat: round(view.center.latitude), lon: round(view.center.longitude), radius: radius.clamp(100, 2000));
+  final area = visibleArea(view, margin: mapStopsMargin);
+  double round(double value, int digits) {
+    final factor = math.pow(10, digits);
+    return (value * factor).roundToDouble() / factor;
+  }
+  double side(double meters) => math.min(((meters / 100).ceil() + 1) * 100.0, _maxHalfSide);
+  final lat = round(area.center.latitude, 3);
+  final lon = round(area.center.longitude, 3);
+  final dLat = side(area.halfHeight) / metersPerDegree;
+  final dLon = side(area.halfWidth) / (metersPerDegree * math.cos(lat * math.pi / 180));
+  return (
+    minLat: round(lat - dLat, 5),
+    minLon: round(lon - dLon, 5),
+    maxLat: round(lat + dLat, 5),
+    maxLon: round(lon + dLon, 5),
+  );
 }
 
-/// The stop areas of the part of the map shown, with their lines, once it is close enough ([mapStopsMetersPerPixel]);
-/// none further out (and the map hides those it has as soon as it zooms out: [PinZoom]). From the GTFS only (`/api/v2/nearby`): no real-time quota. While the stops of a new view are
-/// fetched, the previous ones stay (the provider keeps its last value): the markers don't blink as the map moves.
+/// The stop areas of the part of the map shown ([mapStopsQuery]), with their lines, once it is close enough
+/// ([mapStopsMetersPerPixel]); none further out (and the map hides those it has as soon as it zooms out: [PinZoom]).
+/// From the GTFS only (`/api/v2/stops`): no real-time quota. While the stops of a new view are fetched, the previous
+/// ones stay (the provider keeps its last value): the markers don't blink as the map moves.
 final mapStopsProvider = FutureProvider.autoDispose<List<StopAreaSummary>>((ref) async {
   final query = ref.watch(mapViewProvider.select(mapStopsQuery));
   if (query == null) {
     return const [];
   }
-  return ref.mobilityApi.nearby(query.lat, query.lon, radius: query.radius, limit: mapStopsLimit);
+  return ref.mobilityApi.stopsInBox(query.minLat, query.minLon, query.maxLat, query.maxLon, limit: mapStopsLimit);
 });
 
 /// The stop of [departures] for its marker: with the lines of its departures when it comes without its own

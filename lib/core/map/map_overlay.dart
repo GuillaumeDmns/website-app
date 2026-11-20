@@ -58,7 +58,7 @@ class MapPin {
   /// station, and say nothing yet)
   final bool closeUp;
 
-  /// The zooms it shows at: a stop's dot from afar, its lines closer ([PinZoom])
+  /// The zooms it shows at: a stop's dot from afar, its lines closer, a Vélib station close ([PinZoom])
   final PinZoom zoom;
 
   /// Shown at [zoom], MapLibre's (its world 512 px wide at zoom 0; flutter_map's is one more)
@@ -76,7 +76,11 @@ enum PinZoom {
   stopDot(min: stopDotZoom, max: stopLinesZoom),
 
   /// A stop seen close: its marker with its lines, from [stopLinesZoom]
-  stopLines(min: stopLinesZoom);
+  stopLines(min: stopLinesZoom),
+
+  /// Other pins worth seeing close only, under the stops' lines: the Vélib stations around, from [stopLinesZoom] (a
+  /// neighbourhood on the screen; further out they pile up)
+  close(min: stopLinesZoom);
 
   const PinZoom({this.min, this.max});
 
