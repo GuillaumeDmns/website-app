@@ -82,7 +82,7 @@ class _MobilityAppState extends ConsumerState<MobilityApp> with WidgetsBindingOb
       builder: (context, child) {
         final app = KeyedSubtree(
           key: ValueKey(locale),
-          // flutter_map, vector_map_tiles and maplibre still build their widgets (the attribution, …) from Flutter's own
+          // flutter_map (the tests' map) and maplibre still build their widgets (the attribution, …) from Flutter's own
           // Material library, which only reads its own ThemeData and MaterialLocalizations: the bridge gives them
           // the app's. To drop once they have moved to material_ui.
           // ignore: deprecated_member_use
