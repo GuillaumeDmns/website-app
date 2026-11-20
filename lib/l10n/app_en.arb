@@ -465,7 +465,6 @@
   "goMissedShort": "{line} missed",
   "goCancelledShort": "{line} cancelled",
   "goRetained": "The next one is kept, choose another one if needed",
-  "goRecalculateIn": "Recalculating in {seconds} s",
   "goRecalculateJourney": "Recalculate the journey",
   "timeSheetTitle": "When?",
   "timeNow": "Now",

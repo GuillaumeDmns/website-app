@@ -164,9 +164,6 @@ class GoController extends Notifier<GoState?> {
   ({RideKey key, GoTracker tracker, int step})? _boardKey;
   static const _boardedWatch = Duration(minutes: 5);
 
-  /// Off the way: the recalculation on its own, after a countdown the user can beat or cancel
-  Timer? _recalculateTimer;
-  static const _recalculateAfter = Duration(seconds: 10);
 
   @override
   GoState? build() {
@@ -240,18 +237,7 @@ class GoController extends Notifier<GoState?> {
     _save();
   }
 
-  void dismissIssue() {
-    _cancelRecalculation();
-    _setProgress((tracker, progress) => tracker.dismissIssue(progress));
-  }
-
-  void _cancelRecalculation() {
-    _recalculateTimer?.cancel();
-    _recalculateTimer = null;
-    if (state?.recalculateAt != null) {
-      state = state!.copyWith(recalculateAt: () => null);
-    }
-  }
+  void dismissIssue() => _setProgress((tracker, progress) => tracker.dismissIssue(progress));
 
   /// Takes [ride] for the ride [step] (in progress or to come) instead of the planned departure (missed, cancelled,
   /// or another one preferred): the journey moves to it from there, the following connections included. [retained]:
@@ -422,10 +408,8 @@ class GoController extends Notifier<GoState?> {
   }
 
   /// New journey from the current position to the same destination with the same options; the first option is
-  /// followed.
+  /// followed. Only when the user asks for it: GO never replaces the journey followed on its own.
   Future<void> recalculate() async {
-    _recalculateTimer?.cancel();
-    _recalculateTimer = null;
     final current = state;
     if (current == null || current.recalculating) {
       return;
@@ -437,7 +421,7 @@ class GoController extends Notifier<GoState?> {
       return;
     }
 
-    state = current.copyWith(recalculating: true, error: () => null, recalculateAt: () => null);
+    state = current.copyWith(recalculating: true, error: () => null);
     try {
       final request = current.request;
       final plan = await ref.read(mobilityApiProvider).journeys(
@@ -746,8 +730,6 @@ class GoController extends Notifier<GoState?> {
     _reacquireRough = null;
     _relocateNext = false;
     _lastPreciseAt = null;
-    _recalculateTimer?.cancel();
-    _recalculateTimer = null;
   }
 
   /// The 5 s clock's beat, for a trace played again on a simulated clock (`test/support/go_replay.dart`)
@@ -793,16 +775,6 @@ class GoController extends Notifier<GoState?> {
     if (current.retained case final retained?
         when progress.step != retained.step || progress.phase != GoPhase.waiting) {
       next = next.copyWith(retained: () => null);
-    }
-    // Off the way: recalculated on its own after a countdown; back on it, nothing to do
-    if (progress.issue == GoIssue.offRoute && current.progress.issue != GoIssue.offRoute && !current.recalculating) {
-      _recalculateTimer?.cancel();
-      _recalculateTimer = Timer(_recalculateAfter, recalculate);
-      next = next.copyWith(recalculateAt: () => _now().add(_recalculateAfter));
-    } else if (progress.issue != GoIssue.offRoute && current.recalculateAt != null) {
-      _recalculateTimer?.cancel();
-      _recalculateTimer = null;
-      next = next.copyWith(recalculateAt: () => null);
     }
     // Felt in the app; the ongoing notification says what to do now, and only what must be done at once rings in a
     // notification of its own while the app isn't on screen

@@ -142,19 +142,14 @@ GoGlance goGlance(GoState state, DateTime now, {bool turns = true}) {
       // stop are no emergency
       final last = left <= 1;
       final minutes = minutesLeft(arrival.difference(now));
-      // Far from the line: not on this vehicle (the wrong train, off too early), the recalculation coming on its own
+      // Far from the line: not on this vehicle (the wrong train, off too early); recalculated only if the user asks
       if (progress.issue == GoIssue.offRoute) {
-        final at = state.recalculateAt;
         return GoGlance(
           line: line,
           icon: Icons.wrong_location,
           kicker: currentL10n.direction(section.headsign ?? ''),
           action: currentL10n.goOffRoute,
-          place: state.recalculating
-              ? currentL10n.recalculate
-              : at == null
-                  ? null
-                  : currentL10n.goRecalculateIn(math.max(0, at.difference(now).inSeconds)),
+          place: state.recalculating ? currentL10n.recalculate : null,
           tone: GoTone.warn,
         );
       }
@@ -182,18 +177,13 @@ GoGlance goGlance(GoState state, DateTime now, {bool turns = true}) {
       final towards = section.to?.name ?? '';
       final meters = metersToGo(state);
 
-      // Off the way: said first, with the recalculation coming on its own
+      // Off the way: said first; recalculated only if the user asks
       if (progress.issue == GoIssue.offRoute) {
-        final at = state.recalculateAt;
         return GoGlance(
           icon: Icons.wrong_location,
           kicker: currentL10n.goKickerTowards(mode, towards),
           action: currentL10n.goOffRoute,
-          place: state.recalculating
-              ? currentL10n.recalculate
-              : at == null
-                  ? null
-                  : currentL10n.goRecalculateIn(math.max(0, at.difference(now).inSeconds)),
+          place: state.recalculating ? currentL10n.recalculate : null,
           tone: GoTone.warn,
         );
       }

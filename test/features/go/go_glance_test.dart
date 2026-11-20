@@ -127,12 +127,13 @@ void main() {
     expect(glance.tone, GoTone.warn);
   });
 
-  test('off the way: said first, with the recalculation coming', () {
+  test('off the way: said first, no recalculation coming on its own', () {
     final off = tracker.initial().copyWith(issue: () => GoIssue.offRoute);
-    final glance = goGlance(state(off).copyWith(recalculateAt: () => at(1).add(const Duration(seconds: 8))), at(1));
+    final glance = goGlance(state(off), at(1));
     expect(glance.action, currentL10n.goOffRoute);
-    expect(glance.place, currentL10n.goRecalculateIn(8));
+    expect(glance.place, isNull);
     expect(glance.tone, GoTone.warn);
+    expect(goGlance(state(off).copyWith(recalculating: true), at(1)).place, currentL10n.recalculate);
   });
 
   test('a missed train replaced by the next one: said, with how much later', () {

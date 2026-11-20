@@ -1241,8 +1241,6 @@
   "goCancelledShort": "{line} supprimé",
   "@goCancelledShort": {"placeholders": {"line": {"type": "String"}}},
   "goRetained": "Le suivant est retenu, choisissez-en un autre si besoin",
-  "goRecalculateIn": "Recalcul dans {seconds} s",
-  "@goRecalculateIn": {"placeholders": {"seconds": {"type": "int"}}},
   "goRecalculateJourney": "Recalculer l'itinéraire",
   "timeSheetTitle": "Quand partir ?",
   "timeNow": "Maintenant",

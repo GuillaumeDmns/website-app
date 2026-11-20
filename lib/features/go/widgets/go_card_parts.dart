@@ -254,7 +254,7 @@ class GoNoGpsLine extends ConsumerWidget {
       );
 }
 
-/// Off the way: recalculate now, or ignore it
+/// Off the way: recalculate (only ever on the user's tap: GO never replaces the journey on its own), or ignore it
 class GoOffRouteActions extends ConsumerWidget {
   const GoOffRouteActions({super.key, required this.state});
 
