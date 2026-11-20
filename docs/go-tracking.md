@@ -84,8 +84,9 @@ sure). **Moving** in a vehicle = sure speed ≥ 4 m/s (`_movingSpeed`).
 
 - **Progress**: the fix projected on the path from `along − 30 m` on; `along` never goes back.
 - **Joined**: a fix within 80 m of the path.
-- **Off the way**: `distance − accuracy > 150 m` for 1 min → `offRoute` (alert `offroute-<step>`), the journey recalculated
-  10 s later unless the user does it or ignores it (`GoController.recalculate`). Not before the path was joined while
+- **Off the way**: `distance − accuracy > 150 m` for 1 min → `offRoute` (alert `offroute-<step>`), said with
+  "Recalculer" / "Ignorer": the journey is only ever recalculated on the user's tap (`GoController.recalculate`), never on
+  its own (a train's wrong position once had GO swap the plan for a metro the user never meant to take). Not before the path was joined while
   within 400 m of where it starts (out of a train, the platform is hundreds of meters from where the walk is drawn from).
   Back within 80 m clears it.
 - **Done**: within 40 m of the path's end (or of the step's end point). The journey's **last** move ends only right by
@@ -193,7 +194,7 @@ A **P fix within 100 m of the line**:
   left. At most 30 s change per fix: a few fixes converge, one odd fix can't jump.
 
 A **P fix more than 300 m + accuracy from the line for 1 min** → `offRoute` (wrong train or direction, off too early):
-the ride card shows "Recalculer" / "Ignorer", recalculated after 10 s.
+the ride card shows "Recalculer" / "Ignorer", recalculated only on the user's tap.
 
 ### Without it (underground, rough fixes, location off)
 
@@ -257,7 +258,7 @@ The device's stream is opened again (`PositionFeed.reopen`: Android's stream end
 | Ride: still and within the zone + 200 m | waiting for it |
 | Ride: moving or further | on board, stops from its position |
 | Move | on it, at its position |
-| Nowhere: further than 300 m + accuracy from every step | `offRoute`, recalculated |
+| Nowhere: further than 300 m + accuracy from every step | `offRoute` (recalculated only on the user's tap) |
 
 Relocation also runs after a **restart** (the session restored, its last fix not kept) and after **3 min without a precise fix**
 (a long tunnel).
@@ -279,7 +280,7 @@ Relocation also runs after a **restart** (the session restored, its last fix not
 | Metro, positions near some stations | hints set the clock; one behind ignored unless confirmed |
 | RER: outdoors, tunnel, outdoors | delay measured outdoors, clock in the tunnel from it, GPS leads again at the exit |
 | Clock says "get off" but the train is late and the GPS sees it on the line | back on board |
-| Wrong train / wrong direction | off the line for 1 min → recalculation |
+| Wrong train / wrong direction | off the line for 1 min → off the way, "Recalculer" offered |
 | Location off for several steps | clock; when back, placed where the fix is, possibly steps ahead |
 | App killed and restarted mid-journey | session restored, next fix relocated |
 

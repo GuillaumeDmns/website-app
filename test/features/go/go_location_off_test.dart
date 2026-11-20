@@ -80,7 +80,7 @@ void main() {
       expect(progress.phase, GoPhase.onBoard);
     });
 
-    test('nowhere near the journey: off the way, the recalculation coming', () {
+    test('nowhere near the journey: off the way', () {
       final onBoard = tracker.next(tracker.jumpTo(tracker.initial(), 1));
       final (progress, alerts) = tracker.update(onBoard, back(at(10), const LatLng(48.8900, 2.2500)));
       expect(progress.issue, GoIssue.offRoute);

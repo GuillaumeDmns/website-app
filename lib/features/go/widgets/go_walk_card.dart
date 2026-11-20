@@ -152,7 +152,6 @@ class GoWalkCard extends ConsumerWidget {
   }
 }
 
-/// Off the way: the recalculation coming on its own (its countdown in the header), done now or ignored
 /// One instruction of a move, like Citymapper's: its arrow in a square, `Dans 35 m` over what to do, the time it takes
 class _TurnRow extends StatelessWidget {
   const _TurnRow({required this.walk, required this.meters, required this.pace, required this.next});
