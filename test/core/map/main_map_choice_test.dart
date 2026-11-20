@@ -12,15 +12,20 @@ void main() {
     return container.read(useMapLibreProvider);
   }
 
-  test('MapLibre on phones, flutter_map on desktop', () {
-    expect(usesMapLibre(TargetPlatform.android), isTrue);
-    expect(usesMapLibre(TargetPlatform.iOS), isTrue);
-    expect(usesMapLibre(TargetPlatform.linux), isFalse);
-    expect(usesMapLibre(TargetPlatform.windows), isFalse);
-    expect(usesMapLibre(TargetPlatform.macOS), isFalse);
+  test('MapLibre on phones and on desktop', () {
+    for (final platform in [
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.linux,
+      TargetPlatform.windows,
+      TargetPlatform.macOS,
+    ]) {
+      expect(usesMapLibre(platform), isTrue, reason: '$platform');
+    }
   });
 
   test('flutter_map without tiles (the tests)', () {
     expect(usesMapLibre(TargetPlatform.android, tiles: false), isFalse);
+    expect(usesMapLibre(TargetPlatform.linux, tiles: false), isFalse);
   });
 }
