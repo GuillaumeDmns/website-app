@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,19 +18,49 @@ void main() {
   const tram3 = LineSummary(id: 'C03000', name: 'T3a', mode: TransportMode.tram, color: 'FF5A00');
 
   group('the part of the map shown', () {
+    // The map beside the 420 px side panel of a 1920 × 994 window
+    const desktop = Size(1499, 994);
+    double metersAcross(double fromLon, double toLon, double lat) => (toLon - fromLon) * metersPerDegree * math.cos(lat * math.pi / 180);
+    double metersUp(double fromLat, double toLat) => (toLat - fromLat) * metersPerDegree;
+
     test('the same scale whatever draws the map: MapLibre counts its zooms one less than flutter_map', () {
       final mapLibre = mapViewOf(paris, 15, phone, tileSize: 512);
       final flutterMap = mapViewOf(paris, 16, phone, tileSize: 256);
       expect(mapLibre.metersPerPixel, closeTo(1.57, 0.01));
       expect(flutterMap.metersPerPixel, closeTo(mapLibre.metersPerPixel, 1e-9));
-      // To its corners: half its diagonal
-      expect(mapLibre.radius, closeTo(1.57 * 1003.5 / 2, 2));
+    });
+
+    test('on a phone, the part above the sheet: its middle higher than the map\'s, as wide, less high', () {
+      final view = mapViewOf(paris, 15, phone, tileSize: 512, hidden: 400);
+      final area = visibleArea(view);
+      final meters = view.metersPerPixel;
+      expect(metersUp(paris.latitude, area.center.latitude), closeTo(200 * meters, 0.01));
+      expect(area.center.longitude, paris.longitude);
+      expect(area.halfWidth, closeTo(206 * meters, 0.01));
+      expect(area.halfHeight, closeTo(257.5 * meters, 0.01));
+      // With a margin, a tenth more on each side
+      final wider = visibleArea(view, margin: 0.1);
+      expect(wider.halfWidth, closeTo(412 * 0.6 * meters, 0.01));
+      expect(wider.halfHeight, closeTo(515 * 0.6 * meters, 0.01));
+      // The sheet never hides more than the map
+      expect(mapViewOf(paris, 15, phone, tileSize: 512, hidden: 2000).hidden, phone.height);
+      expect(visibleArea(mapViewOf(paris, 15, phone, tileSize: 512)).center, paris);
+    });
+
+    test('on a wide window, the whole map beside the side panel, MapLibre and flutter_map alike', () {
+      final mapLibre = visibleArea(mapViewOf(paris, 13, desktop, tileSize: 512));
+      final flutterMap = visibleArea(mapViewOf(paris, 14, desktop, tileSize: 256));
+      expect(mapLibre.center, paris);
+      // About 9.4 × 6.3 km
+      expect(mapLibre.halfWidth * 2, closeTo(9420, 20));
+      expect(mapLibre.halfHeight * 2, closeTo(6250, 20));
+      expect(flutterMap.halfWidth, closeTo(mapLibre.halfWidth, 1e-6));
+      expect(flutterMap.halfHeight, closeTo(mapLibre.halfHeight, 1e-6));
     });
 
     test('its stops are asked once close enough, none further out', () {
       // A neighbourhood on the screen
-      final close = mapStopsQuery(mapViewOf(paris, 16, phone, tileSize: 512));
-      expect(close, (lat: 48.858, lon: 2.347, radius: 500));
+      expect(mapStopsQuery(mapViewOf(paris, 16, phone, tileSize: 512)), isNotNull);
       expect(mapStopsQuery(mapViewOf(paris, 15, phone, tileSize: 512)), isNotNull);
       // A part of the town: their dots, from the zoom they show at
       expect(mapStopsQuery(mapViewOf(paris, PinZoom.stopDotZoom, phone, tileSize: 512)), isNotNull);
@@ -39,11 +71,45 @@ void main() {
       expect(mapStopsQuery(null), isNull);
     });
 
-    test('a small move of the map asks nothing new, a wide screen never more than the backend looks around', () {
+    test('on a phone, the box of the part above the sheet with its margin', () {
+      final view = mapViewOf(paris, 15, phone, tileSize: 512, hidden: 400);
+      final box = mapStopsQuery(view)!;
+      final area = visibleArea(view, margin: mapStopsMargin);
+      final middle = (lat: (box.minLat + box.maxLat) / 2, lon: (box.minLon + box.maxLon) / 2);
+      // Its middle above the map's, within the rounding
+      expect(metersUp(area.center.latitude, middle.lat).abs(), lessThan(60));
+      expect(middle.lat, greaterThan(paris.latitude));
+      // At least the visible part and its margin, at most 200 m more on each side
+      final width = metersAcross(box.minLon, box.maxLon, middle.lat);
+      final height = metersUp(box.minLat, box.maxLat);
+      expect(width, inInclusiveRange(area.halfWidth * 2, area.halfWidth * 2 + 400));
+      expect(height, inInclusiveRange(area.halfHeight * 2, area.halfHeight * 2 + 400));
+      // Not what the sheet hides: its bottom above the map's
+      expect(box.minLat, greaterThan(paris.latitude - phone.height / 2 * view.metersPerPixel / metersPerDegree));
+    });
+
+    test('on a wide window, the whole map, not a disc 2 km around its middle', () {
+      final view = mapViewOf(paris, 13, desktop, tileSize: 512);
+      final box = mapStopsQuery(view)!;
+      final width = metersAcross(box.minLon, box.maxLon, paris.latitude);
+      final height = metersUp(box.minLat, box.maxLat);
+      // 9.4 × 6.3 km and a tenth more on each side
+      expect(width, inInclusiveRange(9420 * 1.2, 9420 * 1.2 + 400));
+      expect(height, inInclusiveRange(6250 * 1.2, 6250 * 1.2 + 400));
+      expect(box.minLat, lessThan(paris.latitude));
+      expect(box.maxLat, greaterThan(paris.latitude));
+      // flutter_map's zoom one more: the same box
+      expect(mapStopsQuery(mapViewOf(paris, 14, desktop, tileSize: 256)), box);
+    });
+
+    test('a small move of the map asks nothing new, a very wide screen no more than the backend takes', () {
       final view = mapViewOf(paris, 16, phone, tileSize: 512);
       final moved = mapViewOf(const LatLng(48.8582, 2.3472), 16, phone, tileSize: 512);
       expect(mapStopsQuery(moved), mapStopsQuery(view));
-      expect(mapStopsQuery(mapViewOf(paris, 15, const Size(3840, 2160), tileSize: 512))?.radius, 2000);
+      // An 8K screen at the zoom the dots show from: 15 km each side at most, under half a degree
+      final huge = mapStopsQuery(mapViewOf(paris, PinZoom.stopDotZoom, const Size(7680, 4320), tileSize: 512))!;
+      expect(huge.maxLon - huge.minLon, lessThan(0.5));
+      expect(metersAcross(huge.minLon, huge.maxLon, paris.latitude), closeTo(30000, 200));
     });
   });
 

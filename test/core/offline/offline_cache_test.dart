@@ -98,7 +98,7 @@ void main() {
   });
 
   test('never keeps real-time-only answers, the stops of the map nor the account', () async {
-    for (final path in ['/api/v2/lines/C1/vehicles', '/api/v2/lines/C1/rides', '/api/v2/bikes/nearby', '/api/v2/search', '/api/v2/nearby', '/api/v2/me', '/api/v2/me/export']) {
+    for (final path in ['/api/v2/lines/C1/vehicles', '/api/v2/lines/C1/rides', '/api/v2/bikes/nearby', '/api/v2/search', '/api/v2/nearby', '/api/v2/stops', '/api/v2/me', '/api/v2/me/export']) {
       backend.get(path, {'path': path});
       await dio.get<Object>(path);
     }

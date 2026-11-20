@@ -290,8 +290,9 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
     }
   }
 
-  /// The panel moved: followed once a frame
+  /// The panel moved: followed once a frame, and what the map shows above it published once it rests
   void _onPanel() {
+    _publishView();
     if (_panelScheduled) {
       return;
     }
@@ -407,20 +408,24 @@ class _MapLibreMainMapState extends ConsumerState<MapLibreMainMap> {
   void _onLongPress(Geographic point) => widget.onLongPress?.call(context, LatLng(point.lat, point.lon));
 
   /// Once the camera rests: where it is, and what it shows (the stops there; MapLibre's world is 512 px wide at
-  /// zoom 0)
+  /// zoom 0). The camera's center is the middle of its padding, the part above the panel or lower: the view gives the
+  /// map's own middle, and the part the panel hides where it rests.
   void _publishView() {
     _centerDebounce?.cancel();
     _centerDebounce = Timer(const Duration(milliseconds: 600), () {
       if (!mounted) {
         return;
       }
-      final camera = _controller?.camera;
+      final controller = _controller;
+      final camera = controller?.camera;
       final size = _size ?? context.size;
-      if (camera != null) {
+      if (controller != null && camera != null) {
         final center = LatLng(camera.center.lat, camera.center.lon);
         ref.read(mapCenterProvider.notifier).update(center);
         if (size != null) {
-          ref.read(mapViewProvider.notifier).update(mapViewOf(center, camera.zoom, size, tileSize: 512));
+          final middle = controller.toLngLat(size.center(Offset.zero));
+          ref.read(mapViewProvider.notifier).update(mapViewOf(LatLng(middle.lat, middle.lon), camera.zoom, size,
+              tileSize: 512, hidden: panelInset(_restingPanel, size.height)));
         }
       }
     });

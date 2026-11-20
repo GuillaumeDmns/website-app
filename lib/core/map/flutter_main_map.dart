@@ -88,8 +88,9 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
   double get _height => _controller.mapController.camera.nonRotatedSize.height;
   double _inset(double? extent) => panelInset(extent ?? 0, _height);
 
-  /// The panel moved: followed once a frame
+  /// The panel moved: followed once a frame, and what the map shows above it published once it rests
   void _onPanel() {
+    _publishView();
     if (_panelScheduled) {
       return;
     }
@@ -252,14 +253,17 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
     }
   }
 
-  /// Once the camera rests: where it is, and what it shows (the stops there)
+  /// Once the camera rests: where it is, and what it shows (the stops there; the camera's center is the map's middle,
+  /// with no padding, and the part the panel hides where it rests)
   void _publishView() {
     _centerDebounce?.cancel();
     _centerDebounce = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) {
+      // The panel may move before the map is drawn
+      if (mounted && _ready) {
         final camera = _controller.mapController.camera;
         ref.read(mapCenterProvider.notifier).update(camera.center);
-        ref.read(mapViewProvider.notifier).update(mapViewOf(camera.center, camera.zoom, camera.nonRotatedSize, tileSize: 256));
+        ref.read(mapViewProvider.notifier).update(mapViewOf(camera.center, camera.zoom, camera.nonRotatedSize,
+            tileSize: 256, hidden: _inset(widget.panel?.resting)));
       }
     });
   }
