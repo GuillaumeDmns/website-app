@@ -47,7 +47,7 @@ class HomeScreen extends ConsumerWidget {
       // Stops above the stations; only what the filter shows. Close enough, every stop of the part of the map shown
       // has its marker with its lines; the ones around the user, listed at the bottom of the page, on top.
       overlay: MapOverlay(pins: [
-        if (filter == NearbyFilter.all || filter == NearbyFilter.bikes) ...bikeStationPins(context, bikes),
+        if (filter == NearbyFilter.all || filter == NearbyFilter.bikes) ...bikeStationPins(context, bikes, zoom: PinZoom.close),
         if (filter != NearbyFilter.bikes)
           ...stopPins(
             context,

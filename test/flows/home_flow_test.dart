@@ -58,6 +58,13 @@ void main() {
     await tapOn(tester, find.text('Vélib'));
     expect(find.byType(NearbyDeparturesList), findsNothing);
     expect(find.text('Châtelet - Rivoli'), findsOneWidget);
+    // On the map, close only: further out they pile up
+    final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    final bikePins = [
+      for (final pin in container.read(mapOverlaysProvider)[container.read(routerLocationProvider)]!.pins)
+        if (pin.label!.startsWith('Châtelet - Rivoli')) pin,
+    ];
+    expect([for (final pin in bikePins) pin.zoom], [PinZoom.close]);
 
     await tapOn(tester, find.text(currentL10n.filterAll));
     expect(badgeOf('C01371'), findsWidgets);

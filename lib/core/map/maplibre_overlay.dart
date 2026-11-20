@@ -37,6 +37,7 @@ class MapLibreOverlay {
   static const closeUpPinsLayer = 'overlay-pins-close-up';
   static const turnedPinsLayer = 'overlay-pins-turned';
   static const stopDotsLayer = 'overlay-pins-stop-dots';
+  static const closePinsLayer = 'overlay-pins-close';
   static const pinsLayer = 'overlay-pins';
   static const stopLinesLayer = 'overlay-pins-stop-lines';
   static const headingLayer = 'overlay-user-heading';
@@ -213,7 +214,7 @@ class MapLibreOverlay {
     final pins = _pins;
     final features = await controller.queryRenderedFeatures(
       QueryGeometry.point(screenPoint),
-      layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer, stopDotsLayer, stopLinesLayer],
+      layerIds: const [pinsLayer, turnedPinsLayer, closeUpPinsLayer, stopDotsLayer, closePinsLayer, stopLinesLayer],
     );
     MapPin? tapped;
     var top = -1;
@@ -442,8 +443,10 @@ List<StyleLayer> overlayStyleLayers() {
     pins(MapLibreOverlay.turnedPinsLayer, MapLibreOverlay.pinsSource, const ['==', ['get', 'turned'], true],
         symbols(turned: true)),
     // The stops: dots from afar under the other pins, their lines closer over them; nothing further out. The map
-    // shows each layer at its zooms as it zooms, the stops of a view left behind gone at once.
+    // shows each layer at its zooms as it zooms, the stops of a view left behind gone at once. The Vélib stations
+    // around close only, under the stops' lines.
     upright(MapLibreOverlay.stopDotsLayer, PinZoom.stopDot),
+    upright(MapLibreOverlay.closePinsLayer, PinZoom.close),
     upright(MapLibreOverlay.pinsLayer, PinZoom.any),
     upright(MapLibreOverlay.stopLinesLayer, PinZoom.stopLines),
     pins(MapLibreOverlay.headingLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'heading'],

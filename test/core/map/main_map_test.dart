@@ -284,13 +284,14 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets("the stops as the camera zooms, without waiting for it to rest: their lines, their dots, then nothing",
+  testWidgets("the stops as the camera zooms, without waiting for it to rest: their lines and the Vélib stations, their dots, then nothing",
       (tester) async {
     final container = await pumpMap(tester);
     const pins = [
       MapPin(point: user, color: Colors.black, label: 'dot', zoom: PinZoom.stopDot, image: 'stop-dot', child: SizedBox.square(dimension: 9)),
       MapPin(point: user, color: Colors.black, label: 'lines', zoom: PinZoom.stopLines, image: 'stop-1', child: SizedBox.square(dimension: 20)),
       MapPin(point: user, color: Colors.green, label: 'always'),
+      MapPin(point: user, color: Colors.green, label: 'velib', zoom: PinZoom.close),
     ];
     List<String?> shown() => [for (final pin in tester.widgetList<PinView>(find.byType(PinView))) pin.pin.label];
     // flutter_map counts its zooms one more than MapLibre, whose zooms the pins say
@@ -303,8 +304,11 @@ void main() {
     }
 
     await zoomTo(16);
-    // The other pins under the stops' lines, over their dots
-    expect(shown(), ['always', 'lines']);
+    // The other pins under the stops' lines, over their dots and the Vélib stations
+    expect(shown(), ['velib', 'always', 'lines']);
+    await zoomTo(PinZoom.stopLinesZoom);
+    expect(shown(), ['velib', 'always', 'lines']);
+    // Further out, the Vélib stations gone with the stops' lines
     await zoomTo(PinZoom.stopLinesZoom - 0.5);
     expect(shown(), ['dot', 'always']);
     // Zoomed out a long way after close up: the stops gone, not piled up on one point
