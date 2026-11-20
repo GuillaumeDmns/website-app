@@ -8,20 +8,17 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng;
-import 'package:vector_map_tiles/vector_map_tiles.dart' as vmt;
 
 import '../location/location_providers.dart';
-import 'base_map_style.dart';
-import 'main_map.dart' show mapTilesEnabledProvider;
 import 'map_overlay.dart';
 import 'map_panel.dart';
 import 'map_pins.dart';
 import 'map_view.dart';
 
-/// The map with flutter_map and OpenFreeMap's vector tiles in the MapLibre map's style (vector_map_tiles, flat: no
-/// tilt nor 3D buildings): on desktop, where MapLibre doesn't run, and in the tests (the tiles off). flutter_map has
-/// no padding: the camera's center is moved by half the panel's moves instead, so that what is in the middle of the
-/// part left above stays there. See [MainMap].
+/// The map of the tests, where MapLibre can't run (no GPU): flutter_map without background tiles, flat, the overlay
+/// and the user dot as widgets, so that the tests find and tap them. flutter_map has no padding: the camera's center
+/// is moved by half the panel's moves instead, so that what is in the middle of the part left above stays there. See
+/// [MainMap].
 class FlutterMainMap extends ConsumerStatefulWidget {
   const FlutterMainMap({super.key, this.panel, this.onLongPress});
 
@@ -308,15 +305,6 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         onSecondaryTap: widget.onLongPress == null ? null : (_, position) => widget.onLongPress!(context, position),
       ),
       children: [
-        // OpenFreeMap's vector tiles, drawn by vector_map_tiles with the MapLibre map's style and its hidden layers
-        if (ref.watch(mapTilesEnabledProvider))
-          if (ref.watch(baseMapStyleProvider).value case final style?)
-            vmt.VectorTileLayer(
-              theme: style.theme,
-              sprites: style.sprites,
-              tileProviders: style.providers,
-              maximumZoom: 19,
-            ),
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
