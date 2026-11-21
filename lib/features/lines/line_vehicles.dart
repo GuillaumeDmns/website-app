@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/platform/app_shown.dart';
@@ -136,6 +135,21 @@ class BranchPath {
 
   /// Where [vehicle] is at [progress] between its two stops and which way it goes; null when they are not on this branch
   VehiclePlacement? place(Vehicle vehicle, double progress) {
+    final along = alongOf(vehicle, progress)?.along;
+    if (along == null) {
+      return null;
+    }
+    // The way ahead around it (the branch's direction at a stop where it waits), over 100 m: GTFS shapes often make a
+    // small hook at stations, which turned the pointer sideways
+    const around = 50.0;
+    final ahead = math.min(along + around, line.length);
+    final behind = math.max(ahead - 2 * around, 0.0);
+    return (point: line.pointAt(along), heading: bearingBetween(line.pointAt(behind), line.pointAt(ahead)));
+  }
+
+  /// How far along the path [vehicle] is at [progress] between the stop it left ([from], meters along) and the next
+  /// one ([to]); null when they are not on this branch
+  ({double along, double from, double to})? alongOf(Vehicle vehicle, double progress) {
     final to = stopIds.indexOf(vehicle.toStopId);
     if (to < 0 || line.isEmpty) {
       return null;
@@ -143,13 +157,18 @@ class BranchPath {
     // Stop just left: in this branch when the vehicle serves it, the previous stop otherwise
     final left = vehicle.fromStopId == null ? -1 : stopIds.lastIndexOf(vehicle.fromStopId!, to);
     final from = vehicle.fromStopId == null ? to : left >= 0 ? left : math.max(0, to - 1);
-    final along = stopAlongs[from] + (stopAlongs[to] - stopAlongs[from]) * progress;
-    // The way ahead around it (the branch's direction at a stop where it waits), over 100 m: GTFS shapes often make a
-    // small hook at stations, which turned the pointer sideways
-    const around = 50.0;
-    final ahead = math.min(along + around, line.length);
-    final behind = math.max(ahead - 2 * around, 0.0);
-    return (point: line.pointAt(along), heading: bearingBetween(line.pointAt(behind), line.pointAt(ahead)));
+    return (
+      along: stopAlongs[from] + (stopAlongs[to] - stopAlongs[from]) * progress,
+      from: stopAlongs[from],
+      to: stopAlongs[to],
+    );
+  }
+
+  /// How far along the path [stop] is, from [minAlong] meters on; null when it is more than [within] meters off the
+  /// path (a stop this branch doesn't run by)
+  double? alongStop(StopRef stop, {double minAlong = 0, double within = 600}) {
+    final projection = line.project(LatLng(stop.lat, stop.lon), minAlong: minAlong);
+    return projection == null || projection.distance > within ? null : projection.along;
   }
 }
 
@@ -160,40 +179,10 @@ List<StopRef> stopsOnce(LineBranch branch) => [
         if (index == 0 || branch.stops[index - 1].id != stop.id) stop,
     ];
 
-/// Vehicles on the stop list of [branch], by the stop they are closest to, with their offset from it (between -0.5
-/// and 0.5): their fractional stop index between the stop they left and the next one. Vehicles of other branches
-/// are shown where they run on this one: the stop they left must be on it too, so that a train coming from another
-/// branch to where both merge is not drawn on this one's last segment.
-Map<int, List<({double offset, Vehicle vehicle})>> stopListPositions(
-  LineBranch? branch,
-  List<({Vehicle vehicle, double progress})> vehicles,
-) {
-  final positions = <int, List<({double offset, Vehicle vehicle})>>{};
-  final stopIds = [for (final stop in branch?.stops ?? const <StopRef>[]) stop.id];
-  for (final (:vehicle, :progress) in vehicles) {
-    final to = stopIds.indexOf(vehicle.toStopId);
-    if (to < 0) {
-      continue;
-    }
-    // The stop left may be several stops back (stops it doesn't serve)
-    final from = vehicle.fromStopId == null ? to : stopIds.lastIndexOf(vehicle.fromStopId!, to);
-    if (from < 0) {
-      continue;
-    }
-    final position = from + (to - from) * progress;
-    positions.putIfAbsent(position.round(), () => []).add((offset: position - position.round(), vehicle: vehicle));
-  }
-  return positions;
-}
+/// Whether a vehicle at [progress] stands at a stop: waiting where its trip starts, or arrived at its next stop
+bool isAtStop(Vehicle vehicle, double progress) => vehicle.fromStopId == null || progress >= 1;
 
-IconData vehicleIcon(TransportMode mode) => switch (mode) {
-      TransportMode.metro => Icons.subway,
-      TransportMode.rer || TransportMode.transilien || TransportMode.ter => Icons.train,
-      TransportMode.tram => Icons.tram,
-      _ => Icons.directions_bus,
-    };
-
-/// How on time a vehicle is, for the ring of its marker
+/// How on time a vehicle is (the vehicle sheet and the stop list say it; its marker doesn't)
 enum Punctuality {
   /// No delay given
   unknown,
@@ -208,116 +197,271 @@ enum Punctuality {
       };
 }
 
-/// Round marker in the line's color, its ring telling how on time it is (white when unknown). With a [heading] (degrees
-/// clockwise from the top of the screen), a pointer shows which way it goes; [stale] (missing from the latest real
-/// time) fades it.
-class VehicleMarker extends StatelessWidget {
-  const VehicleMarker({
+/// A vehicle as a train seen from above (design 2c, "Rame", shape L): a slim body of the line's color along the track,
+/// ringed with white, its cab rounded at the front with a dark windscreen (the way it goes), bands on its roof, its
+/// back square; drawn pointing up (the map turns it the way the vehicle goes). A white bar across it when it stands
+/// at a stop; larger over a halo of the line's color when [selected] (its sheet open or followed). Whether it is late
+/// doesn't show on it.
+class VehicleCapsule extends StatelessWidget {
+  const VehicleCapsule({
     super.key,
     required this.line,
-    this.size = 22,
-    this.heading,
-    this.punctuality = Punctuality.unknown,
-    this.stale = false,
+    this.atStop = false,
+    this.selected = false,
+    this.faded = false,
+    this.scale = 1,
   });
 
   final LineSummary line;
-  final double size;
-  final double? heading;
-  final Punctuality punctuality;
-  final bool stale;
+  final bool atStop;
+  final bool selected;
 
-  /// Box of a marker with a pointer: the pointer goes beyond the circle
-  static double boxSize(double size) => size + 22;
+  /// Left out by the line page's filter: still on the map, faded
+  final bool faded;
+
+  /// Smaller in the stop list
+  final double scale;
+
+  /// Its box, square: the halo of a selected one, else room for the bar and a 44 dp tap target
+  static double boxSize({bool selected = false, double scale = 1}) => (selected ? 56 : 44) * scale;
+
+  /// The name of its image on the map, one per line and look
+  static String imageName(LineSummary line, {required bool atStop, required bool selected, bool faded = false}) =>
+      'capsule-${line.id}-${line.color}-${atStop ? 'stop' : 'run'}-${selected ? 'selected' : faded ? 'faded' : 'normal'}';
 
   @override
   Widget build(BuildContext context) {
-    final color = parseHexColor(line.color, Colors.grey.shade700);
-    final ring = switch (punctuality) {
-      Punctuality.unknown => Colors.white,
-      Punctuality.onTime => context.colors.live,
-      Punctuality.late => context.colors.delayed,
-    };
-    final circle = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: ring, width: punctuality == Punctuality.unknown ? 2 : 2.5),
-        boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 3)],
+    final size = boxSize(selected: selected, scale: scale);
+    final capsule = SizedBox.square(
+      dimension: size,
+      child: CustomPaint(
+        painter: _CapsulePainter(
+          color: parseHexColor(line.color, Colors.grey.shade700),
+          atStop: atStop,
+          selected: selected,
+          scale: scale,
+        ),
       ),
-      child: Icon(vehicleIcon(line.mode), size: size * 0.6, color: parseHexColor(line.textColor, Colors.white)),
     );
-    final heading = this.heading;
-    final marker = heading == null
-        ? circle
-        : SizedBox.square(
-            dimension: boxSize(size),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Transform.rotate(
-                  angle: heading * math.pi / 180,
-                  child: CustomPaint(size: Size.square(boxSize(size)), painter: _PointerPainter(radius: size / 2)),
-                ),
-                circle,
-              ],
-            ),
-          );
-    return stale ? Opacity(opacity: 0.45, child: marker) : marker;
+    return faded && !selected ? Opacity(opacity: 0.35, child: capsule) : capsule;
   }
 }
 
-/// The pointer of a [VehicleMarker] of [size] alone, pointing up, in the marker's box: turned on the map the way the
-/// vehicle goes, under its circle drawn apart
-class VehiclePointer extends StatelessWidget {
-  const VehiclePointer({super.key, required this.size, this.stale = false});
+class _CapsulePainter extends CustomPainter {
+  const _CapsulePainter({
+    required this.color,
+    required this.atStop,
+    required this.selected,
+    required this.scale,
+  });
 
-  final double size;
-  final bool stale;
+  /// Its edges, dark on every map
+  static const ink = Color(0xFF101215);
 
-  @override
-  Widget build(BuildContext context) {
-    final pointer = CustomPaint(size: Size.square(VehicleMarker.boxSize(size)), painter: _PointerPainter(radius: size / 2));
-    return stale ? Opacity(opacity: 0.45, child: pointer) : pointer;
-  }
-}
-
-/// A dark triangle pointing up, just outside a circle of [radius] at the center: dark, since it points along the line
-/// drawn in the line's color
-class _PointerPainter extends CustomPainter {
-  const _PointerPainter({required this.radius});
-
-  static const color = Color(0xFF1F2933);
-
-  final double radius;
+  final Color color;
+  final bool atStop;
+  final bool selected;
+  final double scale;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final tip = center.dy - radius - 10;
-    final base = center.dy - radius + 1;
-    final path = Path()
-      ..moveTo(center.dx, tip)
-      ..lineTo(center.dx - 7, base)
-      ..lineTo(center.dx + 7, base)
-      ..close();
-    // With a white edge, like the circle
-    canvas.drawPath(path, Paint()..color = color);
+    canvas.translate(size.width / 2, size.height / 2);
+    canvas.scale(scale);
+    final k = selected ? 1.25 : 1.0;
+    final w = 5 * k;
+    final hh = 16 * k;
+    final body = bodyPath(w, hh, k);
+
+    if (selected) {
+      canvas.drawCircle(Offset.zero, 26, Paint()..color = color.withValues(alpha: 0.3));
+    }
+    if (atStop) {
+      final bar = RRect.fromLTRBR(-13 * k, -2.5, 13 * k, 2.5, const Radius.circular(2.5));
+      canvas.drawRRect(bar, Paint()..color = Colors.white);
+      canvas.drawRRect(
+        bar,
+        Paint()
+          ..color = ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
+    // A white ring: it stands out of its line, a light one too
     canvas.drawPath(
-      path,
+      body,
       Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
+        ..strokeWidth = selected ? 6 : 5
         ..strokeJoin = StrokeJoin.round,
     );
+    canvas.drawPath(body, Paint()..color = color);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = ink
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeJoin = StrokeJoin.round,
+    );
+    // The windscreen across its cab
+    final top = -hh + 2 * k;
+    canvas.drawPath(
+      Path()
+        ..moveTo(-w * 0.72, top + 3 * k)
+        ..quadraticBezierTo(0, top - 1.6 * k, w * 0.72, top + 3 * k)
+        ..lineTo(w * 0.72, top + 5 * k)
+        ..quadraticBezierTo(0, top + 1.4 * k, -w * 0.72, top + 5 * k)
+        ..close(),
+      Paint()..color = ink,
+    );
+    // Bands on its roof
+    final band = Paint()..color = ink.withValues(alpha: 0.55);
+    for (final y in const [-4.0, 1.0, 6.0, 11.0]) {
+      canvas.drawRRect(
+        RRect.fromLTRBR(-w * 0.45, (y - 1.4) * k, w * 0.45, (y + 1.4) * k, Radius.circular(0.8 * k)),
+        band,
+      );
+    }
+  }
+
+  /// Its body, [w] half wide and [hh] half long, pointing up: its cab rounded at the front, its back square with
+  /// rounded corners
+  static Path bodyPath(double w, double hh, double k) {
+    final nose = 6.5 * k;
+    final back = 2 * k;
+    return Path()
+      ..moveTo(-w, hh - back)
+      ..lineTo(-w, -hh + nose)
+      ..cubicTo(-w, -hh + nose * 0.35, -w * 0.45, -hh, 0, -hh)
+      ..cubicTo(w * 0.45, -hh, w, -hh + nose * 0.35, w, -hh + nose)
+      ..lineTo(w, hh - back)
+      ..quadraticBezierTo(w, hh, w - back, hh)
+      ..lineTo(-w + back, hh)
+      ..quadraticBezierTo(-w, hh, -w, hh - back)
+      ..close();
   }
 
   @override
-  bool shouldRepaint(_PointerPainter old) => old.radius != radius;
+  bool shouldRepaint(_CapsulePainter old) =>
+      old.color != color || old.atStop != atStop || old.selected != selected || old.scale != scale;
 }
+
+/// Over the selected vehicle on the map: its next stop and when it gets there (`République · 1 min`, `· à quai`), and
+/// its delay. Dark on every map, its tip [gap] above the vehicle's middle, in a box of [sizeOf] (the map pin stands it
+/// on its point by its bottom).
+class VehicleCallout extends StatelessWidget {
+  const VehicleCallout({super.key, required this.stop, required this.when, this.delay, this.fontFamily});
+
+  final String stop;
+
+  /// The app's (Inter), the same as [sizeOf] measured with
+  final String? fontFamily;
+  final String when;
+
+  /// `3 min de retard`, when late
+  final String? delay;
+
+  /// From the vehicle's middle to the tip, clear of a selected capsule
+  static const gap = 30.0;
+  static const _arrow = 6.0;
+  static const _style = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.2);
+
+  static const _background = Color(0xFF101215);
+
+  /// The name of its image on the map
+  String get imageName => 'vehicle-callout-$stop-$when-$delay';
+
+  /// Its text, the same measured and drawn: nothing inherited (Material's letter spacing widened it past its box)
+  static TextSpan _text({required String stop, required String when, String? delay, String? fontFamily}) => TextSpan(
+        style: _style.copyWith(color: const Color(0xFFECEEF1), fontFamily: fontFamily, letterSpacing: 0),
+        children: [
+          TextSpan(text: stop),
+          TextSpan(
+            text: '   $when',
+            style: const TextStyle(color: Color(0xFF9AA1AC), fontWeight: FontWeight.w500),
+          ),
+          if (delay != null) TextSpan(text: '   $delay', style: const TextStyle(color: Color(0xFFF5A524))),
+        ],
+      );
+
+  /// Its box: the bubble as wide as its text, its arrow, the gap under it
+  static Size sizeOf({required String stop, required String when, String? delay, String? fontFamily}) {
+    final painter = TextPainter(
+      text: _text(stop: stop, when: when, delay: delay, fontFamily: fontFamily),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + 2 * 10 + 4;
+    final height = painter.height + 2 * 6 + _arrow + gap;
+    painter.dispose();
+    return Size(width.ceilToDouble(), height.ceilToDouble());
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: gap),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: _background,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x24FFFFFF), spreadRadius: 1),
+                  BoxShadow(color: Color(0x73000000), blurRadius: 12, offset: Offset(0, 4)),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text.rich(
+                  _text(stop: stop, when: when, delay: delay, fontFamily: fontFamily),
+                  textScaler: TextScaler.noScaling,
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ),
+            ),
+            CustomPaint(size: const Size(12, _arrow), painter: _ArrowPainter(_background)),
+          ],
+        ),
+      );
+}
+
+/// The callout's tip, pointing down
+class _ArrowPainter extends CustomPainter {
+  const _ArrowPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) => canvas.drawPath(
+        Path()
+          ..moveTo(0, 0)
+          ..lineTo(size.width, 0)
+          ..lineTo(size.width / 2, size.height)
+          ..close(),
+        Paint()..color = color,
+      );
+
+  @override
+  bool shouldRepaint(_ArrowPainter old) => old.color != color;
+}
+
+/// When [vehicle] gets to its next stop: `1 min` (still on its way when due), `à quai` (`à l'arrêt`) when there, its
+/// time an hour away or more
+String vehicleWhen(Vehicle vehicle, DateTime now, TransportMode mode, {required bool atStop}) {
+  if (atStop) {
+    return atStopLabel(mode);
+  }
+  final minutes = vehicle.expectedAt.difference(now).inSeconds / 60;
+  return minutes < 60 ? currentL10n.minutesShort(math.max(1, minutes.ceil())) : formatClock(vehicle.expectedAt);
+}
+
+/// Its delay in words, `3 min de retard`, when late ([Punctuality.late])
+String? vehicleDelay(Vehicle vehicle) =>
+    Punctuality.of(vehicle) == Punctuality.late ? currentL10n.goMinutesLate((vehicle.delaySeconds! / 60).round()) : null;
 
 /// `→ Saint-Denis - Pleyel · Madeleine dans 2 min`, `… · Madeleine à quai`
 String vehicleLabel(Vehicle vehicle, DateTime now, TransportMode mode) {

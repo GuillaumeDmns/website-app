@@ -530,5 +530,21 @@
   "followDepartureHint": "It stays in your notifications until it leaves, with its delay and platform.",
   "followStop": "Stop",
   "followLeavesAt": "Leaves {time}",
-  "followAt": "{stop} · leaves {time}"
+  "followAt": "{stop} · leaves {time}",
+  "liveTrains": "{count, plural, =1{1 train} other{{count} trains}} to {destination}",
+  "liveTrams": "{count, plural, =1{1 tram} other{{count} trams}} to {destination}",
+  "liveBuses": "{count, plural, =1{1 bus} other{{count} buses}} to {destination}",
+  "liveFetchedSecondsAgo": "seen {seconds} s ago",
+  "liveFetchedMinutesAgo": "seen {minutes} min ago",
+  "liveTrainsCount": "{count, plural, =1{1 train} other{{count} trains}}",
+  "liveTramsCount": "{count, plural, =1{1 tram} other{{count} trams}}",
+  "liveBusesCount": "{count, plural, =1{1 bus} other{{count} buses}}",
+  "lineBothDirections": "Both ways",
+  "lineAllDestinations": "All",
+  "lineDirectionMore": "To {destination} +{count}",
+  "lineBranchFrom": "From {stop}",
+  "lineBranchTo": "To {stop}",
+  "lineBranchStops": "{count, plural, =1{1 stop} other{{count} stops}}",
+  "lineBranchUnfold": "Unfold the branch",
+  "lineBranchFold": "Fold the branch"
 }
