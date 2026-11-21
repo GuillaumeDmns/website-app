@@ -546,5 +546,7 @@
   "lineBranchTo": "To {stop}",
   "lineBranchStops": "{count, plural, =1{1 stop} other{{count} stops}}",
   "lineBranchUnfold": "Unfold the branch",
-  "lineBranchFold": "Fold the branch"
+  "lineBranchFold": "Fold the branch",
+  "lineBranchVia": "Via {stop}",
+  "lineBranchOtherWay": "Other way, via {stop}"
 }

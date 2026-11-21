@@ -27,12 +27,25 @@ class LineTrunk extends LineTreeNode {
 }
 
 /// Stops of other branches off the trunk, attached at [attach]: running into it ([merges], a branch from further out,
-/// listed before it) or out of it (a branch to its own terminus, after it)
+/// listed before it) or out of it (a branch to its own terminus, after it). Another way between two listed stops
+/// leaves [attach] and comes back at [rejoin].
 class LineSpur extends LineTreeNode {
-  LineSpur({required List<StopRef> stops, required this.attach, required this.merges}) : super(stops);
+  LineSpur({
+    required List<StopRef> stops,
+    required this.attach,
+    required this.merges,
+    this.rejoin,
+    this.otherWay = false,
+  }) : super(stops);
 
   final StopRef attach;
   final bool merges;
+
+  /// The listed stop it comes back to, for another way between two listed stops
+  final StopRef? rejoin;
+
+  /// Stops only the other direction serves (a bus taking other streets back), listed both ways
+  final bool otherWay;
 
   /// Stable while the line's data is: what it is attached at and where it leads
   String get id => '${merges ? 'from' : 'to'}-${attach.id}-${(merges ? stops.first : stops.last).id}';
@@ -41,7 +54,7 @@ class LineSpur extends LineTreeNode {
   StopRef get end => merges ? stops.first : stops.last;
 
   @override
-  List<StopRef> get sequenceStops => merges ? [...stops, attach] : [attach, ...stops];
+  List<StopRef> get sequenceStops => merges ? [...stops, attach] : [attach, ...stops, ?rejoin];
 
   /// Its stops and those of the spurs hanging from it
   int get stopCount => stops.length + spurs.fold(0, (count, spur) => count + spur.stopCount);
@@ -50,8 +63,9 @@ class LineSpur extends LineTreeNode {
 /// The stop list of [branches] (one direction, or the branches to one destination) as a tree: the trunk is the
 /// busiest branch; each other branch adds the runs of stops not listed yet as spurs, attached where they leave or join
 /// what is listed (a run in the middle of a branch, another way between two listed stops, hangs from the stop before
-/// it)
-LineTrunk lineTree(List<LineBranch> branches) {
+/// it, back at the stop after it). The branches of the [otherWay] (both ways: the other directions' branches) add the
+/// stops only they serve the same way, read against their direction.
+LineTrunk lineTree(List<LineBranch> branches, {List<LineBranch> otherWay = const []}) {
   final ordered = [...branches]..sort((a, b) => b.tripCount.compareTo(a.tripCount));
   if (ordered.isEmpty) {
     return LineTrunk(const []);
@@ -59,8 +73,12 @@ LineTrunk lineTree(List<LineBranch> branches) {
   final trunk = LineTrunk(stopsOnce(ordered.first));
   // Where each listed stop is, to attach spurs to the right node
   final listed = <String, LineTreeNode>{for (final stop in trunk.stops) stop.id: trunk};
-  for (final branch in ordered.skip(1)) {
-    final stops = stopsOnce(branch);
+  final others = [...otherWay]..sort((a, b) => b.tripCount.compareTo(a.tripCount));
+  for (final (branch, reversed) in [
+    for (final branch in ordered.skip(1)) (branch, false),
+    for (final branch in others) (branch, true),
+  ]) {
+    final stops = reversed ? stopsOnce(branch).reversed.toList() : stopsOnce(branch);
     var i = 0;
     while (i < stops.length) {
       if (listed.containsKey(stops[i].id)) {
@@ -79,7 +97,13 @@ LineTrunk lineTree(List<LineBranch> branches) {
         break;
       }
       final attach = merges ? stops[i] : stops[start - 1];
-      final spur = LineSpur(stops: run, attach: attach, merges: merges);
+      final spur = LineSpur(
+        stops: run,
+        attach: attach,
+        merges: merges,
+        rejoin: merges || i >= stops.length ? null : stops[i],
+        otherWay: reversed,
+      );
       listed[attach.id]!.spurs.add(spur);
       for (final stop in run) {
         listed[stop.id] = spur;

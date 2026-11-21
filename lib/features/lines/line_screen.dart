@@ -405,7 +405,15 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                   for (final entry in vehicles)
                     if (_matches(detail, entry.vehicle)) entry,
                 ];
-                final trunk = lineTree(shown);
+                // Both ways, the stops only the other direction serves too (a bus taking other streets back)
+                final trunk = lineTree(
+                  shown,
+                  otherWay: _direction != null
+                      ? const []
+                      : [
+                          for (final other in detail.directions.skip(1)) ...other.branches,
+                        ],
+                );
                 final fetchedAt = ref.watch(lineVehiclesProvider(widget.lineId)).value?.fetchedAt;
                 final rows = _TreeRows(
                   line: line,
@@ -505,7 +513,7 @@ class _TreeRows {
     for (var i = 0; i < count; i++) {
       final stop = node.stops[i];
       final top = i > 0 || fork;
-      final bottom = i < count - 1 || (spur?.merges ?? false);
+      final bottom = i < count - 1 || (spur?.merges ?? false) || spur?.rejoin != null;
       for (final merging in node.spurs.where((other) => other.merges && other.attach.id == stop.id)) {
         rows.addAll(_spur(merging, lane: lane + 1, parentLane: lane, passing: {...passing, if (top) lane}));
       }
@@ -546,6 +554,11 @@ class _TreeRows {
   List<Widget> _spur(LineSpur spur, {required int lane, required int parentLane, required Set<int> passing}) {
     final expanded = unfolded.contains(spur.id);
     final header = LineSpurTile(
+      title: switch (spur) {
+        LineSpur(otherWay: true) => currentL10n.lineBranchOtherWay(spur.stops.first.name),
+        LineSpur(rejoin: _?) => currentL10n.lineBranchVia(spur.stops.first.name),
+        _ => null,
+      },
       end: spur.end,
       merges: spur.merges,
       stopCount: spur.stopCount,
@@ -559,8 +572,12 @@ class _TreeRows {
     if (!expanded) {
       // Folded, the vehicles between it and its parent still show: under its row, beside the parent's lane (which a
       // branch joining it reaches under its row)
-      final junction = spur.merges ? spur.stops.length - 1 : 0;
-      return [header, ..._runningIn(spur, junction, lane, {...passing, if (spur.merges) parentLane}, rail: false)];
+      final junctions = spur.merges ? [spur.stops.length - 1] : [0, if (spur.rejoin != null) spur.stops.length];
+      return [
+        header,
+        for (final junction in junctions)
+          ..._runningIn(spur, junction, lane, {...passing, if (spur.merges) parentLane}, rail: false),
+      ];
     }
     if (spur.merges) {
       return [...of(spur, lane: lane, passing: passing), header];

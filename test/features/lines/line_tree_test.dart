@@ -63,6 +63,48 @@ void main() {
     });
   });
 
+  group('both ways', () {
+    // A bus going A → E by B, coming back E → A by Y and X instead of C and B
+    final going = branch('E', 100, ['A', 'B', 'C', 'D', 'E']);
+    final back = branch('A', 100, ['E', 'D', 'Y', 'X', 'A']);
+    final trunk = lineTree([going], otherWay: [back]);
+
+    test('lists the stops only the other direction serves, where it leaves and rejoins the listed ones', () {
+      final other = trunk.spurs.single;
+      expect(other.otherWay, isTrue);
+      // Read against its direction: from A, X then Y, back at D
+      expect((other.attach.id, other.merges, other.rejoin?.id), ('A', false, 'D'));
+      expect(other.stops.map((stop) => stop.id), ['X', 'Y']);
+      expect(other.sequence, ['A', 'X', 'Y', 'D']);
+    });
+
+    test('places the other direction\'s vehicles on its own stops, running up the list', () {
+      Vehicle coming(String from, String to) => Vehicle(
+            id: '$from-$to',
+            direction: 1,
+            branch: 0,
+            fromStopId: from,
+            toStopId: to,
+            progress: 0.5,
+            expectedAt: DateTime.utc(2026, 11, 21, 12),
+          );
+      final placed = treeVehicles(trunk, [
+        (vehicle: coming('D', 'Y'), progress: 0.5),
+        (vehicle: coming('X', 'A'), progress: 0.5),
+      ]);
+
+      final other = trunk.spurs.single;
+      expect(placed.map((placement) => (placement.node, placement.gap, placement.reverse)), [
+        (other, 0, true),
+        (other, 2, true),
+      ]);
+    });
+
+    test('adds nothing for a direction serving the same stops back', () {
+      expect(lineTree([going], otherWay: [branch('A', 100, ['E', 'D', 'C', 'B', 'A'])]).spurs, isEmpty);
+    });
+  });
+
   group('treeVehicles', () {
     final trunk = lineTree(north);
     Vehicle vehicle(String id, {String? from, required String to, int direction = 0}) => Vehicle(

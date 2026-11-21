@@ -294,6 +294,7 @@ class LineVehicleTile extends StatelessWidget {
 class LineSpurTile extends StatelessWidget {
   const LineSpurTile({
     super.key,
+    this.title,
     required this.end,
     required this.merges,
     required this.stopCount,
@@ -309,6 +310,9 @@ class LineSpurTile extends StatelessWidget {
 
   /// Its far end: where it comes from, or its terminus
   final StopRef end;
+
+  /// Instead of where it comes from or goes: another way between two stops, the other direction's own stops
+  final String? title;
   final bool merges;
   final int stopCount;
   final int vehicleCount;
@@ -362,7 +366,7 @@ class LineSpurTile extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                merges ? l10n.lineBranchFrom(end.name) : l10n.lineBranchTo(end.name),
+                                title ?? (merges ? l10n.lineBranchFrom(end.name) : l10n.lineBranchTo(end.name)),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),

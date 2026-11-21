@@ -1355,5 +1355,9 @@
   "lineBranchStops": "{count, plural, =1{1 arrêt} other{{count} arrêts}}",
   "@lineBranchStops": {"placeholders": {"count": {"type": "int"}}},
   "lineBranchUnfold": "Déplier la branche",
-  "lineBranchFold": "Replier la branche"
+  "lineBranchFold": "Replier la branche",
+  "lineBranchVia": "Par {stop}",
+  "@lineBranchVia": {"placeholders": {"stop": {"type": "String"}}},
+  "lineBranchOtherWay": "Autre sens, par {stop}",
+  "@lineBranchOtherWay": {"placeholders": {"stop": {"type": "String"}}}
 }
