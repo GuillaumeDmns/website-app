@@ -31,20 +31,25 @@ class RailSpec {
     this.passing = const {},
     this.top = true,
     this.bottom = true,
+    this.joinFrom = const {},
     this.width = 48,
   });
 
   final Color color;
   final int lane;
   final Set<int> passing;
+
+  /// Lanes bending into this row's own lane at its stop: another way coming back (the loop closing)
+  final Set<int> joinFrom;
   final bool top;
   final bool bottom;
   final double width;
 }
 
 /// A bend of the rail across a row, from lane [from] at its top to lane [to] at its bottom; [partial] keeps only the
-/// half touching the parent's lane ([parentAtTop]), ended by a dot: a branch folded away
-typedef RailBend = ({int from, int to, bool partial, bool parentAtTop});
+/// half touching the parent's lane ([parentAtTop]), ended by a dot: a branch folded away. A [loop] leaves lane `from`
+/// and comes back to it within the row, out to lane `to`: another way between two stops, folded.
+typedef RailBend = ({int from, int to, bool partial, bool parentAtTop, bool loop});
 
 class _RailPainter extends CustomPainter {
   const _RailPainter(this.rail, {this.bend});
@@ -60,6 +65,10 @@ class _RailPainter extends CustomPainter {
     for (final lane in rail.passing) {
       canvas.drawLine(Offset(laneX(lane), 0), Offset(laneX(lane), size.height), paint);
     }
+    final stroke = Paint()
+      ..color = rail.color
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke;
     final bend = this.bend;
     if (bend == null) {
       final x = laneX(rail.lane);
@@ -69,6 +78,29 @@ class _RailPainter extends CustomPainter {
       if (rail.bottom) {
         canvas.drawLine(Offset(x, size.height / 2), Offset(x, size.height), paint);
       }
+      // A way coming back into this lane at its stop
+      for (final lane in rail.joinFrom) {
+        final from = laneX(lane);
+        canvas.drawPath(
+          Path()
+            ..moveTo(from, 0)
+            ..cubicTo(from, size.height * 0.3, x, size.height * 0.2, x, size.height / 2),
+          stroke,
+        );
+      }
+      return;
+    }
+    if (bend.loop) {
+      // Out of the lane and back into it: a closed loop beside the lane passing straight
+      final lane = laneX(bend.from);
+      final out = laneX(bend.to);
+      canvas.drawPath(
+        Path()
+          ..moveTo(lane, size.height * 0.1)
+          ..cubicTo(lane, size.height * 0.35, out, size.height * 0.25, out, size.height * 0.5)
+          ..cubicTo(out, size.height * 0.75, lane, size.height * 0.65, lane, size.height * 0.9),
+        stroke,
+      );
       return;
     }
     final start = Offset(laneX(bend.from), 0);
@@ -76,10 +108,6 @@ class _RailPainter extends CustomPainter {
     final path = Path()
       ..moveTo(start.dx, start.dy)
       ..cubicTo(start.dx, size.height * 0.55, end.dx, size.height * 0.45, end.dx, end.dy);
-    final stroke = Paint()
-      ..color = rail.color
-      ..strokeWidth = _strokeWidth
-      ..style = PaintingStyle.stroke;
     if (!bend.partial) {
       canvas.drawPath(path, stroke);
       return;
@@ -102,6 +130,8 @@ class _RailPainter extends CustomPainter {
       old.rail.bottom != rail.bottom ||
       old.rail.passing.length != rail.passing.length ||
       !old.rail.passing.containsAll(rail.passing) ||
+      old.rail.joinFrom.length != rail.joinFrom.length ||
+      !old.rail.joinFrom.containsAll(rail.joinFrom) ||
       old.bend != bend;
 }
 
@@ -295,6 +325,7 @@ class LineSpurTile extends StatelessWidget {
   const LineSpurTile({
     super.key,
     this.title,
+    this.loop = false,
     required this.end,
     required this.merges,
     required this.stopCount,
@@ -313,6 +344,9 @@ class LineSpurTile extends StatelessWidget {
 
   /// Instead of where it comes from or goes: another way between two stops, the other direction's own stops
   final String? title;
+
+  /// Another way between two stops of its parent: it comes back to it, folded as a closed loop
+  final bool loop;
   final bool merges;
   final int stopCount;
   final int vehicleCount;
@@ -344,9 +378,11 @@ class LineSpurTile extends StatelessWidget {
           children: [
             _RailColumn(
               rail: rail,
-              bend: merges
-                  ? (from: rail.lane, to: parentLane, partial: !expanded, parentAtTop: false)
-                  : (from: parentLane, to: rail.lane, partial: !expanded, parentAtTop: true),
+              bend: loop && !expanded
+                  ? (from: parentLane, to: rail.lane, partial: false, parentAtTop: true, loop: true)
+                  : merges
+                      ? (from: rail.lane, to: parentLane, partial: !expanded, parentAtTop: false, loop: false)
+                      : (from: parentLane, to: rail.lane, partial: !expanded, parentAtTop: true, loop: false),
             ),
             Expanded(
               child: Padding(

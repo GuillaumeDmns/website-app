@@ -421,7 +421,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                   now: now,
                   closed: closed,
                   placements: treeVehicles(trunk, listed, pathOf: (vehicle) => _vehiclePath(detail, vehicle)),
-                  width: railWidth(treeDepth(trunk)),
+                  // One lane more for an unfolded other way running beside its parent's stops
+                  width: railWidth(treeDepth(trunk) + (treeNodes(trunk).any((node) => node.spurs.any((spur) => spur.rejoin != null)) ? 1 : 0)),
                   unfolded: _unfolded,
                   onToggle: (id) => setState(() => _unfolded.contains(id) ? _unfolded.remove(id) : _unfolded.add(id)),
                   onOpen: (vehicle) => _open(line, vehicle),
@@ -510,17 +511,29 @@ class _TreeRows {
     final offset = fork ? 1 : 0;
     final rows = <Widget>[];
     final count = node.stops.length;
+    // Other ways unfolded and not back yet: their lane goes on beside this node's stops until the stop they rejoin
+    final open = <String, int>{};
     for (var i = 0; i < count; i++) {
       final stop = node.stops[i];
       final top = i > 0 || fork;
       final bottom = i < count - 1 || (spur?.merges ?? false) || spur?.rejoin != null;
+      Set<int> here() => {...passing, ...open.values};
       for (final merging in node.spurs.where((other) => other.merges && other.attach.id == stop.id)) {
-        rows.addAll(_spur(merging, lane: lane + 1, parentLane: lane, passing: {...passing, if (top) lane}));
+        rows.addAll(_spur(merging, lane: lane + 1 + open.length, parentLane: lane, passing: {...here(), if (top) lane}));
       }
+      final back = open.remove(stop.id);
       final standing = _standing[node]?[i] ?? const <TreePlacement>[];
       rows.add(LineStopTile(
         stop: stop,
-        rail: _rail(lane, passing, top: top, bottom: bottom),
+        rail: RailSpec(
+          color: color,
+          lane: lane,
+          passing: here(),
+          top: top,
+          bottom: bottom,
+          joinFrom: {?back},
+          width: width,
+        ),
         line: line,
         terminus: spur == null ? i == 0 || i == count - 1 : stop.id == spur.end.id,
         vehicle: standing.firstOrNull?.vehicle,
@@ -532,7 +545,7 @@ class _TreeRows {
       for (final other in standing.skip(1)) {
         rows.add(LineVehicleTile(
           vehicle: other.vehicle,
-          rail: _rail(lane, passing, bottom: bottom),
+          rail: _rail(lane, here(), bottom: bottom),
           line: line,
           now: now,
           reverse: other.reverse,
@@ -540,10 +553,18 @@ class _TreeRows {
         ));
       }
       for (final forking in node.spurs.where((other) => !other.merges && other.attach.id == stop.id)) {
-        rows.addAll(_spur(forking, lane: lane + 1, parentLane: lane, passing: {...passing, if (bottom) lane}));
+        final spurLane = lane + 1 + open.length;
+        rows.addAll(_spur(forking, lane: spurLane, parentLane: lane, passing: {...here(), if (bottom) lane}));
+        // Unfolded, another way back to a later stop of this node: its lane goes on until then
+        final rejoin = forking.rejoin;
+        if (rejoin != null &&
+            unfolded.contains(forking.id) &&
+            node.stops.skip(i + 1).any((later) => later.id == rejoin.id)) {
+          open[rejoin.id] = spurLane;
+        }
       }
       if (bottom) {
-        rows.addAll(_runningIn(node, i + offset, lane, passing));
+        rows.addAll(_runningIn(node, i + offset, lane, here()));
       }
     }
     return rows;
@@ -559,6 +580,7 @@ class _TreeRows {
         LineSpur(rejoin: _?) => currentL10n.lineBranchVia(spur.stops.first.name),
         _ => null,
       },
+      loop: spur.rejoin != null,
       end: spur.end,
       merges: spur.merges,
       stopCount: spur.stopCount,

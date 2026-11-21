@@ -148,6 +148,8 @@ void main() {
         LineBranch(headsign: 'Gare D', tripCount: 60, stops: [at('A', 0), at('D', 10)]),
         // A branch joining at C, from F through E
         LineBranch(headsign: 'Gare D', tripCount: 40, stops: [off('F', 6), off('E', 3), at('C', 2), at('D', 10)]),
+        // Another way from A to C, by W
+        LineBranch(headsign: 'Gare D', tripCount: 20, stops: [at('A', 0), off('W', 1), at('C', 2), at('D', 10)]),
       ]),
     ]).toJson());
     final now = DateTime.now().toUtc();
@@ -174,6 +176,16 @@ void main() {
     await tapOn(tester, find.text(currentL10n.lineBranchFrom('Gare F')));
     expect(find.text('Gare E'), findsOneWidget);
     expect(find.byWidgetPredicate((widget) => widget is LineVehicleTile && widget.vehicle.id == 'joining'), findsOneWidget);
+
+    // Another way between two stops: folded as a closed loop; unfolded, its lane runs on until the stop it rejoins
+    LineStopTile stopTile(String name) =>
+        tester.widget<LineStopTile>(find.byWidgetPredicate((widget) => widget is LineStopTile && widget.stop.name == name));
+    expect(tester.widget<LineSpurTile>(find.widgetWithText(LineSpurTile, currentL10n.lineBranchVia('Gare W'))).loop, isTrue);
+    expect(stopTile('Gare C').rail.joinFrom, isEmpty);
+    await tapOn(tester, find.text(currentL10n.lineBranchVia('Gare W')));
+    expect(find.text('Gare W'), findsOneWidget);
+    expect(stopTile('Gare B').rail.passing, contains(1));
+    expect(stopTile('Gare C').rail.joinFrom, {1});
 
     await closeApp(tester);
   });
