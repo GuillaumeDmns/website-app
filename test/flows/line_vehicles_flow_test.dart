@@ -91,8 +91,16 @@ void main() {
     expect(rows.map((row) => row.reverse), [false, false, true]);
     expect(find.textContaining(currentL10n.goMinutesLate(2)), findsOneWidget);
 
+    // Both ways, each direction's path is drawn (a bus's two ways often take different streets); one direction, its own
+    Iterable<fm.Polyline> linePaths() => tester
+        .widgetList<fm.PolylineLayer>(find.byType(fm.PolylineLayer))
+        .expand((layer) => layer.polylines)
+        .where((polyline) => polyline.strokeWidth == 6);
+    expect(linePaths(), hasLength(2));
+
     // One direction: its vehicles listed, the other one's faded on the map
     await tapOn(tester, find.text(currentL10n.towards('Nation')));
+    expect(linePaths(), hasLength(1));
     expect(find.textContaining('2 trains vers Nation'), findsOneWidget);
     expect(find.byType(LineVehicleTile), findsNWidgets(2));
     expect(tester.widgetList<VehicleCapsule>(onMap).where((capsule) => capsule.faded), hasLength(1));

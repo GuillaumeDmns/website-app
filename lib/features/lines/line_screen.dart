@@ -165,7 +165,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     final color = parseHexColor(line.color, Colors.grey);
     List<LatLng> points(LineBranch branch) => _pathOf(branch).line.points;
 
-    final shown = _shownBranches(detail);
+    // Both ways, every direction's branches: a bus's two ways often take different streets
+    final shown = _direction == null
+        ? [for (final direction in detail.directions) ...direction.branches]
+        : _shownBranches(detail);
     final faded = [
       if (_direction != null)
         for (final branch in _listedDirection(detail)?.branches ?? const <LineBranch>[])
