@@ -440,14 +440,18 @@ List<StyleLayer> overlayStyleLayers() {
     }),
     // A station's ways in and out, close up only: under the other pins
     upright(MapLibreOverlay.closeUpPinsLayer, PinZoom.any, closeUp: true),
-    pins(MapLibreOverlay.turnedPinsLayer, MapLibreOverlay.pinsSource, const ['==', ['get', 'turned'], true],
-        symbols(turned: true)),
     // The stops: dots from afar under the other pins, their lines closer over them; nothing further out. The map
     // shows each layer at its zooms as it zooms, the stops of a view left behind gone at once. The Vélib stations
     // around close only, under the stops' lines.
     upright(MapLibreOverlay.stopDotsLayer, PinZoom.stopDot),
     upright(MapLibreOverlay.closePinsLayer, PinZoom.close),
     upright(MapLibreOverlay.pinsLayer, PinZoom.any),
+    // The pins turned with the map, a line's vehicles: over the line's stops, which they stand on
+    pins(MapLibreOverlay.turnedPinsLayer, MapLibreOverlay.pinsSource, const ['==', ['get', 'turned'], true], {
+      ...symbols(turned: true),
+      // Smaller further out, where a whole line is on the screen: half their size at a town on it
+      'icon-size': turnedPinSize,
+    }),
     upright(MapLibreOverlay.stopLinesLayer, PinZoom.stopLines),
     pins(MapLibreOverlay.headingLayer, MapLibreOverlay.userSource, const ['==', ['get', 'kind'], 'heading'],
         symbols(turned: true, flat: true)),
@@ -455,6 +459,10 @@ List<StyleLayer> overlayStyleLayers() {
         symbols(turned: false)),
   ];
 }
+
+/// How big the pins turned with the map (a line's vehicles) are drawn as the map zooms: half their size from a town on
+/// the screen ([zoom] 10), their own from a neighbourhood (13.5)
+const turnedPinSize = ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13.5, 1];
 
 /// A color as the map's style reads it, transparency included
 String styleColor(Color color) =>

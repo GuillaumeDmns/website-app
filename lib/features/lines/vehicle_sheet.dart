@@ -99,7 +99,7 @@ class _VehicleSheetState extends ConsumerState<_VehicleSheet> {
               padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
               child: Row(
                 children: [
-                  VehicleMarker(line: widget.line, size: 32, punctuality: Punctuality.of(_vehicle), stale: _vehicle.stale),
+                  VehicleCapsule(line: widget.line, scale: 0.9),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
