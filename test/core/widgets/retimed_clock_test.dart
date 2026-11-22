@@ -41,31 +41,45 @@ void main() {
     expect(tester.getCenter(now).dy, lessThan(tester.getCenter(was).dy));
   });
 
-  test('moved: the minutes between the clocks printed, not the delay rounded', () {
+  test('moved: the minutes between the clocks printed, from 2 min off or said delayed', () {
     // 20:1x UTC: 21:1x in Paris
     DateTime at(int minute, int second) => DateTime.utc(2026, 11, 3, 20, minute, second);
     // 40 s late, still 21:11
     expect(RetimedClock.moved(at(11, 40), at(11, 0)), 0);
-    // 20 s late across the minute: 21:10, then 21:11
-    expect(RetimedClock.moved(at(11, 10), at(10, 50)), 1);
-    // 20 s early across the minute: 21:11, then 21:10
-    expect(RetimedClock.moved(at(10, 50), at(11, 10)), -1);
+    // The RER A at Gare de Lyon, 45 s late across the minute (21:07:41, then 21:08:26): on time
+    expect(RetimedClock.moved(at(8, 26), at(7, 41)), 0);
+    // 4 s early across the minute (Transilien P, 21:12:00 then 21:11:56), 64 s early: on time
+    expect(RetimedClock.moved(at(11, 56), at(12, 0)), 0);
+    expect(RetimedClock.moved(at(21, 59), at(23, 3)), 0);
+    // 1 min 59 off: still on time; 2 min: the minutes printed
+    expect(RetimedClock.moved(at(12, 59), at(11, 0)), 0);
+    expect(RetimedClock.moved(at(13, 0), at(11, 0)), 2);
+    // 2 min 6 late across a minute (RER D, 21:36:30 then 21:38:36): the clocks print 2 min apart
+    expect(RetimedClock.moved(at(38, 36), at(36, 30)), 2);
+    expect(RetimedClock.moved(at(8, 59), at(11, 0)), -3);
     expect(RetimedClock.moved(at(14, 30), at(11, 30)), 3);
+    // Said delayed by the real time (a bus, 77 s late): moved however little, as long as its clock changes
+    expect(RetimedClock.moved(at(12, 17), at(11, 0), delayed: true), 1);
+    expect(RetimedClock.moved(at(11, 40), at(11, 0), delayed: true), 0);
+    // Said delayed but early by the real time: not late
+    expect(RetimedClock.moved(at(10, 30), at(11, 30), delayed: true), 0);
     expect(RetimedClock.moved(at(11, 40), null), 0);
   });
 
-  testWidgets('late by less than a minute within the same minute: the time alone, nothing struck through', (tester) async {
-    // Transilien L at Bécon les Bruyères, 21:11 planned and expected 40 s later: no "21:11" struck through before "21:11"
-    final aimed = DateTime.utc(2026, 11, 3, 20, 11);
-    await pump(tester, RetimedClock(time: aimed.add(const Duration(seconds: 40)), planned: aimed));
-    expect(find.text(formatClock(aimed)), findsOneWidget);
+  testWidgets('less than 2 min off: the new time alone, nothing struck through nor colored', (tester) async {
+    // RER A at Gare de Lyon, 21:07:41 planned and expected 45 s later: "21:08" alone, not "21:07" struck through
+    final aimed = DateTime.utc(2026, 11, 3, 20, 7, 41);
+    final expected = aimed.add(const Duration(seconds: 45));
+    await pump(tester, RetimedClock(time: expected, planned: aimed));
+    expect(find.byType(Text), findsOneWidget);
+    expect(find.text(formatClock(expected)), findsOneWidget);
     expect(tester.widget<Text>(find.byType(Text)).style?.decoration, isNot(TextDecoration.lineThrough));
+    expect(tester.widget<Text>(find.byType(Text)).style?.color, isNot(AppColors.light.delayed));
 
-    // 20 s late across the minute: moved, the planned time struck through
-    final crossing = DateTime.utc(2026, 11, 3, 20, 10, 50);
-    await pump(tester, RetimedClock(time: crossing.add(const Duration(seconds: 20)), planned: crossing));
-    expect(tester.widget<Text>(find.text(formatClock(crossing))).style?.decoration, TextDecoration.lineThrough);
-    expect(tester.widget<Text>(find.text(formatClock(aimed))).style?.color, AppColors.light.delayed);
+    // The same said delayed by the real time: late, the planned time struck through
+    await pump(tester, RetimedClock(time: expected, planned: aimed, delayed: true));
+    expect(tester.widget<Text>(find.text(formatClock(aimed))).style?.decoration, TextDecoration.lineThrough);
+    expect(tester.widget<Text>(find.text(formatClock(expected))).style?.color, AppColors.light.delayed);
   });
 
   testWidgets('less than a minute off, or no planned time: the time alone', (tester) async {

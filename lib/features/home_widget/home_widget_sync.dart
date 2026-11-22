@@ -124,7 +124,7 @@ String widgetRows(StopDepartures departures) {
       formatClock(first.time),
       field(group.line.destination),
       group.line.line.mode.name,
-      first.delayed ? 'late' : (first.realtime ? 'live' : ''),
+      first.late ? 'late' : (first.realtime ? 'live' : ''),
       if (next != null) formatClock(next.time) else '',
     ].join('|');
     // Every row ends with a new line, even a single one: the widget tells this format from the older one by it

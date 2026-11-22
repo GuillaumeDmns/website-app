@@ -254,6 +254,7 @@ class _RideRow extends StatelessWidget {
                         RetimedClock(
                           time: departure.time,
                           planned: departure.aimedTime,
+                          delayed: departure.delayed,
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                         ),
                       if (arrival != null && !departure.cancelled) ...[

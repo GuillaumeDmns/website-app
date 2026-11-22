@@ -71,7 +71,7 @@ class GoDeparturesCard extends ConsumerWidget {
 
     // When it leaves: its time on time or from the schedule; moved by the real time, the planned time struck through and
     // the new one beside it, in the delay's color (blue early); cancelled, the planned time struck through
-    final moved = vehicle == null || vehicle.cancelled ? 0 : RetimedClock.moved(departure, vehicle.aimedTime);
+    final moved = vehicle == null || vehicle.cancelled ? 0 : RetimedClock.moved(departure, vehicle.aimedTime, delayed: vehicle.delayed);
     final struck = TextStyle(
       color: colors.muted,
       fontWeight: FontWeight.w400,

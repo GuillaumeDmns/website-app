@@ -59,7 +59,7 @@ String androidWidgetRows(StopDepartures departures, {Set<String>? lines}) {
       field(group.line.destination),
       [
         for (final departure in group.upcoming.take(_timesPerRow))
-          '${departure.time.millisecondsSinceEpoch ~/ 1000}:${departure.delayed ? 'd' : (departure.realtime ? 'l' : 's')}',
+          '${departure.time.millisecondsSinceEpoch ~/ 1000}:${departure.late ? 'd' : (departure.realtime ? 'l' : 's')}',
       ].join(','),
     ].join('|');
   }).map((row) => '$row\n').join();

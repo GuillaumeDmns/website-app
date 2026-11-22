@@ -9,6 +9,7 @@ import '../../core/api/models.dart';
 import '../../core/platform/app_shown.dart';
 import '../../core/utils/colors.dart';
 import '../../core/utils/geo.dart';
+import '../../core/utils/punctuality.dart';
 import '../../core/utils/refresh.dart';
 import '../../core/utils/time_format.dart';
 import '../../l10n/l10n.dart';
@@ -212,10 +213,10 @@ enum Punctuality {
   onTime,
   late;
 
-  /// Late from a minute, like the delays shown in the vehicle sheet
+  /// Late from [shownOffset], like the delays shown in the vehicle sheet (a vehicle has no real-time status)
   static Punctuality of(Vehicle vehicle) => switch (vehicle.delaySeconds) {
         null => unknown,
-        final delay when delay >= 60 => late,
+        final delay when showsLate(Duration(seconds: delay)) => late,
         _ => onTime,
       };
 }

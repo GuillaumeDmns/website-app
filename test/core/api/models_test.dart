@@ -39,6 +39,21 @@ void main() {
     expect(departures.lines.single.departures.last.realtime, isFalse);
   });
 
+  test('a departure shows late when the real time says so, or from 2 min late', () {
+    final aimed = DateTime.utc(2026, 11, 22, 21, 7, 41);
+    Departure at(Duration off, {String status = 'onTime'}) =>
+        Departure(time: aimed.add(off), aimedTime: aimed, realtime: true, status: status);
+    // The RER A's steady 45 s at Gare de Lyon, 1 min 59: on time (SNCF and RATP say onTime even 13 min late)
+    expect(at(const Duration(seconds: 45)).late, isFalse);
+    expect(at(const Duration(seconds: 119)).late, isFalse);
+    expect(at(const Duration(minutes: 2)).late, isTrue);
+    expect(at(const Duration(minutes: 13)).late, isTrue);
+    expect(at(const Duration(minutes: -3)).late, isFalse);
+    // A bus said delayed from a minute: late however little
+    expect(at(const Duration(seconds: 62), status: 'delayed').late, isTrue);
+    expect(Departure(time: aimed, realtime: false).late, isFalse);
+  });
+
   test('reads an unknown mode as a bus', () {
     expect(LineSummary.fromJson({'id': 'C1', 'mode': 'CABLE_CAR'}).mode, TransportMode.bus);
   });
