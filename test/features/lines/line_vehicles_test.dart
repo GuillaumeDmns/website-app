@@ -157,6 +157,22 @@ void main() {
     test('ignores vehicles of another branch', () {
       expect(path.place(vehicle(to: 'IDFM:99'), 0.5), isNull);
     });
+
+    test('keeps the stretches through stops a path drawn does not serve', () {
+      // All served: nothing to add (the other direction on the same tracks)
+      expect(path.partsOff({'IDFM:1', 'IDFM:2', 'IDFM:3'}), isEmpty);
+
+      // Gare de Lyon served the other way only: from Châtelet to Nation, through it
+      final [loop] = path.partsOff({'IDFM:1', 'IDFM:3'});
+      expect(loop.first.latitude, closeTo(48.8584, 0.0001));
+      expect(loop.last.latitude, closeTo(48.8484, 0.0001));
+      expect(loop.any((point) => (point.latitude - 48.8443).abs() < 0.0001), isTrue);
+
+      // Its own end: from the last stop served to the path's end
+      final [end] = path.partsOff({'IDFM:1', 'IDFM:2'});
+      expect(end.first.latitude, closeTo(48.8443, 0.0001));
+      expect(end.last.latitude, closeTo(48.8484, 0.0001));
+    });
   });
 
   test('lists a stop area served twice in a row once', () {

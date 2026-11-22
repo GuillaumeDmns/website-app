@@ -133,6 +133,29 @@ class BranchPath {
   final List<String> stopIds;
   final List<double> stopAlongs = [];
 
+  /// The stretches of the path through its stops not in [served], each from the served stop before them to the one
+  /// after (the path's end where there is none): what it adds to a path drawn through [served]
+  List<List<LatLng>> partsOff(Set<String> served) {
+    final parts = <List<LatLng>>[];
+    var i = 0;
+    while (i < stopIds.length) {
+      if (served.contains(stopIds[i])) {
+        i++;
+        continue;
+      }
+      final start = i;
+      while (i < stopIds.length && !served.contains(stopIds[i])) {
+        i++;
+      }
+      final from = start == 0 ? 0.0 : stopAlongs[start - 1];
+      final to = i >= stopIds.length ? line.length : stopAlongs[i];
+      if (to > from) {
+        parts.add(MeasuredPolyline(line.split(to).$1).split(from).$2);
+      }
+    }
+    return parts;
+  }
+
   /// Where [vehicle] is at [progress] between its two stops and which way it goes; null when they are not on this branch
   VehiclePlacement? place(Vehicle vehicle, double progress) {
     final along = alongOf(vehicle, progress)?.along;

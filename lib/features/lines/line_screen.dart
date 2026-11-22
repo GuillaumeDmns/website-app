@@ -165,10 +165,23 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     final color = parseHexColor(line.color, Colors.grey);
     List<LatLng> points(LineBranch branch) => _pathOf(branch).line.points;
 
-    // Both ways, every direction's branches: a bus's two ways often take different streets
-    final shown = _direction == null
+    // Both ways: a bus's two ways often take other streets, every direction's branches are drawn. A train's or a
+    // metro's run side by side, the direction listed alone is drawn, with the stretches where the other ones serve
+    // stops it doesn't (a loop run one way, the metro 10 at Auteuil)
+    final everyWay = _direction == null && !line.mode.hasPlatforms;
+    final shown = everyWay
         ? [for (final direction in detail.directions) ...direction.branches]
         : _shownBranches(detail);
+    final served = {
+      for (final branch in shown)
+        for (final stop in branch.stops) stop.id,
+    };
+    final otherWay = [
+      if (_direction == null && !everyWay)
+        for (final direction in detail.directions)
+          if (direction != _listedDirection(detail))
+            for (final branch in direction.branches) ..._pathOf(branch).partsOff(served),
+    ];
     final faded = [
       if (_direction != null)
         for (final branch in _listedDirection(detail)?.branches ?? const <LineBranch>[])
@@ -187,8 +200,9 @@ class _LineScreenState extends ConsumerState<LineScreen> {
       // The ones the filter leaves out under the others, the selected one on top
       ..sort((a, b) => _layer(a.vehicle, a.faded, chosen).compareTo(_layer(b.vehicle, b.faded, chosen)));
     final fontFamily = Theme.of(context).textTheme.bodyMedium?.fontFamily;
+    // Both ways, the stops of every direction (those only the other one serves too)
     final stops = <String, StopRef>{
-      for (final branch in shown)
+      for (final branch in _direction == null ? [for (final direction in detail.directions) ...direction.branches] : shown)
         for (final stop in branch.stops) stop.id: stop,
     };
     return MapOverlay(
@@ -204,7 +218,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         if (shown.isNotEmpty)
           MapPath(
             points: points(shown.first),
-            parts: [for (final branch in shown.skip(1)) points(branch)],
+            parts: [for (final branch in shown.skip(1)) points(branch), ...otherWay],
             color: color,
             width: 6,
           ),
