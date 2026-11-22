@@ -79,9 +79,10 @@ class DepartureTime extends StatelessWidget {
 }
 
 /// A clock time the real time moved, like a station's board: the planned time struck through and the new one beside
-/// it, in the delay's color when late and blue when early, so that nothing is left to add up; the time alone when it is
-/// less than [shownOffset] off (unless the real time says it is [delayed]) or when both print the same minute.
-/// [stacked] puts the new time over the planned one, for narrow columns.
+/// it, in the delay's color when late and blue when early, so that nothing is left to add up; on time, less than
+/// [shownOffset] off (unless the real time says it is [delayed]) or both printing the same minute, the planned time
+/// alone ([shown]), as a station's board and Citymapper do. [stacked] puts the new time over the planned one, for
+/// narrow columns.
 class RetimedClock extends StatelessWidget {
   const RetimedClock({
     super.key,
@@ -117,6 +118,12 @@ class RetimedClock extends StatelessWidget {
     return _printedMinute(time).difference(_printedMinute(planned)).inMinutes;
   }
 
+  /// The time to print: on time ([moved] 0), the [planned] one (Citymapper's 22:44 for a train due 22:44:00 and
+  /// expected 22:44:50: the schedule's minute, which a few seconds more or less never change; the minutes left are
+  /// still counted from [time]), else [time]
+  static DateTime shown(DateTime time, DateTime? planned, {bool delayed = false}) =>
+      planned != null && moved(time, planned, delayed: delayed) == 0 ? planned : time;
+
   /// The minute [formatClock] prints for [time]: its local time without the seconds
   static DateTime _printedMinute(DateTime time) {
     final local = time.toLocal();
@@ -135,7 +142,7 @@ class RetimedClock extends StatelessWidget {
     final base = DefaultTextStyle.of(context).style.merge(style).copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
     final minutes = moved(time, planned, delayed: delayed);
     if (minutes == 0) {
-      return Text(formatClock(time), style: base);
+      return Text(formatClock(planned ?? time), style: base);
     }
     final muted = context.colors.muted;
     final now = Text(formatClock(time), style: base.copyWith(color: colorOf(context, minutes)));

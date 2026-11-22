@@ -66,13 +66,25 @@ void main() {
     expect(RetimedClock.moved(at(11, 40), null), 0);
   });
 
-  testWidgets('less than 2 min off: the new time alone, nothing struck through nor colored', (tester) async {
-    // RER A at Gare de Lyon, 21:07:41 planned and expected 45 s later: "21:08" alone, not "21:07" struck through
+  test('shown: the planned time when on time, the new one when moved', () {
+    DateTime at(int minute, int second) => DateTime.utc(2026, 11, 3, 20, minute, second);
+    // RER B KOCA50 at Gare du Nord, due 22:44, expected a minute later: 22:44 as in Citymapper
+    expect(RetimedClock.shown(at(45, 10), at(44, 0)), at(44, 0));
+    expect(RetimedClock.shown(at(43, 30), at(44, 0)), at(44, 0));
+    // PIPA54, 22:56 then 22:58: the new time
+    expect(RetimedClock.shown(at(58, 0), at(56, 0)), at(58, 0));
+    // Said delayed by the real time: the new time however little
+    expect(RetimedClock.shown(at(12, 17), at(11, 0), delayed: true), at(12, 17));
+    expect(RetimedClock.shown(at(45, 10), null), at(45, 10));
+  });
+
+  testWidgets('less than 2 min off: the planned time alone, as a station board and Citymapper show it', (tester) async {
+    // RER A at Gare de Lyon, 21:07:41 planned and expected 45 s later: "21:07" alone, neither "21:08" nor struck through
     final aimed = DateTime.utc(2026, 11, 3, 20, 7, 41);
     final expected = aimed.add(const Duration(seconds: 45));
     await pump(tester, RetimedClock(time: expected, planned: aimed));
     expect(find.byType(Text), findsOneWidget);
-    expect(find.text(formatClock(expected)), findsOneWidget);
+    expect(find.text(formatClock(aimed)), findsOneWidget);
     expect(tester.widget<Text>(find.byType(Text)).style?.decoration, isNot(TextDecoration.lineThrough));
     expect(tester.widget<Text>(find.byType(Text)).style?.color, isNot(AppColors.light.delayed));
 

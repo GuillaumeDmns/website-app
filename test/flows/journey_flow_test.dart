@@ -278,10 +278,9 @@ void main() {
 
     bool struck(DateTime time) =>
         tester.widgetList<Text>(find.text(formatClock(time))).any((text) => text.style?.decoration == TextDecoration.lineThrough);
-    // The metro at its new minute alone, not "21:11" struck through before "21:12"
-    expect(find.text(formatClock(metro)), findsWidgets);
-    expect(find.text(formatClock(metroPlanned)), findsNothing);
-    expect(struck(metro), isFalse);
+    // The metro on time: its planned minute alone, as on a station board, not "21:11" struck through before "21:12"
+    expect(find.text(formatClock(metroPlanned)), findsWidgets);
+    expect(struck(metroPlanned), isFalse);
     // The RER: the planned minute struck through under the new one, in the delay's color
     expect(struck(rerPlanned), isTrue);
     expect(tester.widgetList<Text>(find.text(formatClock(rer))).any((text) => text.style?.color == AppColors.light.delayed), isTrue);

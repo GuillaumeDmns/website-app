@@ -72,6 +72,7 @@ class GoDeparturesCard extends ConsumerWidget {
     // When it leaves: its time on time or from the schedule; moved by the real time, the planned time struck through and
     // the new one beside it, in the delay's color (blue early); cancelled, the planned time struck through
     final moved = vehicle == null || vehicle.cancelled ? 0 : RetimedClock.moved(departure, vehicle.aimedTime, delayed: vehicle.delayed);
+    final shown = vehicle == null || moved != 0 ? departure : vehicle.aimedTime ?? departure;
     final struck = TextStyle(
       color: colors.muted,
       fontWeight: FontWeight.w400,
@@ -89,7 +90,8 @@ class GoDeparturesCard extends ConsumerWidget {
           TextSpan(text: formatClock(vehicle.aimedTime!), style: struck),
           TextSpan(text: ' ${formatClock(departure)}', style: colored(RetimedClock.colorOf(context, moved))),
         ],
-      _ => [TextSpan(text: '${formatClock(departure)} '), TextSpan(text: context.l10n.goOnTime, style: colored(colors.live))],
+      // On time: its planned time, as the departures listed under it
+      _ => [TextSpan(text: '${formatClock(shown)} '), TextSpan(text: context.l10n.goOnTime, style: colored(colors.live))],
     };
     final mission = vehicle?.mission;
     final issue = live && waiting && progress.issue != GoIssue.offRoute ? progress.issue : null;
@@ -107,7 +109,7 @@ class GoDeparturesCard extends ConsumerWidget {
         ? GoCardHeader.alert(glance, live: true)
         : GoCardHeader(
             leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
-            title: formatClock(departure),
+            title: formatClock(shown),
             titleSpan: TextSpan(children: when),
             subtitle: [?mission, mission != null ? section.headsign ?? '' : context.l10n.direction(section.headsign ?? '')]
                 .where((part) => part.isNotEmpty)

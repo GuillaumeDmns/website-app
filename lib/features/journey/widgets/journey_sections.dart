@@ -249,7 +249,7 @@ class _RideTile extends StatelessWidget {
       children: [
         TimelineRow(
           color: color,
-          time: formatClock(section.departure),
+          time: formatClock(RetimedClock.shown(section.departure, planned)),
           // Late or early by the real time, its clock printing another minute: the planned time struck through under
           // the new one, as in its departures below
           clock: RetimedClock.moved(section.departure, planned) != 0
