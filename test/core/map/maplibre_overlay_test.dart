@@ -33,6 +33,20 @@ void main() {
     expect(line.paint.containsKey('line-dasharray'), isFalse);
   });
 
+  test("a line's branches are one path: every edge under every line, rounded where they meet", () {
+    const branch = [LatLng(48.8584, 2.3470), LatLng(48.8500, 2.3300)];
+    final path = MapPath(points: points, parts: const [branch], color: const Color(0xFFFFCD00), width: 6);
+
+    final lines = (jsonDecode(pathGeoJson(path)) as Map<String, dynamic>)['features'] as List<dynamic>;
+    expect(lines, hasLength(2));
+    // One layer for the edges, one for the lines: none drawn over another one's
+    final [edge, line] = mapLibrePathLayers(path);
+    expect(edge.layout, containsPair('line-join', 'round'));
+    expect(line.layout, containsPair('line-cap', 'round'));
+    expect(path.sameAs(MapPath(points: points, parts: const [branch], color: const Color(0xFFFFCD00), width: 6)), isTrue);
+    expect(path.sameAs(MapPath(points: points, color: const Color(0xFFFFCD00), width: 6)), isFalse);
+  });
+
   test('pins as the map draws them: their image once there, a callout standing on its place, turned ones apart', () {
     const at = LatLng(48.8584, 2.3470);
     final pins = [

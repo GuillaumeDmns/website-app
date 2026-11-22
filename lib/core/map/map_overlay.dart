@@ -106,9 +106,17 @@ class MapPath {
     required this.color,
     this.width = 5,
     this.dotted = false,
+    this.parts = const [],
   });
 
   final List<LatLng> points;
+
+  /// Other lines drawn as part of the same path (a line's branches): every edge under every line, so where they part
+  /// or meet none is drawn over another one's
+  final List<List<LatLng>> parts;
+
+  /// [points] and the [parts]
+  List<List<LatLng>> get lines => [points, ...parts];
   final Color color;
   final double width;
 
@@ -120,7 +128,9 @@ class MapPath {
       color == other.color &&
       width == other.width &&
       dotted == other.dotted &&
-      listEquals(points, other.points);
+      listEquals(points, other.points) &&
+      parts.length == other.parts.length &&
+      [for (var i = 0; i < parts.length; i++) listEquals(parts[i], other.parts[i])].every((same) => same);
 }
 
 /// The camera following the user (GO, [user]) on foot or by bike: the way ahead up, the user low in the visible part,

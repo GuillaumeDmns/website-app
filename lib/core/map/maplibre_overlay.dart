@@ -355,19 +355,20 @@ String accuracyGeoJson(LatLng? position, double? accuracy) => jsonEncode({
       ],
     });
 
-/// [path] as GeoJSON
+/// [path] as GeoJSON, a line each for its points and its parts
 String pathGeoJson(MapPath path) => jsonEncode({
       'type': 'FeatureCollection',
       'features': [
-        if (path.points.length >= 2)
-          {
-            'type': 'Feature',
-            'geometry': {
-              'type': 'LineString',
-              'coordinates': [for (final point in path.points) _coordinates(point)],
+        for (final line in path.lines)
+          if (line.length >= 2)
+            {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'LineString',
+                'coordinates': [for (final point in line) _coordinates(point)],
+              },
+              'properties': <String, Object>{},
             },
-            'properties': <String, Object>{},
-          },
       ],
     });
 
@@ -486,8 +487,10 @@ List<PathLayer> mapLibrePathLayers(MapPath path) {
       ),
     ];
   }
+  // Rounded where it bends and where a part ends on another one: branches meet without a notch
+  const layout = {'line-cap': 'round', 'line-join': 'round'};
   return [
-    (layout: const {}, paint: {'line-color': styleColor(_casing.withValues(alpha: path.color.a)), 'line-width': (path.width + 3).round()}),
-    (layout: const {}, paint: {'line-color': styleColor(path.color), 'line-width': path.width.round()}),
+    (layout: layout, paint: {'line-color': styleColor(_casing.withValues(alpha: path.color.a)), 'line-width': (path.width + 3).round()}),
+    (layout: layout, paint: {'line-color': styleColor(path.color), 'line-width': path.width.round()}),
   ];
 }

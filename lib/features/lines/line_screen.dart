@@ -192,9 +192,22 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         for (final stop in branch.stops) stop.id: stop,
     };
     return MapOverlay(
+      // The branches as one path each way they are drawn: their edges under all of them, where they part or meet
       paths: [
-        for (final branch in faded) MapPath(points: points(branch), color: color.withValues(alpha: 0.35), width: 4),
-        for (final branch in shown) MapPath(points: points(branch), color: color, width: 6),
+        if (faded.isNotEmpty)
+          MapPath(
+            points: points(faded.first),
+            parts: [for (final branch in faded.skip(1)) points(branch)],
+            color: color.withValues(alpha: 0.35),
+            width: 4,
+          ),
+        if (shown.isNotEmpty)
+          MapPath(
+            points: points(shown.first),
+            parts: [for (final branch in shown.skip(1)) points(branch)],
+            color: color,
+            width: 6,
+          ),
       ],
       pins: [
         for (final stop in stops.values)

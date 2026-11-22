@@ -308,15 +308,16 @@ class _FlutterMainMapState extends ConsumerState<FlutterMainMap> with TickerProv
         PolylineLayer(
           polylines: [
             for (final path in overlay.paths)
-              Polyline(
-                points: path.points,
-                color: path.color,
-                strokeWidth: path.width,
-                // Walks: the dots alone on the map, like Citymapper's
-                pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
-                borderColor: Colors.white.withValues(alpha: path.color.a),
-                borderStrokeWidth: path.dotted ? 0 : 1.5,
-              ),
+              for (final line in path.lines)
+                Polyline(
+                  points: line,
+                  color: path.color,
+                  strokeWidth: path.width,
+                  // Walks: the dots alone on the map, like Citymapper's
+                  pattern: path.dotted ? StrokePattern.dotted(spacingFactor: 2) : const StrokePattern.solid(),
+                  borderColor: Colors.white.withValues(alpha: path.color.a),
+                  borderStrokeWidth: path.dotted ? 0 : 1.5,
+                ),
           ],
         ),
         // How sure the position is, under the pins and the dot
