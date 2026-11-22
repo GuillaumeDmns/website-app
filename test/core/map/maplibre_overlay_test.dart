@@ -33,6 +33,20 @@ void main() {
     expect(line.paint.containsKey('line-dasharray'), isFalse);
   });
 
+  test("a line's branches are one path: every edge under every line, rounded where they meet", () {
+    const branch = [LatLng(48.8584, 2.3470), LatLng(48.8500, 2.3300)];
+    final path = MapPath(points: points, parts: const [branch], color: const Color(0xFFFFCD00), width: 6);
+
+    final lines = (jsonDecode(pathGeoJson(path)) as Map<String, dynamic>)['features'] as List<dynamic>;
+    expect(lines, hasLength(2));
+    // One layer for the edges, one for the lines: none drawn over another one's
+    final [edge, line] = mapLibrePathLayers(path);
+    expect(edge.layout, containsPair('line-join', 'round'));
+    expect(line.layout, containsPair('line-cap', 'round'));
+    expect(path.sameAs(MapPath(points: points, parts: const [branch], color: const Color(0xFFFFCD00), width: 6)), isTrue);
+    expect(path.sameAs(MapPath(points: points, color: const Color(0xFFFFCD00), width: 6)), isFalse);
+  });
+
   test('pins as the map draws them: their image once there, a callout standing on its place, turned ones apart', () {
     const at = LatLng(48.8584, 2.3470);
     final pins = [
@@ -89,17 +103,17 @@ void main() {
   });
 
   test(
-      "the overlay's layers from the bottom: the circle, the close-up pins, the turned pins, the stops' dots, the Vélib "
-      "stations, the pins, the stops' lines, the heading, the dot", () {
+      "the overlay's layers from the bottom: the circle, the close-up pins, the stops' dots, the Vélib "
+      "stations, the pins, the turned pins (a line's vehicles, over its stops), the stops' lines, the heading, the dot", () {
     final layers = overlayStyleLayers();
     Map<String, Object?> layout(StyleLayer layer) => layer.toJson()['layout']! as Map<String, Object?>;
     expect([for (final layer in layers) layer.id], [
       MapLibreOverlay.accuracyLayer,
       MapLibreOverlay.closeUpPinsLayer,
-      MapLibreOverlay.turnedPinsLayer,
       MapLibreOverlay.stopDotsLayer,
       MapLibreOverlay.closePinsLayer,
       MapLibreOverlay.pinsLayer,
+      MapLibreOverlay.turnedPinsLayer,
       MapLibreOverlay.stopLinesLayer,
       MapLibreOverlay.headingLayer,
       MapLibreOverlay.userLayer,
@@ -108,27 +122,29 @@ void main() {
     final closeUp = layers[1] as SymbolStyleLayer;
     expect(closeUp.minZoom, MapPin.closeUpZoom);
     expect(closeUp.filter.toString(), contains('closeUp'));
-    expect((layers[5] as SymbolStyleLayer).minZoom, 0);
-    expect(layers[5].filter.toString(), contains('closeUp'));
+    expect((layers[4] as SymbolStyleLayer).minZoom, 0);
+    expect(layers[4].filter.toString(), contains('closeUp'));
     // The stops, by the map itself as it zooms: their dots from a part of the town until their lines show, nothing
     // further out
-    final dots = layers[3] as SymbolStyleLayer;
+    final dots = layers[2] as SymbolStyleLayer;
     expect((dots.minZoom, dots.maxZoom), (PinZoom.stopDotZoom, PinZoom.stopLinesZoom));
     expect(dots.filter.toString(), contains('stopDot'));
     final lines = layers[6] as SymbolStyleLayer;
     expect((lines.minZoom, lines.maxZoom), (PinZoom.stopLinesZoom, 24));
     expect(lines.filter.toString(), contains('stopLines'));
     // The Vélib stations around from a neighbourhood on the screen, under the stops' lines
-    final close = layers[4] as SymbolStyleLayer;
+    final close = layers[3] as SymbolStyleLayer;
     expect((close.minZoom, close.maxZoom), (PinZoom.stopLinesZoom, 24));
     expect(close.filter.toString(), contains('close'));
-    expect(layers[5].filter.toString(), contains('any'));
-    expect(layers[2], isA<SymbolStyleLayer>());
-    expect(layout(layers[2]), containsPair('icon-rotation-alignment', 'map'));
-    expect(layout(layers[5]), containsPair('icon-rotation-alignment', 'viewport'));
+    expect(layers[4].filter.toString(), contains('any'));
+    expect(layers[5], isA<SymbolStyleLayer>());
+    expect(layout(layers[5]), containsPair('icon-rotation-alignment', 'map'));
+    // The vehicles smaller further out, where a whole line is on the screen
+    expect(layout(layers[5]), containsPair('icon-size', turnedPinSize));
+    expect(layout(layers[4]), containsPair('icon-rotation-alignment', 'viewport'));
     // Images made at the screen's density and the map told so: shown at their size, no icon-size
-    expect(layout(layers[5]).containsKey('icon-size'), isFalse);
-    expect(layout(layers[5]), containsPair('icon-allow-overlap', true));
+    expect(layout(layers[4]).containsKey('icon-size'), isFalse);
+    expect(layout(layers[4]), containsPair('icon-allow-overlap', true));
     // The heading lies on the map; the circle too
     expect(layout(layers[7]), containsPair('icon-pitch-alignment', 'map'));
     expect(layers[0].toJson()['paint'], containsPair('circle-pitch-alignment', 'map'));

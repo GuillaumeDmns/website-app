@@ -157,6 +157,22 @@ void main() {
     test('ignores vehicles of another branch', () {
       expect(path.place(vehicle(to: 'IDFM:99'), 0.5), isNull);
     });
+
+    test('keeps the stretches through stops a path drawn does not serve', () {
+      // All served: nothing to add (the other direction on the same tracks)
+      expect(path.partsOff({'IDFM:1', 'IDFM:2', 'IDFM:3'}), isEmpty);
+
+      // Gare de Lyon served the other way only: from Châtelet to Nation, through it
+      final [loop] = path.partsOff({'IDFM:1', 'IDFM:3'});
+      expect(loop.first.latitude, closeTo(48.8584, 0.0001));
+      expect(loop.last.latitude, closeTo(48.8484, 0.0001));
+      expect(loop.any((point) => (point.latitude - 48.8443).abs() < 0.0001), isTrue);
+
+      // Its own end: from the last stop served to the path's end
+      final [end] = path.partsOff({'IDFM:1', 'IDFM:2'});
+      expect(end.first.latitude, closeTo(48.8443, 0.0001));
+      expect(end.last.latitude, closeTo(48.8484, 0.0001));
+    });
   });
 
   test('lists a stop area served twice in a row once', () {
@@ -173,45 +189,6 @@ void main() {
     expect(stopsOnce(branch).map((stop) => stop.id), ['A', 'D', 'P', 'D']);
   });
 
-  group('stopListPositions', () {
-    // A branch from W merging at M with another one from N
-    const branch = LineBranch(headsign: 'Paris', tripCount: 10, stops: [
-      StopRef(id: 'W1', name: 'W1', lat: 48.80, lon: 2.20),
-      StopRef(id: 'W2', name: 'W2', lat: 48.81, lon: 2.21),
-      StopRef(id: 'M', name: 'M', lat: 48.82, lon: 2.22),
-      StopRef(id: 'P', name: 'Paris', lat: 48.83, lon: 2.23),
-    ]);
-
-    test('places a vehicle between the stop it left and the next one', () {
-      final positions = stopListPositions(branch, [(vehicle: vehicle(from: 'W2', to: 'M'), progress: 0.75)]);
-
-      expect(positions.keys, [2]);
-      expect(positions[2]!.single.offset, closeTo(-0.25, 0.001));
-    });
-
-    test('spreads a direct train over the stops it skips', () {
-      // Left W1 for M, skipping W2: halfway is at W2
-      final positions = stopListPositions(branch, [(vehicle: vehicle(from: 'W1', to: 'M'), progress: 0.5)]);
-
-      expect(positions.keys, [1]);
-      expect(positions[1]!.single.offset, closeTo(0, 0.001));
-    });
-
-    test('leaves out a vehicle coming from another branch until it runs on this one', () {
-      final coming = vehicle(from: 'N2', to: 'M');
-      final merged = vehicle(from: 'M', to: 'P');
-
-      expect(stopListPositions(branch, [(vehicle: coming, progress: 0.5)]), isEmpty);
-      expect(stopListPositions(branch, [(vehicle: merged, progress: 0.5)]).values.single.single.vehicle, merged);
-    });
-
-    test('places a vehicle waiting at its first stop on it', () {
-      final positions = stopListPositions(branch, [(vehicle: vehicle(from: null, to: 'M'), progress: 1)]);
-
-      expect(positions.keys, [2]);
-    });
-  });
-
   test('tells how on time a vehicle is', () {
     expect(Punctuality.of(vehicle()), Punctuality.unknown);
     expect(Punctuality.of(vehicle().copyWith(delaySeconds: 30)), Punctuality.onTime);
@@ -219,18 +196,37 @@ void main() {
     expect(Punctuality.of(vehicle().copyWith(delaySeconds: 60)), Punctuality.late);
   });
 
-  testWidgets('fades a stale vehicle and points it the way it goes', (tester) async {
+  testWidgets('draws a vehicle as a capsule, larger when selected, late or not alike', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Row(children: [
-        VehicleMarker(line: metro1, heading: 90, punctuality: Punctuality.late),
-        VehicleMarker(line: metro1, stale: true),
+        VehicleCapsule(line: metro1),
+        VehicleCapsule(line: metro1, atStop: true, selected: true),
       ]),
     ));
 
-    expect(tester.getSize(find.byType(VehicleMarker).first), Size.square(VehicleMarker.boxSize(22)));
-    expect(find.descendant(of: find.byType(VehicleMarker).first, matching: find.byType(Transform)), findsWidgets);
-    expect(find.descendant(of: find.byType(VehicleMarker).last, matching: find.byType(Opacity)), findsOneWidget);
-    expect(find.descendant(of: find.byType(VehicleMarker).first, matching: find.byType(Opacity)), findsNothing);
+    expect(tester.getSize(find.byType(VehicleCapsule).first), Size.square(VehicleCapsule.boxSize()));
+    expect(tester.getSize(find.byType(VehicleCapsule).last), Size.square(VehicleCapsule.boxSize(selected: true)));
+    // One image per line and look, nothing of its punctuality in it
+    expect(VehicleCapsule.imageName(metro1, atStop: false, selected: false),
+        isNot(VehicleCapsule.imageName(metro1, atStop: true, selected: false)));
+  });
+
+  test('says when a vehicle gets to its next stop, and its delay', () {
+    expect(vehicleWhen(vehicle(toNext: const Duration(seconds: 70)), fetchedAt, TransportMode.metro, atStop: false), '2 min');
+    expect(vehicleWhen(vehicle(), fetchedAt, TransportMode.metro, atStop: true), 'à quai');
+    // Due but still on its way: never "à quai" between two stops
+    expect(vehicleWhen(vehicle(toNext: const Duration(seconds: -20)), fetchedAt, TransportMode.metro, atStop: false), '1 min');
+    expect(vehicleDelay(vehicle()), isNull);
+    expect(vehicleDelay(vehicle().copyWith(delaySeconds: 30)), isNull);
+    expect(vehicleDelay(vehicle().copyWith(delaySeconds: 180)), '3 min de retard');
+  });
+
+  test('measures the callout over the selected vehicle to hold its text', () {
+    final short = VehicleCallout.sizeOf(stop: 'Nation', when: '1 min');
+    final long = VehicleCallout.sizeOf(stop: 'Nation', when: '1 min', delay: '3 min de retard');
+
+    expect(long.width, greaterThan(short.width));
+    expect(short.height, greaterThan(VehicleCallout.gap));
   });
 
   test('labels a vehicle with its next stop', () {
