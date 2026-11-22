@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
 import '../../core/utils/colors.dart';
+import '../../core/utils/punctuality.dart';
 import '../../core/widgets/departure_time.dart';
 import '../../l10n/l10n.dart';
 import 'line_vehicles.dart';
@@ -312,13 +313,14 @@ class _CallRow extends StatelessWidget {
   }
 }
 
-/// `3 min de retard` or `2 min d'avance`, in words (a sign beside a time reads as a sum to make), from a minute off
+/// `3 min de retard` or `2 min d'avance`, in words (a sign beside a time reads as a sum to make), from [shownOffset] off
 class _DelayLabel extends StatelessWidget {
   const _DelayLabel(this.seconds);
 
   final int seconds;
 
-  static bool shown(int? seconds) => seconds != null && seconds.abs() >= 60;
+  static bool shown(int? seconds) =>
+      seconds != null && (showsLate(Duration(seconds: seconds)) || showsEarly(Duration(seconds: seconds)));
 
   @override
   Widget build(BuildContext context) {

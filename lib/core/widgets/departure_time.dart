@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../l10n/l10n.dart';
 import '../api/models.dart';
+import '../utils/punctuality.dart';
 import '../utils/time_format.dart';
 
 /// Time until a departure, Citymapper-like: the minutes in large figures, "min" small beside, green with the
@@ -27,7 +28,7 @@ class DepartureTime extends StatelessWidget {
     final live = departure.realtime && !departure.cancelled;
     final color = departure.cancelled
         ? colors.cancelled
-        : departure.delayed
+        : departure.late
         ? colors.delayed
         : live
         ? colors.live
@@ -78,23 +79,50 @@ class DepartureTime extends StatelessWidget {
 }
 
 /// A clock time the real time moved, like a station's board: the planned time struck through and the new one beside
-/// it, in the delay's color when late and blue when early, so that nothing is left to add up; the time alone when both
-/// print the same minute. [stacked] puts the new time over the planned one, for narrow columns.
+/// it, in the delay's color when late and blue when early, so that nothing is left to add up; on time, less than
+/// [shownOffset] off (unless the real time says it is [delayed]) or both printing the same minute, the planned time
+/// alone ([shown]), as a station's board and Citymapper do. [stacked] puts the new time over the planned one, for
+/// narrow columns.
 class RetimedClock extends StatelessWidget {
-  const RetimedClock({super.key, required this.time, required this.planned, this.style, this.stacked = false});
+  const RetimedClock({
+    super.key,
+    required this.time,
+    required this.planned,
+    this.delayed = false,
+    this.style,
+    this.stacked = false,
+  });
 
   /// When it leaves (or gets there) now
   final DateTime time;
 
   /// When it was planned to, null when unknown
   final DateTime? planned;
+
+  /// The real time says it is late (`Departure.delayed`): shown late however little
+  final bool delayed;
   final TextStyle? style;
   final bool stacked;
 
   /// Minutes between the clocks [planned] and [time] print ([formatClock]: local time, to the minute): late above 0,
-  /// early below, 0 when both print the same minute (planned 21:11:00, 40 s late: still 21:11)
-  static int moved(DateTime time, DateTime? planned) =>
-      planned == null ? 0 : _printedMinute(time).difference(_printedMinute(planned)).inMinutes;
+  /// early below; 0 when shown on time, less than [shownOffset] off and not [delayed] (`showsLate`, `showsEarly`: the
+  /// RER A's +45 s, 21:07:41 then 21:08:26, is on time), or when both print the same minute
+  static int moved(DateTime time, DateTime? planned, {bool delayed = false}) {
+    if (planned == null) {
+      return 0;
+    }
+    final off = time.difference(planned);
+    if (!showsLate(off, delayed: delayed) && !showsEarly(off)) {
+      return 0;
+    }
+    return _printedMinute(time).difference(_printedMinute(planned)).inMinutes;
+  }
+
+  /// The time to print: on time ([moved] 0), the [planned] one (Citymapper's 22:44 for a train due 22:44:00 and
+  /// expected 22:44:50: the schedule's minute, which a few seconds more or less never change; the minutes left are
+  /// still counted from [time]), else [time]
+  static DateTime shown(DateTime time, DateTime? planned, {bool delayed = false}) =>
+      planned != null && moved(time, planned, delayed: delayed) == 0 ? planned : time;
 
   /// The minute [formatClock] prints for [time]: its local time without the seconds
   static DateTime _printedMinute(DateTime time) {
@@ -112,9 +140,9 @@ class RetimedClock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = DefaultTextStyle.of(context).style.merge(style).copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
-    final minutes = moved(time, planned);
+    final minutes = moved(time, planned, delayed: delayed);
     if (minutes == 0) {
-      return Text(formatClock(time), style: base);
+      return Text(formatClock(planned ?? time), style: base);
     }
     final muted = context.colors.muted;
     final now = Text(formatClock(time), style: base.copyWith(color: colorOf(context, minutes)));

@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../l10n/l10n.dart';
+import '../utils/punctuality.dart';
 
 part 'models.freezed.dart';
 part 'models.g.dart';
@@ -137,6 +138,10 @@ abstract class Departure with _$Departure {
   bool get cancelled => status == 'cancelled';
 
   bool get delayed => status == 'delayed';
+
+  /// Shown late (`DepartureTime` in the delay's color, the home screen widget): said [delayed] by the real time, or at
+  /// least [shownOffset] after [aimedTime]: SNCF and RATP never say a train is delayed, even 13 min late
+  bool get late => delayed || (aimedTime != null && showsLate(time.difference(aimedTime!)));
 
   factory Departure.fromJson(Map<String, dynamic> json) => _$DepartureFromJson(json);
 }

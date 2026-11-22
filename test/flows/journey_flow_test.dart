@@ -253,19 +253,20 @@ void main() {
     await closeApp(tester);
   });
 
-  testWidgets("the timeline strikes a ride's planned time through only when its clock prints another minute", (tester) async {
+  testWidgets("the timeline strikes a ride's planned time through only from 2 min off", (tester) async {
     final backend = standardBackend();
     final soon = DateTime.now().toUtc().add(const Duration(minutes: 10));
     final minute = DateTime.utc(soon.year, soon.month, soon.day, soon.hour, soon.minute);
-    // The metro 40 s late, still in its minute; the RER 20 s late, across the minute
-    final metro = minute.add(const Duration(seconds: 40));
+    // The metro 45 s late across the minute (the RER A's steady offset at Gare de Lyon): on time; the RER 2 min 30 late
+    final metro = minute.add(const Duration(seconds: 70));
+    final metroPlanned = metro.subtract(const Duration(seconds: 45));
     final rer = minute.add(const Duration(minutes: 12, seconds: 10));
-    final rerPlanned = rer.subtract(const Duration(seconds: 20));
+    final rerPlanned = rer.subtract(const Duration(seconds: 150));
     backend.on('GET', '/api/v2/journeys', (_) => FakeResponse(JourneyPlan(journeys: [
           journey([
             walk(minute.subtract(const Duration(minutes: 5)), 300),
-            transit(metro, 480, to: gareDeLyon).copyWith(realtime: true, delay: 40),
-            transit(rer, 600, line: rerA, from: gareDeLyon, to: nation).copyWith(realtime: true, delay: 20),
+            transit(metro, 480, to: gareDeLyon).copyWith(realtime: true, delay: 45),
+            transit(rer, 600, line: rerA, from: gareDeLyon, to: nation).copyWith(realtime: true, delay: 150),
           ]),
         ]).toJson()));
     // No departures to retime the rides with: the timeline shows the journey's own real time
@@ -277,9 +278,9 @@ void main() {
 
     bool struck(DateTime time) =>
         tester.widgetList<Text>(find.text(formatClock(time))).any((text) => text.style?.decoration == TextDecoration.lineThrough);
-    // The metro at its minute alone, not "21:11" struck through before "21:11"
-    expect(find.text(formatClock(metro)), findsWidgets);
-    expect(struck(metro), isFalse);
+    // The metro on time: its planned minute alone, as on a station board, not "21:11" struck through before "21:12"
+    expect(find.text(formatClock(metroPlanned)), findsWidgets);
+    expect(struck(metroPlanned), isFalse);
     // The RER: the planned minute struck through under the new one, in the delay's color
     expect(struck(rerPlanned), isTrue);
     expect(tester.widgetList<Text>(find.text(formatClock(rer))).any((text) => text.style?.color == AppColors.light.delayed), isTrue);

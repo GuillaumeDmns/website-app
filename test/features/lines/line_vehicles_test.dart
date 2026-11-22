@@ -193,7 +193,9 @@ void main() {
     expect(Punctuality.of(vehicle()), Punctuality.unknown);
     expect(Punctuality.of(vehicle().copyWith(delaySeconds: 30)), Punctuality.onTime);
     expect(Punctuality.of(vehicle().copyWith(delaySeconds: -90)), Punctuality.onTime);
-    expect(Punctuality.of(vehicle().copyWith(delaySeconds: 60)), Punctuality.late);
+    // Late from 2 min: a minute or so is noise
+    expect(Punctuality.of(vehicle().copyWith(delaySeconds: 90)), Punctuality.onTime);
+    expect(Punctuality.of(vehicle().copyWith(delaySeconds: 120)), Punctuality.late);
   });
 
   testWidgets('draws a vehicle as a capsule, larger when selected, late or not alike', (tester) async {
@@ -218,6 +220,7 @@ void main() {
     expect(vehicleWhen(vehicle(toNext: const Duration(seconds: -20)), fetchedAt, TransportMode.metro, atStop: false), '1 min');
     expect(vehicleDelay(vehicle()), isNull);
     expect(vehicleDelay(vehicle().copyWith(delaySeconds: 30)), isNull);
+    expect(vehicleDelay(vehicle().copyWith(delaySeconds: 100)), isNull);
     expect(vehicleDelay(vehicle().copyWith(delaySeconds: 180)), '3 min de retard');
   });
 
