@@ -673,6 +673,7 @@
   "locationUnavailableChooseStart": "Position indisponible : choisissez un point de départ",
   "allDepartures": "Tous les départs",
   "now": "maintenant",
+  "goApproaching": "À l'approche",
   "goArrived": "Vous êtes arrivé",
   "goArrivedAt": "À {time}",
   "@goArrivedAt": {

@@ -42,8 +42,11 @@ class GoRideCard extends ConsumerWidget {
     final stops = section.stops;
     final onBoard = progress.phase == GoPhase.onBoard && progress.step == card.step;
     final left = onBoard ? tracker.stopsLeft(progress) : math.max(1, stops.length - 1);
-    final arrival = section.arrival.add(progress.shift);
+    // The times of the vehicle followed as the API gives them, never moved by the delay GO measures itself
+    final arrival = section.arrival;
     final minutes = onBoard ? minutesLeft(arrival.difference(now)) : math.max(1, (section.duration / 60).round());
+    // Its time past, not there yet: the API didn't know the train late, no figure made up
+    final approaching = onBoard && arrival.isBefore(now);
     final to = section.to?.name ?? '';
     final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
 
@@ -58,12 +61,15 @@ class GoRideCard extends ConsumerWidget {
                 : left <= 1 || nextStop == null
                 ? '$to · ${context.l10n.arrivalAt(formatClock(arrival))}'
                 : context.l10n.goNextStop(nextStop),
-            figure: minutes <= 0 ? context.l10n.now : '$minutes',
-            unit: minutes <= 0 ? null : context.l10n.minutesUnit,
+            figure: approaching ? context.l10n.goApproaching : minutes <= 0 ? context.l10n.now : '$minutes',
+            unit: approaching || minutes <= 0 ? null : context.l10n.minutesUnit,
             live: live,
             done: done,
           );
-    final late = (progress.shift.inSeconds / 60).round();
+    // Late as the API says it of the departure followed, nothing otherwise
+    final vehicle = state.currentVehicle;
+    final aimed = vehicle?.aimedTime;
+    final late = vehicle == null || aimed == null ? 0 : (vehicle.time.difference(aimed).inSeconds / 60).round();
     return GoCardFrame(
       children: [
         SizeReporter(
@@ -155,7 +161,7 @@ class _StopsRail extends StatelessWidget {
                     : _StopRow(
                         name: stops[k].name,
                         // Where to get off: the ride's arrival (a stop's time is its departure)
-                        time: (k == last ? step.section.arrival : step.stopTime(k)).add(progress.shift),
+                        time: k == last ? step.section.arrival : step.stopTime(k),
                         color: color,
                         gone: onBoard && row == 0,
                         next: onBoard && row == 1 && k != last,

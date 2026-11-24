@@ -59,6 +59,26 @@ void main() {
     expect(VehicleMatch.start(0, onStopping, rides, departed: at(5)).better, isNull);
   });
 
+  test('an earlier train with the same stops: that one, not the one followed early', () {
+    // Waiting for the stopping train of 7:19, the user takes the one of 7:10 (the line L at Saint-Lazare): another
+    // train number
+    final planned = train('9', at(540), [chatelet, gareDeLyon, nation]);
+    final guess = VehicleMatch.start(0, stepOf(planned, [gareDeLyon]), [stopping, planned],
+        departed: at(30), followed: planned.departure);
+    expect(guess.candidates, [stopping]);
+    expect(guess.better, stopping);
+
+    // The train followed by its number, whatever its time: nothing to change
+    final late = stopping.copyWith(departure: stopping.departure.copyWith(time: at(240)));
+    expect(VehicleMatch.start(0, onStopping, [late], departed: at(250), followed: stopping.departure).better, isNull);
+
+    // A metro: no numbers, the same stops 9 min apart are another one
+    Ride metro(Ride train) => train.copyWith(departure: train.departure.copyWith(trainNumber: null));
+    final unnumbered = VehicleMatch.start(0, stepOf(metro(planned), [gareDeLyon]), [metro(stopping), metro(planned)],
+        departed: at(30), followed: metro(planned).departure);
+    expect(unnumbered.better, metro(stopping));
+  });
+
   test('the stops followed being none of theirs: the one that left when the user did, if any', () {
     final unknown = GoStep(transit(at(0), 600, line: rerA, via: [gareDeLyon]).copyWith(stops: const []), 0);
 

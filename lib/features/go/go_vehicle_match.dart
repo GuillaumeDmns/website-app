@@ -22,12 +22,14 @@ import 'go_tracker.dart';
 /// Checked again at every such sign until the alighting stop: a wrong guess (two trains leaving 30 s apart, a stop at
 /// a signal) is put right on its own.
 class VehicleMatch {
-  VehicleMatch(this.step, this._ride);
+  /// [followed]: the real-time departure the journey follows for that ride, when known (its train number says which
+  /// candidate it is)
+  VehicleMatch(this.step, this._ride, {Departure? followed}) : _followedDeparture = followed;
 
   /// [rides]: the departures seen for the ride [step] (index in the tracker's steps, [ride]), the user having left at
   /// [departed]
-  factory VehicleMatch.start(int step, GoStep ride, List<Ride> rides, {required DateTime departed}) =>
-      VehicleMatch(step, ride)
+  factory VehicleMatch.start(int step, GoStep ride, List<Ride> rides, {required DateTime departed, Departure? followed}) =>
+      VehicleMatch(step, ride, followed: followed)
         ..seen(rides, departed)
         ..departed(departed);
 
@@ -72,6 +74,10 @@ class VehicleMatch {
   static const _ranThroughPenalty = 8.0;
   static const _stoppedPenalty = 3.0;
 
+  /// A candidate with the stops of the ride followed is that train only this close to its time: the line L's 21:41 and
+  /// 21:50 serve the same stations, and the 21:41 taken was the 21:50 followed, 8 min early (November 2026)
+  static const _sameTrainWithin = Duration(minutes: 2);
+
   /// Another candidate is followed once this much more likely than the one followed
   static const _margin = 2.0;
 
@@ -84,6 +90,7 @@ class VehicleMatch {
 
   final int step;
   GoStep _ride;
+  final Departure? _followedDeparture;
 
   /// Every departure seen, whether it may be the one or not
   final _all = <_Candidate>[];
@@ -191,7 +198,7 @@ class VehicleMatch {
     }
     _candidates = candidates;
     _stations = _stationsApart(_ride, candidates);
-    _current = _followed(_ride.section, candidates);
+    _current = _followed(_ride.section, _followedDeparture, candidates);
     for (final candidate in candidates) {
       candidate.alongs = _alongs(_ride, candidate.ride);
     }
@@ -344,9 +351,16 @@ class VehicleMatch {
       ..sort((a, b) => a.along.compareTo(b.along));
   }
 
-  /// The candidate whose stops are the ride's (same stations, a few hundred meters apart at most), leaving closest to
-  /// it
-  static int _followed(JourneySection section, List<_Candidate> candidates) {
+  /// The candidate the journey follows: the train of the same number as [departure] when both have one (SNCF); else
+  /// the one whose stops are the ride's (same stations, a few hundred meters apart at most), leaving closest to it
+  static int _followed(JourneySection section, Departure? departure, List<_Candidate> candidates) {
+    final number = departure?.trainNumber;
+    if (number != null) {
+      final numbered = candidates.indexWhere((candidate) => candidate.ride.departure.trainNumber != null);
+      if (numbered >= 0) {
+        return candidates.indexWhere((candidate) => candidate.ride.departure.trainNumber == number);
+      }
+    }
     var followed = -1;
     Duration? closest;
     for (final (index, candidate) in candidates.indexed) {
@@ -363,7 +377,8 @@ class VehicleMatch {
       final real = departure.time.difference(section.departure).abs();
       final aimed = departure.aimedTime?.difference(section.departure).abs() ?? real;
       final gap = aimed < real ? aimed : real;
-      if (same && (closest == null || gap < closest)) {
+      // The same stops at another time is another train: two minutes off its time at most
+      if (same && gap <= _sameTrainWithin && (closest == null || gap < closest)) {
         followed = index;
         closest = gap;
       }

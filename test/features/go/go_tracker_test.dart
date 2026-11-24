@@ -313,7 +313,8 @@ void main() {
     expect(progress.phase, GoPhase.onBoard);
     // Left two minutes late: the rest of the journey follows
     expect(progress.shift, const Duration(minutes: 2));
-    expect(tracker.eta(progress, null), plan.arrival.add(const Duration(minutes: 2)));
+    // The arrival shown stays the API's: the delay measured is GO's own
+    expect(tracker.eta(progress, null), plan.arrival);
   });
 
   test('boarding another vehicle than the one expected: the times follow the one taken', () {
@@ -351,7 +352,7 @@ void main() {
 
     expect(progress.phase, GoPhase.onBoard);
     expect(progress.shift, -const Duration(minutes: 6));
-    expect(retained.eta(progress, null), retainedPlan.arrival.subtract(const Duration(minutes: 6)));
+    expect(retained.eta(progress, null), retainedPlan.arrival);
     // Its stops come on its own times: Gare de Lyon at 8:12, not 8:18
     expect(retained.steps[1].stopTime(1).add(progress.shift), at(12));
   });

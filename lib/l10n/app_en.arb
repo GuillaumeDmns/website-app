@@ -249,6 +249,7 @@
   "locationUnavailableChooseStart": "Location unavailable: choose a starting point",
   "allDepartures": "All departures",
   "now": "now",
+  "goApproaching": "Approaching",
   "goArrived": "You have arrived",
   "goArrivedAt": "At {time}",
   "goPlannedSuffix": " (planned {time})",

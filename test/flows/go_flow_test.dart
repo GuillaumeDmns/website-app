@@ -278,14 +278,37 @@ void main() {
     await closeApp(tester);
   });
 
+  /// The metro to Nation getting there at [arrival] (in minutes from now), Gare de Lyon left
+  GoState nearNation(int arrival) => followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 1)).copyWith(
+        tracker: GoTracker(journey([
+          walk(inMinutes(arrival - 12), 240),
+          transit(inMinutes(arrival - 8), 480, via: [gareDeLyon]),
+          walk(inMinutes(arrival), 180, from: point(nation), to: const JourneyPoint(name: 'Cours de Vincennes', lat: 48.8475, lon: 2.4000)),
+        ])),
+      );
+
   testWidgets('getting off in a minute: the ride card says it in red', (tester) async {
-    // Gare de Lyon left, Nation in a minute
-    await openGo(tester, followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 1, shift: Duration(minutes: -13))));
+    // Gare de Lyon left, Nation in a minute by the API's times
+    await openGo(tester, nearNation(1));
 
     expect(find.text(currentL10n.goGetOffNext), findsOneWidget);
     final header = tester.widget<AnimatedContainer>(find.ancestor(of: find.text(currentL10n.goGetOffNext), matching: find.byType(AnimatedContainer)).first);
     expect((header.decoration as BoxDecoration?)?.color, isNotNull);
 
+    await closeApp(tester);
+  });
+
+  testWidgets('on board, the API\'s times only: a delay GO measures itself moves none of them', (tester) async {
+    // GO measures the metro 5 min late: the card still says the API's arrival
+    final measured = followed(const GoProgress(step: 1, phase: GoPhase.onBoard, stopIndex: 0, shift: Duration(minutes: 5)));
+    await openGo(tester, measured);
+    expect(find.textContaining(formatClock(plan.sections[1].arrival)), findsWidgets);
+    expect(find.textContaining(formatClock(plan.sections[1].arrival.add(const Duration(minutes: 5)))), findsNothing);
+    await closeApp(tester);
+
+    // Its time past, not there yet: approaching, no minutes made up
+    await openGo(tester, nearNation(-1));
+    expect(find.text(currentL10n.goApproaching), findsWidgets);
     await closeApp(tester);
   });
 

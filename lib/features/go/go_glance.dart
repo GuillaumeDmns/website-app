@@ -137,11 +137,14 @@ GoGlance goGlance(GoState state, DateTime now, {bool turns = true}) {
       final left = tracker.stopsLeft(progress);
       final stops = section.stops;
       final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
-      final arrival = section.arrival.add(progress.shift);
+      // The API's arrival of the vehicle followed, never moved by the delay GO measures itself
+      final arrival = section.arrival;
       // The last stretch counts the minutes left, red once the stop is close: a direct train's ten minutes to its only
       // stop are no emergency
       final last = left <= 1;
       final minutes = minutesLeft(arrival.difference(now));
+      // Its time past, not there yet: the API didn't know the train late, no figure made up
+      final approaching = arrival.isBefore(now);
       // Far from the line: not on this vehicle (the wrong train, off too early); recalculated only if the user asks
       if (progress.issue == GoIssue.offRoute) {
         return GoGlance(
@@ -158,8 +161,8 @@ GoGlance goGlance(GoState state, DateTime now, {bool turns = true}) {
         icon: Icons.directions_transit,
         kicker: currentL10n.direction(section.headsign ?? ''),
         action: last ? currentL10n.goGetOffNext : currentL10n.goGetOffAtStop(section.to?.name ?? ''),
-        hero: last ? (minutes == 0 ? currentL10n.now : '$minutes') : '$left',
-        heroUnit: last ? (minutes == 0 ? null : currentL10n.minutesUnit) : currentL10n.goStopsUnit(left),
+        hero: last ? (approaching ? currentL10n.goApproaching : minutes == 0 ? currentL10n.now : '$minutes') : '$left',
+        heroUnit: last ? (approaching || minutes == 0 ? null : currentL10n.minutesUnit) : currentL10n.goStopsUnit(left),
         place: [
           if (last) section.to?.name ?? '' else if (nextStop != null) currentL10n.goNextStopShort(nextStop),
           currentL10n.arrivalAt(formatClock(arrival)),
