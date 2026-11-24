@@ -42,7 +42,7 @@ Code map:
 | `along` | meters done along the step's path (what the map fades) |
 | `stopIndex` | on board: last stop the vehicle has left (0 = boarding stop) |
 | `stopFloor` | on board: last stop the **GPS** saw left; the clock never goes below it |
-| `shift` | how late the user is on the schedule from the current ride on (delay measured) |
+| `shift` | how late the user is on the schedule from the current ride on (delay measured); GO's own: it moves the clock, the dot and the alerts, never a time shown (the ride card, the header's arrival, the notification and the connections show the API's times of the vehicle followed; its time past and the user not there yet, "À l'approche") |
 | `preciseAlong`, `preciseAt` | last precise fix on the ride (waiting: where the user stands/sits on the platform) |
 | `departedAt` | when the vehicle taken left the boarding stop |
 | `byClock` | the current step/phase was reached by the clock or an assumption, not seen |
@@ -273,7 +273,7 @@ Relocation also runs after a **restart** (the session restored, its last fix not
 | Another train of the line leaves on time meanwhile | ruled out (gone while the user was still at the platform) |
 | Train held at a signal just after leaving | on board once beyond the zone + 200 m, or moving |
 | Direct and stopping trains leaving 30 s apart | the time can't tell; the first station where they differ does (stopped / ran through) |
-| Two trains with the same stops, minutes apart | time left, then position vs real time once a minute |
+| Two trains with the same stops, minutes apart | time left, then position vs real time once a minute; the train followed is the one of its number (SNCF), else of its stops within 2 min of its time: another one is never that one early (the line L's 21:41 taken while the 21:50 was followed) |
 | Planned vehicle late, real time says "à quai" | never missed |
 | Vehicle only scheduled, not seen | given up 3 min after its time (90 s with real time) |
 | Metro, GPS stuck at the entrance | stale → clock from the departure, `shift` from the last measure |

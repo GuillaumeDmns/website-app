@@ -447,7 +447,8 @@ class GoTracker {
       final after = steps.skip(progress.step + 1).fold(0, (seconds, step) => seconds + step.section.duration);
       return now.add(Duration(seconds: secondsToGo.round() + after));
     }
-    var delay = progress.shift;
+    // The rides' times as the API gives them: the delay GO measures itself on board is never shown
+    var delay = Duration.zero;
     final step = stepOf(progress);
     if (step != null && step.isRide && progress.phase == GoPhase.waiting) {
       // Not left yet: at least the time until the vehicle leaves (missed: the next one, at least now)

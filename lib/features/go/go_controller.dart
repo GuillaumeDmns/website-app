@@ -248,7 +248,6 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     final previousEta = current.tracker.eta(current.progress, current.currentVehicle);
-    final sectionIndex = current.tracker.steps[step].sectionIndex;
     var journey = await _retimedWith(current, step, ride);
 
     final latest = state;
@@ -256,10 +255,6 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     final progress = latest.progress;
-    if (step > progress.step && progress.shift != Duration.zero) {
-      // The current ride's lateness still applies to what follows it: the chosen times are kept as they are
-      journey = shiftJourney(journey, from: sectionIndex, by: -progress.shift);
-    }
     final tracker = GoTracker(journey);
     final chosen = tracker.chosen(progress, step);
     state = GoState(
@@ -320,7 +315,7 @@ class GoController extends Notifier<GoState?> {
     final now = _now();
     var match = _match;
     if (match == null || match.step != progress.step) {
-      match = _match = VehicleMatch(progress.step, ride);
+      match = _match = VehicleMatch(progress.step, ride, followed: state.currentVehicle);
       _stillSince = null;
       final seen = _seenFor == state.tracker ? _seen[progress.step] : null;
       if (seen != null) {

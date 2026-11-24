@@ -107,7 +107,7 @@ GoInstruction goInstruction(GoState state, DateTime now) {
       final left = tracker.stopsLeft(progress);
       final stops = section.stops;
       final nextStop = progress.stopIndex + 1 < stops.length ? stops[progress.stopIndex + 1].name : null;
-      final arrival = section.arrival.add(progress.shift);
+      final arrival = section.arrival;
       return GoInstruction(
         line: section.line,
         icon: Icons.directions_transit,
