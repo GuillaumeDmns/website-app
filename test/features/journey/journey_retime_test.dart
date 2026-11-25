@@ -48,6 +48,14 @@ void main() {
     expect(plannedRide(rides, at(30)), isNull);
   });
 
+  test('a journey searched with real time: the late train at its real time, not another one scheduled then', () {
+    // The direct of 8:11 leaves at 8:14, the stopping train scheduled at 8:13 on time
+    final late = ride(at(14), aimed: at(11), trainNumber: '1');
+    final stopping = ride(at(13), aimed: at(13), trainNumber: '2');
+
+    expect(plannedRide([stopping, late], at(14)), late);
+  });
+
   test('a vehicle listed twice (a line serving two stops of a stop area): the first one is the planned one, the other '
       'one keeps its own arrival when chosen', () {
     final first = ride(at(10), ride: const Duration(minutes: 6));

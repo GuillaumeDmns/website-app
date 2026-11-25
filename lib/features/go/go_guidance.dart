@@ -9,6 +9,7 @@ import '../../l10n/l10n.dart';
 import '../../core/map/map_overlay.dart';
 import 'go_state.dart';
 import 'go_tracker.dart';
+import 'go_vehicle_match.dart';
 
 /// A turn ahead on a walk, for turn-by-turn guidance: Navitia's instruction placed along the walking path
 @immutable
@@ -401,3 +402,78 @@ Ride? replacementRide(List<Ride> rides, GoIssue issue, DateTime planned, DateTim
     .where((ride) => ride.departure.time.isAfter(now) && ride.departure.cancelled != true)
     .where((ride) => issue != GoIssue.cancelled || ride.departure.time.isAfter(planned.add(const Duration(seconds: 30))))
     .firstOrNull;
+
+/// Time to spare at the stop for a departure to count as one the user can catch
+const targetMargin = Duration(seconds: 30);
+
+/// A departure aimed at is kept while the user can still catch it hurrying, this late on their pace
+const targetStillCatchable = Duration(seconds: 60);
+
+/// Another one is aimed at instead only when it arrives this much earlier
+const targetBetterBy = Duration(seconds: 60);
+
+/// Where a ride's vehicle gets to the alighting stop: its arrival as the API gives it, else its last stop's time
+DateTime? rideArrival(Ride ride) => ride.arrivalAt ?? ride.stops.lastOrNull?.time;
+
+/// The departure GO aims at for a ride the user isn't on yet, getting to its stop at [readyAt] (their pace on the
+/// moves before it, the vehicle they are on): of the departures they can catch with [targetMargin] to spare, the one
+/// arriving first, the earlier of two arriving together. Never one arriving later than another they can catch: a
+/// direct train is never swapped for a stopping one leaving first. [current], the one aimed at so far, is kept while
+/// it can still be caught hurrying ([targetStillCatchable]) and none arrives [targetBetterBy] earlier, so that a pace
+/// measured a little faster or slower never swaps trains back and forth; kept too when no other one can be caught.
+Ride? targetRide(List<Ride> rides, DateTime readyAt, {Ride? current}) {
+  Ride? best;
+  DateTime? bestArrival;
+  for (final ride in rides) {
+    final arrival = rideArrival(ride);
+    if (ride.departure.cancelled == true || arrival == null || ride.departure.time.isBefore(readyAt.add(targetMargin))) {
+      continue;
+    }
+    if (best == null ||
+        arrival.isBefore(bestArrival!) ||
+        arrival == bestArrival && ride.departure.time.isBefore(best.departure.time)) {
+      best = ride;
+      bestArrival = arrival;
+    }
+  }
+  final kept = current == null
+      ? null
+      : rides.where((ride) => sameDeparture(ride, current) && ride.departure.cancelled != true).firstOrNull;
+  if (kept != null && !kept.departure.time.isBefore(readyAt.subtract(targetStillCatchable))) {
+    final keptArrival = rideArrival(kept);
+    if (best == null || keptArrival == null || bestArrival!.isAfter(keptArrival.subtract(targetBetterBy))) {
+      return kept;
+    }
+  }
+  return best ?? kept;
+}
+
+/// How far before the stop's point a platform starts, where a train, a metro or a tram is boarded ([GoStep.platformZone])
+const _platformAhead = 150.0;
+
+/// When the user can be at the boarding stop of the ride [step], from where they are at [now]: the move in progress at
+/// their pace (as the walk's card counts it), a ride they are on or wait for at its arrival as the API gives it, the
+/// moves between them at their planned durations
+DateTime readyAtRide(GoState state, int step, DateTime now) {
+  final tracker = state.tracker;
+  final progress = state.progress;
+  var at = now;
+  for (var i = progress.step; i < step && i < tracker.steps.length; i++) {
+    final move = tracker.steps[i];
+    if (move.isRide) {
+      // On board, or still to board: it gets there when the API says, never before now
+      final arrival = move.section.arrival;
+      at = arrival.isAfter(at) ? arrival : at;
+    } else if (i == progress.step && progress.phase == GoPhase.moving) {
+      // A train, a metro or a tram is boarded from where its platform starts, before the stop's point the walk ends at
+      // (Saint-Lazare: 200 m before it); a bus at its stop
+      final ride = tracker.steps[step];
+      final boardFrom = i + 1 == step && (ride.section.line?.mode.hasPlatforms ?? false) ? _platformAhead : 0.0;
+      final meters = math.max(0.0, metersToGo(state) - boardFrom);
+      at = at.add(Duration(milliseconds: (meters / movePace(state, move) * 1000).round()));
+    } else {
+      at = at.add(Duration(seconds: move.section.duration));
+    }
+  }
+  return at;
+}
