@@ -138,6 +138,24 @@ void main() {
       expect((placed.single.node, placed.single.stop), (trunk, 2));
     });
 
+    test('turns a vehicle standing at a stop the way it goes', () {
+      final placed = treeVehicles(trunk, [
+        (vehicle: vehicle('down', from: 'Massy', to: 'BourgLaReine'), progress: 1),
+        (vehicle: vehicle('up', from: 'Chatelet', to: 'BourgLaReine', direction: 1), progress: 1),
+      ]);
+
+      expect({for (final placement in placed) placement.vehicle.id: placement.reverse}, {'down': false, 'up': true});
+    });
+
+    test('turns a vehicle standing at its first stop by its next one', () {
+      final next = [VehicleCall(stopId: 'Massy', expectedAt: DateTime.utc(2026, 11, 21, 12, 5))];
+      final placed = treeVehicles(trunk, [
+        (vehicle: vehicle('first', to: 'BourgLaReine', direction: 1).copyWith(calls: next), progress: 1),
+      ]);
+
+      expect((placed.single.stop, placed.single.reverse), (2, true));
+    });
+
     test('runs the other direction up the list', () {
       final placed = treeVehicles(trunk, [(vehicle: vehicle('south', from: 'Chatelet', to: 'BourgLaReine', direction: 1), progress: 0.25)]);
 

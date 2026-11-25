@@ -171,7 +171,7 @@ List<TreePlacement> treeVehicles(
           node: node,
           stop: stop,
           gap: null,
-          reverse: false,
+          reverse: _runsUp(sequence, vehicle, from, to),
           direct: false,
           position: to.toDouble(),
           vehicle: vehicle,
@@ -206,6 +206,21 @@ List<TreePlacement> treeVehicles(
   }
   placed.sort((a, b) => a.position.compareTo(b.position));
   return placed;
+}
+
+/// Whether [vehicle], standing at `sequence[to]`, runs up the list: it came from a later stop, else its next stop
+/// listed is an earlier one; down the list without either
+bool _runsUp(List<String> sequence, Vehicle vehicle, int from, int to) {
+  if (from >= 0 && from != to) {
+    return from > to;
+  }
+  for (final call in vehicle.calls) {
+    final next = sequence.indexOf(call.stopId);
+    if (next >= 0 && next != to) {
+      return next < to;
+    }
+  }
+  return false;
 }
 
 /// Where a vehicle running from `stops[from]` to `stops[to]` is among the stops between, as a fractional index: the
