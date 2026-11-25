@@ -134,7 +134,9 @@ A fix is **in the zone** when its projection on the line is between `from` and `
 
 `_departureTaken`: if the time measured is within a minute of the expected departure (real time, else planned), the
 expected one is kept (more precise); otherwise the user took another vehicle (a late one, an earlier one) and the time
-measured is kept. `shift` = departure taken − planned (clamped to −30 min … +60 min).
+measured is kept. `shift` = departure taken − planned (clamped to −30 min … +60 min). The departure taken is never
+before the last precise fix still on the platform (`preciseAt`): seen on board only far down the line, the schedule's
+time made the late direct of 9:16 at Bécon the stopping train of 9:14, gone while the user still stood there.
 
 Also while waiting: `delay-<step>` when the vehicle is ≥ 3 min late, `soon-<step>` within 2 min, `cancel-<step>`,
 platform announcements and changes for trains (`platform-<step>-<platform>`).
@@ -274,6 +276,7 @@ Relocation also runs after a **restart** (the session restored, its last fix not
 | Train held at a signal just after leaving | on board once beyond the zone + 200 m, or moving |
 | Direct and stopping trains leaving 30 s apart | the time can't tell; the first station where they differ does (stopped / ran through) |
 | Two trains with the same stops, minutes apart | time left, then position vs real time once a minute; the train followed is the one of its number (SNCF), else of its stops within 2 min of its time: another one is never that one early (the line L's 21:41 taken while the 21:50 was followed) |
+| Rough positions as the train leaves, on board seen only far down the line | the departure taken is not before the last precise fix on the platform: the late direct followed, not the stopping train gone before it (Bécon, 9:16 for 9:11) |
 | Planned vehicle late, real time says "à quai" | never missed |
 | Vehicle only scheduled, not seen | given up 3 min after its time (90 s with real time) |
 | Metro, GPS stuck at the entrance | stale → clock from the departure, `shift` from the last measure |

@@ -925,6 +925,13 @@ class GoTracker {
     if (ride == null) {
       return progress;
     }
+    // Never left before the GPS last saw the user on the platform: seen on board only far down the line (rough
+    // positions as the train left), the schedule's time made the direct of 9:16 at Bécon the stopping one of 9:14,
+    // gone while the user still stood there (November 2026)
+    final seen = progress.phase == GoPhase.waiting ? progress.preciseAt : null;
+    if (departure != null && seen != null && departure.isBefore(seen)) {
+      departure = seen;
+    }
     // Schedule shift from the real departure: later or earlier than planned (an earlier vehicle, a late one taken
     // after the next one was retained), clamped so that a wrong detection never shifts by hours
     var shift = progress.shift;
