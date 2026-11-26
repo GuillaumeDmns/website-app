@@ -212,6 +212,13 @@ class _RideRow extends StatelessWidget {
   final bool tooEarly;
   final VoidCallback? onTap;
 
+  /// Most of the row the time left and the platform may take: the times on the left come first
+  static const _rightShare = 0.32;
+
+  /// Narrower rows (a small phone, the journey detail's timeline on the left) leave the ride time out rather than
+  /// scale the times down
+  static const _rideTimeWidth = 300.0;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -226,96 +233,114 @@ class _RideRow extends StatelessWidget {
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Scaled down rather than cut when the text is large
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      if (departure.cancelled)
-                        Text(
-                          formatClock(departure.time),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            fontFeatures: figures,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        )
-                      else
-                        // Moved by the real time: the planned time struck through, the new one beside it
-                        RetimedClock(
-                          time: departure.time,
-                          planned: departure.aimedTime,
-                          delayed: departure.delayed,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                        ),
-                      if (arrival != null && !departure.cancelled) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Icon(Icons.arrow_forward, size: 14, color: muted),
-                        ),
-                        Text(
-                          '${ride.arrivalSource == ArrivalSource.typical ? '~' : ''}${formatClock(arrival)}',
-                          style: TextStyle(color: muted, fontSize: 15, fontFeatures: figures),
-                        ),
-                        if (minutes != null && minutes > 0 && !largeText)
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          return Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Scaled down rather than cut when the text is large
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        children: [
+                          if (departure.cancelled)
+                            Text(
+                              formatClock(departure.time),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                fontFeatures: figures,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            )
+                          else
+                            // Moved by the real time: the planned time struck through, the new one beside it
+                            RetimedClock(
+                              time: departure.time,
+                              planned: departure.aimedTime,
+                              delayed: departure.delayed,
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          if (arrival != null && !departure.cancelled) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Icon(Icons.arrow_forward, size: 14, color: muted),
+                            ),
+                            Text(
+                              '${ride.arrivalSource == ArrivalSource.typical ? '~' : ''}${formatClock(arrival)}',
+                              style: TextStyle(color: muted, fontSize: 15, fontFeatures: figures),
+                            ),
+                            if (minutes != null && minutes > 0 && !largeText && width >= _rideTimeWidth)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: Text(
+                                  context.l10n.minutesShort(minutes).replaceAll(' ', '\u00a0'),
+                                  style: TextStyle(color: muted, fontSize: 12, fontFeatures: figures),
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (destination) const SizedBox(height: 2),
+                    if (destination) Row(
+                      children: [
+                        if (departure.mission != null)
                           Padding(
-                            padding: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.only(right: 6),
                             child: Text(
-                              context.l10n.minutesShort(minutes).replaceAll(' ', '\u00a0'),
-                              style: TextStyle(color: muted, fontSize: 12, fontFeatures: figures),
+                              departure.mission!,
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.5),
                             ),
                           ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (destination) const SizedBox(height: 2),
-                if (destination) Row(
-                  children: [
-                    if (departure.mission != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Text(
-                          departure.mission!,
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                        Expanded(
+                          child: Text(
+                            ride.destination,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ),
-                      ),
-                    Expanded(
-                      child: Text(
-                        ride.destination,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (countdown) DepartureTime(departure, now: now, mode: mode, emphasized: true),
-              if (departure.platform != null)
-                Text(
-                  context.l10n.platform(departure.platform!),
-                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+              ),
+              const SizedBox(width: 8),
+              // At most a share of the row: a long platform ("Voie BECON LES BRUYERES", a replacement bus's stop) is cut
+              // instead of squeezing the times on the left
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: width * _rightShare),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (countdown)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: DepartureTime(departure, now: now, mode: mode, emphasized: true),
+                      ),
+                    if (departure.platform != null)
+                      Text(
+                        context.l10n.platform(departure.platform!),
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                      ),
+                  ],
                 ),
+              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
 

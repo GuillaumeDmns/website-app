@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/app/theme.dart';
 import 'package:website_app/core/api/models.dart';
@@ -60,6 +61,39 @@ void main() {
     expect(find.textContaining('+'), findsNothing);
     expect(find.textContaining(RegExp(r'^-\d')), findsNothing);
   });
+
+  for (final (phone, rideTime) in [(const Size(412, 900), true), (const Size(360, 800), false)]) {
+    testWidgets('a long platform is cut, the times keep their size (${phone.width.round()} wide)', (tester) async {
+      // A Transilien L replacement bus: its "platform" is the stop's name
+      tester.view.physicalSize = phone * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final rides = [
+        ride(inMinutes(13), aimed: inMinutes(9)).copyWith(
+            departure: departure(inMinutes(13), aimed: inMinutes(9), platform: 'BECON LES BRUYERES')),
+        ride(inMinutes(36), aimed: inMinutes(32)).copyWith(departure: departure(inMinutes(36), aimed: inMinutes(32), platform: '4')),
+      ];
+      // As in the journey detail, past the timeline on the left
+      await pump(
+        tester,
+        Padding(
+          padding: const EdgeInsets.only(left: 60, right: 12),
+          child: RideDepartureList(rides: rides, now: now, selected: rides.first, compact: true, onSelect: (_) {}),
+        ),
+      );
+
+      for (final ride in rides) {
+        final clock = find.text(formatClock(ride.departure.time));
+        // Drawn at its own size: not scaled down to make room
+        expect(tester.getRect(clock).height, moreOrLessEquals(tester.getSize(clock).height));
+      }
+      final platform = tester.renderObject<RenderParagraph>(find.text(currentL10n.platform('BECON LES BRUYERES')));
+      expect(platform.didExceedMaxLines, isTrue);
+      expect(find.text(currentL10n.platform('4')), findsOneWidget);
+      // A small phone leaves the ride time out first
+      expect(find.text(currentL10n.minutesShort(8).replaceAll(' ', '\u00a0')), rideTime ? findsNWidgets(2) : findsNothing);
+    });
+  }
 
   group('compact, in the journey detail', () {
     testWidgets('each thing once: no destination every row has; each row its own ride time, missions differ', (tester) async {
