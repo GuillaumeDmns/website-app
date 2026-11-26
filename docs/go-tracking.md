@@ -134,13 +134,25 @@ A fix is **in the zone** when its projection on the line is between `from` and `
 
 `_departureTaken`: if the time measured is within a minute of the expected departure (real time, else planned), the
 expected one is kept (more precise); otherwise the user took another vehicle (a late one, an earlier one) and the time
-measured is kept. `shift` = departure taken − planned (clamped to −30 min … +60 min).
+measured is kept. `shift` = departure taken − planned (clamped to −30 min … +60 min). The departure taken is never
+before the last precise fix still on the platform (`preciseAt`): seen on board only far down the line, the schedule's
+time made the late direct of 9:16 at Bécon the stopping train of 9:14, gone while the user still stood there.
 
 Also while waiting: `delay-<step>` when the vehicle is ≥ 3 min late, `soon-<step>` within 2 min, `cancel-<step>`,
 platform announcements and changes for trains (`platform-<step>-<platform>`).
 
 **A missed or cancelled vehicle** is replaced at once by the line's next departure (`_replaceMissed`,
 `replacementRide`), shown as retained in the departures card, which offers another one or a recalculation.
+
+**The departure aimed at** is reworked until the user boards (`GoController._retarget`, `targetRide`,
+`readyAtRide`), after every progress and every departures refresh, for every ride ahead: when the user can be at its
+stop = the moves before it at the user's pace (the current one from the meters left, minus 150 m for a train or metro
+stop, whose point is mid-platform), the rides before it at their API arrival. The aim is the first departure catchable
+with 30 s to spare arriving earliest (never one arriving later than another catchable one); the current one is kept
+while it can still be caught (60 s) unless another arrives a minute earlier. A new aim must hold 20 s before it is
+taken (no flicker standing still); it is then chosen like a tap in the departures card (`choose`), without a word: the
+cards show the new train's API times. While a ride waits, the vehicle followed's API times are taken up as they move
+(`_followTimes`, ≥ 30 s): only API times are shown for transport, GO's `shift` never rewrites them.
 
 ### Why this matters (the incident of November 2026)
 
@@ -156,24 +168,35 @@ Created as soon as the user waits for a ride, fed with every departure seen at t
 departed ones kept with their last real time). After boarding, the ride's departures are followed **5 more minutes**
 (`_watchBoarded`, same provider key: no extra request), so a late train's real time and `atStop` keep coming.
 
+Never asks the user: the most likely departure is shown as if sure. No departure is privileged beyond the one the
+journey aims at, which starts with **+1** (two trains 30 s apart with the same stops are told apart by nothing else).
+A departure is known by what it is (`sameVehicleDeparture`): its train number, else its mission, else its scheduled
+time, else a real time within 60 s; never by its stops.
+
 Each departure is a candidate with a score starting at 0. Each thing seen lowers scores **once per event**, not per fix
-(fixes a second apart say the same thing):
+(fixes a second apart say the same thing). **Strong** signs don't depend on how the vehicle runs; **weak** ones do (a
+slowdown, a stop at a signal, a rough GPS):
 
-| Evidence | When | Penalty |
-|---|---|---|
-| **Gone without the user** | P, still, in the zone for ≥ 30 s at t: a departure that left before t − 60 s (and the real time didn't say it was still at the stop afterwards) | −8 |
-| **Time left** | at boarding (`departed`), for each candidate leaving within ±3 min | −min(4, (gap / 30 s)² / 2) |
-| **Not yet left** | a candidate leaving > 2 min after the user did | −8 |
-| **Where it should be** | on board, a P fix, at most once a minute: expected position by its real departure and stop times vs the GPS | −min(4, (Δ / (500 m + 10 % of the way))² / 2) |
-| **Station stopped at** | a station where the candidates' stops differ: still (< 1 m/s and < 1.5 m/s along) 15 s within 200 m of it | −3 for those not stopping there |
-| **Station run through** | crossed never under 5 m/s, fixes ≤ 15 s apart | −8 for those stopping there |
-| **Still at the stop** | the real time says a candidate is at the stop while the user is already beyond the zone | −8 |
+| Evidence | Kind | When | Penalty |
+|---|---|---|---|
+| **Gone without the user** | strong | P, still, in the zone for ≥ 30 s at t: a departure that left before t − 60 s (and the real time didn't say it was still at the stop afterwards) | −8 |
+| **Not yet left** | strong | a candidate leaving > 60 s after a fix saw the user away from the stop | −8 |
+| **Time left, measured** | strong | the user seen leaving (not `byClock`): a candidate leaving > 90 s from that time | −8 |
+| **Time left** | weak | at boarding (`departed`), the others, by their gap to the time left | −min(4, (gap / 30 s)² / 2) |
+| **Where it should be** | weak | on board, a P fix, at most once a minute: expected position by its real departure and stop times vs the GPS | −min(4, (Δ / (500 m + 10 % of the way))² / 2); a sign only when the user is **ahead** of it (a slowing train is behind its times, never ahead) |
+| **Station stopped at** | weak | a station where the candidates' stops differ: still (< 1 m/s and < 1.5 m/s along) 15 s within 200 m of it | −3 for those not stopping there (a signal, maybe) |
+| **Station run through** | strong | crossed never under 5 m/s, fixes ≤ 15 s apart | −8 for those stopping there |
+| **Still at the stop** | strong | the real time says a candidate is at the stop while the user is already beyond the zone | −8 |
 
-Candidates at boarding: departures whose stops are known (≥ 2), not cancelled, leaving within ±3 min of the user.
-The one **followed** at first is the one whose stops are the ride's (same stations, < 300 m apart) and whose scheduled
-(or real) time is closest to the ride's. Another one is followed when it scores **2 points** better (or, following none,
-one scoring ≥ −2). Then the journey is retimed on it (`_followRide`, `retimeJourney`: its stops, its arrival, the
-connections after it) and the progress kept (`onAnotherVehicle`). Rechecked until the alighting stop.
+A weak sign counts from 1 point. Candidates at boarding: departures whose stops are known (≥ 2), not cancelled,
+leaving between the last time the user was seen on the platform and the first time seen away, ±3 min (only around
+the time assumed without the GPS). The departure aimed at (found by what it is, else the one leaving closest to the
+ride's time, within 60 s) is followed at first; following none, one scoring ≥ −2. **Another one is followed** when it
+scores **2 points** better and has fewer strong signs, or at least two weak signs fewer, than the one followed: a rough
+GPS gives few signs and leaves the one aimed at, a slowing train never makes it another one. **Locked**: once one leads
+every other by 8 points, each of them with a strong sign against it, it is the one until the alighting stop.
+Switching retimes the journey on it (`_followRide`, `retimeJourney`: its stops, its arrival, the connections after
+it) and keeps the progress (`onAnotherVehicle`).
 
 Fixes worse than 50 m or further than 100 m from the line tell nothing about stations.
 
@@ -274,6 +297,7 @@ Relocation also runs after a **restart** (the session restored, its last fix not
 | Train held at a signal just after leaving | on board once beyond the zone + 200 m, or moving |
 | Direct and stopping trains leaving 30 s apart | the time can't tell; the first station where they differ does (stopped / ran through) |
 | Two trains with the same stops, minutes apart | time left, then position vs real time once a minute; the train followed is the one of its number (SNCF), else of its stops within 2 min of its time: another one is never that one early (the line L's 21:41 taken while the 21:50 was followed) |
+| Rough positions as the train leaves, on board seen only far down the line | the departure taken is not before the last precise fix on the platform: the late direct followed, not the stopping train gone before it (Bécon, 9:16 for 9:11) |
 | Planned vehicle late, real time says "à quai" | never missed |
 | Vehicle only scheduled, not seen | given up 3 min after its time (90 s with real time) |
 | Metro, GPS stuck at the entrance | stale → clock from the departure, `shift` from the last measure |

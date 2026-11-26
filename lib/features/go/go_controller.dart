@@ -132,6 +132,15 @@ class GoController extends Notifier<GoState?> {
   /// A missed or cancelled vehicle being replaced by the next one
   bool _retaining = false;
 
+  /// The departure aimed at is being moved to another one ([_retarget])
+  bool _retargeting = false;
+
+  /// Another departure to aim at, and since when it is the one ([_retarget]: a pace still settling never swaps trains)
+  ({Ride ride, DateTime since})? _nextTarget;
+
+  /// The one to aim at only once it has been for this long
+  static const _targetSettles = Duration(seconds: 20);
+
   /// Departures received for each ride of the journey followed by [_seenFor] (by step), the departed ones kept: those
   /// the user may have boarded
   final _seen = <int, List<Ride>>{};
@@ -249,6 +258,10 @@ class GoController extends Notifier<GoState?> {
     }
     final previousEta = current.tracker.eta(current.progress, current.currentVehicle);
     var journey = await _retimedWith(current, step, ride);
+    // GO ended meanwhile
+    if (!ref.mounted) {
+      return;
+    }
 
     final latest = state;
     if (latest == null || latest.tracker != current.tracker) {
@@ -267,6 +280,9 @@ class GoController extends Notifier<GoState?> {
       keepAwake: latest.keepAwake,
       position: latest.position,
       retained: retained ? (step: step, later: tracker.eta(chosen, null).difference(previousEta), cancelled: cancelled) : null,
+      // That departure from now on, found again in the departures by what it is, not by its time
+      vehicle: ride.departure,
+      vehicleStep: step,
       alightAlertsOff: latest.alightAlertsOff,
       locationOff: latest.locationOff,
     );
@@ -286,7 +302,11 @@ class GoController extends Notifier<GoState?> {
     final known = <RideKey, List<Ride>>{};
     var retimed = retimeJourney(current.journey, lookup: (key) => known[key], now: now, choices: {sectionIndex: ride}, from: sectionIndex);
     for (var round = 0; round < 6; round++) {
-      final missing = retimed.rides.values.map((plan) => plan.key).where((key) => !known.containsKey(key)).toList();
+      // The departures of the rides after it only: the one taken is given
+      final missing = [
+        for (final MapEntry(key: index, value: plan) in retimed.rides.entries)
+          if (index != sectionIndex && !known.containsKey(plan.key)) plan.key,
+      ];
       if (missing.isEmpty) {
         break;
       }
@@ -339,7 +359,15 @@ class GoController extends Notifier<GoState?> {
     }
     _stillSince = null;
     if (!match.hasDeparted) {
-      match.departed(progress.departedAt ?? ride.section.departure.add(progress.shift));
+      // Seen away from the stop by a fix (down the line, beyond where its vehicle stands), not assumed by the clock: no
+      // departure leaving after that is the one taken
+      final projection = fresh ? ride.line.project(LatLng(fix.latitude, fix.longitude)) : null;
+      final away = projection != null && projection.along > ride.platformZone.to &&
+              projection.distance <= math.max(100.0, fix!.accuracy)
+          ? since
+          : null;
+      match.departed(progress.departedAt ?? ride.section.departure.add(progress.shift),
+          measured: !progress.byClock && progress.departedAt != null, seenAway: away);
     }
     // A new position only: the same one given again tells nothing of a station (stopped there or not)
     if (fix != null && fix.timestamp != _matchedFixAt && fix.timestamp == since) {
@@ -362,13 +390,21 @@ class GoController extends Notifier<GoState?> {
       return;
     }
     final journey = await _retimedWith(current, step, ride);
+    if (!ref.mounted) {
+      return;
+    }
     final latest = state;
     if (latest == null || latest.tracker != current.tracker || latest.progress.step != step || latest.progress.phase != GoPhase.onBoard) {
       return;
     }
     final departed = latest.progress.departedAt ?? latest.tracker.steps[step].section.departure.add(latest.progress.shift);
     final tracker = GoTracker(journey);
-    state = latest.copyWith(tracker: tracker, progress: tracker.onAnotherVehicle(latest.progress, departed));
+    state = latest.copyWith(
+      tracker: tracker,
+      progress: tracker.onAnotherVehicle(latest.progress, departed),
+      vehicle: () => ride.departure,
+      vehicleStep: () => step,
+    );
     _match
       ?..ride = tracker.steps[step]
       ..follow(ride);
@@ -799,6 +835,7 @@ class GoController extends Notifier<GoState?> {
       _watchBoarded();
     }
     _replaceMissed(next);
+    _retarget(next);
     if (progress.phase == GoPhase.arrived) {
       _stopFeeds();
       _lastLive = null;
@@ -831,6 +868,64 @@ class GoController extends Notifier<GoState?> {
     }
     _retaining = true;
     choose(state.progress.step, ride, retained: true, cancelled: issue == GoIssue.cancelled).whenComplete(() => _retaining = false);
+  }
+
+  /// Before the user is on the next ride, the departure aimed at follows when they can be at its stop ([readyAtRide]:
+  /// their pace on the way there, the arrival of the vehicle they are on): the one they can catch arriving first
+  /// ([targetRide]). Nothing is said of it: the cards and the notification simply show that departure's times.
+  void _retarget(GoState state) {
+    final rides = _rides;
+    final of = _departuresOf;
+    final progress = state.progress;
+    if (_retaining || _retargeting || _following || rides == null || of == null || of.tracker != state.tracker ||
+        of.step < progress.step) {
+      return;
+    }
+    // At the stop, the vehicle taken is worked out by [VehicleMatch] (seated in a late train, another one leaving first
+    // is not the one), a missed or cancelled one replaced on its own ([_replaceMissed])
+    if (of.step == progress.step) {
+      return;
+    }
+    final now = _now();
+    final ride = state.tracker.steps[of.step];
+    final aimed = state.vehicleStep == of.step ? state.vehicle : null;
+    final current = aimed == null
+        ? plannedRide(rides, state.tracker.plannedDeparture(ride, progress), arrival: ride.section.arrival)
+        : rides.where((ride) => sameVehicleDeparture(ride.departure, aimed)).firstOrNull;
+    final target = targetRide(rides, readyAtRide(state, of.step, now), current: current);
+    if (target == null || current != null && sameDeparture(target, current)) {
+      _nextTarget = null;
+      return;
+    }
+    // The same one for a while, not a pace measured at a standstill
+    final pending = _nextTarget;
+    if (pending == null || !sameDeparture(pending.ride, target)) {
+      _nextTarget = (ride: target, since: now);
+      return;
+    }
+    if (now.difference(pending.since) < _targetSettles) {
+      return;
+    }
+    _nextTarget = null;
+    _retargeting = true;
+    choose(of.step, target).whenComplete(() => _retargeting = false);
+  }
+
+  /// The ride [step] of the journey on the times the API now gives [ride], the departure it follows, once they moved
+  /// (a train announced later, its arrival with it): the cards and the notification show the API's times only
+  void _followTimes(int step, Ride ride, GoState state) {
+    if (_retaining || _retargeting || _following || step >= state.tracker.steps.length) {
+      return;
+    }
+    final section = state.tracker.steps[step].section;
+    final arrival = rideArrival(ride);
+    final moved = ride.departure.time.difference(section.departure).abs() >= const Duration(seconds: 30) ||
+        arrival != null && arrival.difference(section.arrival).abs() >= const Duration(seconds: 30);
+    if (!moved) {
+      return;
+    }
+    _retargeting = true;
+    choose(step, ride).whenComplete(() => _retargeting = false);
   }
 
   /// Progress in the system notification (Android), when its text changes or every 15 s of progress
@@ -898,14 +993,17 @@ class GoController extends Notifier<GoState?> {
     if (of == _departuresOf) {
       return;
     }
-    _departures?.close();
+    final previous = _departures;
     _departuresOf = of;
     _rides = null;
+    // Listened to before the previous listener goes: the same departures (the journey moved to another vehicle) are not
+    // asked again
     _departures = ref.listen(
       rideOptionsProvider(key),
       (_, departures) => _onDepartures(of, departures),
       fireImmediately: true,
     );
+    previous?.close();
   }
 
   void _onDepartures(({RideKey key, GoTracker tracker, int step}) of, AsyncValue<List<Ride>> departures) {
@@ -919,19 +1017,33 @@ class GoController extends Notifier<GoState?> {
     }
     _rides = rides;
     _remember(of, rides, latest);
-    // The planned vehicle: same scheduled time (a few minutes of tolerance); among departures of the same minute, the
-    // one arriving when the ride does, as the departures card picks it (its mission is the card's header)
+    // The departure followed, found again by what it is (its train number, else its scheduled time: a late train's time
+    // is minutes off its schedule, another train's may be closer); else the planned vehicle: same scheduled time (a few
+    // minutes of tolerance); among departures of the same minute, the one arriving when the ride does, as the
+    // departures card picks it (its mission is the card's header)
     final ride = of.tracker.steps[of.step];
-    final vehicle = plannedRide(
-      rides,
-      of.tracker.plannedDeparture(ride, latest.progress),
-      arrival: ride.section.arrival.add(latest.progress.shift),
-    )?.departure;
+    final followed = latest.vehicleStep == of.step ? latest.vehicle : null;
+    // Gone from the list once it left: its last known time is still when it left
+    final vehicle = (followed == null ? null : rides.where((ride) => sameVehicleDeparture(ride.departure, followed)).firstOrNull)
+            ?.departure ??
+        followed ??
+        plannedRide(
+          rides,
+          of.tracker.plannedDeparture(ride, latest.progress),
+          arrival: ride.section.arrival.add(latest.progress.shift),
+        )?.departure;
     state = latest.copyWith(
       vehicle: () => vehicle,
       vehicleStep: () => of.step,
       realtimeDepartures: rides.any((ride) => ride.departure.realtime),
     );
+    // The departure followed, still to leave, on its times as the API now gives them
+    final followedRide = vehicle == null ? null : rides.where((ride) => sameVehicleDeparture(ride.departure, vehicle)).firstOrNull;
+    final progress = latest.progress;
+    if (followedRide != null && !(of.step == progress.step && progress.phase == GoPhase.onBoard)) {
+      _followTimes(of.step, followedRide, state!);
+    }
+    _retarget(state!);
   }
 
   /// The departures [rides] received for the ride of [of], the departed ones kept: those the user may be on

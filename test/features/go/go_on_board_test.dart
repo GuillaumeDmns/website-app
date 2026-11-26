@@ -92,6 +92,69 @@ void main() {
     controller.stop();
   });
 
+  test('walking to the stop, GO aims at the departure the user can catch arriving first, without a word', () async {
+    final now = DateTime.now().toUtc();
+    DateTime at(int minutes) => now.add(Duration(minutes: minutes));
+    Ride train(String number, int leaves, int arrives) =>
+        ride(at(leaves), trainNumber: number, ride: Duration(minutes: arrives - leaves));
+    // 4 min of walk planned to Châtelet, then the train of +4 min; the user, at their door, is more than 7 min away at
+    // a usual pace: the train of +9 arriving at +17 can be caught, and the direct of +11 arriving at +16
+    final plan = journey([walk(now, 240), transit(at(4), 480, line: rerA, via: [gareDeLyon])]);
+    final backend = standardBackend();
+    backend.on('GET', '/api/v2/lines/*/rides', (_) => FakeResponse([
+          train('1', 4, 12).toJson(),
+          train('2', 9, 17).toJson(),
+          train('3', 11, 16).toJson(),
+        ]));
+    final fixes = StreamController<Position>.broadcast();
+    addTearDown(fixes.close);
+    var time = now;
+    final container = testContainer(backend, overrides: [
+      positionFeedProvider.overrideWithValue(PositionFeed(open: (_) => fixes.stream)),
+      liveJourneyProvider.overrideWithValue(_NoLiveJourney()),
+      userLocationProvider.overrideWith((ref) => Stream.value(LatLng(address.lat, address.lon))),
+      goClockProvider.overrideWithValue(() => time),
+    ]);
+    container.listen(goControllerProvider, (_, _) {});
+    final controller = container.read(goControllerProvider.notifier);
+
+    controller.start(plan, const JourneyRequest());
+    await pumpEventQueue();
+    // At the door for half a minute: the same departure to aim at for 20 s before it is aimed at
+    for (var second = 0; second <= 30; second += 5) {
+      time = now.add(Duration(seconds: second));
+      fixes.add(Position(
+        latitude: address.lat + second * 1e-6,
+        longitude: address.lon,
+        timestamp: time,
+        accuracy: 8,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0.5,
+      ));
+      await pumpEventQueue();
+      if (second == 10) {
+        expect(container.read(goControllerProvider)!.journey.rides.single.departure, at(4));
+      }
+    }
+    for (var k = 0; k < 5; k++) {
+      await pumpEventQueue();
+    }
+
+    final state = container.read(goControllerProvider)!;
+    expect(state.progress.step, 0);
+    expect(state.journey.rides.single.departure, at(11));
+    expect(state.vehicle?.trainNumber, '3');
+    // Nothing said about it
+    expect(state.retained, isNull);
+    expect(state.progress.issue, isNull);
+
+    controller.stop();
+  });
+
   test('seated early in a late train at a terminus, far down the platform: GO waits with it, never follows the one '
       'leaving on time meanwhile, nor gets the user off at that one\'s arrival', () async {
     final base = DateTime.now().toUtc();
@@ -149,9 +212,9 @@ void main() {
     }
     var state = container.read(goControllerProvider)!;
     expect(state.progress.phase, GoPhase.onBoard);
-    // Six minutes late at the start, a little less once the GPS saw it run faster than its schedule
-    expect(state.progress.shift.inSeconds, inInclusiveRange(290, 360));
-    expect(state.journey.rides.single.departure, at(6));
+    // On the times the API gives that train, six minutes late: the delay GO measures is little more than that
+    expect(state.journey.rides.single.departure, at(12));
+    expect(state.progress.shift.inSeconds, inInclusiveRange(-90, 60));
 
     // Into a tunnel: the GPS gives its last position again. Past the arrival of the one that left at 8:07 (8:15), still
     // on board; off about 8:19

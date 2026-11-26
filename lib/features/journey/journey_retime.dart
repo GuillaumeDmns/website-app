@@ -222,13 +222,17 @@ Ride _firstToArrive(List<Ride> list, Ride taken) {
 Duration _arrivalGap(Ride ride, DateTime? arrival) =>
     ride.arrivalAt == null || arrival == null ? Duration.zero : ride.arrivalAt!.difference(arrival).abs();
 
-/// The departure planned at [planned]: closest scheduled time, a few minutes off at most. Among the same ones (a
-/// vehicle listed twice, arriving at two stops of a stop area), the one arriving closest to [arrival], else the first
+/// The departure planned at [planned]: closest time, scheduled or real (a journey searched with real time gives a late
+/// train's real time: the direct of 9:11 at 9:14:31, another train scheduled at 9:13 is not it), a few minutes off at
+/// most. Among the same ones (a vehicle listed twice, arriving at two stops of a stop area), the one arriving closest to
+/// [arrival], else the first
 Ride? plannedRide(List<Ride> rides, DateTime planned, {DateTime? arrival}) {
   Ride? best;
   var bestGap = const Duration(minutes: 4);
   for (final ride in rides) {
-    final gap = (ride.departure.aimedTime ?? ride.departure.time).difference(planned).abs();
+    final real = ride.departure.time.difference(planned).abs();
+    final scheduled = (ride.departure.aimedTime ?? ride.departure.time).difference(planned).abs();
+    final gap = real < scheduled ? real : scheduled;
     final closer = best == null
         ? gap <= bestGap
         : gap < bestGap || (gap == bestGap && arrival != null && _arrivalGap(ride, arrival) < _arrivalGap(best, arrival));

@@ -79,11 +79,19 @@ void main() {
     expect(unnumbered.better, metro(stopping));
   });
 
-  test('the stops followed being none of theirs: the one that left when the user did, if any', () {
-    final unknown = GoStep(transit(at(0), 600, line: rerA, via: [gareDeLyon]).copyWith(stops: const []), 0);
+  test('the departure aimed at left at another time: the one that left when the user did, if any', () {
+    final aimedLater = departure(at(600), trainNumber: '9');
 
-    expect(VehicleMatch.start(0, unknown, [stopping, express], departed: at(25)).better, express);
-    expect(VehicleMatch.start(0, unknown, [express], departed: at(-60)).better, isNull);
+    expect(VehicleMatch.start(0, onStopping, [stopping, express], departed: at(25), followed: aimedLater).better, express);
+    expect(VehicleMatch.start(0, onStopping, [express], departed: at(-60), followed: aimedLater).better, isNull);
+  });
+
+  test('two trains with nothing to tell them apart: the one aimed at', () {
+    // The same stops, 20 s apart, seen leaving between them
+    final close = train('3', at(20), [chatelet, gareDeLyon, nation]);
+    expect(VehicleMatch.start(0, onStopping, [stopping, close], departed: at(12), followed: stopping.departure).better, isNull);
+    expect(VehicleMatch.start(0, onStopping, [stopping, close], departed: at(12), followed: close.departure).better, isNull);
+    expect(VehicleMatch.start(0, onStopping, [stopping, close], departed: at(8), followed: close.departure).better, isNull);
   });
 
   test('a station run through: not the train stopping there', () {
@@ -97,7 +105,7 @@ void main() {
     expect(guess.better, express);
   });
 
-  test('a stop at a station only the stopping train serves: that one', () {
+  test('a stop at a station only the stopping train serves: maybe a signal, a weak sign alone changes nothing', () {
     final guess = VehicleMatch.start(0, onExpress, [stopping, express], departed: at(25));
     expect(guess.better, isNull);
 
@@ -106,7 +114,7 @@ void main() {
     position = travel(guess, onExpress, position, List.filled(10, 0));
     travel(guess, onExpress, position, [2, 5, 8, 11, 14, 15, 15, 15, 15, 15, 15, 15]);
 
-    expect(guess.better, stopping);
+    expect(guess.better, isNull);
   });
 
   test('fixes too far apart, too slow or too blurred tell nothing', () {
@@ -138,7 +146,7 @@ void main() {
     expect(guess.better, isNull);
   });
 
-  test('checked again at each station: a stop at a signal is put right further on', () {
+  test('a stop at a signal changes nothing; a station run through says the express', () {
     // To Fontenay: the stopping train serves Gare de Lyon, Nation and Vincennes, the express only Nation
     final everyStation = train('1', at(0), [chatelet, gareDeLyon, nation, vincennes, fontenay]);
     final fewStations = train('2', at(30), [chatelet, nation, fontenay]);
@@ -147,16 +155,15 @@ void main() {
     final guess = VehicleMatch.start(0, step, [everyStation, fewStations], departed: at(30));
     expect(guess.better, isNull);
 
-    // Held 30 s at a signal by Gare de Lyon: the stopping train, for now
+    // Held 30 s at a signal by Gare de Lyon: a weak sign, the express still
     var position = travel(guess, step, (time: at(150), along: alongOf(gareDeLyon) - 300), List.filled(6, 15));
     position = travel(guess, step, position, List.filled(10, 0));
     position = travel(guess, step, position, List.filled(12, 15));
-    expect(guess.better, everyStation);
-    guess.follow(everyStation);
+    expect(guess.better, isNull);
 
-    // Through Vincennes at full speed: the express after all
+    // Through Vincennes at full speed: the express, surely
     travel(guess, step, (time: position.time, along: alongOf(vincennes) - 600), List.filled(30, 20));
-    expect(guess.better, fewStations);
+    expect(guess.better, isNull);
   });
 
   group('from the platform on', () {
@@ -204,12 +211,43 @@ void main() {
 
     test('on board, the real time says another one is still at the stop: not that one', () {
       final other = train('3', at(90), [chatelet, gareDeLyon, nation]);
-      final match = VehicleMatch.start(0, step, [onTime, other], departed: at(75));
+      // The late one aimed at is none of them: the one that left with the user
+      final match = VehicleMatch.start(0, step, [onTime, other], departed: at(75), followed: late.departure);
+      expect(match.better, onTime);
+      match.follow(onTime);
       expect(match.better, isNull);
       match.seen([other.copyWith(departure: other.departure.copyWith(atStop: true))], at(150), userGone: true);
       expect(match.better, isNull);
       match.follow(other);
       expect(match.better, onTime);
+    });
+
+    test('behind where the one followed should be: maybe a slowdown, never another train on its own', () {
+      // Same stops, 2 min 30 apart, following the one of 7:11: at 7:14 and 7:15 the user is only where the later one
+      // should be, as the one of 7:11 would be had it slowed down
+      final next = train('3', at(210), [chatelet, gareDeLyon, nation]);
+      final match = VehicleMatch.start(0, step, [onTime, next], departed: at(135));
+      match.follow(onTime);
+      final lyonAt = step.line.project(LatLng(gareDeLyon.lat, gareDeLyon.lon))!.along;
+      match.observe(at(240), step.line.pointAt(lyonAt * 0.4), speed: 10, accuracy: 10);
+      match.observe(at(300), step.line.pointAt(lyonAt * 0.7), speed: 10, accuracy: 10);
+      expect(match.better, isNull);
+    });
+
+    test('surely the one once ahead of every other by a strong sign\'s worth: kept until the alighting stop', () {
+      // Still on the platform after the one of 7:10 left, seen leaving at 7:12:35 with the one of 7:12:30
+      final later = train('3', at(150), [chatelet, gareDeLyon, nation]);
+      final match = VehicleMatch(0, step, followed: late.departure)..seen([onTime, later], at(-60));
+      for (var second = 0; second <= 120; second += 30) {
+        match.stillAtPlatform(at(second));
+      }
+      match.departed(at(155), measured: true);
+      expect(match.better, later);
+      // Even should the journey be moved back to the other one, the one surely taken
+      match.follow(onTime);
+      expect(match.better, later);
+      match.follow(later);
+      expect(match.better, isNull);
     });
 
     test('where each one should be by its times, against where the GPS puts the user', () {

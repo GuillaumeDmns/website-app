@@ -317,6 +317,27 @@ void main() {
     expect(tracker.eta(progress, null), plan.arrival);
   });
 
+  test('seen on board only far down the line: never left before the GPS last saw the user on the platform', () {
+    // Like the line L at Bécon: the metro of 8:06 late beyond what the real time said, the user still on the platform
+    // at 8:08:30 by the GPS, then only rough positions until one far down the line
+    final waiting = tracker.jumpTo(tracker.initial(), 1);
+    final platform = tracker.steps[1].line.pointAt(20);
+    var progress = waiting;
+    for (var second = 0; second <= 150; second += 10) {
+      (progress, _) = tracker.update(progress, input(at(6, second), position: platform, accuracy: 5));
+    }
+    for (var second = 0; second <= 150; second += 10) {
+      (progress, _) = tracker.update(progress, input(at(7, second), position: platform, accuracy: 5));
+    }
+    expect(progress.phase, GoPhase.waiting);
+
+    (progress, _) = tracker.update(progress, input(at(9, 30), position: tracker.steps[1].line.pointAt(900), accuracy: 100));
+
+    expect(progress.phase, GoPhase.onBoard);
+    expect(progress.departedAt!.isBefore(at(8, 30)), isFalse);
+    expect(progress.shift, greaterThanOrEqualTo(const Duration(minutes: 2, seconds: 30)));
+  });
+
   test('boarding another vehicle than the one expected: the times follow the one taken', () {
     final waiting = tracker.jumpTo(tracker.initial(), 1);
     // 150 m along the line at 10 m/s: seen leaving 15 s before

@@ -90,7 +90,7 @@ void main() {
     // Exported as text, read back
     expect(await GoTrace.export(store), contains('"kind": "fix"'));
 
-    // Played again: waiting until it leaves, then on board that train, six minutes late
+    // Played again: waiting until it leaves, then on board that train, on its times six minutes late
     final replayed = await replayGoTrace(sessions.single);
     for (final (:at, :state) in replayed) {
       if (at.isBefore(base.add(const Duration(minutes: 12)))) {
@@ -99,8 +99,8 @@ void main() {
     }
     final last = replayed.last.state;
     expect(last.progress.phase, GoPhase.onBoard);
-    expect(last.journey.rides.single.departure, at(6));
-    expect(last.progress.shift.inMinutes, inInclusiveRange(4, 6));
+    expect(last.journey.rides.single.departure, at(12));
+    expect(last.progress.shift.inMinutes, inInclusiveRange(-1, 1));
   });
 
   test('played again on the clock: rough positions at home end no walk; the schedule leads between the events', () async {

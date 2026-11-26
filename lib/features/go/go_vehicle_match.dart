@@ -3,35 +3,42 @@ import 'dart:math' as math;
 import 'package:latlong2/latlong.dart';
 
 import '../../core/api/models.dart';
-import '../../core/utils/geo.dart';
 import '../journey/journey_retime.dart';
 import 'go_tracker.dart';
 
 /// Which of the departures seen at the stop the user is on, worked out without ever asking them, from the moment they
-/// wait for it to the alighting stop. Each departure is a candidate with a score; what the GPS shows takes points off
-/// the ones it doesn't fit, once per thing seen (not per fix: fixes a second apart say the same thing):
+/// wait for it to the alighting stop: always the most likely one, the one the journey aimed at only a little ahead of
+/// the others ([_aimedBonus]). Each departure is a candidate with a score; what the GPS shows takes points off the ones
+/// it doesn't fit, once per thing seen (not per fix: fixes a second apart say the same thing). Strong signs don't
+/// depend on how the vehicle runs:
 /// - still on the platform (or seated in the train waiting there) after a departure left: not on that one
 ///   ([stillAtPlatform]), unless the real time said it was still at the stop since;
-/// - seen leaving at a time: the further from it a departure left, the less likely ([departed]); one leaving minutes
-///   later had not left yet;
-/// - on board, where each departure should be by its real time and its stop times, against where the GPS puts the user
-///   ([observe], once a minute);
-/// - at each station where their stops differ, whether the vehicle stopped there (15 s still) or ran through it (never
-///   under 5 m/s, fixes at most 15 s apart): a direct train runs through the stations a stopping one serves;
+/// - seen away from the stop at a time: a departure leaving after that had not left ([departed]);
+/// - at a station where their stops differ, a vehicle running through it (never under 5 m/s, fixes at most 15 s apart)
+///   doesn't stop there: a direct train runs through the stations a stopping one serves;
 /// - a departure the real time says is still at the stop while the user is already down the line ([seen]).
-/// Checked again at every such sign until the alighting stop: a wrong guess (two trains leaving 30 s apart, a stop at
-/// a signal) is put right on its own.
+/// Weak ones do (a slowdown, a stop at a signal, a rough GPS):
+/// - how far a departure left from when the user did ([departed]);
+/// - on board, where each departure should be by its real time and its stop times, against where a precise fix puts the
+///   user ([observe], once a minute): the user ahead of where one should be is a sign against it, behind it only takes
+///   points off (a slowing train is behind its times, never ahead of them);
+/// - a vehicle standing at a station 15 s that only other candidates serve (a signal, maybe).
+/// Another candidate is followed once 2 points more likely and by a strong sign, or two weak ones more than the one
+/// followed ([better]): a rough GPS gives few signs and leaves the departure aimed at; a slowing train never makes it
+/// another one. Once one leads every other by a strong sign's worth, each of them with a strong sign against it, it is
+/// the one until the alighting stop ([_locked]).
 class VehicleMatch {
-  /// [followed]: the real-time departure the journey follows for that ride, when known (its train number says which
-  /// candidate it is)
+  /// [followed]: the real-time departure the journey aims at for that ride, when known (found among the candidates by
+  /// what it is: [sameVehicleDeparture])
   VehicleMatch(this.step, this._ride, {Departure? followed}) : _followedDeparture = followed;
 
-  /// [rides]: the departures seen for the ride [step] (index in the tracker's steps, [ride]), the user having left at
-  /// [departed]
-  factory VehicleMatch.start(int step, GoStep ride, List<Ride> rides, {required DateTime departed, Departure? followed}) =>
+  /// [rides]: the departures seen for the ride [step] (index in the tracker's steps, [ride]), the user seen leaving at
+  /// [departed] ([measured]: false when it was only assumed; [seenAway]: when a fix saw them away from the stop)
+  factory VehicleMatch.start(int step, GoStep ride, List<Ride> rides,
+          {required DateTime departed, bool measured = true, DateTime? seenAway, Departure? followed}) =>
       VehicleMatch(step, ride, followed: followed)
         ..seen(rides, departed)
-        ..departed(departed);
+        ..departed(departed, measured: measured, seenAway: seenAway);
 
   /// Departures leaving this close to the user are the ones they may be on
   static const window = Duration(minutes: 3);
@@ -40,14 +47,24 @@ class VehicleMatch {
   static const _timing = Duration(seconds: 30);
   static const _maxTimingPenalty = 4.0;
 
-  /// What a thing seen says against a candidate: it surely is not that one
+  /// What a strong sign says against a candidate: it surely is not that one
   static const _ruledOut = 8.0;
+
+  /// The departure the journey aimed at, a little more likely than the others before anything is seen: two trains
+  /// leaving 30 s apart with the same stops are told apart by nothing else
+  static const _aimedBonus = 1.0;
+
+  /// A weak sign counts from this many points (a departure a few seconds off is no sign)
+  static const _weakSign = 1.0;
 
   /// A departure this far past is gone, whatever its time said (the real time is a little off)
   static const _leftSince = Duration(seconds: 60);
 
-  /// One leaving this long after the user did had not left
-  static const _notYet = Duration(minutes: 2);
+  /// One leaving this long after the user was seen away from the stop had not left
+  static const _notYet = Duration(seconds: 60);
+
+  /// The user seen leaving: a departure this far off that time is another one
+  static const _measuredOff = Duration(seconds: 90);
 
   /// Where it should be against where it is, at most once a minute: off by about [_spread] (plus 10 % of the way) is
   /// nothing much, three times that much
@@ -74,11 +91,7 @@ class VehicleMatch {
   static const _ranThroughPenalty = 8.0;
   static const _stoppedPenalty = 3.0;
 
-  /// A candidate with the stops of the ride followed is that train only this close to its time: the line L's 21:41 and
-  /// 21:50 serve the same stations, and the 21:41 taken was the 21:50 followed, 8 min early (November 2026)
-  static const _sameTrainWithin = Duration(minutes: 2);
-
-  /// Another candidate is followed once this much more likely than the one followed
+  /// Another candidate is followed once this much more likely than the one followed (and by enough signs: [better])
   static const _margin = 2.0;
 
   /// Fixes less accurate (m), or further from the way, tell nothing about a station
@@ -99,8 +112,11 @@ class VehicleMatch {
   List<_Candidate> _candidates = const [];
   List<_Station> _stations = const [];
 
-  /// Index in [_candidates] of the one the journey follows, -1 when none (the planned stops are not one of theirs)
+  /// Index in [_candidates] of the one the journey follows, -1 when none (the departure aimed at is none of them)
   int _current = -1;
+
+  /// Index in [_candidates] of the one surely taken, once it is ([_lock])
+  int? _locked;
 
   DateTime? _departedAt;
   double _along = 0;
@@ -121,6 +137,10 @@ class VehicleMatch {
     if (_candidates.isEmpty) {
       return null;
     }
+    final locked = _locked ?? _lock();
+    if (locked != null) {
+      return locked == _current ? null : _candidates[locked].ride;
+    }
     var best = _current < 0 ? 0 : _current;
     for (var i = 0; i < _candidates.length; i++) {
       if (_candidates[i].score > _candidates[best].score) {
@@ -130,11 +150,35 @@ class VehicleMatch {
     if (best == _current) {
       return null;
     }
-    // Following none of them (stops not known): only one about as likely as can be, left within a minute
-    final likely = _current < 0
-        ? _candidates[best].score >= -_margin
-        : _candidates[best].score - _candidates[_current].score >= _margin;
-    return likely ? _candidates[best].ride : null;
+    final candidate = _candidates[best];
+    // Following none of them (the departure aimed at left at another time): only one about as likely as can be
+    if (_current < 0) {
+      return candidate.score >= -_margin ? candidate.ride : null;
+    }
+    // More likely by enough, and by a strong sign or two weak ones: never by a slowdown or a rough fix alone
+    final followed = _candidates[_current];
+    final signs = followed.strong > candidate.strong || followed.weak >= candidate.weak + 2;
+    return candidate.score - followed.score >= _margin && signs ? candidate.ride : null;
+  }
+
+  /// The candidate surely taken: ahead of every other one by a strong sign's worth, each of them with a strong sign
+  /// against it; from then on nothing seen changes it (a train slowing down, a stop at a signal)
+  int? _lock() {
+    if (_candidates.length < 2) {
+      return null;
+    }
+    var leader = 0;
+    for (var i = 1; i < _candidates.length; i++) {
+      if (_candidates[i].score > _candidates[leader].score) {
+        leader = i;
+      }
+    }
+    for (var i = 0; i < _candidates.length; i++) {
+      if (i != leader && (_candidates[leader].score - _candidates[i].score < _ruledOut || _candidates[i].strong == 0)) {
+        return null;
+      }
+    }
+    return _locked = leader;
   }
 
   /// The journey now follows [ride] (one of [candidates])
@@ -155,7 +199,7 @@ class VehicleMatch {
         candidate.atStopAt = at;
         if (userGone && !candidate.leftBehind) {
           candidate.leftBehind = true;
-          candidate.score -= _ruledOut;
+          candidate.against(_ruledOut, strong: true);
         }
       }
     }
@@ -169,39 +213,72 @@ class VehicleMatch {
       final stillThere = candidate.atStopAt != null && !candidate.atStopAt!.isBefore(time);
       if (!candidate.gone && !stillThere && time.isBefore(at.subtract(_leftSince))) {
         candidate.gone = true;
-        candidate.score -= _ruledOut;
+        candidate.against(_ruledOut, strong: true);
       }
     }
   }
 
-  /// The user left the stop at [at] (seen leaving, or assumed then underground): the candidates are the departures
-  /// whose stops are known that left about then
-  void departed(DateTime at) {
+  /// The user left the stop at [at] ([measured]: seen leaving, by fixes moving fast near the stop; else assumed then,
+  /// underground or seen on board only further), seen away from it at [seenAway] when a fix did: the candidates are
+  /// the departures whose stops are known that left from about then to about that time
+  void departed(DateTime at, {bool measured = false, DateTime? seenAway}) {
     if (_departedAt != null) {
       return;
     }
     _departedAt = at;
+    final until = seenAway != null && seenAway.isAfter(at) ? seenAway : at;
     final candidates = <_Candidate>[];
     for (final candidate in _all) {
       final departure = candidate.ride.departure;
-      if (candidate.ride.stops.length >= 2 && !departure.cancelled && departure.time.difference(at).abs() <= window &&
-          !candidates.any((other) => sameDeparture(other.ride, candidate.ride))) {
-        final gap = departure.time.difference(at);
-        // The departure time seen: the further from it a candidate left, the less likely it is the one (30 s off is
-        // little, two minutes much; a station may still say otherwise)
-        candidate.score -= math.min(_maxTimingPenalty, _timingPenalty(gap));
-        if (gap > _notYet) {
-          candidate.score -= _ruledOut;
-        }
-        candidates.add(candidate);
+      final time = departure.time;
+      if (candidate.ride.stops.length < 2 || departure.cancelled || time.isBefore(at.subtract(window)) ||
+          time.isAfter(until.add(window)) || candidates.any((other) => sameDeparture(other.ride, candidate.ride))) {
+        continue;
       }
+      // When the user left: the further from it a candidate left, the less likely it is the one (30 s off is little,
+      // two minutes much; a station may still say otherwise)
+      final gap = time.isBefore(at) ? time.difference(at) : time.isAfter(until) ? time.difference(until) : Duration.zero;
+      // Seen leaving at a time, one leaving a minute and a half off it is another one; seen away from the stop before
+      // it left, not that one either. An assumed time says no more than how likely.
+      if (measured && gap.abs() > _measuredOff || seenAway != null && time.isAfter(seenAway.add(_notYet))) {
+        candidate.against(_ruledOut, strong: true);
+      } else {
+        candidate.against(math.min(_maxTimingPenalty, _timingPenalty(gap)));
+      }
+      candidates.add(candidate);
     }
     _candidates = candidates;
     _stations = _stationsApart(_ride, candidates);
-    _current = _followed(_ride.section, _followedDeparture, candidates);
+    _current = _aimedIndex(candidates);
+    if (_current >= 0) {
+      candidates[_current].score += _aimedBonus;
+    }
     for (final candidate in candidates) {
       candidate.alongs = _alongs(_ride, candidate.ride);
     }
+  }
+
+  /// Index in [candidates] of the departure the journey aims at: the one given, found by what it is; without one, the
+  /// one leaving closest to when the ride does, within a minute; -1 when none
+  int _aimedIndex(List<_Candidate> candidates) {
+    final aimed = _followedDeparture;
+    if (aimed != null) {
+      return candidates.indexWhere((candidate) => sameVehicleDeparture(candidate.ride.departure, aimed));
+    }
+    final planned = _ride.section.departure;
+    var best = -1;
+    var bestGap = const Duration(seconds: 60);
+    for (final (index, candidate) in candidates.indexed) {
+      final departure = candidate.ride.departure;
+      final real = departure.time.difference(planned).abs();
+      final scheduled = departure.aimedTime?.difference(planned).abs() ?? real;
+      final gap = real < scheduled ? real : scheduled;
+      if (gap < bestGap) {
+        best = index;
+        bestGap = gap;
+      }
+    }
+    return best;
   }
 
   static double _timingPenalty(Duration gap) {
@@ -284,7 +361,9 @@ class VehicleMatch {
         continue;
       }
       final x = (expected - along) / spread;
-      candidate.score -= math.min(_maxPositionPenalty, x * x / 2);
+      // Behind where it should be: a slowdown of the very vehicle followed may say as much, its score only; ahead of
+      // it, no slowdown explains that: a sign
+      candidate.against(math.min(_maxPositionPenalty, x * x / 2), sign: along > expected);
     }
   }
 
@@ -319,9 +398,9 @@ class VehicleMatch {
     for (var i = 0; i < _candidates.length; i++) {
       final serves = station.stopping.contains(i);
       if (stopped && !serves) {
-        _candidates[i].score -= _stoppedPenalty;
+        _candidates[i].against(_stoppedPenalty);
       } else if (!stopped && serves) {
-        _candidates[i].score -= _ranThroughPenalty;
+        _candidates[i].against(_ranThroughPenalty, strong: true);
       }
     }
   }
@@ -350,55 +429,26 @@ class VehicleMatch {
     return byName.values.where((station) => station.stopping.length < candidates.length).toList()
       ..sort((a, b) => a.along.compareTo(b.along));
   }
-
-  /// The candidate the journey follows: the train of the same number as [departure] when both have one (SNCF); else
-  /// the one whose stops are the ride's (same stations, a few hundred meters apart at most), leaving closest to it
-  static int _followed(JourneySection section, Departure? departure, List<_Candidate> candidates) {
-    final number = departure?.trainNumber;
-    if (number != null) {
-      final numbered = candidates.indexWhere((candidate) => candidate.ride.departure.trainNumber != null);
-      if (numbered >= 0) {
-        return candidates.indexWhere((candidate) => candidate.ride.departure.trainNumber == number);
-      }
-    }
-    var followed = -1;
-    Duration? closest;
-    for (final (index, candidate) in candidates.indexed) {
-      final stops = candidate.ride.stops;
-      if (stops.length != section.stops.length) {
-        continue;
-      }
-      var same = true;
-      for (var k = 0; k < stops.length && same; k++) {
-        same = metersBetween(LatLng(stops[k].lat, stops[k].lon), LatLng(section.stops[k].lat, section.stops[k].lon)) < 300;
-      }
-      // Its scheduled time, or its real time when the journey was moved to it
-      final departure = candidate.ride.departure;
-      final real = departure.time.difference(section.departure).abs();
-      final aimed = departure.aimedTime?.difference(section.departure).abs() ?? real;
-      final gap = aimed < real ? aimed : real;
-      // The same stops at another time is another train: two minutes off its time at most
-      if (same && gap <= _sameTrainWithin && (closest == null || gap < closest)) {
-        followed = index;
-        closest = gap;
-      }
-    }
-    return followed;
-  }
 }
 
 /// The same departure in two lists received at different times, like [sameRide], but two trains leaving 30 s apart
 /// (a direct one and a stopping one) stay two: same train number, else same scheduled time
-bool sameDeparture(Ride a, Ride b) {
-  final x = a.departure;
-  final y = b.departure;
+bool sameDeparture(Ride a, Ride b) => sameVehicleDeparture(a.departure, b.departure);
+
+/// The same departure of a vehicle, whatever the real time made of its time since: its train number when both have one
+/// (SNCF), else its scheduled time (and its mission when both have one: two trains of the same minute), else its time
+/// within a minute
+bool sameVehicleDeparture(Departure x, Departure y) {
   if (x.trainNumber != null && y.trainNumber != null) {
     return x.trainNumber == y.trainNumber;
+  }
+  if (x.mission != null && y.mission != null && x.mission != y.mission) {
+    return false;
   }
   if (x.aimedTime != null && y.aimedTime != null) {
     return x.aimedTime == y.aimedTime;
   }
-  return sameRide(a, b);
+  return (x.aimedTime ?? x.time).difference(y.aimedTime ?? y.time).abs() < const Duration(seconds: 60);
 }
 
 /// A departure the user may be on, and what was seen of it
@@ -407,6 +457,21 @@ class _Candidate {
 
   Ride ride;
   double score = 0;
+
+  /// Signs seen against it: strong ones (it surely isn't that one), weak ones (it may not be)
+  int strong = 0;
+  int weak = 0;
+
+  /// [points] taken off for a sign against it ([sign]: false when it may come from the vehicle running late, the score
+  /// only)
+  void against(double points, {bool strong = false, bool sign = true}) {
+    score -= points;
+    if (strong) {
+      this.strong++;
+    } else if (sign && points >= VehicleMatch._weakSign) {
+      weak++;
+    }
+  }
 
   /// Last time the real time said it was at the stop
   DateTime? atStopAt;
