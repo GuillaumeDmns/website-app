@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/l10n/l10n.dart';
 
 /// The models read the backend's JSON as it is sent (see website-back's controller/object/v2 records)
 void main() {
@@ -52,6 +53,15 @@ void main() {
     // A bus said delayed from a minute: late however little
     expect(at(const Duration(seconds: 62), status: 'delayed').late, isTrue);
     expect(Departure(time: aimed, realtime: false).late, isFalse);
+  });
+
+  test('reads the buses replacing a line: the badge of the train, said a bus', () {
+    final bus = LineSummary.fromJson(
+        {'id': 'C01847', 'name': 'L', 'longName': 'Remplacement Transilien L', 'mode': 'BUS', 'color': 'D282BE', 'replacement': true});
+    expect(bus.replacement, isTrue);
+    expect(bus.label, currentL10n.replacementBusLine('L'));
+    // An older backend says nothing: a line like any other
+    expect(LineSummary.fromJson({'id': 'C01740', 'name': 'L', 'mode': 'TRANSILIEN'}).replacement, isFalse);
   });
 
   test('reads an unknown mode as a bus', () {

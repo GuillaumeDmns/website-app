@@ -580,6 +580,18 @@
       }
     }
   },
+  "replacementBus": "Bus de remplacement",
+  "@replacementBus": {
+    "description": "Buses replacing a train, metro or tram line during works"
+  },
+  "replacementBusLine": "Bus de remplacement {line}",
+  "@replacementBusLine": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
   "realtime": "Temps réel",
   "stopsCount": "{count, plural, =1{1 arrêt} other{{count} arrêts}}",
   "@stopsCount": {

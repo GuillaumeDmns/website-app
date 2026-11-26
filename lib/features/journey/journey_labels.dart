@@ -51,3 +51,9 @@ String? platformLabel(LineSummary? line, String? platform) {
   }
   return line?.mode.isRail ?? false ? currentL10n.goPlatform(value) : currentL10n.goQuay(value);
 }
+
+/// `Direction Paris Saint-Lazare`, `Bus de remplacement · Direction Paris Saint-Lazare` for the buses replacing a line
+String rideDirection(LineSummary? line, String? headsign) {
+  final direction = currentL10n.direction(headsign ?? '');
+  return line?.replacement ?? false ? '${currentL10n.replacementBus} · $direction' : direction;
+}

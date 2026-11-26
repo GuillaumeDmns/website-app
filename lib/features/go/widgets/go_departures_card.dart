@@ -111,7 +111,7 @@ class GoDeparturesCard extends ConsumerWidget {
             leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
             title: formatClock(shown),
             titleSpan: TextSpan(children: when),
-            subtitle: [?mission, mission != null ? section.headsign ?? '' : context.l10n.direction(section.headsign ?? '')]
+            subtitle: [?mission, mission != null ? section.headsign ?? '' : rideDirection(line, section.headsign)]
                 .where((part) => part.isNotEmpty)
                 .join(' '),
             figure: done ? null : (minutes <= 0 ? context.l10n.now : '$minutes'),

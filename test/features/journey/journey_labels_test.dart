@@ -1,5 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/core/api/models.dart';
 import 'package:website_app/features/journey/journey_labels.dart';
+import 'package:website_app/l10n/l10n.dart';
+
+import '../../support/samples.dart';
 
 void main() {
   test("a place's town apart from its name", () {
@@ -19,5 +24,13 @@ void main() {
   test('a stop of the timeline goes by its name', () {
     expect(stopName('Gare Saint-Lazare (Paris)'), 'Gare Saint-Lazare');
     expect(stopName('Opéra'), 'Opéra');
+  });
+
+  test('a replacement bus is said so before its direction', () {
+    useLocale(const Locale('fr'));
+    const bus = LineSummary(id: 'C01847', name: 'L', mode: TransportMode.bus, color: 'D282BE', replacement: true);
+    expect(rideDirection(bus, 'Paris Saint-Lazare'), 'Bus de remplacement · Direction Paris Saint-Lazare');
+    expect(rideDirection(rerA, 'Boissy-Saint-Léger'), 'Direction Boissy-Saint-Léger');
+    expect(rideDirection(null, null), 'Direction ');
   });
 }
