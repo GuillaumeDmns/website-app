@@ -10,6 +10,7 @@ import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/size_reporter.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
+import '../../journey/journey_labels.dart';
 import '../go_cards.dart';
 import '../go_controller.dart';
 import '../go_glance.dart';
@@ -57,7 +58,7 @@ class GoRideCard extends ConsumerWidget {
             leading: line != null ? LineBadge(line, size: 30) : const Icon(Icons.directions_transit, size: 30),
             title: onBoard && left <= 1 ? context.l10n.goGetOffNext : context.l10n.goStopsTo(left, to),
             subtitle: !onBoard
-                ? context.l10n.direction(section.headsign ?? '')
+                ? rideDirection(line, section.headsign)
                 : left <= 1 || nextStop == null
                 ? '$to · ${context.l10n.arrivalAt(formatClock(arrival))}'
                 : context.l10n.goNextStop(nextStop),

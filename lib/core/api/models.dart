@@ -86,12 +86,15 @@ abstract class LineSummary with _$LineSummary {
     /// Hex colors without `#`
     String? color,
     String? textColor,
+
+    /// Buses replacing a train, metro or tram line during works: a line of their own wearing its badge
+    @Default(false) bool replacement,
   }) = _LineSummary;
 
   const LineSummary._();
 
-  /// `Métro 1`, `RER A`, `Bus 38`
-  String get label => '${mode.label} ${name ?? ''}'.trim();
+  /// `Métro 1`, `RER A`, `Bus 38`, `Bus de remplacement L`
+  String get label => replacement ? currentL10n.replacementBusLine(name ?? '').trim() : '${mode.label} ${name ?? ''}'.trim();
 
   factory LineSummary.fromJson(Map<String, dynamic> json) => _$LineSummaryFromJson(json);
 }

@@ -6,6 +6,7 @@ import '../../../core/api/models.dart';
 import '../../../core/widgets/line_badge.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
+import '../journey_labels.dart';
 import '../../traffic/disruption_widgets.dart';
 import '../../traffic/traffic_providers.dart';
 
@@ -190,7 +191,7 @@ Future<void> showRideAlertsSheet(BuildContext context, {required JourneySection 
                 if (section.line case final line?) ...[LineBadge(line, size: 26), const SizedBox(width: 8)],
                 Expanded(
                   child: Text(
-                    context.l10n.direction(section.headsign ?? ''),
+                    rideDirection(section.line, section.headsign),
                     style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                   ),
                 ),

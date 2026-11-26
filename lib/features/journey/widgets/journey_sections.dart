@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../core/api/models.dart';
 import '../../../core/location/location_providers.dart';
 import '../../../core/utils/colors.dart';
@@ -277,9 +278,20 @@ class _RideTile extends StatelessWidget {
                       ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        context.l10n.direction(section.headsign ?? ''),
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Not the train its badge shows: it stops elsewhere, often outside the station
+                          if (line?.replacement ?? false)
+                            Text(
+                              context.l10n.replacementBus,
+                              style: theme.textTheme.labelMedium?.copyWith(color: context.colors.delayed, fontWeight: FontWeight.w600),
+                            ),
+                          Text(
+                            context.l10n.direction(section.headsign ?? ''),
+                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
                     ),
                   ],
