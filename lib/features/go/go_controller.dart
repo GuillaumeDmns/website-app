@@ -141,6 +141,21 @@ class GoController extends Notifier<GoState?> {
   /// The departure the user chose in a card for a ride, kept while it can be caught ([choose], [_retarget])
   ({int step, Departure departure})? _chosenByUser;
 
+  /// For each ride boarded, when the user left and the departures seen at its stop then ([takenOptions])
+  final _boardings = <int, ({DateTime departed, List<Ride> rides})>{};
+
+  /// The departures the user may have taken for the ride [step], about when they left, in time order: what the
+  /// development and beta builds ask once arrived ([GoTrace.taken]); empty for a ride not boarded
+  List<Ride> takenOptions(int step) {
+    final boarding = _boardings[step];
+    if (boarding == null) {
+      return const [];
+    }
+    bool near(Ride ride) => ride.departure.time.difference(boarding.departed).abs() <= const Duration(minutes: 8);
+    return [for (final ride in boarding.rides) if (near(ride) && ride.departure.cancelled != true) ride]
+      ..sort((a, b) => a.departure.time.compareTo(b.departure.time));
+  }
+
   /// The one to aim at only once it has been for this long
   static const _targetSettles = Duration(seconds: 20);
 
@@ -216,6 +231,7 @@ class GoController extends Notifier<GoState?> {
     if (state != null) {
       _trace?.stop(_now());
     }
+    _boardings.clear();
     _closeTimer?.cancel();
     _closeTimer = null;
     _stopFeeds();
@@ -260,6 +276,7 @@ class GoController extends Notifier<GoState?> {
     if (current == null || step < current.progress.step || step >= current.tracker.steps.length) {
       return;
     }
+    _trace?.choose(step, ride, _now(), byUser: byUser);
     if (byUser) {
       _chosenByUser = (step: step, departure: ride.departure);
     } else if (_chosenByUser case final chosen? when chosen.step == step && !sameVehicleDeparture(chosen.departure, ride.departure)) {
@@ -381,8 +398,9 @@ class GoController extends Notifier<GoState?> {
               projection.distance <= math.max(100.0, fix!.accuracy)
           ? since
           : null;
-      match.departed(progress.departedAt ?? ride.section.departure.add(progress.shift),
-          measured: !progress.byClock && progress.departedAt != null, seenAway: away);
+      final departed = progress.departedAt ?? ride.section.departure.add(progress.shift);
+      match.departed(departed, measured: !progress.byClock && progress.departedAt != null, seenAway: away);
+      _boardings[progress.step] = (departed: departed, rides: match.seenRides);
     }
     // A new position only: the same one given again tells nothing of a station (stopped there or not)
     if (fix != null && fix.timestamp != _matchedFixAt && fix.timestamp == since) {
@@ -514,8 +532,9 @@ class GoController extends Notifier<GoState?> {
     _walkSpeed = null;
     _vehicleSpeed.reset();
     _turnFelt = null;
-    // Another journey: its rides are not the ones chosen
+    // Another journey: its rides are not the ones chosen nor boarded
     _chosenByUser = null;
+    _boardings.clear();
     final tracker = GoTracker(journey);
     state = GoState(
       tracker: tracker,

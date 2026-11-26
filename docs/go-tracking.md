@@ -316,14 +316,35 @@ Relocation also runs after a **restart** (the session restored, its last fix not
 
 Development and **beta** builds (beta = production backend, installable next to the store app: the one to take on a
 real trip) keep a trace of the last 3 GO sessions (`GoTrace`): the journey, every fix as the device gave it, the
-departures received per ride, location on/off, progress changes and vehicles followed. Stored on the device only
-(`LocalStore` key `go_traces`), written when the app leaves the screen, at the end of the session and every 600 events.
+departures received per ride, location on/off, progress changes, vehicles followed, departures chosen (`choose`,
+`byUser` for a tap in a card), and what the user says: `flag` ("GO se trompe", the flag button beside the GPS figures,
+the moment marked with an optional note) and `taken` (once arrived, the arrival card asks for each ride boarded which
+departure was really taken, among those seen at its stop within 8 min of the user leaving,
+`GoController.takenOptions`; one tap, written into the session even after it ended). Never asked in the published app,
+never during the journey. Stored on the device only (`LocalStore` key `go_traces`), written when the app leaves the
+screen, at the end of the session, every 600 events and at once for what the user says.
 
-Export: GO's page, the share button beside the GPS figures ("Exporter la trace"). Replay in a test:
+Export: GO's page, the share button beside the GPS figures ("Exporter la trace").
+
+**The traces folder.** Exports go into `traces/` at the root of the app, kept out of git by `.git/info/exclude` (the
+developer's own trips: never published, not even the folder's name). `test/features/go/go_traces_test.dart` plays
+every session found there again (each once, its longest copy across exports; skipped without the folder, as in the
+CI), the user's taps included, and checks it: played to its end, the departure aimed at never swapping back and forth
+before boarding on its own, the end reached when the trace reached it, and on board each ride the departure the user
+took (`taken` events, else `traces/expected.json`, written by hand: per session a `note`, `taken` per ride step by
+train number or local time, and `taps` for traces older than the `choose` events). Run it before committing a change
+to GO:
+
+```bash
+flutter test test/features/go/go_traces_test.dart
+```
+
+It prints per session when the user was on board each ride and which departure GO followed. A single session in a
+test of its own:
 
 ```dart
-final session = (jsonDecode(File('test/fixtures/my_trip.json').readAsStringSync()) as List).last as Map<String, Object?>;
-final replayed = await replayGoTrace(session);
+final session = (jsonDecode(File('traces/my_trip.json').readAsStringSync()) as List).last as Map<String, Object?>;
+final replayed = await replayGoTrace(session, taps: {/* untraced taps, by time */});
 // replayed: (at, state) after each fix / departures / service event, on a simulated clock (goClockProvider)
 ```
 
