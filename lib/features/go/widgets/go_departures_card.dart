@@ -405,7 +405,7 @@ class _Departures extends ConsumerWidget {
       mode: step.section.line?.mode,
       selected: selected,
       earliest: earliest,
-      onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride),
+      onSelect: (ride) => ref.read(goControllerProvider.notifier).choose(index, ride, byUser: true),
       onAllDepartures: () => context.push(Routes.stop(departures!.from)),
     );
   }
@@ -449,7 +449,7 @@ class _IssueActions extends ConsumerWidget {
                 onPressed: () {
                   HapticFeedback.mediumImpact();
                   controller.dismissIssue();
-                  controller.choose(progress.step, next);
+                  controller.choose(progress.step, next, byUser: true);
                 },
                 child: Text(context.l10n.goTakeThisOne),
               ),

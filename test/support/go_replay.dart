@@ -28,7 +28,9 @@ typedef GoReplayed = ({DateTime at, GoState state});
 /// the departures and the location turned off and on at the times they came, through GO's own controller on a
 /// simulated clock, beating every 5 s between them like the controller's. The departures asked are answered with the last ones the trace received for that line. Gives GO's
 /// state after each of them; the trace's own `progress` and `follow` events say what the app made of them then.
-Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session) async {
+/// [taps]: what the user did then, not traced (a departure chosen in a card), done at those times on the controller.
+Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session,
+    {Map<DateTime, Future<void> Function(GoController controller)> taps = const {}}) async {
   final events = [for (final event in session['events'] as List) (event as Map).cast<String, Object?>()];
   final start = events.firstWhere((event) => event['kind'] == 'start');
   final journey = JourneyOption.fromJson((start['journey'] as Map).cast<String, dynamic>());
@@ -77,14 +79,27 @@ Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session) async {
   // The controller's 5 s clock beats between the events, from the start as in the app: what the schedule does without
   // a fix
   var beat = time.add(_beat);
+  final waiting = taps.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  Future<void> tapsUntil(DateTime next) async {
+    while (waiting.isNotEmpty && !waiting.first.key.isAfter(next)) {
+      final tap = waiting.removeAt(0);
+      time = tap.key;
+      await tap.value(controller);
+      await pumpEventQueue();
+      record();
+    }
+  }
+
   for (final event in events) {
     final next = DateTime.parse(event['t'] as String);
     for (; beat.isBefore(next); beat = beat.add(_beat)) {
+      await tapsUntil(beat);
       time = beat;
       controller.tick();
       await pumpEventQueue();
       record();
     }
+    await tapsUntil(next);
     time = next;
     switch (event['kind']) {
       case 'fix':
