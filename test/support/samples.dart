@@ -14,8 +14,16 @@ JourneyPoint point(StopAreaSummary stop) => JourneyPoint(name: stop.name, lat: s
 
 const address = JourneyPoint(name: '10 Rue de Rivoli', lat: 48.8600, lon: 2.3400);
 
-Departure departure(DateTime time, {DateTime? aimed, bool realtime = true, String? status, String? trainNumber, String? mission}) =>
-    Departure(time: time, aimedTime: aimed ?? time, realtime: realtime, status: status, trainNumber: trainNumber, mission: mission);
+Departure departure(DateTime time,
+        {DateTime? aimed, bool realtime = true, String? status, String? trainNumber, String? mission, String? platform}) =>
+    Departure(
+        time: time,
+        aimedTime: aimed ?? time,
+        realtime: realtime,
+        status: status,
+        trainNumber: trainNumber,
+        mission: mission,
+        platform: platform);
 
 Ride ride(DateTime time, {DateTime? aimed, Duration ride = const Duration(minutes: 8), String? trainNumber, String? status}) => Ride(
       departure: departure(time, aimed: aimed, trainNumber: trainNumber, status: status),
