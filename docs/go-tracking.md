@@ -151,7 +151,9 @@ stop, whose point is mid-platform), the rides before it at their API arrival. Th
 with 30 s to spare arriving earliest (never one arriving later than another catchable one); the current one is kept
 while it can still be caught (60 s) unless another arrives a minute earlier. A new aim must hold 20 s before it is
 taken (no flicker standing still); it is then chosen like a tap in the departures card (`choose`), without a word: the
-cards show the new train's API times. While a ride waits, the vehicle followed's API times are taken up as they move
+cards show the new train's API times. A departure the user chose in a card (`choose(byUser: true)`) is kept while it can be caught
+(60 s), whatever arrives first; chosen while waiting, it is the one `VehicleMatch` aims at (`follow`), not the one
+aimed at when the wait began: left with another train, the journey follows that one. While a ride waits, the vehicle followed's API times are taken up as they move
 (`_followTimes`, ≥ 30 s): only API times are shown for transport, GO's `shift` never rewrites them.
 
 ### Why this matters (the incident of November 2026)

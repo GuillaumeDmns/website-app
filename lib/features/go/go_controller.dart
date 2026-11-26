@@ -138,6 +138,9 @@ class GoController extends Notifier<GoState?> {
   /// Another departure to aim at, and since when it is the one ([_retarget]: a pace still settling never swaps trains)
   ({Ride ride, DateTime since})? _nextTarget;
 
+  /// The departure the user chose in a card for a ride, kept while it can be caught ([choose], [_retarget])
+  ({int step, Departure departure})? _chosenByUser;
+
   /// The one to aim at only once it has been for this long
   static const _targetSettles = Duration(seconds: 20);
 
@@ -250,11 +253,17 @@ class GoController extends Notifier<GoState?> {
 
   /// Takes [ride] for the ride [step] (in progress or to come) instead of the planned departure (missed, cancelled,
   /// or another one preferred): the journey moves to it from there, the following connections included. [retained]:
-  /// taken on its own for a missed or cancelled vehicle, said as such with how much later the arrival is.
-  Future<void> choose(int step, Ride ride, {bool retained = false, bool cancelled = false}) async {
+  /// taken on its own for a missed or cancelled vehicle, said as such with how much later the arrival is. [byUser]:
+  /// chosen in a card, kept while it can be caught ([_retarget] aims at no other one).
+  Future<void> choose(int step, Ride ride, {bool retained = false, bool cancelled = false, bool byUser = false}) async {
     final current = state;
     if (current == null || step < current.progress.step || step >= current.tracker.steps.length) {
       return;
+    }
+    if (byUser) {
+      _chosenByUser = (step: step, departure: ride.departure);
+    } else if (_chosenByUser case final chosen? when chosen.step == step && !sameVehicleDeparture(chosen.departure, ride.departure)) {
+      _chosenByUser = null;
     }
     final previousEta = current.tracker.eta(current.progress, current.currentVehicle);
     var journey = await _retimedWith(current, step, ride);
@@ -286,6 +295,12 @@ class GoController extends Notifier<GoState?> {
       alightAlertsOff: latest.alightAlertsOff,
       locationOff: latest.locationOff,
     );
+    // Waiting for it: the vehicle taken is worked out with that one as the one aimed at
+    if (_match case final match? when match.step == step) {
+      match
+        ..ride = tracker.steps[step]
+        ..follow(ride);
+    }
     _save();
     // The departures followed go on with the screen off
     ref.read(followedOffScreenProvider.notifier).set(true);
@@ -499,6 +514,8 @@ class GoController extends Notifier<GoState?> {
     _walkSpeed = null;
     _vehicleSpeed.reset();
     _turnFelt = null;
+    // Another journey: its rides are not the ones chosen
+    _chosenByUser = null;
     final tracker = GoTracker(journey);
     state = GoState(
       tracker: tracker,
@@ -751,6 +768,7 @@ class GoController extends Notifier<GoState?> {
     _seen.clear();
     _seenFor = null;
     _match = null;
+    _chosenByUser = null;
     _stillSince = null;
     _boarded?.close();
     _boarded = null;
@@ -892,7 +910,15 @@ class GoController extends Notifier<GoState?> {
     final current = aimed == null
         ? plannedRide(rides, state.tracker.plannedDeparture(ride, progress), arrival: ride.section.arrival)
         : rides.where((ride) => sameVehicleDeparture(ride.departure, aimed)).firstOrNull;
-    final target = targetRide(rides, readyAtRide(state, of.step, now), current: current);
+    final readyAt = readyAtRide(state, of.step, now);
+    // Chosen by the user: theirs while they can catch it, hurrying
+    final chosen = _chosenByUser;
+    if (chosen != null && chosen.step == of.step && current != null && sameVehicleDeparture(current.departure, chosen.departure) &&
+        !current.departure.time.isBefore(readyAt.subtract(targetStillCatchable))) {
+      _nextTarget = null;
+      return;
+    }
+    final target = targetRide(rides, readyAt, current: current);
     if (target == null || current != null && sameDeparture(target, current)) {
       _nextTarget = null;
       return;

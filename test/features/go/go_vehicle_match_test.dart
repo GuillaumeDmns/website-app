@@ -193,6 +193,15 @@ void main() {
       expect(unseen.better, isNull);
     });
 
+    test('a departure chosen while waiting is the one aimed at from then on; left with another one, that one', () {
+      // Waiting for the 7:11 on time, the user chose the late 7:10 leaving at 7:16, then left at 7:11 all the same
+      final later = late.copyWith(departure: late.departure.copyWith(atStop: null));
+      final match = VehicleMatch(0, step, followed: onTime.departure)..seen([onTime, later], at(0));
+      match.follow(later);
+      match.departed(at(60));
+      expect(match.better, onTime);
+    });
+
     test('a train the real time says is at the platform has not left, however late its time', () {
       final match = VehicleMatch(0, step)
         ..seen([late.copyWith(departure: late.departure.copyWith(time: at(30))), onTime], at(240));

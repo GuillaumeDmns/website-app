@@ -152,6 +152,26 @@ void main() {
     expect(state.retained, isNull);
     expect(state.progress.issue, isNull);
 
+    // The user chooses the train of +9 arriving later: theirs while they can catch it, whatever arrives first
+    await controller.choose(1, train('2', 9, 17), byUser: true);
+    for (var second = 35; second <= 120; second += 5) {
+      time = now.add(Duration(seconds: second));
+      fixes.add(Position(
+        latitude: address.lat + second * 1e-6,
+        longitude: address.lon,
+        timestamp: time,
+        accuracy: 8,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0.5,
+      ));
+      await pumpEventQueue();
+    }
+    expect(container.read(goControllerProvider)!.vehicle?.trainNumber, '2');
+
     controller.stop();
   });
 

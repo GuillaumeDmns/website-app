@@ -103,7 +103,7 @@ class VehicleMatch {
 
   final int step;
   GoStep _ride;
-  final Departure? _followedDeparture;
+  Departure? _followedDeparture;
 
   /// Every departure seen, whether it may be the one or not
   final _all = <_Candidate>[];
@@ -181,8 +181,12 @@ class VehicleMatch {
     return _locked = leader;
   }
 
-  /// The journey now follows [ride] (one of [candidates])
-  void follow(Ride ride) => _current = _candidates.indexWhere((candidate) => sameDeparture(candidate.ride, ride));
+  /// The journey now follows [ride] (one of [candidates]; before the user left, the departure aimed at: one chosen
+  /// in a card while waiting is the one given the aimed bonus, not the one aimed at when the waiting began)
+  void follow(Ride ride) {
+    _followedDeparture = ride.departure;
+    _current = _candidates.indexWhere((candidate) => sameDeparture(candidate.ride, ride));
+  }
 
   /// The departures at the stop as received at [at] (departed ones are kept, with their last times). [userGone]: the
   /// user is down the line by then, so none the real time says is still at the stop is theirs.
