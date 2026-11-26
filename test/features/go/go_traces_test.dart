@@ -24,12 +24,14 @@ import '../../support/go_replay.dart';
 ///       "<session id>": {
 ///         "note": "Bécon → Saint-Lazare, chose the late 15:15 then took the 15:11",
 ///         "taken": {"1": "134618"},
+///         "onBoard": false,
 ///         "taps": [{"t": "2026-11-26T15:07:30", "step": 1, "train": "135954"}]
 ///       }
 ///     }
 ///
 /// `taken`: per ride (step of the journey) the departure taken, by its train number, else its time (`15:11`, local
-/// time of the device, scheduled or real); `taps`: the departures chosen in a card before the traces kept them
+/// time of the device, scheduled or real); `onBoard: false`: the user boarded nothing (a session left running at home,
+/// where an older GO got on board by the clock); `taps`: the departures chosen in a card before the traces kept them
 /// (`choose` events), the same way.
 ///
 /// Checked for every session: played to its end; the departure aimed at never swaps back and forth before boarding
@@ -105,6 +107,9 @@ void main() {
 
         // On board: the departure followed, the one taken
         final onBoard = replayed.where((replayed) => replayed.state.progress.step == step && replayed.state.progress.phase == GoPhase.onBoard);
+        if (said['onBoard'] == false) {
+          expect(onBoard, isEmpty, reason: 'ride $step: on board from ${onBoard.isEmpty ? '' : _clock(onBoard.first.at)}, never boarded');
+        }
         if (onBoard.isEmpty) {
           summary.add('ride $step: never on board');
           expect(taken[step], isNull, reason: 'ride $step: taken, never on board');
