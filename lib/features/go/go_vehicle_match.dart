@@ -181,6 +181,9 @@ class VehicleMatch {
     return _locked = leader;
   }
 
+  /// Every departure seen at the stop, departed ones included
+  List<Ride> get seenRides => [for (final candidate in _all) candidate.ride];
+
   /// The journey now follows [ride] (one of [candidates]; before the user left, the departure aimed at: one chosen
   /// in a card while waiting is the one given the aimed bonus, not the one aimed at when the waiting began)
   void follow(Ride ride) {

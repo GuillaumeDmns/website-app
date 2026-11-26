@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
+import '../../../core/api/models.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/size_reporter.dart';
 import '../../../l10n/l10n.dart';
@@ -12,7 +13,9 @@ import '../../journey/journey_request.dart';
 import '../go_cards.dart';
 import '../go_controller.dart';
 import '../go_state.dart';
+import '../go_trace.dart';
 import '../go_tracker.dart';
+import '../go_vehicle_match.dart';
 import 'go_card_parts.dart';
 
 /// The arrival: the summary, then the way back, saving the trip, finishing (it closes itself after a while)
@@ -61,6 +64,7 @@ class GoArrivalCard extends ConsumerWidget {
             if (arrived) SaveDailyTripButton(journey: state.journey, request: state.request),
           ],
         ),
+        if (arrived && ref.watch(goTraceProvider) != null) _TakenQuestions(state: state),
         const SizedBox(height: 16),
         if (arrived) ...[
           FilledButton(
@@ -139,5 +143,99 @@ class _Summary extends StatelessWidget {
         if (rides > 0) row(Icons.directions_transit, context.l10n.goRides(rides)),
       ],
     );
+  }
+}
+
+/// Development and beta builds: for each ride boarded, which departure the user really took, among those seen at its
+/// stop about when they left ([GoController.takenOptions]); one tap writes it in the trace ([GoTrace.taken]), the truth
+/// the replays of the traces check GO against. Never asked during the journey, nor in the published app.
+class _TakenQuestions extends ConsumerStatefulWidget {
+  const _TakenQuestions({required this.state});
+
+  final GoState state;
+
+  @override
+  ConsumerState<_TakenQuestions> createState() => _TakenQuestionsState();
+}
+
+class _TakenQuestionsState extends ConsumerState<_TakenQuestions> {
+  /// The departure answered per ride
+  final _answers = <int, Departure>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final controller = ref.read(goControllerProvider.notifier);
+    final steps = widget.state.tracker.steps;
+    final questions = <Widget>[];
+    for (final (index, step) in steps.indexed) {
+      final options = step.isRide ? controller.takenOptions(index) : const <Ride>[];
+      if (options.length < 2) {
+        continue;
+      }
+      final section = step.section;
+      final mode = section.line?.mode;
+      questions.add(Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.l10n.goWhichTrain(
+                mode?.isRail == true ? context.l10n.goTrainWord : context.l10n.goVehicleWord,
+                section.line?.name ?? '',
+                section.from?.name ?? '',
+              ),
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final ride in options)
+                  ChoiceChip(
+                    label: Text(_label(ride.departure)),
+                    selected: _answers[index] != null && sameVehicleDeparture(_answers[index]!, ride.departure),
+                    onSelected: (_) => _answer(index, ride.departure),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ));
+    }
+    if (questions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...questions,
+        const SizedBox(height: 4),
+        Text(context.l10n.goWhichTrainHint, style: theme.textTheme.labelSmall?.copyWith(color: context.colors.muted)),
+      ],
+    );
+  }
+
+  /// Its time, its mission (else its destination), and its scheduled time when minutes off it (a late train)
+  static String _label(Departure departure) {
+    final aimed = departure.aimedTime;
+    final late = aimed != null && departure.time.difference(aimed).abs() >= const Duration(minutes: 2);
+    return [
+      formatClock(departure.time),
+      ?departure.mission,
+      if (late) '(${formatClock(aimed)})',
+    ].join(' · ');
+  }
+
+  Future<void> _answer(int step, Departure departure) async {
+    final trace = ref.read(goTraceProvider);
+    final session = trace?.sessionId;
+    if (trace == null || session == null) {
+      return;
+    }
+    setState(() => _answers[step] = departure);
+    await trace.taken(session, step, departure, ref.read(goClockProvider)());
   }
 }

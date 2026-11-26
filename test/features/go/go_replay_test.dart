@@ -66,6 +66,8 @@ void main() {
           altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: speed, speedAccuracy: 0.5);
     }
 
+    // The late one chosen in the departures card
+    await controller.choose(0, train('A', at(6), at(12), atStop: true), byUser: true);
     // Seated 420 m down the platform until 8:12, then off with the train
     for (; time.isBefore(at(12)); time = time.add(const Duration(seconds: 20))) {
       fixes.add(fix(420));
@@ -76,8 +78,15 @@ void main() {
       await pumpEventQueue();
     }
     expect(container.read(goControllerProvider)!.progress.phase, GoPhase.onBoard);
+    // What the user may have taken, for the question once arrived: both, in time order
+    expect([for (final ride in controller.takenOptions(0)) ride.departure.trainNumber], ['B', 'A']);
+    final trace = container.read(goTraceProvider)!;
+    final session = trace.sessionId!;
+    await trace.flag('  wrong train  ', time);
     controller.stop();
     await pumpEventQueue();
+    // Answered after the session ended: written into the session kept
+    await trace.taken(session, 0, train('A', at(6), at(12)).departure, time);
 
     // What the development build kept
     final sessions = await GoTrace.read(store);
@@ -86,7 +95,12 @@ void main() {
     expect(events.first, containsPair('kind', 'start'));
     expect(events.where((event) => (event as Map)['kind'] == 'fix'), hasLength(greaterThan(40)));
     expect(events.where((event) => (event as Map)['kind'] == 'rides'), isNotEmpty);
-    expect(events.last, containsPair('kind', 'stop'));
+    final kinds = [for (final event in events) (event as Map)['kind']];
+    expect(kinds.last, 'taken');
+    expect(kinds[kinds.length - 2], 'stop');
+    expect(events.where((event) => (event as Map)['kind'] == 'choose' && event['byUser'] == true), hasLength(1));
+    expect(events.firstWhere((event) => (event as Map)['kind'] == 'flag'), containsPair('note', 'wrong train'));
+    expect(((events.last as Map)['departure'] as Map)['trainNumber'], 'A');
     // Exported as text, read back
     expect(await GoTrace.export(store), contains('"kind": "fix"'));
 

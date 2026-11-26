@@ -11,7 +11,8 @@ import 'go_tracker.dart';
 
 /// What GO received during a session and what it made of it, in the development builds: the journey, every position
 /// fix as the device gave it, the departures received for each ride, the location turned off and on, the progress as
-/// it changed and the vehicles followed. Exported from GO's page ("Exporter la trace"), a session is played again in
+/// it changed, the vehicles followed, the departures chosen, and what the user said (the train taken, asked once
+/// arrived; "GO se trompe" at a moment). Exported from GO's page ("Exporter la trace"), a session is played again in
 /// the tests (`test/support/go_replay.dart`): a journey GO got wrong becomes a test. Kept on the device only, the last
 /// [sessions] sessions, written when the app leaves the screen, when the session ends and every [_flushEvery] events
 /// (each write rewrites the whole preferences file on Android).
@@ -66,6 +67,44 @@ class GoTrace {
 
   /// The journey now follows [ride] for the ride [step]
   void follow(int step, Ride ride, DateTime at) => _add(at, 'follow', {'step': step, 'ride': _json(ride)});
+
+  /// [ride] taken for the ride [step] ([GoController.choose]): [byUser] chosen in a card (played again by
+  /// `replayGoTrace`), else by GO (the departure aimed at, its times moved, a vehicle missed)
+  void choose(int step, Ride ride, DateTime at, {required bool byUser}) =>
+      _add(at, 'choose', {'step': step, 'byUser': byUser, 'ride': _json(ride)});
+
+  /// The session in progress, to say later what happened in it ([taken])
+  String? get sessionId => _id;
+
+  /// What the user says they took for the ride [step], asked once arrived: the truth the tests check GO against.
+  /// [session]: the one in progress or, closed since, one kept.
+  Future<void> taken(String session, int step, Departure departure, DateTime at) =>
+      _note(session, at, 'taken', {'step': step, 'departure': _json(departure)});
+
+  /// GO went wrong about then, as the user says ("GO se trompe"), with what they wrote
+  Future<void> flag(String? note, DateTime at) async {
+    final session = _id;
+    if (session != null) {
+      await _note(session, at, 'flag', {if (note != null && note.trim().isNotEmpty) 'note': note.trim()});
+    }
+  }
+
+  /// An event said by the user: written at once, into a session kept if it ended meanwhile
+  Future<void> _note(String session, DateTime at, String kind, Map<String, Object?> data) async {
+    if (session == _id) {
+      _add(at, kind, data);
+      await flush();
+      return;
+    }
+    final kept = await read(_store);
+    final found = kept.where((other) => other['id'] == session).firstOrNull;
+    final events = found?['events'];
+    if (events is! List) {
+      return;
+    }
+    events.add({'t': at.toIso8601String(), 'kind': kind, ...data});
+    await _store.writeJson(storageKey, kept);
+  }
 
   void stop(DateTime at) {
     _add(at, 'stop', const {});

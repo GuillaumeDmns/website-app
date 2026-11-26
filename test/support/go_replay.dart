@@ -28,7 +28,8 @@ typedef GoReplayed = ({DateTime at, GoState state});
 /// the departures and the location turned off and on at the times they came, through GO's own controller on a
 /// simulated clock, beating every 5 s between them like the controller's. The departures asked are answered with the last ones the trace received for that line. Gives GO's
 /// state after each of them; the trace's own `progress` and `follow` events say what the app made of them then.
-/// [taps]: what the user did then, not traced (a departure chosen in a card), done at those times on the controller.
+/// The departures the user chose in a card (`choose` events) are chosen again at their times; [taps]: more of what the
+/// user did then, untraced (older traces), done at those times on the controller.
 Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session,
     {Map<DateTime, Future<void> Function(GoController controller)> taps = const {}}) async {
   final events = [for (final event in session['events'] as List) (event as Map).cast<String, Object?>()];
@@ -79,7 +80,17 @@ Future<List<GoReplayed>> replayGoTrace(Map<String, Object?> session,
   // The controller's 5 s clock beats between the events, from the start as in the app: what the schedule does without
   // a fix
   var beat = time.add(_beat);
-  final waiting = taps.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  // The departures the user chose in a card, as traced, with the taps given
+  final waiting = [
+    ...taps.entries,
+    for (final event in events)
+      if (event['kind'] == 'choose' && event['byUser'] == true)
+        MapEntry<DateTime, Future<void> Function(GoController)>(
+          DateTime.parse(event['t'] as String),
+          (controller) => controller.choose(event['step'] as int, Ride.fromJson((event['ride'] as Map).cast<String, dynamic>()),
+              byUser: true),
+        ),
+  ]..sort((a, b) => a.key.compareTo(b.key));
   Future<void> tapsUntil(DateTime next) async {
     while (waiting.isNotEmpty && !waiting.first.key.isAfter(next)) {
       final tap = waiting.removeAt(0);

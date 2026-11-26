@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ import '../../core/location/location_providers.dart';
 import '../../core/map/map_overlay.dart';
 import '../../core/platform/go_system.dart';
 import '../../core/utils/colors.dart';
+import '../../core/utils/time_format.dart';
 import '../../core/widgets/size_reporter.dart';
 import '../../core/widgets/ui.dart';
 import '../../l10n/l10n.dart';
@@ -479,6 +481,44 @@ class GoSystemNotice extends ConsumerWidget {
 class GoGpsStats extends ConsumerWidget {
   const GoGpsStats({super.key});
 
+  /// "GO se trompe": the moment marked at once (the note only adds to it), then what the user writes
+  static Future<void> _flag(BuildContext context, WidgetRef ref) async {
+    final trace = ref.read(goTraceProvider);
+    if (trace == null) {
+      return;
+    }
+    final at = ref.read(goClockProvider)();
+    HapticFeedback.lightImpact();
+    final note = TextEditingController();
+    final mark = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.goFlagWrong),
+        content: TextField(
+          controller: note,
+          autofocus: true,
+          maxLines: 3,
+          minLines: 1,
+          decoration: InputDecoration(hintText: context.l10n.goFlagNoteHint),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(context.l10n.goFlagMark)),
+        ],
+      ),
+    );
+    final text = note.text;
+    note.dispose();
+    if (mark != true) {
+      return;
+    }
+    await trace.flag(text, at);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.goFlagged(formatClock(at)))));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(goFixStatsProvider);
@@ -497,6 +537,14 @@ class GoGpsStats extends ConsumerWidget {
       child: Row(
         children: [
           Expanded(child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.muted))),
+          // GO wrong just now: the moment marked in the trace, with what the user writes, to find it again
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 18,
+            tooltip: context.l10n.goFlagWrong,
+            icon: const Icon(Icons.flag_outlined),
+            onPressed: () => _flag(context, ref),
+          ),
           // The sessions' traces, to play a journey GO got wrong again in the tests
           IconButton(
             visualDensity: VisualDensity.compact,
