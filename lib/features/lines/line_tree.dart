@@ -146,10 +146,14 @@ typedef TreePlacement = ({
 /// A vehicle running past listed stops it doesn't serve (a direct train) is placed among them where it is on its own
 /// path ([pathOf], the map's place): after the last one it has passed, by distance; without its path, as far through
 /// them as it is through its ride in time.
+///
+/// [runsUp] tells which way a vehicle standing at a stop goes when neither the stop it left nor its next calls do
+/// (its direction against the one listed); down the list without it.
 List<TreePlacement> treeVehicles(
   LineTrunk trunk,
   List<({Vehicle vehicle, double progress})> vehicles, {
   BranchPath? Function(Vehicle vehicle)? pathOf,
+  bool Function(Vehicle vehicle)? runsUp,
 }) {
   final nodes = treeNodes(trunk);
   final placed = <TreePlacement>[];
@@ -171,7 +175,7 @@ List<TreePlacement> treeVehicles(
           node: node,
           stop: stop,
           gap: null,
-          reverse: _runsUp(sequence, vehicle, from, to),
+          reverse: _runsUp(sequence, vehicle, from, to) ?? runsUp?.call(vehicle) ?? false,
           direct: false,
           position: to.toDouble(),
           vehicle: vehicle,
@@ -209,8 +213,8 @@ List<TreePlacement> treeVehicles(
 }
 
 /// Whether [vehicle], standing at `sequence[to]`, runs up the list: it came from a later stop, else its next stop
-/// listed is an earlier one; down the list without either
-bool _runsUp(List<String> sequence, Vehicle vehicle, int from, int to) {
+/// listed is an earlier one; null without either
+bool? _runsUp(List<String> sequence, Vehicle vehicle, int from, int to) {
   if (from >= 0 && from != to) {
     return from > to;
   }
@@ -220,7 +224,7 @@ bool _runsUp(List<String> sequence, Vehicle vehicle, int from, int to) {
       return next < to;
     }
   }
-  return false;
+  return null;
 }
 
 /// Where a vehicle running from `stops[from]` to `stops[to]` is among the stops between, as a fractional index: the

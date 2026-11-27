@@ -234,11 +234,16 @@ class VehicleCapsule extends StatelessWidget {
     this.selected = false,
     this.faded = false,
     this.scale = 1,
+    this.arrow = false,
   });
 
   final LineSummary line;
   final bool atStop;
   final bool selected;
+
+  /// The stop list's: a wider body with a chevron to its front instead of its roof, the way it goes read at a
+  /// glance at its small size
+  final bool arrow;
 
   /// Left out by the line page's filter: still on the map, faded
   final bool faded;
@@ -264,6 +269,7 @@ class VehicleCapsule extends StatelessWidget {
           atStop: atStop,
           selected: selected,
           scale: scale,
+          arrow: arrow,
         ),
       ),
     );
@@ -277,6 +283,7 @@ class _CapsulePainter extends CustomPainter {
     required this.atStop,
     required this.selected,
     required this.scale,
+    required this.arrow,
   });
 
   /// Its edges, dark on every map
@@ -286,13 +293,14 @@ class _CapsulePainter extends CustomPainter {
   final bool atStop;
   final bool selected;
   final double scale;
+  final bool arrow;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.translate(size.width / 2, size.height / 2);
     canvas.scale(scale);
     final k = selected ? 1.25 : 1.0;
-    final w = 5 * k;
+    final w = (arrow ? 7 : 5) * k;
     final hh = 16 * k;
     final body = bodyPath(w, hh, k);
 
@@ -328,6 +336,22 @@ class _CapsulePainter extends CustomPainter {
         ..strokeWidth = 1.8
         ..strokeJoin = StrokeJoin.round,
     );
+    if (arrow) {
+      // A chevron to its front, dark on a light line, white on a dark one
+      canvas.drawPath(
+        Path()
+          ..moveTo(-w * 0.55, -hh + 9 * k)
+          ..lineTo(0, -hh + 4.5 * k)
+          ..lineTo(w * 0.55, -hh + 9 * k),
+        Paint()
+          ..color = markOn(color)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+      return;
+    }
     // The windscreen across its cab
     final top = -hh + 2 * k;
     canvas.drawPath(
@@ -368,8 +392,11 @@ class _CapsulePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CapsulePainter old) =>
-      old.color != color || old.atStop != atStop || old.selected != selected || old.scale != scale;
+      old.color != color || old.atStop != atStop || old.selected != selected || old.scale != scale || old.arrow != arrow;
 }
+
+/// What is drawn on a vehicle of [color]: dark on a light line, white on a dark one
+Color markOn(Color color) => color.computeLuminance() > 0.35 ? const Color(0xFF101215) : Colors.white;
 
 /// Over the selected vehicle on the map: its next stop and when it gets there (`République · 1 min`, `· à quai`), and
 /// its delay. Dark on every map, its tip [gap] above the vehicle's middle, in a box of [sizeOf] (the map pin stands it
