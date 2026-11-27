@@ -359,20 +359,18 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
                 shadowColor: Colors.black45,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(sizes.locked ? 0 : 20)),
                 clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    if (sizes.locked)
-                      const SizedBox(height: 8)
-                    else
-                      _SheetHandle(controller: _sheetController, sizes: [sizes.min, sizes.middle, sizes.max], onDragStart: _onUserDrag),
-                    Expanded(
-                      child: MediaQuery.removePadding(
-                        context: context,
-                        removeTop: true,
-                        child: PanelSheetScope(
-                          controller: _sheetController,
-                          middle: sizes.middle,
-                          onFit: _fit,
+                child: PanelSheetScope(
+                  controller: _sheetController,
+                  sizes: (min: sizes.min, middle: sizes.middle, max: sizes.max),
+                  onFit: _fit,
+                  onDragStart: _onUserDrag,
+                  child: Column(
+                    children: [
+                      if (sizes.locked) const SizedBox(height: 8) else const _SheetHandle(),
+                      Expanded(
+                        child: MediaQuery.removePadding(
+                          context: context,
+                          removeTop: true,
                           child: PanelScrollScope(
                             controller: scrollController,
                             // A drag of the page's list, which moves the sheet (or scrolls it): the user's
@@ -400,8 +398,8 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -412,53 +410,25 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
   }
 }
 
-/// Drag handle: moves the sheet itself, since it is outside the page's list; released, it goes to the closest of
-/// [sizes] (or the next one in the direction of a fling)
+/// Drag handle: moves the sheet itself, since it is outside the page's list
 class _SheetHandle extends StatelessWidget {
-  const _SheetHandle({required this.controller, required this.sizes, required this.onDragStart});
-
-  final DraggableScrollableController controller;
-  final List<double> sizes;
-  final VoidCallback onDragStart;
+  const _SheetHandle();
 
   @override
-  Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragStart: (_) => onDragStart(),
-      onVerticalDragUpdate: (details) {
-        if (controller.isAttached) {
-          controller.jumpTo((controller.size - details.delta.dy / height).clamp(sizes.first, sizes.last));
-        }
-      },
-      onVerticalDragEnd: (details) {
-        if (!controller.isAttached) {
-          return;
-        }
-        final size = controller.size;
-        final velocity = details.primaryVelocity ?? 0;
-        final target = velocity < -300
-            ? sizes.firstWhere((s) => s > size + 0.01, orElse: () => sizes.last)
-            : velocity > 300
-                ? sizes.lastWhere((s) => s < size - 0.01, orElse: () => sizes.first)
-                : sizes.reduce((a, b) => (a - size).abs() < (b - size).abs() ? a : b);
-        controller.animateTo(target, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      },
-      child: SizedBox(
-        height: _NarrowLayoutState._handleHeight,
-        width: double.infinity,
-        child: Center(
-          child: Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.outline,
-              borderRadius: BorderRadius.circular(2),
+  Widget build(BuildContext context) => SheetDragArea(
+        child: SizedBox(
+          height: _NarrowLayoutState._handleHeight,
+          width: double.infinity,
+          child: Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outline,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }

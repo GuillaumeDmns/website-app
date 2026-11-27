@@ -105,6 +105,27 @@ void main() {
     await closeApp(tester);
   });
 
+  testWidgets('lowered as far as it goes, the sheet comes up again from what is left of it (the dots, its header)',
+      (tester) async {
+    await openGo(tester, followed(const GoProgress(step: 0, phase: GoPhase.moving), position: LatLng(chatelet.lat, chatelet.lon)));
+    double sheetTop() => tester
+        .getTopLeft(find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Material)).first)
+        .dy;
+
+    // Lowered by its handle: GO's lowest, the map nearly whole
+    await tester.dragFrom(Offset(206, sheetTop() + 11), const Offset(0, 900));
+    await settle(tester);
+    final lowest = sheetTop();
+    expect(lowest, closeTo(915 - 84, 2));
+
+    // Swiped up under the handle (the dots, not the card's scrolled content): the sheet comes up
+    await tester.dragFrom(Offset(206, lowest + 40), const Offset(0, -300));
+    await settle(tester);
+    expect(sheetTop(), lessThan(lowest - 200));
+
+    await closeApp(tester);
+  });
+
   testWidgets('what the system holds back from GO is said on its page, one tap from its settings', (tester) async {
     final checks = _SystemChecks(GoSystemIssue.approximateLocation);
     await pumpApp(tester, standardBackend(), overrides: [

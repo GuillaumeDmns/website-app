@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:website_app/features/journey/widgets/journey_card.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/standard_backend.dart';
@@ -84,6 +85,34 @@ void main() {
     final top = sheetTop(tester);
     expect(top, greaterThan(915 * 0.6));
     expect(onScreen(tester).dy, closeTo(top / 2, 4));
+
+    await closeApp(tester);
+  });
+
+  testWidgets('journey results: the options drive the sheet like the home page, the fixed search drags it too',
+      (tester) async {
+    await pumpApp(tester, standardBackend());
+    await tapOn(tester, find.text('Châtelet'));
+    await tapOn(tester, find.text(currentL10n.goThere));
+    final opened = sheetTop(tester);
+    expect(opened, closeTo(915 * (1 - 0.85), 2));
+
+    // Swiped down on the options: the sheet comes down, not the list overscrolling
+    await tester.dragFrom(tester.getCenter(find.byType(JourneyCard).first), const Offset(0, 450));
+    await settle(tester);
+    final lowered = sheetTop(tester);
+    expect(lowered, greaterThan(opened + 200));
+
+    // Swiped up on the search fixed at the top: the sheet comes up
+    await tester.dragFrom(Offset(206, lowered + 40), const Offset(0, -450));
+    await settle(tester);
+    expect(sheetTop(tester), lessThan(lowered - 200));
+
+    // And down again from there
+    final raised = sheetTop(tester);
+    await tester.dragFrom(Offset(206, raised + 40), const Offset(0, 450));
+    await settle(tester);
+    expect(sheetTop(tester), greaterThan(raised + 200));
 
     await closeApp(tester);
   });
