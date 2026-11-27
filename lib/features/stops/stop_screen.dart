@@ -346,7 +346,7 @@ class _DepartureList extends ConsumerWidget {
           realtimeAvailable: departures.realtimeAvailable,
           showBadge: showBadge,
           approach: switch (row.departures.firstOrNull) {
-            final first? => vehicleApproach(first, stop.id, vehicles[row.line.id] ?? const []),
+            final first? => vehicleApproach(first, stop.id, vehicles[row.line.id] ?? const [], now),
             null => null,
           },
           onTap: () => context.push(Routes.line(row.line.id)),
@@ -414,10 +414,10 @@ class _DepartureList extends ConsumerWidget {
 }
 
 /// Where the vehicle of [departure] from [stopId] is, among [vehicles] of its line: `en approche` when its next stop
-/// is this one, `à 2 arrêts d'ici` further; null when standing there already (the departure says it) or not found (the
-/// vehicle expected at the stop within 90 s of the departure)
-String? vehicleApproach(Departure departure, String stopId, List<Vehicle> vehicles) {
-  if (departure.atStop ?? false) {
+/// is this one, `à 2 arrêts d'ici` further; null when standing there already or about to (the departure says `À quai`,
+/// the same 30 s as `departureLabel`) or not found (the vehicle expected at the stop within 90 s of the departure)
+String? vehicleApproach(Departure departure, String stopId, List<Vehicle> vehicles, DateTime now) {
+  if ((departure.atStop ?? false) || departure.time.difference(now).inSeconds <= 30) {
     return null;
   }
   for (final vehicle in vehicles) {

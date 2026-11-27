@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/service_hours/service_hours.dart';
+import 'package:website_app/features/stops/stop_screen.dart';
 import 'package:website_app/features/stops/widgets/stop_departures_card.dart';
 import 'package:website_app/l10n/l10n.dart';
 
@@ -92,5 +93,27 @@ void main() {
     expect(rows[2].approach, isNull);
 
     await closeApp(tester);
+  });
+
+  test('no approach under a departure that says it is there: standing, or due within 30 s', () {
+    final now = DateTime.utc(2026, 11, 27, 20, 0);
+    Vehicle vehicleAt(DateTime at) => Vehicle(
+          id: 'v',
+          direction: 0,
+          branch: 0,
+          fromStopId: 'IDFM:1',
+          toStopId: 'IDFM:2',
+          progress: 0.5,
+          expectedAt: at,
+          calls: [VehicleCall(stopId: 'IDFM:2', expectedAt: at)],
+        );
+    String? approach(Duration inTime, {bool? atStop}) {
+      final at = now.add(inTime);
+      return vehicleApproach(Departure(time: at, realtime: true, atStop: atStop), 'IDFM:2', [vehicleAt(at)], now);
+    }
+
+    expect(approach(const Duration(minutes: 2)), currentL10n.departureVehicleApproaching);
+    expect(approach(const Duration(seconds: 25)), isNull);
+    expect(approach(const Duration(minutes: 2), atStop: true), isNull);
   });
 }
