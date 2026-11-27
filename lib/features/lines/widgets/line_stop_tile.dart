@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/api/models.dart';
+import '../../../core/utils/colors.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../l10n/l10n.dart';
 import '../line_vehicles.dart';
@@ -59,8 +60,9 @@ class _RailPainter extends CustomPainter {
     final paint = Paint()
       ..color = rail.color
       ..strokeWidth = _strokeWidth;
+    // Half a pixel past the row's edges: no seam between two rows at a fractional height
     for (final lane in rail.passing) {
-      canvas.drawLine(Offset(laneX(lane), 0), Offset(laneX(lane), size.height), paint);
+      canvas.drawLine(Offset(laneX(lane), -0.5), Offset(laneX(lane), size.height + 0.5), paint);
     }
     final stroke = Paint()
       ..color = rail.color
@@ -70,10 +72,10 @@ class _RailPainter extends CustomPainter {
     if (bend == null) {
       final x = laneX(rail.lane);
       if (rail.top) {
-        canvas.drawLine(Offset(x, 0), Offset(x, size.height / 2), paint);
+        canvas.drawLine(Offset(x, -0.5), Offset(x, size.height / 2), paint);
       }
       if (rail.bottom) {
-        canvas.drawLine(Offset(x, size.height / 2), Offset(x, size.height), paint);
+        canvas.drawLine(Offset(x, size.height / 2), Offset(x, size.height + 0.5), paint);
       }
       // A way coming back into this lane at its stop
       for (final lane in rail.joinFrom) {
@@ -344,9 +346,9 @@ String vehiclesCount(TransportMode mode, int count) => switch (mode) {
       _ => currentL10n.liveTrainsCount(count),
     };
 
-/// Vehicles on the rail of the stop list, never on a row of their own: one capsule pointing the way they go (down
-/// the list, up when [reverse]), with how many they are on it when several run between the same two stops the same
-/// way. A white bar across it when they stand at a stop. A tap opens them ([onOpen]).
+/// Vehicles on the rail of the stop list, never on a row of their own: one capsule with a chevron pointing the way
+/// they go (down the list, up when [reverse]), with how many they are on its back half when several run between the
+/// same two stops the same way. A white bar across it when they stand at a stop. A tap opens them ([onOpen]).
 class LineVehicleMark extends StatelessWidget {
   const LineVehicleMark({
     super.key,
@@ -396,42 +398,27 @@ class LineVehicleMark extends StatelessWidget {
                   maxHeight: size,
                   child: Transform.rotate(
                     angle: reverse ? 0 : math.pi,
-                    child: VehicleCapsule(line: line, atStop: atStop, scale: scale),
+                    child: VehicleCapsule(line: line, atStop: atStop, scale: scale, arrow: true),
                   ),
                 ),
+                // On its back half, the chevron on the front one
                 if (vehicles.length > 1)
-                  Align(
-                    alignment: Alignment.center,
-                    child: Transform.translate(offset: const Offset(16, 0), child: _CountBadge(vehicles.length)),
+                  Transform.translate(
+                    offset: Offset(0, (reverse ? 1 : -1) * 3.5),
+                    child: Text(
+                      '${vehicles.length}',
+                      textScaler: TextScaler.noScaling,
+                      style: TextStyle(
+                        color: markOn(parseHexColor(line.color, Colors.grey.shade700)),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                      ),
+                    ),
                   ),
               ],
             ),
           ),
-        ),
-      );
-}
-
-/// How many vehicles a mark stands for, small beside its capsule: dark ringed with white, as the capsule's edges
-class _CountBadge extends StatelessWidget {
-  const _CountBadge(this.count);
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        height: 16,
-        constraints: const BoxConstraints(minWidth: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF101215),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white, width: 1.5),
-        ),
-        child: Text(
-          '$count',
-          textScaler: TextScaler.noScaling,
-          style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600, height: 1),
         ),
       );
 }

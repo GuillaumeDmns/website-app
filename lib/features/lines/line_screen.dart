@@ -458,7 +458,12 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                   color: color,
                   now: now,
                   closed: closed,
-                  placements: treeVehicles(trunk, listed, pathOf: (vehicle) => _vehiclePath(detail, vehicle)),
+                  placements: treeVehicles(
+                    trunk,
+                    listed,
+                    pathOf: (vehicle) => _vehiclePath(detail, vehicle),
+                    runsUp: (vehicle) => vehicle.direction != (_direction ?? 0),
+                  ),
                   // One lane more for an unfolded other way running beside its parent's stops
                   width: railWidth(treeDepth(trunk) + (treeNodes(trunk).any((node) => node.spurs.any((spur) => spur.rejoin != null)) ? 1 : 0)),
                   unfolded: _unfolded,
@@ -548,6 +553,9 @@ class _TreeRows {
 
   /// Where an unfolded other way comes back into its parent, on its lane
   final _rejoinAt = <LineSpur, Offset>{};
+
+  /// The dots with vehicles standing over them
+  final _standingAt = <Offset>{};
 
   int _countIn(LineTreeNode node) => (_counts[node] ?? 0) + node.spurs.fold(0, (count, spur) => count + _countIn(spur));
 
@@ -718,6 +726,7 @@ class _TreeRows {
           }
           continue;
         }
+        _standingAt.add(at);
         final up = [for (final placement in placements) if (placement.reverse) placement];
         final down = [for (final placement in placements) if (!placement.reverse) placement];
         if (up.isNotEmpty && down.isNotEmpty) {
@@ -740,26 +749,27 @@ class _TreeRows {
         }
         final top = math.min(from.dy, to.dy);
         final bottom = math.max(from.dy, to.dy);
+        final middle = (top + bottom) / 2;
+        // Clear of the vehicles standing at the two stops
+        const half = LineVehicleMark.length / 2;
+        final low = top + reach + (_standingAt.contains(Offset(x, top)) ? half : 0);
+        final high = bottom - reach - (_standingAt.contains(Offset(x, bottom)) ? half : 0);
         final up = [for (final placement in placements) if (placement.reverse) placement];
         final down = [for (final placement in placements) if (!placement.reverse) placement];
-        if (bottom - top < 2 * reach) {
-          // A folded branch's row: its vehicles side by side on it, back to back
-          if (up.isEmpty || down.isEmpty) {
-            add(placements, Offset(x, (top + bottom) / 2), atStop: false);
-          } else {
-            add(up, Offset(x, (top + bottom) / 2 - LineVehicleMark.length / 2), atStop: false);
-            add(down, Offset(x, (top + bottom) / 2 + LineVehicleMark.length / 2), atStop: false);
-          }
-        } else if (up.isNotEmpty && down.isNotEmpty) {
-          // Both ways: back to back, each against the stop it goes to
-          add(up, Offset(x, top + reach), atStop: false);
-          add(down, Offset(x, bottom - reach), atStop: false);
+        if (up.isNotEmpty && down.isNotEmpty) {
+          // Both ways: back to back, each against the stop it goes to (around the middle when crowded)
+          final room = high - low >= LineVehicleMark.length;
+          add(up, Offset(x, room ? low : middle - half), atStop: false);
+          add(down, Offset(x, room ? high : middle + half), atStop: false);
+        } else if (bottom - top < 2 * reach) {
+          // A folded branch's row: on it
+          add(placements, Offset(x, middle), atStop: false);
         } else {
           // One way: where the one ahead is between the two stops
           final ahead = placements.reduce((a, b) => (a.reverse ? a.position < b.position : a.position > b.position) ? a : b);
           final share = (ahead.position - gap).clamp(0.0, 1.0);
           final y = from.dy + (to.dy - from.dy) * share;
-          add(placements, Offset(x, y.clamp(top + reach, bottom - reach)), atStop: false);
+          add(placements, Offset(x, low <= high ? y.clamp(low, high) : middle), atStop: false);
         }
       }
     }
