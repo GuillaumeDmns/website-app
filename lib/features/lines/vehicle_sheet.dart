@@ -75,7 +75,9 @@ Future<Vehicle?> showVehicleChooser(
     );
 
 /// [vehicle] in a new fetch: same id, or (vehicles found from passages per stop have no lasting id) the one of the
-/// same direction expected at one of its stops at about the same time
+/// same direction whose next stop is one [vehicle] had still to serve, expected there at about the same time (within
+/// 90 s). Only its next stop counts: a vehicle never goes back, and the one behind, sharing times further down the
+/// line where passages were chained wrongly, must not be taken for it
 Vehicle? sameVehicle(Vehicle vehicle, List<Vehicle> vehicles) {
   for (final other in vehicles) {
     if (other.id == vehicle.id) {
@@ -86,13 +88,12 @@ Vehicle? sameVehicle(Vehicle vehicle, List<Vehicle> vehicles) {
   Vehicle? best;
   var bestGap = 91;
   for (final other in vehicles.where((other) => other.direction == vehicle.direction)) {
-    for (final call in other.calls) {
-      final time = times[call.stopId];
-      final gap = time == null ? null : call.expectedAt.difference(time).inSeconds.abs();
-      if (gap != null && gap < bestGap) {
-        best = other;
-        bestGap = gap;
-      }
+    final next = other.calls.firstOrNull;
+    final time = next == null ? null : times[next.stopId];
+    final gap = time == null ? null : next!.expectedAt.difference(time).inSeconds.abs();
+    if (gap != null && gap < bestGap) {
+      best = other;
+      bestGap = gap;
     }
   }
   return best;

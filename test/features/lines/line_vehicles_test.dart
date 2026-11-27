@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:website_app/core/api/models.dart';
 import 'package:website_app/core/utils/geo.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
+import 'package:website_app/features/lines/vehicle_sheet.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../../support/samples.dart';
@@ -238,5 +239,32 @@ void main() {
     // At the stop: "à quai" on a platform, "à l'arrêt" for a bus
     expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt, TransportMode.rer), '→ Nation · Gare de Lyon à quai');
     expect(vehicleLabel(vehicle(toNext: Duration.zero), fetchedAt, TransportMode.bus), "→ Nation · Gare de Lyon à l'arrêt");
+  });
+
+  test('a vehicle found again in a new fetch by its next stop, never the one behind it', () {
+    // Seen on line 3: passages chained wrongly, the train due at Porte de Champerret at 8:00 listed with the next
+    // one's times further down; the next fetch, under new ids, has that next train due at Louise Michel first
+    final at = DateTime.utc(2026, 11, 27, 8, 0);
+    Vehicle train(String id, List<(String, int)> calls) => Vehicle(
+          id: id,
+          direction: 0,
+          branch: 0,
+          fromStopId: 'IDFM:0',
+          toStopId: calls.first.$1,
+          progress: 0.5,
+          expectedAt: at.add(Duration(minutes: calls.first.$2)),
+          calls: [for (final (stop, minutes) in calls) VehicleCall(stopId: stop, expectedAt: at.add(Duration(minutes: minutes)))],
+        );
+    final followed = train('a', [('champerret', 0), ('pereire', 5), ('wagram', 6)]);
+    final behind = train('b', [('louise-michel', 2), ('champerret', 3), ('pereire', 5), ('wagram', 6)]);
+    expect(sameVehicle(followed, [behind]), isNull);
+
+    // The same train under a new id: still due at Porte de Champerret, or gone past it to Pereire
+    final again = train('c', [('champerret', 1), ('pereire', 5)]);
+    expect(sameVehicle(followed, [behind, again])?.id, 'c');
+    final past = train('d', [('pereire', 4), ('wagram', 6)]);
+    expect(sameVehicle(followed, [behind, past])?.id, 'd');
+    // Its own id always wins
+    expect(sameVehicle(followed, [behind, train('a', [('pereire', 9)])])?.id, 'a');
   });
 }
