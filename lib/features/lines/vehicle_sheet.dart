@@ -27,6 +27,53 @@ Future<void> showVehicleSheet(BuildContext context, {required LineSummary line, 
   );
 }
 
+/// Several vehicles of one mark of the stop list (running the same way between the same two stops): which one to
+/// open, each with its destination, its next stop and when it gets there, its delay
+Future<Vehicle?> showVehicleChooser(
+  BuildContext context, {
+  required LineSummary line,
+  required List<Vehicle> vehicles,
+  required DateTime now,
+}) =>
+    showModalBottomSheet<Vehicle>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 560),
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 8),
+            children: [
+              for (final vehicle in vehicles)
+                ListTile(
+                  leading: VehicleCapsule(line: line, scale: 0.8),
+                  title: Text(
+                    [?vehicle.name, context.l10n.towards(vehicle.destination ?? '?')].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    [
+                      '${vehicle.toStopName ?? ''} · ${vehicleWhen(vehicle, now, line.mode, atStop: vehicle.expectedAt.difference(now).inSeconds < 30)}',
+                      ?vehicleDelay(vehicle),
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: vehicleDelay(vehicle) == null ? context.colors.muted : context.colors.delayed,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, vehicle),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
 /// [vehicle] in a new fetch: same id, or (vehicles found from passages per stop have no lasting id) the one of the
 /// same direction expected at one of its stops at about the same time
 Vehicle? sameVehicle(Vehicle vehicle, List<Vehicle> vehicles) {

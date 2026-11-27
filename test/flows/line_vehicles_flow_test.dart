@@ -83,13 +83,28 @@ void main() {
     List<MapPin> pins() => container.read(mapOverlaysProvider)[container.read(routerLocationProvider)]!.pins;
     expect(pins().firstWhere((pin) => pin.rotation != null).rotation, inInclusiveRange(90, 180));
 
-    // On the stop list, each one on a row of its own between the stops, how many there are above them; the other
-    // direction's running up the list
+    // On the stop list, on the rail between the stops (no row of their own), how many there are above them; the
+    // other direction's pointing up the list
     expect(find.textContaining('3 trains'), findsOneWidget);
-    final rows = tester.widgetList<LineVehicleTile>(find.byType(LineVehicleTile)).toList();
-    expect(rows.map((row) => row.vehicle.id), ['moving', 'stale', 'back']);
-    expect(rows.map((row) => row.reverse), [false, false, true]);
-    expect(find.textContaining(currentL10n.goMinutesLate(2)), findsOneWidget);
+    expect(find.byType(LineVehicleMark), findsNWidgets(3));
+    Finder mark(String id) => find.byWidgetPredicate((widget) => widget is LineVehicleMark && widget.vehicles.any((vehicle) => vehicle.id == id));
+    LineVehicleMark markOf(String id) => tester.widget<LineVehicleMark>(mark(id));
+    expect([for (final id in ['moving', 'stale', 'back']) markOf(id).reverse], [false, false, true]);
+    expect([for (final id in ['moving', 'stale', 'back']) markOf(id).vehicles.length], [1, 1, 1]);
+    // Châtelet → Gare de Lyon, between their dots
+    double dotY(String name) => tester.getCenter(find.widgetWithText(LineStopTile, name)).dy;
+    expect(tester.getCenter(mark('moving')).dy, inExclusiveRange(dotY('Châtelet'), dotY('Gare de Lyon')));
+    // Both ways between Gare de Lyon and Nation: back to back, each against the stop it goes to
+    final back = tester.getRect(mark('back'));
+    final stale = tester.getRect(mark('stale'));
+    expect(back.center.dy, lessThan(stale.center.dy));
+    expect(back.center.dy - dotY('Gare de Lyon'), lessThan(dotY('Nation') - back.center.dy));
+    expect(dotY('Nation') - stale.center.dy, lessThan(stale.center.dy - dotY('Gare de Lyon')));
+    expect(back.overlaps(stale), isFalse);
+    // Its delay in its sheet, opened from the list (and over it on the map)
+    await tapOn(tester, mark('moving'));
+    expect(find.descendant(of: find.byType(BottomSheet), matching: find.textContaining(currentL10n.goMinutesLate(2))), findsOneWidget);
+    await tapOn(tester, find.byTooltip(currentL10n.close));
 
     // Both ways, a metro's directions run side by side: one path, the other direction's only where it serves other
     // stops (a bus's two ways are both drawn, often by other streets); one direction, its own
@@ -103,10 +118,10 @@ void main() {
     await tapOn(tester, find.text(currentL10n.towards('Nation')));
     expect(linePaths(), hasLength(1));
     expect(find.textContaining('2 trains vers Nation'), findsOneWidget);
-    expect(find.byType(LineVehicleTile), findsNWidgets(2));
+    expect(find.byType(LineVehicleMark), findsNWidgets(2));
     expect(tester.widgetList<VehicleCapsule>(onMap).where((capsule) => capsule.faded), hasLength(1));
     await tapOn(tester, find.text(currentL10n.lineBothDirections));
-    expect(find.byType(LineVehicleTile), findsNWidgets(3));
+    expect(find.byType(LineVehicleMark), findsNWidgets(3));
 
     // No trail behind them: the line's branches only
     final paths = tester.widgetList<fm.PolylineLayer>(find.byType(fm.PolylineLayer)).expand((layer) => layer.polylines);
@@ -165,18 +180,23 @@ void main() {
     ProviderScope.containerOf(tester.element(find.byType(MaterialApp))).read(routerProvider).push(Routes.line('C09999'));
     await settle(tester);
 
-    // The direct train among the stops it runs past, with its destination
-    expect(find.byWidgetPredicate((widget) => widget is LineVehicleTile && widget.vehicle.id == 'direct'), findsOneWidget);
-    expect(find.text('→ Gare D'), findsNWidgets(2));
-    // The branch folded, the train between it and the trunk still listed under it
-    expect(find.text(currentL10n.lineBranchFrom('Gare F')), findsOneWidget);
+    Finder mark(String id) => find.byWidgetPredicate((widget) => widget is LineVehicleMark && widget.vehicles.any((vehicle) => vehicle.id == id));
+    double rowY(Finder row) => tester.getCenter(row).dy;
+    // The direct train on the rail among the stops it runs past: halfway from A to D, past C (2 km of 10)
+    expect(mark('direct'), findsOneWidget);
+    expect(rowY(mark('direct')), greaterThan(rowY(find.widgetWithText(LineStopTile, 'Gare C'))));
+    // The branch folded, the train between it and the trunk on its row
+    final folded = find.widgetWithText(LineSpurTile, currentL10n.lineBranchFrom('Gare F'));
+    expect(folded, findsOneWidget);
     expect(find.text('Gare E'), findsNothing);
-    expect(find.byWidgetPredicate((widget) => widget is LineVehicleTile && widget.vehicle.id == 'joining'), findsOneWidget);
+    expect(mark('joining'), findsOneWidget);
+    expect(rowY(mark('joining')), moreOrLessEquals(rowY(folded), epsilon: 1));
 
-    // Unfolded: its stops, the train still there once
+    // Unfolded: its stops, the train still there once, between E and C
     await tapOn(tester, find.text(currentL10n.lineBranchFrom('Gare F')));
     expect(find.text('Gare E'), findsOneWidget);
-    expect(find.byWidgetPredicate((widget) => widget is LineVehicleTile && widget.vehicle.id == 'joining'), findsOneWidget);
+    expect(mark('joining'), findsOneWidget);
+    expect(rowY(mark('joining')), greaterThan(rowY(find.widgetWithText(LineStopTile, 'Gare E'))));
 
     // Another way between two stops: folded as a closed loop; unfolded, its lane runs on until the stop it rejoins
     LineStopTile stopTile(String name) =>
@@ -187,6 +207,39 @@ void main() {
     expect(find.text('Gare W'), findsOneWidget);
     expect(stopTile('Gare B').rail.passing, contains(1));
     expect(stopTile('Gare C').rail.joinFrom, {1});
+
+    await closeApp(tester);
+  });
+
+  testWidgets('several vehicles the same way between two stops: one mark, how many on it, a choice when tapped', (tester) async {
+    final backend = standardBackend();
+    final now = DateTime.now().toUtc();
+    Vehicle between(String id, double progress, int seconds) => Vehicle(
+          id: id,
+          destination: 'Nation',
+          direction: 0,
+          branch: 0,
+          fromStopId: chatelet.id,
+          toStopId: gareDeLyon.id,
+          toStopName: 'Gare de Lyon',
+          progress: progress,
+          expectedAt: now.add(Duration(seconds: seconds)),
+        );
+    backend.get('/api/v2/lines/C01371/vehicles', [between('first', 0.8, 30).toJson(), between('second', 0.2, 150).toJson()]);
+    await pumpApp(tester, backend);
+    ProviderScope.containerOf(tester.element(find.byType(MaterialApp))).read(routerProvider).push(Routes.line(metro1.id));
+    await settle(tester);
+
+    final marks = tester.widgetList<LineVehicleMark>(find.byType(LineVehicleMark)).toList();
+    expect(marks, hasLength(1));
+    expect(marks.single.vehicles.map((vehicle) => vehicle.id), unorderedEquals(['first', 'second']));
+    expect(find.descendant(of: find.byType(LineVehicleMark), matching: find.text('2')), findsOneWidget);
+
+    // A tap: which one, then its sheet
+    await tapOn(tester, find.byType(LineVehicleMark));
+    expect(find.text(currentL10n.towards('Nation')), findsNWidgets(3));
+    await tapOn(tester, find.textContaining('Gare de Lyon · 3 min'));
+    expect(find.text(currentL10n.vehicleFollow), findsOneWidget);
 
     await closeApp(tester);
   });

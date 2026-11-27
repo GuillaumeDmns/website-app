@@ -63,6 +63,17 @@ class _LineScreenState extends ConsumerState<LineScreen> {
   /// Vehicle whose sheet is open, shown selected on the map like the one followed
   String? _opened;
 
+  /// Opens the vehicles of a mark of the stop list: its sheet for one, a choice between them for several
+  Future<void> _openMark(LineSummary line, List<Vehicle> vehicles, DateTime now) async {
+    if (vehicles.length == 1) {
+      return _open(line, vehicles.single);
+    }
+    final chosen = await showVehicleChooser(context, line: line, vehicles: vehicles, now: now);
+    if (chosen != null && mounted) {
+      await _open(line, chosen);
+    }
+  }
+
   /// Opens [vehicle]'s sheet, the vehicle selected on the map while it is open
   Future<void> _open(LineSummary line, Vehicle vehicle) async {
     setState(() => _opened = vehicle.id);
@@ -452,7 +463,8 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                   width: railWidth(treeDepth(trunk) + (treeNodes(trunk).any((node) => node.spurs.any((spur) => spur.rejoin != null)) ? 1 : 0)),
                   unfolded: _unfolded,
                   onToggle: (id) => setState(() => _unfolded.contains(id) ? _unfolded.remove(id) : _unfolded.add(id)),
-                  onOpen: (vehicle) => _open(line, vehicle),
+                  onOpen: (vehicles) => _openMark(line, vehicles, now),
+                  scale: MediaQuery.textScalerOf(context).scale,
                 );
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -465,7 +477,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
                         fetchedAt: fetchedAt,
                         now: now,
                       ),
-                    ...rows.of(trunk, lane: 0, passing: const {}),
+                    rows.build(trunk),
                   ],
                 );
               }),
@@ -476,8 +488,11 @@ class _LineScreenState extends ConsumerState<LineScreen> {
   }
 }
 
-/// The rows of the stop list for a tree of branches: each node's stops on its lane, its vehicles standing at them or
-/// running between them, the branches off it folded on a row (unfolded: their own stops on the next lane)
+/// The rows of the stop list for a tree of branches: each node's stops on its lane, the branches off it folded on a
+/// row (unfolded: their own stops on the next lane), and over them the vehicles on the rail ([LineVehicleMark]),
+/// never on rows of their own: standing at a stop over its dot, running between two stops where they are between
+/// them; several the same way between the same stops are one mark with how many they are, and when both ways run
+/// there, each way's mark stands back to back with the other's, each against the stop it goes to.
 class _TreeRows {
   _TreeRows({
     required this.line,
@@ -489,6 +504,7 @@ class _TreeRows {
     required this.unfolded,
     required this.onToggle,
     required this.onOpen,
+    required this.scale,
   }) {
     for (final placement in placements) {
       if (placement.stop case final stop?) {
@@ -507,132 +523,253 @@ class _TreeRows {
   final double width;
   final Set<String> unfolded;
   final ValueChanged<String> onToggle;
-  final ValueChanged<Vehicle> onOpen;
+  final ValueChanged<List<Vehicle>> onOpen;
+
+  /// The text size's scale of a row height
+  final double Function(double) scale;
 
   final _standing = <LineTreeNode, Map<int, List<TreePlacement>>>{};
   final _running = <LineTreeNode, Map<int, List<TreePlacement>>>{};
   final _counts = <LineTreeNode, int>{};
+
+  final _rows = <Widget>[];
+
+  /// Height of the rows added so far
+  double _y = 0;
+
+  /// The lane of each node drawn
+  final _lanes = <LineTreeNode, int>{};
+
+  /// The middle of each stop's dot, by node and index in its stops
+  final _stopAt = <LineTreeNode, Map<int, Offset>>{};
+
+  /// The middle of a branch's own row, on its lane: where it leaves or joins its parent
+  final _headerAt = <LineSpur, Offset>{};
+
+  /// Where an unfolded other way comes back into its parent, on its lane
+  final _rejoinAt = <LineSpur, Offset>{};
 
   int _countIn(LineTreeNode node) => (_counts[node] ?? 0) + node.spurs.fold(0, (count, spur) => count + _countIn(spur));
 
   RailSpec _rail(int lane, Set<int> passing, {bool top = true, bool bottom = true}) =>
       RailSpec(color: color, lane: lane, passing: passing, top: top, bottom: bottom, width: width);
 
-  List<Widget> _runningIn(LineTreeNode node, int gap, int lane, Set<int> passing, {bool rail = true}) => [
-        for (final placement in _running[node]?[gap] ?? const <TreePlacement>[])
-          LineVehicleTile(
-            vehicle: placement.vehicle,
-            rail: _rail(lane, passing, top: rail, bottom: rail),
-            line: line,
-            now: now,
-            reverse: placement.reverse,
-            onOpen: onOpen,
-          ),
-      ];
+  /// Adds [row], [height] high before the text size; returns the middle of its height
+  double _add(Widget row, double height) {
+    final scaled = scale(height);
+    final middle = _y + scaled / 2;
+    _rows.add(row);
+    _y += scaled;
+    return middle;
+  }
+
+  /// The rows of [trunk]'s tree, the vehicles over them
+  Widget build(LineTrunk trunk) {
+    _of(trunk, lane: 0, passing: const {});
+    // Wider than the capsule, for the finger; as long as it, so that two back to back stay apart
+    final tapWidth = math.max(LineVehicleMark.size, 40.0);
+    const box = LineVehicleMark.length;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _rows),
+        for (final (:at, :mark) in _marks())
+          Positioned(left: at.dx - tapWidth / 2, top: at.dy - box / 2, width: tapWidth, height: box, child: mark),
+      ],
+    );
+  }
 
   /// [node]'s rows on [lane], the lanes [passing] by drawn across them
-  List<Widget> of(LineTreeNode node, {required int lane, required Set<int> passing}) {
+  void _of(LineTreeNode node, {required int lane, required Set<int> passing}) {
+    _lanes[node] = lane;
     final spur = node is LineSpur ? node : null;
     final fork = spur != null && !spur.merges;
-    // A fork's sequence starts with the stop it leaves: its stop i is the sequence's i + 1
-    final offset = fork ? 1 : 0;
-    final rows = <Widget>[];
     final count = node.stops.length;
     // Other ways unfolded and not back yet: their lane goes on beside this node's stops until the stop they rejoin
-    final open = <String, int>{};
+    final open = <String, ({int lane, LineSpur spur})>{};
     for (var i = 0; i < count; i++) {
       final stop = node.stops[i];
       final top = i > 0 || fork;
       final bottom = i < count - 1 || (spur?.merges ?? false) || spur?.rejoin != null;
-      Set<int> here() => {...passing, ...open.values};
+      Set<int> here() => {...passing, for (final way in open.values) way.lane};
       for (final merging in node.spurs.where((other) => other.merges && other.attach.id == stop.id)) {
-        rows.addAll(_spur(merging, lane: lane + 1 + open.length, parentLane: lane, passing: {...here(), if (top) lane}));
+        _spur(merging, lane: lane + 1 + open.length, parentLane: lane, passing: {...here(), if (top) lane});
       }
       final back = open.remove(stop.id);
-      final standing = _standing[node]?[i] ?? const <TreePlacement>[];
-      rows.add(LineStopTile(
-        stop: stop,
-        rail: RailSpec(
-          color: color,
-          lane: lane,
-          passing: here(),
-          top: top,
-          bottom: bottom,
-          joinFrom: {?back},
-          width: width,
+      final middle = _add(
+        LineStopTile(
+          stop: stop,
+          rail: RailSpec(
+            color: color,
+            lane: lane,
+            passing: here(),
+            top: top,
+            bottom: bottom,
+            joinFrom: {?back?.lane},
+            width: width,
+          ),
+          terminus: spur == null ? i == 0 || i == count - 1 : stop.id == spur.end.id,
+          closed: closed.contains(stop.id),
         ),
-        line: line,
-        terminus: spur == null ? i == 0 || i == count - 1 : stop.id == spur.end.id,
-        vehicle: standing.firstOrNull?.vehicle,
-        reverse: standing.firstOrNull?.reverse ?? false,
-        closed: closed.contains(stop.id),
-        onOpen: onOpen,
-      ));
-      // Another vehicle standing there (rare) on a row of its own
-      for (final other in standing.skip(1)) {
-        rows.add(LineVehicleTile(
-          vehicle: other.vehicle,
-          rail: _rail(lane, here(), bottom: bottom),
-          line: line,
-          now: now,
-          reverse: other.reverse,
-          onOpen: onOpen,
-        ));
+        LineStopTile.height,
+      );
+      (_stopAt[node] ??= {})[i] = Offset(laneX(lane), middle);
+      if (back != null) {
+        _rejoinAt[back.spur] = Offset(laneX(back.lane), middle);
       }
       for (final forking in node.spurs.where((other) => !other.merges && other.attach.id == stop.id)) {
         final spurLane = lane + 1 + open.length;
-        rows.addAll(_spur(forking, lane: spurLane, parentLane: lane, passing: {...here(), if (bottom) lane}));
+        _spur(forking, lane: spurLane, parentLane: lane, passing: {...here(), if (bottom) lane});
         // Unfolded, another way back to a later stop of this node: its lane goes on until then
         final rejoin = forking.rejoin;
         if (rejoin != null &&
             unfolded.contains(forking.id) &&
             node.stops.skip(i + 1).any((later) => later.id == rejoin.id)) {
-          open[rejoin.id] = spurLane;
+          open[rejoin.id] = (lane: spurLane, spur: forking);
         }
       }
-      if (bottom) {
-        rows.addAll(_runningIn(node, i + offset, lane, here()));
-      }
     }
-    return rows;
   }
 
   /// A branch off its parent: its row, and when unfolded its stops on its own [lane] (after the row when it leaves
   /// the parent, before it when it joins it)
-  List<Widget> _spur(LineSpur spur, {required int lane, required int parentLane, required Set<int> passing}) {
+  void _spur(LineSpur spur, {required int lane, required int parentLane, required Set<int> passing}) {
+    _lanes[spur] = lane;
     final expanded = unfolded.contains(spur.id);
-    final header = LineSpurTile(
-      title: switch (spur) {
-        LineSpur(otherWay: true) => currentL10n.lineBranchOtherWay(spur.stops.first.name),
-        LineSpur(rejoin: _?) => currentL10n.lineBranchVia(spur.stops.first.name),
-        _ => null,
-      },
-      loop: spur.rejoin != null,
-      end: spur.end,
-      merges: spur.merges,
-      stopCount: spur.stopCount,
-      vehicleCount: _countIn(spur),
-      mode: line.mode,
-      expanded: expanded,
-      rail: _rail(lane, passing.difference({lane})),
-      parentLane: parentLane,
-      onToggle: () => onToggle(spur.id),
-    );
+    void header() => _headerAt[spur] = Offset(
+          laneX(lane),
+          _add(
+            LineSpurTile(
+              title: switch (spur) {
+                LineSpur(otherWay: true) => currentL10n.lineBranchOtherWay(spur.stops.first.name),
+                LineSpur(rejoin: _?) => currentL10n.lineBranchVia(spur.stops.first.name),
+                _ => null,
+              },
+              loop: spur.rejoin != null,
+              end: spur.end,
+              merges: spur.merges,
+              stopCount: spur.stopCount,
+              vehicleCount: _countIn(spur),
+              mode: line.mode,
+              expanded: expanded,
+              rail: _rail(lane, passing.difference({lane})),
+              parentLane: parentLane,
+              onToggle: () => onToggle(spur.id),
+            ),
+            LineSpurTile.height,
+          ),
+        );
     if (!expanded) {
-      // Folded, the vehicles between it and its parent still show: under its row, beside the parent's lane (which a
-      // branch joining it reaches under its row)
-      final junctions = spur.merges ? [spur.stops.length - 1] : [0, if (spur.rejoin != null) spur.stops.length];
-      return [
-        header,
-        for (final junction in junctions)
-          ..._runningIn(spur, junction, lane, {...passing, if (spur.merges) parentLane}, rail: false),
-      ];
+      // Folded, its vehicles stand on its row
+      header();
+    } else if (spur.merges) {
+      _of(spur, lane: lane, passing: passing);
+      header();
+    } else {
+      header();
+      _of(spur, lane: lane, passing: passing);
     }
-    if (spur.merges) {
-      return [...of(spur, lane: lane, passing: passing), header];
+  }
+
+  /// Where the stop [index] of [node]'s sequence (with the stop a branch is attached at) is drawn: its dot; the
+  /// branch's own row for the stop it is attached at, or for any of its stops while it is folded
+  Offset? _sequenceAt(LineTreeNode node, int index) {
+    final header = node is LineSpur ? _headerAt[node] : null;
+    final stops = _stopAt[node];
+    if (node is LineSpur) {
+      if (!unfolded.contains(node.id) || stops == null) {
+        return header;
+      }
+      if (node.merges) {
+        return index >= node.stops.length ? header : stops[index];
+      }
+      if (index == 0) {
+        return header;
+      }
+      return index - 1 < node.stops.length ? stops[index - 1] : _rejoinAt[node] ?? header;
     }
-    // Vehicles between the stop it leaves and its first stop
-    return [header, ..._runningIn(spur, 0, lane, passing), ...of(spur, lane: lane, passing: passing)];
+    return stops?[index];
+  }
+
+  /// The marks of the vehicles: standing at stops, then running between them
+  List<({Offset at, Widget mark})> _marks() {
+    final marks = <({Offset at, Widget mark})>[];
+    // From the middle of a capsule to the dot it goes to: its nose just on the dot's edge
+    const reach = LineVehicleMark.length / 2 + 2;
+    void add(List<TreePlacement> placements, Offset at, {required bool atStop}) => marks.add((
+          at: at,
+          mark: LineVehicleMark(
+            line: line,
+            vehicles: [for (final placement in placements) placement.vehicle],
+            reverse: placements.first.reverse,
+            atStop: atStop,
+            label: _label(placements),
+            onOpen: onOpen,
+          ),
+        ));
+
+    for (final MapEntry(key: node, value: stops) in _standing.entries) {
+      for (final MapEntry(key: index, value: placements) in stops.entries) {
+        final at = _stopAt[node]?[index];
+        if (at == null) {
+          // A folded branch: its vehicles on its row
+          if (node case final LineSpur spur when _headerAt[spur] != null) {
+            add(placements, _headerAt[spur]!, atStop: true);
+          }
+          continue;
+        }
+        final up = [for (final placement in placements) if (placement.reverse) placement];
+        final down = [for (final placement in placements) if (!placement.reverse) placement];
+        if (up.isNotEmpty && down.isNotEmpty) {
+          // Both ways at the same stop: back to back over its dot
+          add(up, at.translate(0, -LineVehicleMark.length / 2), atStop: true);
+          add(down, at.translate(0, LineVehicleMark.length / 2), atStop: true);
+        } else {
+          add(placements, at, atStop: true);
+        }
+      }
+    }
+
+    for (final MapEntry(key: node, value: gaps) in _running.entries) {
+      final x = laneX(_lanes[node] ?? 0);
+      for (final MapEntry(key: gap, value: placements) in gaps.entries) {
+        final from = _sequenceAt(node, gap);
+        final to = _sequenceAt(node, gap + 1);
+        if (from == null || to == null) {
+          continue;
+        }
+        final top = math.min(from.dy, to.dy);
+        final bottom = math.max(from.dy, to.dy);
+        final up = [for (final placement in placements) if (placement.reverse) placement];
+        final down = [for (final placement in placements) if (!placement.reverse) placement];
+        if (bottom - top < 2 * reach) {
+          // A folded branch's row: its vehicles side by side on it, back to back
+          if (up.isEmpty || down.isEmpty) {
+            add(placements, Offset(x, (top + bottom) / 2), atStop: false);
+          } else {
+            add(up, Offset(x, (top + bottom) / 2 - LineVehicleMark.length / 2), atStop: false);
+            add(down, Offset(x, (top + bottom) / 2 + LineVehicleMark.length / 2), atStop: false);
+          }
+        } else if (up.isNotEmpty && down.isNotEmpty) {
+          // Both ways: back to back, each against the stop it goes to
+          add(up, Offset(x, top + reach), atStop: false);
+          add(down, Offset(x, bottom - reach), atStop: false);
+        } else {
+          // One way: where the one ahead is between the two stops
+          final ahead = placements.reduce((a, b) => (a.reverse ? a.position < b.position : a.position > b.position) ? a : b);
+          final share = (ahead.position - gap).clamp(0.0, 1.0);
+          final y = from.dy + (to.dy - from.dy) * share;
+          add(placements, Offset(x, y.clamp(top + reach, bottom - reach)), atStop: false);
+        }
+      }
+    }
+    return marks;
+  }
+
+  /// What a screen reader says of a mark: its vehicle, or how many and the one ahead
+  String _label(List<TreePlacement> placements) {
+    final first = vehicleLabel(placements.first.vehicle, now, line.mode);
+    return placements.length == 1 ? first : '${vehiclesCount(line.mode, placements.length)} · $first';
   }
 }
 

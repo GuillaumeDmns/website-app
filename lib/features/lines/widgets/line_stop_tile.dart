@@ -19,9 +19,6 @@ double railWidth(int depth) => 48 + depth * 20;
 /// The line's stroke in the stop list
 const _strokeWidth = 6.0;
 
-/// Size of a vehicle on the stop list, smaller than on the map
-const _capsuleScale = 0.82;
-
 /// How a row of the stop list draws the line on its left: its own [lane] (its [top] and [bottom] halves, the stop
 /// between them), the other lanes [passing] by from top to bottom, in a column [width] wide
 class RailSpec {
@@ -165,152 +162,63 @@ class _RailColumn extends StatelessWidget {
       );
 }
 
-/// Stop of the line on its lane; a vehicle standing there in place of its dot, with "à quai", its mission and its
-/// destination on the right (design 2c)
+/// Stop of the line on its lane; the vehicles standing there are drawn over its dot by the stop list
+/// ([LineVehicleMark])
 class LineStopTile extends StatelessWidget {
   const LineStopTile({
     super.key,
     required this.stop,
     required this.rail,
-    required this.line,
     this.terminus = false,
-    this.vehicle,
-    this.reverse = false,
     this.closed = false,
-    required this.onOpen,
   });
 
-  /// Opens a vehicle's sheet
-  final ValueChanged<Vehicle> onOpen;
-
-  static const _height = 44.0;
+  /// Its height before the text size: room for two vehicles back to back between two stops
+  static const height = 52.0;
 
   /// The line doesn't stop there now (station closed, stop not served)
   final bool closed;
 
   final StopRef stop;
   final RailSpec rail;
-  final LineSummary line;
 
   /// A terminus: a larger dot, its name bold
   final bool terminus;
 
-  /// The vehicle standing at this stop
-  final Vehicle? vehicle;
-
-  /// It runs up the list (the other direction)
-  final bool reverse;
-
   @override
   Widget build(BuildContext context) {
-    final vehicle = this.vehicle;
-    // Taller with a larger text size
-    final height = MediaQuery.textScalerOf(context).scale(_height);
-
     return InkWell(
       onTap: () => context.push(Routes.stop(stop.id)),
       child: SizedBox(
-        height: height,
-        child: LayoutBuilder(builder: (context, constraints) {
-          final rowWidth = constraints.maxWidth;
-          return Row(
-            children: [
-              _RailColumn(
-                rail: rail,
-                child: vehicle == null
-                    ? Container(
-                        width: terminus ? 16 : 12,
-                        height: terminus ? 16 : 12,
-                        decoration: BoxDecoration(
-                          color: context.colors.card,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: rail.color, width: 3),
-                        ),
-                      )
-                    : _ListCapsule(line: line, vehicle: vehicle, atStop: true, reverse: reverse, onOpen: onOpen),
-              ),
-              Expanded(
-                child: Text(
-                  stop.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: terminus || vehicle != null ? FontWeight.w600 : FontWeight.w400,
-                    color: closed ? context.colors.muted : null,
-                    decoration: closed ? TextDecoration.lineThrough : null,
-                  ),
-                ),
-              ),
-              if (closed) PillTag(icon: Icons.block, color: Theme.of(context).colorScheme.error, text: context.l10n.notServed),
-              // At most half of the row, against its end like the other rows' times: the stop's name keeps the rest
-              if (vehicle != null)
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: rowWidth / 2),
-                  child: InkWell(
-                    onTap: () => onOpen(vehicle),
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          _VehicleWhen(vehicle: vehicle, when: atStopLabel(line.mode)),
-                          _VehicleDestination(vehicle: vehicle, compact: true),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-}
-
-/// A vehicle running between two stops, on a row of its own between them (design 2c): its mission and destination,
-/// when it gets to the next stop on the right
-class LineVehicleTile extends StatelessWidget {
-  const LineVehicleTile({
-    super.key,
-    required this.vehicle,
-    required this.rail,
-    required this.line,
-    required this.now,
-    this.reverse = false,
-    required this.onOpen,
-  });
-
-  static const _height = 34.0;
-
-  final Vehicle vehicle;
-  final RailSpec rail;
-  final LineSummary line;
-  final DateTime now;
-
-  /// It runs up the list (the other direction)
-  final bool reverse;
-
-  /// Opens its sheet
-  final ValueChanged<Vehicle> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final height = MediaQuery.textScalerOf(context).scale(_height);
-    return InkWell(
-      onTap: () => onOpen(vehicle),
-      child: SizedBox(
-        height: height,
+        // Taller with a larger text size
+        height: MediaQuery.textScalerOf(context).scale(height),
         child: Row(
           children: [
             _RailColumn(
               rail: rail,
-              child: _ListCapsule(line: line, vehicle: vehicle, atStop: false, reverse: reverse, onOpen: onOpen),
+              child: Container(
+                width: terminus ? 16 : 12,
+                height: terminus ? 16 : 12,
+                decoration: BoxDecoration(
+                  color: context.colors.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: rail.color, width: 3),
+                ),
+              ),
             ),
-            Expanded(child: _VehicleDestination(vehicle: vehicle)),
-            const SizedBox(width: 8),
-            _VehicleWhen(vehicle: vehicle, when: vehicleWhen(vehicle, now, line.mode, atStop: false)),
+            Expanded(
+              child: Text(
+                stop.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: terminus ? FontWeight.w600 : FontWeight.w400,
+                  color: closed ? context.colors.muted : null,
+                  decoration: closed ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (closed) PillTag(icon: Icons.block, color: Theme.of(context).colorScheme.error, text: context.l10n.notServed),
           ],
         ),
       ),
@@ -337,7 +245,8 @@ class LineSpurTile extends StatelessWidget {
     required this.onToggle,
   });
 
-  static const _height = 48.0;
+  /// Its height before the text size
+  static const height = 48.0;
 
   /// Its far end: where it comes from, or its terminus
   final StopRef end;
@@ -362,14 +271,8 @@ class LineSpurTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final height = MediaQuery.textScalerOf(context).scale(_height);
-    final vehicles = vehicleCount == 0
-        ? null
-        : switch (mode) {
-            TransportMode.tram => l10n.liveTramsCount(vehicleCount),
-            TransportMode.bus || TransportMode.noctilien => l10n.liveBusesCount(vehicleCount),
-            _ => l10n.liveTrainsCount(vehicleCount),
-          };
+    final height = MediaQuery.textScalerOf(context).scale(LineSpurTile.height);
+    final vehicles = vehicleCount == 0 ? null : vehiclesCount(mode, vehicleCount);
     return InkWell(
       onTap: onToggle,
       child: SizedBox(
@@ -434,105 +337,101 @@ class LineSpurTile extends StatelessWidget {
   }
 }
 
-/// The vehicle on the line of the stop list, pointing down the list (the way it goes), up when [reverse]
-class _ListCapsule extends StatelessWidget {
-  const _ListCapsule({
+/// `3 trains`, `2 bus`, `1 tram`
+String vehiclesCount(TransportMode mode, int count) => switch (mode) {
+      TransportMode.tram => currentL10n.liveTramsCount(count),
+      TransportMode.bus || TransportMode.noctilien => currentL10n.liveBusesCount(count),
+      _ => currentL10n.liveTrainsCount(count),
+    };
+
+/// Vehicles on the rail of the stop list, never on a row of their own: one capsule pointing the way they go (down
+/// the list, up when [reverse]), with how many they are on it when several run between the same two stops the same
+/// way. A white bar across it when they stand at a stop. A tap opens them ([onOpen]).
+class LineVehicleMark extends StatelessWidget {
+  const LineVehicleMark({
+    super.key,
     required this.line,
-    required this.vehicle,
-    required this.atStop,
+    required this.vehicles,
     required this.reverse,
+    required this.atStop,
+    required this.label,
     required this.onOpen,
   });
 
   final LineSummary line;
-  final Vehicle vehicle;
-  final bool atStop;
+  final List<Vehicle> vehicles;
   final bool reverse;
-  final ValueChanged<Vehicle> onOpen;
+  final bool atStop;
+
+  /// What a screen reader says of it
+  final String label;
+  final ValueChanged<List<Vehicle>> onOpen;
+
+  /// Smaller than on the map: two fit back to back between two stops
+  static const scale = 0.64;
+
+  /// Its length along the rail, its white ring included
+  static const length = 37 * scale;
+
+  /// Its box, square
+  static double get size => VehicleCapsule.boxSize(scale: scale);
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: () => onOpen(vehicle),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Transform.rotate(
-            angle: reverse ? 0 : math.pi,
-            child: VehicleCapsule(line: line, atStop: atStop, scale: _capsuleScale),
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onOpen(vehicles),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Its square box drawn whole in a tap area as long as the capsule
+                OverflowBox(
+                  maxWidth: size,
+                  maxHeight: size,
+                  child: Transform.rotate(
+                    angle: reverse ? 0 : math.pi,
+                    child: VehicleCapsule(line: line, atStop: atStop, scale: scale),
+                  ),
+                ),
+                if (vehicles.length > 1)
+                  Align(
+                    alignment: Alignment.center,
+                    child: Transform.translate(offset: const Offset(16, 0), child: _CountBadge(vehicles.length)),
+                  ),
+              ],
+            ),
           ),
         ),
       );
 }
 
-/// When a vehicle gets to its next stop (`1 min`, `à quai`), orange when it is late, with its delay
-class _VehicleWhen extends StatelessWidget {
-  const _VehicleWhen({required this.vehicle, required this.when});
+/// How many vehicles a mark stands for, small beside its capsule: dark ringed with white, as the capsule's edges
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count);
 
-  final Vehicle vehicle;
-  final String when;
-
-  @override
-  Widget build(BuildContext context) {
-    final delay = vehicleDelay(vehicle);
-    return Text(
-      delay == null ? when : '$when · $delay',
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: delay == null ? context.colors.live : context.colors.delayed,
-          ),
-    );
-  }
-}
-
-/// A vehicle's mission (a train's code) and destination, `ZEMA → Melun`
-class _VehicleDestination extends StatelessWidget {
-  const _VehicleDestination({required this.vehicle, this.compact = false});
-
-  final Vehicle vehicle;
-
-  /// Under "à quai": smaller, the mission in text
-  final bool compact;
+  final int count;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final destination = '→ ${vehicle.destination ?? '?'}';
-    if (compact) {
-      return Text(
-        [?vehicle.name, destination].join(' '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted),
-      );
-    }
-    return Row(
-      children: [
-        if (vehicle.name case final name?) ...[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              child: Text(
-                name,
-                style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.6),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Flexible(
-          child: Text(
-            destination,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted),
-          ),
+  Widget build(BuildContext context) => Container(
+        height: 16,
+        constraints: const BoxConstraints(minWidth: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF101215),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white, width: 1.5),
         ),
-      ],
-    );
-  }
+        child: Text(
+          '$count',
+          textScaler: TextScaler.noScaling,
+          style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600, height: 1),
+        ),
+      );
 }
