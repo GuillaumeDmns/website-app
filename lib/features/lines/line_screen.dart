@@ -15,6 +15,7 @@ import '../../core/platform/share.dart';
 import '../../core/utils/colors.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/line_badge.dart';
+import '../../core/widgets/size_reporter.dart';
 import '../../core/widgets/ui.dart';
 import '../../core/location/location_providers.dart';
 import '../../l10n/l10n.dart';
@@ -26,6 +27,7 @@ import 'line_tree.dart';
 import 'line_vehicles.dart';
 import 'vehicle_sheet.dart';
 import 'widgets/line_stop_tile.dart';
+import 'widgets/vehicle_follow_card.dart';
 
 final lineDetailProvider = FutureProvider.autoDispose.family<LineDetail, String>(
   (ref, lineId) => ref.mobilityApi.line(lineId),
@@ -55,10 +57,51 @@ class _LineScreenState extends ConsumerState<LineScreen> {
 
   BranchPath _pathOf(LineBranch branch) => _paths[branch] ??= BranchPath(branch);
 
-  /// Vehicle the map keeps in view ("Suivre" in its sheet), until stopped or gone
+  /// Vehicle the map keeps in view ("Suivre" in its sheet), until stopped or gone: the page is then its card alone,
+  /// the sheet lowered to it
   String? _followed;
 
-  void _follow(Vehicle vehicle) => setState(() => _followed = vehicle.id);
+  /// The vehicle followed as last seen: found again in a fetch where its id changed ([sameVehicle])
+  Vehicle? _followedSeen;
+
+  /// The sheet is fitted to the follow card anew (a vehicle just followed)
+  bool _newFollow = false;
+
+  void _follow(Vehicle vehicle) => setState(() {
+        _followed = vehicle.id;
+        _followedSeen = vehicle;
+        _newFollow = true;
+      });
+
+  void _stopFollowing() {
+    setState(() {
+      _followed = null;
+      _followedSeen = null;
+    });
+    PanelSheetScope.unfit(context);
+  }
+
+  /// The vehicle followed among [vehicles]: by its id, else the same one in a new fetch (its id then taken); null
+  /// when gone
+  ({Vehicle vehicle, double progress})? _followedIn(List<({Vehicle vehicle, double progress})> vehicles) {
+    final id = _followed;
+    if (id == null) {
+      return null;
+    }
+    final byId = vehicles.where((entry) => entry.vehicle.id == id).firstOrNull;
+    if (byId != null) {
+      _followedSeen = byId.vehicle;
+      return byId;
+    }
+    final seen = _followedSeen;
+    final found = seen == null ? null : sameVehicle(seen, [for (final entry in vehicles) entry.vehicle]);
+    if (found == null) {
+      return null;
+    }
+    _followedSeen = found;
+    _followed = found.id;
+    return vehicles.firstWhere((entry) => entry.vehicle.id == found.id);
+  }
 
   /// Vehicle whose sheet is open, shown selected on the map like the one followed
   String? _opened;
@@ -198,6 +241,7 @@ class _LineScreenState extends ConsumerState<LineScreen> {
         for (final branch in _listedDirection(detail)?.branches ?? const <LineBranch>[])
           if (!shown.contains(branch)) branch,
     ];
+    _followedIn(vehicles);
     final chosen = _followed ?? _opened;
     final placed = [
       for (final (:vehicle, :progress) in vehicles)
@@ -296,9 +340,10 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     }
     final place = placed.where((entry) => entry.vehicle.id == followed).firstOrNull?.place;
     if (place == null) {
+      // Gone: the page back to the whole line
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() => _followed = null);
+        if (mounted && _followed == followed) {
+          _stopFollowing();
         }
       });
       return null;
@@ -306,7 +351,46 @@ class _LineScreenState extends ConsumerState<LineScreen> {
     return MapFollow.overhead(place.point);
   }
 
+  /// The vehicle followed: its card alone, the sheet lowered to it (the map above keeping the vehicle in view)
+  Widget _followContent(BuildContext context, LineDetail detail) {
+    final line = detail.line;
+    return ListView(
+      controller: PanelScrollScope.of(context),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        SizeReporter(
+          onSize: (size) {
+            if (!mounted || _followed == null) {
+              return;
+            }
+            PanelSheetScope.fitContent(context, size.height + 4 + 16 + MediaQuery.paddingOf(context).bottom, reset: _newFollow);
+            _newFollow = false;
+          },
+          child: Consumer(builder: (context, ref, _) {
+            final (:vehicles, :now) = _vehicles(ref, detail);
+            final followed = _followedIn(vehicles);
+            if (followed == null) {
+              return const SizedBox(height: 120);
+            }
+            return VehicleFollowCard(
+              line: line,
+              vehicle: followed.vehicle,
+              atStop: isAtStop(followed.vehicle, followed.progress),
+              now: now,
+              fetchedAt: ref.watch(lineVehiclesProvider(widget.lineId)).value?.fetchedAt,
+              onStops: () => _open(line, followed.vehicle),
+              onStop: _stopFollowing,
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
   Widget _content(BuildContext context, LineDetail detail) {
+    if (_followed != null) {
+      return _followContent(context, detail);
+    }
     final closed = ref.watch(lineClosedStopsProvider(detail.line.id)).value ?? const <String>{};
     final theme = Theme.of(context);
     final line = detail.line;
@@ -419,19 +503,6 @@ class _LineScreenState extends ConsumerState<LineScreen> {
           padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
           child: LineServiceHoursSummary(lineId: line.id, direction: (_direction ?? 0).clamp(0, math.max(0, detail.directions.length - 1))),
         ),
-        if (_followed != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: InputChip(
-                avatar: const Icon(Icons.my_location, size: 18),
-                label: Text(context.l10n.vehicleFollowing),
-                deleteButtonTooltipMessage: context.l10n.vehicleStopFollowing,
-                onDeleted: () => setState(() => _followed = null),
-              ),
-            ),
-          ),
         if (shown.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 0, 0),
