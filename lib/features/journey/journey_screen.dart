@@ -90,25 +90,33 @@ class JourneyScreen extends ConsumerWidget {
               ],
               fit: [?point(request.from), ?point(request.to)],
             ),
-      // The search stays at the top, like Citymapper; the options scroll below it inside the sheet (not the sheet's
-      // controller: it only moves with its handle, lowered to see the map)
+      // The search stays at the top, like Citymapper, and drags the sheet; the options scroll below it and drive the
+      // sheet as the home page's list does (up to its highest first, down to the map)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(padding: const EdgeInsets.fromLTRB(4, 8, 16, 0), child: _Header(
-            request: request,
-            onBack: () => context.canPop() ? context.pop() : context.go(Routes.home),
-            onPickFrom: () => _pickPlace(context, from: true),
-            onPickTo: () => _pickPlace(context, from: false),
-            onSwap: () => _update(context, request.swapped()),
-          )),
-          // When, then how, on one row scrolled sideways: the time, step-free journeys, the options, the modes
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 0, 8),
-            child: _Filters(request: request, onChanged: (next) => _update(context, next)),
+          SheetDragArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(padding: const EdgeInsets.fromLTRB(4, 8, 16, 0), child: _Header(
+                  request: request,
+                  onBack: () => context.canPop() ? context.pop() : context.go(Routes.home),
+                  onPickFrom: () => _pickPlace(context, from: true),
+                  onPickTo: () => _pickPlace(context, from: false),
+                  onSwap: () => _update(context, request.swapped()),
+                )),
+                // When, then how, on one row scrolled sideways: the time, step-free journeys, the options, the modes
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 0, 8),
+                  child: _Filters(request: request, onChanged: (next) => _update(context, next)),
+                ),
+              ],
+            ),
           ),
           Expanded(
             child: ListView(
+              controller: PanelScrollScope.of(context),
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               children: [
                 plan == null

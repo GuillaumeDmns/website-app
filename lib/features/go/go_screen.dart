@@ -145,13 +145,16 @@ class _GoScreenState extends ConsumerState<GoScreen> {
               _top = size.height;
               _fitSheet();
             },
-            child: Column(
-              children: [
-                if (isWideLayout(context)) GoPanelHeader(state: state),
-                const GoSystemNotice(),
-                if (AppConfig.isDev || AppConfig.isBeta) const GoGpsStats(),
-                _Dots(count: cards.length, shown: _shown, live: current, onTap: _show),
-              ],
+            // Out of the cards' list, which may be cut off below once the sheet is lowered: dragging it moves the sheet
+            child: SheetDragArea(
+              child: Column(
+                children: [
+                  if (isWideLayout(context)) GoPanelHeader(state: state),
+                  const GoSystemNotice(),
+                  if (AppConfig.isDev || AppConfig.isBeta) const GoGpsStats(),
+                  _Dots(count: cards.length, shown: _shown, live: current, onTap: _show),
+                ],
+              ),
             ),
           ),
           Expanded(
