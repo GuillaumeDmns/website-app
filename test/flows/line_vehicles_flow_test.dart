@@ -3,12 +3,14 @@ import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:website_app/core/api/models.dart';
+import 'package:website_app/app/panel_scope.dart';
 import 'package:website_app/app/router.dart';
 import 'package:website_app/app/routes.dart';
 import 'package:website_app/core/map/map_overlay.dart';
 import 'package:website_app/core/widgets/line_badge.dart';
 import 'package:website_app/features/lines/line_vehicles.dart';
 import 'package:website_app/features/lines/widgets/line_stop_tile.dart';
+import 'package:website_app/features/lines/widgets/vehicle_follow_card.dart';
 import 'package:website_app/l10n/l10n.dart';
 
 import '../support/samples.dart';
@@ -141,14 +143,29 @@ void main() {
     expect(find.descendant(of: map, matching: find.byType(VehicleCallout)), findsOneWidget);
     expect(tester.widget<VehicleCallout>(find.byType(VehicleCallout)).stop, 'Gare de Lyon');
 
-    // Followed on the map from its sheet, still selected once it is closed, until stopped
+    // Followed on the map from its sheet: the page is its card alone, the sheet lowered to it, the map above; still
+    // selected, until stopped
+    double sheetTop() =>
+        tester.getTopLeft(find.byWidgetPredicate((widget) => widget is PanelSheetScope)).dy;
+    final sheetBefore = sheetTop();
     await tapOn(tester, find.text(currentL10n.vehicleFollow));
-    expect(find.text(currentL10n.vehicleFollowing), findsOneWidget);
+    expect(find.byType(VehicleFollowCard), findsOneWidget);
+    expect(find.byType(LineStopTile), findsNothing);
     expect(selected(), isTrue);
-    await tapOn(tester, find.byTooltip(currentL10n.vehicleStopFollowing));
-    expect(find.text(currentL10n.vehicleFollowing), findsNothing);
+    expect(find.text(currentL10n.vehicleNextStop), findsOneWidget);
+    expect(find.descendant(of: find.byType(VehicleFollowCard), matching: find.text('Gare de Lyon')), findsOneWidget);
+    expect(find.descendant(of: find.byType(VehicleFollowCard), matching: find.text(currentL10n.goMinutesLate(2))), findsOneWidget);
+    expect(sheetTop(), greaterThan(sheetBefore + 100));
+    // Its stops in its sheet
+    await tapOn(tester, find.text(currentL10n.vehicleAllStops));
+    expect(find.text(currentL10n.vehicleFollow), findsOneWidget);
+    await tapOn(tester, find.byTooltip(currentL10n.close));
+    await tapOn(tester, find.text(currentL10n.followStop));
+    expect(find.byType(VehicleFollowCard), findsNothing);
+    expect(find.byType(LineStopTile), findsWidgets);
     expect(selected(), isFalse);
     expect(find.byType(VehicleCallout), findsNothing);
+    expect(sheetTop(), moreOrLessEquals(sheetBefore, epsilon: 2));
 
     await closeApp(tester);
   });

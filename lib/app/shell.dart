@@ -269,6 +269,15 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
     });
   }
 
+  /// A page sized to its content no more: back to its own middle size
+  void _unfit() {
+    final location = ref.read(routerLocationProvider);
+    if (_fitted.containsKey(location)) {
+      setState(() => _fitted.remove(location));
+      _animateTo(_sizesOf(location).middle);
+    }
+  }
+
   /// A content-sized page (GO) gives its content's height: its middle size. The sheet goes there for a new content
   /// ([reset]), or while the user hasn't moved it (or it rests at the previous middle): content growing as its data
   /// loads is followed, a sheet the user moved elsewhere stays there.
@@ -363,6 +372,7 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> with SingleTickerP
                   controller: _sheetController,
                   sizes: (min: sizes.min, middle: sizes.middle, max: sizes.max),
                   onFit: _fit,
+                  onUnfit: _unfit,
                   onDragStart: _onUserDrag,
                   child: Column(
                     children: [

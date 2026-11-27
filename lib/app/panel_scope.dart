@@ -31,6 +31,7 @@ class PanelSheetScope extends InheritedWidget {
     required this.controller,
     required this.sizes,
     required this.onFit,
+    required this.onUnfit,
     required this.onDragStart,
     required super.child,
   });
@@ -44,6 +45,7 @@ class PanelSheetScope extends InheritedWidget {
   double get middle => sizes.middle;
 
   final void Function(double height, {required bool reset}) onFit;
+  final VoidCallback onUnfit;
 
   /// The user takes the sheet by a [SheetDragArea]
   final VoidCallback onDragStart;
@@ -53,6 +55,9 @@ class PanelSheetScope extends InheritedWidget {
   /// previous height; a sheet the user moved elsewhere stays there.
   static void fitContent(BuildContext context, double height, {bool reset = false}) =>
       context.getInheritedWidgetOfExactType<PanelSheetScope>()?.onFit(height, reset: reset);
+
+  /// The page sized to its content no more (a vehicle no longer followed): the sheet back to the page's own middle
+  static void unfit(BuildContext context) => context.getInheritedWidgetOfExactType<PanelSheetScope>()?.onUnfit();
 
   @override
   bool updateShouldNotify(PanelSheetScope oldWidget) => oldWidget.controller != controller || oldWidget.sizes != sizes;
