@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../app/routes.dart';
 import '../../app/shell.dart';
+import '../../app/theme.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/models.dart';
 import '../../core/location/location_providers.dart';
@@ -19,6 +20,7 @@ import '../../l10n/l10n.dart';
 import '../favorites/favorite_widgets.dart';
 import '../follow/follow_widgets.dart';
 import '../home/map_stops.dart';
+import '../lines/line_vehicles.dart';
 import '../journey/journey_preferences.dart';
 import '../journey/journey_request.dart';
 import '../service_hours/service_hours.dart';
@@ -133,7 +135,7 @@ class _StopContent extends ConsumerWidget {
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                for (final line in detail.lines)
+                for (final line in detail.lines.where((line) => !line.replacement))
                   InkWell(
                     onTap: () => context.push(Routes.line(line.id)),
                     child: closedLines.contains(line.id)
@@ -162,6 +164,25 @@ class _StopContent extends ConsumerWidget {
               ],
             ),
           ),
+          // Buses replacing a train or RER while it doesn't run: they stop here only then, apart from the lines that
+          // always do (their badges, `A` and `L`, read as the trains')
+          if (detail.lines.any((line) => line.replacement))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 0, 0),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(context.l10n.stopReplacementLines, style: theme.textTheme.bodySmall?.copyWith(color: context.colors.muted)),
+                  for (final line in detail.lines.where((line) => line.replacement))
+                    InkWell(
+                      onTap: () => context.push(Routes.line(line.id)),
+                      child: Tooltip(message: line.label, child: LineBadge(line, size: 22)),
+                    ),
+                ],
+              ),
+            ),
           if (closedLines.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 0, 0),
@@ -283,6 +304,10 @@ class _DepartureList extends ConsumerWidget {
   final DateTime now;
   final StopAreaDetail stop;
 
+  /// At most this many lines have their vehicles asked, to say where the next one is (one request a minute each where
+  /// the backend has no snapshot of the whole network)
+  static const _approachLines = 4;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // A long press on a departure offers to follow it
@@ -291,7 +316,44 @@ class _DepartureList extends ConsumerWidget {
         followDepartureAction(context, ref, stop: summary, line: row.line, destination: destination, departure: departure);
     final rows = departures.lines.where((line) => line.departures.isNotEmpty).toList();
     final theme = Theme.of(context);
+    // Where the vehicles of the lines on the road (bus, tram) are, for their next departure
+    final watched = {
+      for (final row in rows)
+        if (!row.line.mode.isRail && departures.realtimeAvailable) row.line.id,
+    }.take(_approachLines);
+    final vehicles = {
+      for (final id in watched) id: ref.watch(lineVehiclesProvider(id)).value?.vehicles ?? const <Vehicle>[],
+    };
+    // Each line's frequency now, over its line's departures
+    final hours = ref.watch(stopServiceHoursProvider(stop.id)).value;
+    String? frequencyOf(LineSummary line) {
+      for (final lineHours in hours?.lines ?? const <LineServiceHours>[]) {
+        if (lineHours.line.id != line.id) {
+          continue;
+        }
+        for (final direction in lineHours.directions) {
+          if (direction.frequencyAt(now) case final frequency?) {
+            return frequencyLabel(frequency);
+          }
+        }
+      }
+      return null;
+    }
 
+    Widget departureRow(LineDepartures row, {bool showBadge = true}) => LineDeparturesRow(
+          row: row,
+          now: now,
+          realtimeAvailable: departures.realtimeAvailable,
+          showBadge: showBadge,
+          approach: switch (row.departures.firstOrNull) {
+            final first? => vehicleApproach(first, stop.id, vehicles[row.line.id] ?? const [], now),
+            null => null,
+          },
+          onTap: () => context.push(Routes.line(row.line.id)),
+          onLongPress: follow(row, row.destination, row.departures.firstOrNull),
+        );
+
+    final groups = _groups(rows);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -305,47 +367,98 @@ class _DepartureList extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(context.l10n.noDepartureTwoHours, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ),
-        for (final (index, item) in _items(rows).indexed) ...[
-          if (index > 0) const Divider(indent: 48),
-          switch (item) {
-            (final LineDepartures row, null) =>
-              LineDeparturesRow(
-                row: row,
+        for (final (index, group) in groups.indexed) ...[
+          if (index > 0) const Divider(height: 1),
+          if (group.first.line.mode.isRail)
+            for (final (index, train) in trainBoard(group, perDestination: stopDeparturesLimit).take(_trainsShown).indexed) ...[
+              if (index > 0) const Divider(indent: 48),
+              TrainDepartureRow(
+                line: group.first.line,
+                departure: train.departure,
+                destination: train.destination,
                 now: now,
-                realtimeAvailable: departures.realtimeAvailable,
-                onTap: () => context.push(Routes.line(row.line.id)),
-                onLongPress: follow(row, row.destination, row.departures.firstOrNull),
+                onTap: () => context.push(Routes.line(group.first.line.id)),
+                onLongPress: follow(group.first, train.destination, train.departure),
               ),
-            (final LineDepartures row, (:final departure, :final destination)) => TrainDepartureRow(
-                line: row.line,
-                departure: departure,
-                destination: destination,
-                now: now,
-                onTap: () => context.push(Routes.line(row.line.id)),
-                onLongPress: follow(row, destination, departure),
-              ),
-          },
+            ]
+          else if (group.length == 1)
+            departureRow(group.single)
+          else ...[
+            // Its badge and frequency once, its destinations under them
+            _LineHeader(
+              line: group.first.line,
+              frequency: frequencyOf(group.first.line),
+              onTap: () => context.push(Routes.line(group.first.line.id)),
+            ),
+            for (final (index, row) in group.indexed) ...[
+              if (index > 0) const Divider(indent: 48),
+              departureRow(row, showBadge: false),
+            ],
+          ],
         ],
       ],
     );
   }
 
-  /// Like Citymapper, a train line's departures as a board in time order (a station's way), with their mission and
-  /// platform; the other lines one row per destination, their next departures in it. Lines in their order.
-  static List<(LineDepartures, ({Departure departure, String destination})?)> _items(List<LineDepartures> rows) {
+  /// The rows of each line together, lines in their order
+  static List<List<LineDepartures>> _groups(List<LineDepartures> rows) {
     final lines = <String, List<LineDepartures>>{};
     for (final row in rows) {
       lines.putIfAbsent(row.line.id, () => []).add(row);
     }
-    return [
-      for (final rows in lines.values)
-        if (rows.first.line.mode.isRail)
-          for (final train in trainBoard(rows, perDestination: stopDeparturesLimit).take(_trainsShown)) (rows.first, train)
-        else
-          for (final row in rows) (row, null),
-    ];
+    return lines.values.toList();
   }
 
   /// At most, per train line: the timetable has the others
   static const _trainsShown = 10;
+}
+
+/// Where the vehicle of [departure] from [stopId] is, among [vehicles] of its line: `en approche` when its next stop
+/// is this one, `à 2 arrêts d'ici` further; null when standing there already or about to (the departure says `À quai`,
+/// the same 30 s as `departureLabel`) or not found (the vehicle expected at the stop within 90 s of the departure)
+String? vehicleApproach(Departure departure, String stopId, List<Vehicle> vehicles, DateTime now) {
+  if ((departure.atStop ?? false) || departure.time.difference(now).inSeconds <= 30) {
+    return null;
+  }
+  for (final vehicle in vehicles) {
+    final index = vehicle.calls.indexWhere(
+      (call) => call.stopId == stopId && call.expectedAt.difference(departure.time).inSeconds.abs() <= 90,
+    );
+    if (index >= 0) {
+      return index == 0 ? currentL10n.departureVehicleApproaching : currentL10n.departureVehicleAway(index);
+    }
+  }
+  return null;
+}
+
+/// A line's badge over its departures, with how often it runs now (`toutes les 12–15 min`)
+class _LineHeader extends StatelessWidget {
+  const _LineHeader({required this.line, required this.frequency, required this.onTap});
+
+  final LineSummary line;
+  final String? frequency;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(
+            children: [
+              LineBadge(line, size: 28),
+              const SizedBox(width: 12),
+              if (frequency case final frequency?)
+                Expanded(
+                  child: Text(
+                    frequency,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.muted),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
 }

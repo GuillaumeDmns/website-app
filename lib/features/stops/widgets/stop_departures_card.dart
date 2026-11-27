@@ -104,10 +104,25 @@ String? followingDepartures(List<Departure> departures, DateTime now, {Transport
 /// Line badge, the destination in clear, the next departure large on the right; the following ones under the
 /// destination (`puis 12 et 47 min`), with what there is to know about the first one: only scheduled, its platform
 class LineDeparturesRow extends StatelessWidget {
-  const LineDeparturesRow({super.key, required this.row, required this.now, this.realtimeAvailable = true, this.onTap, this.onLongPress});
+  const LineDeparturesRow({
+    super.key,
+    required this.row,
+    required this.now,
+    this.realtimeAvailable = true,
+    this.onTap,
+    this.onLongPress,
+    this.showBadge = true,
+    this.approach,
+  });
 
   final LineDepartures row;
   final DateTime now;
+
+  /// False under its line's header (a stop's page): its place kept, the destinations in line with the header's text
+  final bool showBadge;
+
+  /// Where the vehicle of its next departure is, `à 2 arrêts d'ici`, before the following departures
+  final String? approach;
 
   /// False when the whole stop only has scheduled times, already said above its rows
   final bool realtimeAvailable;
@@ -124,17 +139,18 @@ class LineDeparturesRow extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final following = followingDepartures(departures, now, mode: row.line.mode, count: textScale >= 1.3 ? 1 : 2);
     final notes = [
+      ?approach,
       ?following,
       if (first != null && !first.realtime && !first.cancelled && realtimeAvailable) context.l10n.goScheduled,
       ?platformLabel(row.line, first?.platform),
     ].join(' · ');
     // `puis 12 et 47 min · voie 2` goes on from the departure on the right; alone, a note starts its own line
-    final details = following != null || notes.isEmpty ? notes : '${notes[0].toUpperCase()}${notes.substring(1)}';
+    final details = (following != null && approach == null) || notes.isEmpty ? notes : '${notes[0].toUpperCase()}${notes.substring(1)}';
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          SizedBox(width: 48, child: Align(alignment: Alignment.centerLeft, child: LineBadge(row.line, size: 28))),
+          SizedBox(width: 48, child: showBadge ? Align(alignment: Alignment.centerLeft, child: LineBadge(row.line, size: 28)) : null),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

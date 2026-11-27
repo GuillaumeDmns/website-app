@@ -585,6 +585,10 @@
     "description": "Buses replacing a train, metro or tram line during works"
   },
   "replacementBusLine": "Bus de remplacement {line}",
+  "stopReplacementLines": "Bus de remplacement",
+  "departureVehicleApproaching": "en approche",
+  "departureVehicleAway": "{count, plural, =1{à 1 arrêt d'ici} other{à {count} arrêts d'ici}}",
+  "@departureVehicleAway": {"placeholders": {"count": {"type": "int"}}},
   "@replacementBusLine": {
     "placeholders": {
       "line": {
