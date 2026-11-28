@@ -102,13 +102,6 @@ install(FILES "runner/resources/app_icon.png" DESTINATION "${INSTALL_BUNDLE_DATA
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
-# Flutter 3.50.0's engine draws the app half a window off on some drivers: corrected in the bundle
-get_filename_component(FLUTTER_LIBRARY_NAME "${FLUTTER_LIBRARY}" NAME)
-install(CODE "
-  include(\"${CMAKE_CURRENT_SOURCE_DIR}/flutter_3_50_0_fix.cmake\")
-  fix_flutter_3_50_0_engine(\"${INSTALL_BUNDLE_LIB_DIR}/${FLUTTER_LIBRARY_NAME}\")
-  " COMPONENT Runtime)
-
 foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
   install(FILES "${bundled_library}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
